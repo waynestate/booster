@@ -16,6 +16,9 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
   override and a synthetic `installed.json`.
 - A `composer.json` editor for PHP, Laravel and SESAME constraints.
 - A target-image test gate (`docker/Dockerfile`, `booster-target:<php>`).
+- A recorded baseline test run before the first hop: the app's suite on its current PHP, so a later red gate can be
+  told apart from a suite that was already red. A red baseline stops the run unless `--allow-failing-baseline` is
+  passed, in which case later gate failures are labelled as pre-existing.
 - Coding-tab playbooks generated into `.agents/skills`, with `booster init --check`.
 - A contract (`contract/expectations.json`) and example apps for all five permutations.
 - GitLab and GitHub CI that both call `composer ci`.

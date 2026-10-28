@@ -147,6 +147,61 @@ final class CliTest extends TestCase
         self::assertSame(2, $exit);
     }
 
+    public function test_run_json_contains_the_baseline_object(): void
+    {
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--format' => 'json', '--goal' => 'php-74-to-84',
+        ], $fake);
+        $data = json_decode($out, true);
+
+        self::assertSame(0, $exit);
+        self::assertArrayHasKey('baseline', $data);
+        self::assertSame('passed', $data['baseline']['status']);
+        self::assertSame('7.4', $data['baseline']['php']);
+        self::assertSame(0, $data['baseline']['exit_code']);
+    }
+
+    public function test_run_exits_1_when_the_baseline_fails(): void
+    {
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use (&$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                // The first docker run is the baseline; make it fail.
+                $exit = $dockerRuns === 0 ? 1 : 0;
+                $dockerRuns++;
+
+                return new ProcessResult($exit, $exit !== 0 ? 'FAILURES!' : '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84',
+        ], $fake);
+
+        self::assertSame(1, $exit);
+        self::assertStringContainsString('Baseline: FAIL', $out);
+        self::assertStringContainsString('--allow-failing-baseline', $out);
+    }
+
     public function test_hostile_file_names_cannot_inject_terminal_escapes(): void
     {
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, (string) json_encode([

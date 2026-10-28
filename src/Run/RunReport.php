@@ -14,11 +14,15 @@ final readonly class RunReport
     public function __construct(
         public Plan $plan,
         public bool $dryRun,
+        public BaselineResult $baseline,
         public array $results,
     ) {}
 
     public function failed(): bool
     {
+        if ($this->baseline->failed()) {
+            return true;
+        }
         foreach ($this->results as $result) {
             if ($result->failed()) {
                 return true;
@@ -37,6 +41,7 @@ final readonly class RunReport
             'tool' => 'booster',
             'dry_run' => $this->dryRun,
             'result' => $this->failed() ? 'fail' : 'pass',
+            'baseline' => $this->baseline->toArray(),
             'plan' => $this->plan->toArray(),
             'results' => array_map(static fn(StepResult $r): array => $r->toArray(), $this->results),
         ];
