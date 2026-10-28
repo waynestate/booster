@@ -12,6 +12,8 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
   SESAME stub recipe, and a Vue 2 to 3 playbook.
 - A planner that interleaves PHP and Laravel hops inside Laravel's supported PHP range and refuses unsupported targets.
 - Policy loading from `--policy`, `BOOSTER_POLICY`, or a bundled snapshot of CREED's `policy.json`.
+- A generated copy of CREED's policy reader under `src/Creed/` (namespace `Waynestate\Booster\Creed`), written by
+  CREED's `bin/export.php` and verified by `composer creed-copy:check`; BOOSTER's own reader is gone.
 - A Rector runner on `rector/rector` 2.8 and `driftingly/rector-laravel` 2.7 with a per-run file cap, a PHP target
   override and a synthetic `installed.json`.
 - A `composer.json` editor for PHP, Laravel and SESAME constraints.
