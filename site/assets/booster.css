@@ -511,7 +511,7 @@ h2 {
   inset-inline-start: 50%;
   inset-block-end: 22%;
   inline-size: clamp(130px, 9vw + 70px, 190px);
-  translate: -50% -14%;
+  translate: -50% -24%;
 }
 
 .pad__mark {
@@ -1004,7 +1004,7 @@ html:not(.motion) .dose__no,
 }
 
 .stamp--none {
-  color: var(--b-mint-line);
+  color: var(--b-slate-ink);
   border-style: dashed;
   outline-color: transparent;
   rotate: 0deg !important;
@@ -1015,7 +1015,11 @@ html:not(.motion) .dose__no,
 }
 
 .dose.is-skipped {
-  opacity: 0.55;
+  background: repeating-linear-gradient(135deg, transparent 0 10px, rgba(214, 235, 226, 0.45) 10px 12px);
+}
+
+.dose.is-skipped :is(.dose__no, code, .dose__pair) {
+  color: var(--b-slate-ink);
 }
 
 .card__foot {
@@ -1994,8 +1998,8 @@ html:not(.motion) .dose__no,
 }
 
 @keyframes craft-hover {
-  from { translate: -50% -14%; }
-  to { translate: -50% -18%; }
+  from { translate: -50% -24%; }
+  to { translate: -50% -29%; }
 }
 
 @keyframes count-pop {
@@ -2025,10 +2029,10 @@ html:not(.motion) .dose__no,
 .motion .pad { animation: rise-in 0.8s 0.15s var(--b-ease-out) both; }
 
 /* Launch pad states, driven by booster.js. On the pad: craft low, no plume. */
-.motion .pad.is-armed .pad__craft { translate: -50% 0; animation: none; }
+.motion .pad.is-armed .pad__craft { translate: -50% 10%; animation: none; }
 .motion .pad.is-armed .pad__plume { opacity: 0; }
 .motion .pad.is-lifting .pad__craft {
-  translate: -50% -14%;
+  translate: -50% -24%;
   transition: translate 2.4s var(--b-ease-thrust);
 }
 .motion .pad.is-lifting .pad__plume,

@@ -6,6 +6,8 @@ Checks: `composer ci` (the same command runs on GitLab and GitHub).
 
 > A booster shot keeps your immunity current. This one keeps your PHP current, and it stings less.
 
+Front page: [`site/index.html`](site/index.html), a static page you can open in a browser or serve from `site/`.
+
 BOOSTER is WELD's upgrade tool. It plans the hops that take a WSU PHP app from the PHP or Laravel version it runs now
 to one the version policy still supports, and it runs them one at a time: [Rector](https://getrector.com) rewrites the
 code, BOOSTER raises the constraints in `composer.json`, and the app's own tests must pass on the target PHP before the
