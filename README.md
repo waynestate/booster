@@ -1,6 +1,6 @@
 # BOOSTER
 
-[![GitLab pipeline](https://gitlab.example/enterprise-apps/booster/badges/main/pipeline.svg)](https://gitlab.example/enterprise-apps/booster/-/pipelines) [![GitHub CI](https://github.com/waynestate/booster/actions/workflows/ci.yml/badge.svg)](https://github.com/waynestate/booster/actions/workflows/ci.yml)
+[![GitHub CI](https://github.com/waynestate/booster/actions/workflows/ci.yml/badge.svg)](https://github.com/waynestate/booster/actions/workflows/ci.yml)
 
 Checks: `composer ci` (the same command runs on GitLab and GitHub).
 
@@ -42,15 +42,15 @@ on PHP 7.4 is rewritten by a Rector that runs on 8.3 or newer.
 Linux and macOS:
 
 ```
-git clone git@gitlab.example:enterprise-apps/booster.git
+git clone https://github.com/waynestate/booster.git
 cd booster && composer install
-vendor/bin/booster --version
+bin/booster --version
 ```
 
 Windows (PowerShell, no bash or WSL needed):
 
 ```
-git clone git@gitlab.example:enterprise-apps/booster.git
+git clone https://github.com/waynestate/booster.git
 cd booster; composer install
 php vendor\bin\booster --version
 ```
