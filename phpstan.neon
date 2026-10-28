@@ -1,0 +1,12 @@
+# Same settings as Pinstripe's phpstan/raw.neon. Swap for an include once waynestate/pinstripe is on Packagist.
+parameters:
+    level: 8
+    paths:
+        - src
+        - bin/booster
+        - config
+    reportIgnoresWithoutComments: true
+    reportUnmatchedIgnoredErrors: true
+    phpVersion:
+        min: 80300
+        max: 80599

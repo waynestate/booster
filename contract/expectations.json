@@ -1,0 +1,64 @@
+{
+    "today": "2026-10-28",
+    "examples": {
+        "raw-php": {
+            "app_type": "raw-php",
+            "php": "7.4",
+            "laravel": null,
+            "vue": null,
+            "plan": ["php-74-to-80", "php-80-to-81", "php-81-to-82", "php-82-to-83", "php-83-to-84", "php-84-to-85"],
+            "rector": {
+                "php-74-to-80": ["src/Legacy.php"],
+                "php-80-to-81": [],
+                "php-83-to-84": ["src/Legacy.php"]
+            }
+        },
+        "vue-spa": {
+            "app_type": "raw-php-vue",
+            "php": "8.0",
+            "laravel": null,
+            "vue": "2",
+            "plan": ["php-80-to-81", "php-81-to-82", "php-82-to-83", "php-83-to-84", "php-84-to-85", "vue-2-to-3"],
+            "rector": {}
+        },
+        "laravel-blade": {
+            "app_type": "laravel-blade",
+            "php": "8.2",
+            "laravel": "10",
+            "vue": null,
+            "plan": ["laravel-10-to-11", "laravel-11-to-12", "php-82-to-83", "laravel-12-to-13", "php-83-to-84", "php-84-to-85"],
+            "stub_vendor": true,
+            "rector": {
+                "laravel-10-to-11": ["app/Models/Post.php"],
+                "laravel-11-to-12": []
+            }
+        },
+        "laravel-blade-vue": {
+            "app_type": "laravel-blade-vue",
+            "php": "8.3",
+            "laravel": "12",
+            "vue": "3",
+            "plan": ["laravel-12-to-13", "php-83-to-84", "php-84-to-85"],
+            "rector": {}
+        },
+        "laravel-inertia-vue": {
+            "app_type": "laravel-inertia-vue",
+            "php": "8.3",
+            "laravel": "12",
+            "vue": "3",
+            "plan": ["laravel-12-to-13", "php-83-to-84", "php-84-to-85"],
+            "rector": {}
+        },
+        "laravel-wayne-cas": {
+            "app_type": "laravel-blade",
+            "php": "8.3",
+            "laravel": "12",
+            "vue": null,
+            "sesame": true,
+            "plan": ["laravel-12-to-13", "php-83-to-84", "php-84-to-85", "cas-to-sesame"],
+            "rector": {
+                "cas-to-sesame": ["app/Http/Kernel.php", "app/User.php"]
+            }
+        }
+    }
+}

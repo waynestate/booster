@@ -1,0 +1,7 @@
+{
+    "name": "example-laravel-blade-vue",
+    "private": true,
+    "dependencies": {
+        "vue": "^3.5.0"
+    }
+}

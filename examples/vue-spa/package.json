@@ -1,0 +1,7 @@
+{
+    "name": "example-vue-spa",
+    "private": true,
+    "dependencies": {
+        "vue": "^2.7.16"
+    }
+}

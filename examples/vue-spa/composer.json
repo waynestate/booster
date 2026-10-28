@@ -1,0 +1,6 @@
+{
+    "name": "example/vue-spa",
+    "require": {
+        "php": "^8.0"
+    }
+}
