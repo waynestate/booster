@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Plan;
 
 use DateTimeImmutable;
+use Waynestate\Booster\Creed\State;
 use Waynestate\Booster\Hop\HopRegistry;
+use Waynestate\Booster\Policy\Policy;
 use Waynestate\Booster\Policy\PolicyException;
-use Waynestate\Booster\Policy\PolicySource;
-use Waynestate\Booster\Policy\State;
 use Waynestate\Booster\Project\Project;
 use Waynestate\Booster\ToolError;
 
@@ -25,7 +25,7 @@ final class Planner
     public const GATE_MANUAL = 'manual-review';
 
     public function __construct(
-        private readonly PolicySource $policy,
+        private readonly Policy $policy,
         private readonly HopRegistry $registry,
     ) {}
 
@@ -185,10 +185,10 @@ final class Planner
         } catch (PolicyException) {
             throw new ToolError(sprintf('%s %s is not a version the policy supports. Pick one of: %s.', ucfirst($component), $version, implode(', ', $this->policy->supported($component, $today))));
         }
-        if ($state === State::EOL || $state === State::EOL_GRACE_EXPIRED) {
+        if ($state === State::Eol || $state === State::EolGraceExpired) {
             throw new ToolError(sprintf('%s %s is past security support; pick a version the policy still supports.', ucfirst($component), $version));
         }
-        if ($state === State::SECURITY) {
+        if ($state === State::Security) {
             $warnings[] = sprintf('%s %s only gets security fixes now; a newer version is a better place to stop.', ucfirst($component), $version);
         }
     }

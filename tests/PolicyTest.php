@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Tests;
 
 use DateTimeImmutable;
-use Waynestate\Booster\Policy\JsonFilePolicySource;
+use Waynestate\Booster\Creed\State;
 use Waynestate\Booster\Policy\PolicyException;
 use Waynestate\Booster\Policy\PolicyLocator;
-use Waynestate\Booster\Policy\State;
 
 final class PolicyTest extends TestCase
 {
@@ -16,10 +15,10 @@ final class PolicyTest extends TestCase
     {
         $p = $this->policy();
 
-        self::assertSame(State::ACTIVE, $p->stateOf('php', '8.4', new DateTimeImmutable('2026-12-31')));
-        self::assertSame(State::SECURITY, $p->stateOf('php', '8.4', new DateTimeImmutable('2027-01-01')));
-        self::assertSame(State::EOL, $p->stateOf('php', '8.1', new DateTimeImmutable('2026-01-15')));
-        self::assertSame(State::EOL_GRACE_EXPIRED, $p->stateOf('php', '8.1', new DateTimeImmutable('2026-10-28')));
+        self::assertSame(State::Active, $p->stateOf('php', '8.4', new DateTimeImmutable('2026-12-31')));
+        self::assertSame(State::Security, $p->stateOf('php', '8.4', new DateTimeImmutable('2027-01-01')));
+        self::assertSame(State::Eol, $p->stateOf('php', '8.1', new DateTimeImmutable('2026-01-15')));
+        self::assertSame(State::EolGraceExpired, $p->stateOf('php', '8.1', new DateTimeImmutable('2026-10-28')));
     }
 
     public function test_supported_lists_only_active_and_security_versions_in_order(): void
@@ -56,7 +55,7 @@ final class PolicyTest extends TestCase
     public function test_missing_file_fails_closed(): void
     {
         $this->expectException(PolicyException::class);
-        new JsonFilePolicySource('/nonexistent/policy.json');
+        PolicyLocator::locate('/nonexistent/policy.json', null);
     }
 
     public function test_malformed_policies_are_rejected(): void
@@ -74,11 +73,23 @@ final class PolicyTest extends TestCase
             $file = $dir . '/' . md5($name) . '.json';
             file_put_contents($file, $json);
             try {
-                new JsonFilePolicySource($file);
+                PolicyLocator::locate($file, null);
                 self::fail("Policy case '{$name}' should have been rejected.");
             } catch (PolicyException) {
                 $this->addToAssertionCount(1);
             }
         }
+    }
+
+    public function test_a_fixture_policy_is_read_through_the_creed_copy(): void
+    {
+        $file = __DIR__ . '/fixtures/policy.json';
+        $p = PolicyLocator::locate($file, null);
+
+        self::assertSame($file, $p->origin());
+        self::assertSame(State::EolGraceExpired, $p->stateOf('php', '8.1', $this->today()));
+        self::assertSame(State::Security, $p->stateOf('php', '8.2', $this->today()));
+        self::assertSame(State::Active, $p->stateOf('php', '8.3', $this->today()));
+        self::assertSame(['8.2', '8.3', '8.4'], $p->supported('php', $this->today()));
     }
 }

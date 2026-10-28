@@ -6,7 +6,7 @@
     "files": [
         "config/rector.php",
         "docker/Dockerfile",
-        "resources/policy.json",
+        "src/Creed/policy.json",
         "resources/policy.schema.json"
     ]
 }

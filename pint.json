@@ -3,6 +3,7 @@
     "exclude": [
         "vendor",
         "tests/fixtures",
-        "examples"
+        "examples",
+        "src/Creed"
     ]
 }

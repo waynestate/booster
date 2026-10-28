@@ -49,7 +49,7 @@ final class CliTest extends TestCase
     public function test_the_policy_option_replaces_the_bundled_copy(): void
     {
         $policy = $this->tempDir() . '/policy.json';
-        $json = json_decode((string) file_get_contents(dirname(__DIR__) . '/resources/policy.json'), true);
+        $json = json_decode((string) file_get_contents(dirname(__DIR__) . '/src/Creed/policy.json'), true);
         $json['components']['php']['versions']['8.5']['security_until'] = '2020-01-01';
         $json['components']['php']['versions']['8.5']['active_until'] = '2020-01-01';
         file_put_contents($policy, json_encode($json));
