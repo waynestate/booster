@@ -67,6 +67,31 @@ docker run --rm -v "${PWD}:/booster" -v "C:\path\to\app:/app" -w /booster php:8.
 The `run` command's test gate starts Docker itself, so it needs a Docker daemon on the machine that runs BOOSTER.
 When BOOSTER itself runs in a container, use `--skip-gate` and run the tests yourself.
 
+## Single-file download
+
+BOOSTER can also be built as a single-file PHAR, so PREFLIGHT and apps without Composer access can run it as one
+file. Build it with the script for your OS (both need Docker, and no PHP or Composer on the host):
+
+Windows (PowerShell):
+
+```
+.\scripts\build-phar.ps1
+```
+
+Linux / macOS:
+
+```
+scripts/build-phar.sh
+```
+
+Each script writes `build/booster.phar` and verifies it by printing BOOSTER's version. The phar is not published
+yet — there is no release step — so build it from a checkout rather than downloading it.
+
+Every command works from the phar. `detect`, `plan`, `hops` and `init` read only what is bundled inside it. `run`
+copies Rector, its `config/rector.php` and `docker/` out of the phar into a temp directory first, because Rector and
+`docker build` are child processes that cannot be pointed at a `phar://` path; the temp directory is removed when the
+command exits.
+
 ## Quick start
 
 ```

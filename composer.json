@@ -17,6 +17,7 @@
         "symfony/process": "^7.1"
     },
     "require-dev": {
+        "humbug/box": "4.7.1",
         "laravel/pint": "^1.32",
         "phpstan/phpstan": "^2.1",
         "phpunit/phpunit": "^11.5"

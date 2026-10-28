@@ -36,8 +36,10 @@ BOOSTER holds no secrets and calls no API.
 
 ## Not built yet
 
-- **PHAR build** (a distribution decision). 0.1 ships `vendor/bin/booster` and `bin/booster` only. A PHAR needs a packaging decision
-  (box or similar) and a way to find `config/rector.php` and `docker/` inside it.
+- **Publishing the PHAR.** `build/booster.phar` is built by `scripts/build-phar.ps1` / `scripts/build-phar.sh` (Box, pinned in
+  require-dev); `src/Packaging/PharFiles.php` copies Rector, `config/rector.php` and `docker/` out of the phar to a temp
+  directory so the child processes get real paths. There is no release step yet, so the phar is built from a checkout,
+  not downloaded.
 - **`booster mcp`**, the read-only tool server. Waiting on the shared MCP conventions.
 - **PROCTOR as a built-in gate step.** PROCTOR is not on Packagist and needs `--policy`; `--proctor-command` runs it today.
 - **PHPCompatibility and PHPStan-on-the-target-version** as advisory scans.

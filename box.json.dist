@@ -1,0 +1,12 @@
+{
+    "main": "bin/booster",
+    "output": "build/booster.phar",
+    "compression": "GZ",
+    "check-requirements": true,
+    "files": [
+        "config/rector.php",
+        "docker/Dockerfile",
+        "resources/policy.json",
+        "resources/policy.schema.json"
+    ]
+}
