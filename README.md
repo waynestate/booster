@@ -120,15 +120,27 @@ Options for `run`:
 
 | Option | Meaning |
 |---|---|
-| `--dry-run` | Show the diffs; change nothing; skip git and the gate |
+| `--dry-run` | Show the diffs; change nothing; skip git, the baseline and the gate |
 | `--max-changes` | Stop a hop that would change more than this many files (default 50) |
-| `--skip-gate` | Do not run the tests in the target image |
+| `--skip-gate` | Do not run the tests in the target image (skips the baseline too) |
+| `--allow-failing-baseline` | Continue when the baseline fails; later gate failures are labelled as pre-existing |
 | `--allow-dirty` | Run even when the working copy has uncommitted changes |
 | `--test-command` | What runs the app's tests in the image (default `composer test`, else `vendor/bin/phpunit`) |
 | `--proctor-command` | An extra command run after the tests, for example a PROCTOR check |
 
-Exit codes: `0` pass, `1` a hop was capped, errored or failed its gate, `2` bad usage (bad option, unreadable policy,
-broken `composer.json`, a target the policy does not support).
+Exit codes: `0` pass, `1` the baseline failed or a hop was capped, errored or failed its gate, `2` bad usage (bad
+option, unreadable policy, broken `composer.json`, a target the policy does not support).
+
+### The baseline
+
+Before the first hop, `run` runs the app's own tests on the PHP the app is on now, in the same `booster-target:<php>`
+image the gate uses. The point is to tell "BOOSTER broke it" from "it was already broken": a red baseline means the
+suite was red before any change, so a later red gate is not proof of a bad hop. The baseline is recorded in the report
+(`passed`, `failed` or `skipped`, with the exit code and the last 20 lines of output).
+
+- A red baseline stops the run before the first hop, with a non-zero exit. `--allow-failing-baseline` lets it go on;
+  each later gate failure is then labelled "the baseline was already failing" in the text and JSON output.
+- `--skip-gate` and `--dry-run` skip the baseline (reported as `skipped`), so a dry run never starts Docker.
 
 ### What a hop does
 

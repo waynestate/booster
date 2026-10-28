@@ -40,7 +40,6 @@ BOOSTER holds no secrets and calls no API.
   (box or similar) and a way to find `config/rector.php` and `docker/` inside it.
 - **`booster mcp`**, the read-only tool server. Waiting on the shared MCP conventions.
 - **PROCTOR as a built-in gate step.** PROCTOR is not on Packagist and needs `--policy`; `--proctor-command` runs it today.
-- **A baseline run before the first hop** (tests green on the starting version).
 - **PHPCompatibility and PHPStan-on-the-target-version** as advisory scans.
 - **Real wayne-cas migration.** The recipe renames classes and swaps the requirement; it does not move
   `config/wayne-cas.php`, the user model trait methods or Duo settings, and it was not run against a real app.

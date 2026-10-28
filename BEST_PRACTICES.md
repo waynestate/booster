@@ -24,8 +24,9 @@ tag for how BOOSTER holds each rule today.
 
 ## Tests first
 
-- **Start from a green baseline** and **run the tests on the target image.** `Checked`: the gate runs the app's suite
-  in a container on the PHP the hop moves to. `Not yet`: a recorded baseline run before the first hop.
+- **Start from a green baseline** and **run the tests on the target image.** `Checked`: `run` records a baseline of the
+  app's suite on its current PHP before the first hop, and the gate runs the suite in a container on the PHP the hop
+  moves to. A red baseline stops the run unless `--allow-failing-baseline` is passed.
 - **Write characterization tests for code that has none.** `Documented`: the playbooks ask for it before the PHP 8.0
   hop.
 
