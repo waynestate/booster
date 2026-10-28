@@ -7,12 +7,17 @@ namespace Waynestate\Booster\Run;
 use Composer\InstalledVersions;
 use Waynestate\Booster\Hop\Hop;
 use Waynestate\Booster\Hop\HopKind;
+use Waynestate\Booster\Packaging\PharFiles;
 use Waynestate\Booster\ToolError;
 
 /**
  * Runs rector/rector from BOOSTER's own vendor directory against an app, with
  * config/rector.php. Rector never comes from the app's composer.json, so an app
  * on PHP 7.4 can be rewritten by a Rector that runs on PHP 8.3 or newer.
+ *
+ * From the phar, Rector and its config are copied out of the phar to a temp
+ * directory first (PharFiles), because Rector is a child process and cannot be
+ * pointed at a phar:// path.
  */
 final class RectorRunner
 {
@@ -24,7 +29,7 @@ final class RectorRunner
 
     public static function configPath(): string
     {
-        return dirname(__DIR__, 2) . '/config/rector.php';
+        return PharFiles::path('config/rector.php');
     }
 
     /**
@@ -93,6 +98,17 @@ final class RectorRunner
     {
         if ($this->rectorBinary !== null) {
             return $this->rectorBinary;
+        }
+
+        if (PharFiles::running()) {
+            // Rector's bin requires the root vendor autoloader, so the whole
+            // runtime vendor tree is copied out of the phar, not just Rector.
+            $binary = PharFiles::path('vendor') . '/rector/rector/bin/rector';
+            if (!is_file($binary)) {
+                throw new ToolError('Rector is not installed in the BOOSTER phar.');
+            }
+
+            return $binary;
         }
 
         $root = InstalledVersions::isInstalled('rector/rector')

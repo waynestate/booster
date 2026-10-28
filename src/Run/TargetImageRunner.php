@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Run;
 
+use Waynestate\Booster\Packaging\PharFiles;
 use Waynestate\Booster\ToolError;
 
 /**
@@ -11,6 +12,9 @@ use Waynestate\Booster\ToolError;
  * PHP, so a green result means "green on the version the app is moving to".
  * The image comes from docker/Dockerfile (PHP CLI plus Composer), built once
  * per PHP version. Nothing runs on the host and nothing is pushed anywhere.
+ *
+ * From the phar, docker/ is copied out to a temp directory first (PharFiles),
+ * because `docker build` needs a real directory, not a phar:// path.
  */
 final class TargetImageRunner
 {
@@ -61,7 +65,7 @@ final class TargetImageRunner
             return;
         }
 
-        $dir = $this->dockerDir ?? dirname(__DIR__, 2) . '/docker';
+        $dir = $this->dockerDir ?? PharFiles::path('docker');
         $build = $this->processes->run([$this->docker, 'build', '--build-arg', 'PHP_VERSION=' . $php, '-t', $tag, $dir], null, [], 1800);
         if (!$build->successful()) {
             throw new ToolError(sprintf("Could not build %s.\n%s", $tag, trim($build->stderr)));
