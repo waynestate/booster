@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase as PhpUnitTestCase;
 use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Hop\HopRegistry;
@@ -73,6 +74,83 @@ final class HopRegistryTest extends PhpUnitTestCase
         self::assertNull(HopRegistry::nextPhp('4.0'));
         self::assertSame('13', HopRegistry::nextLaravel('12'));
         self::assertNull(HopRegistry::nextLaravel('13'));
+    }
+
+    public function test_phpunit_hop_id(): void
+    {
+        self::assertSame('phpunit-9-to-10', HopRegistry::phpunitHopId('9', '10'));
+    }
+
+    /**
+     * @return array<string, array{string, ?string}>
+     */
+    public static function phpunitChainNeighbours(): array
+    {
+        $cases = [];
+        foreach (HopRegistry::PHPUNIT_CHAIN as $i => $major) {
+            $cases['phpunit ' . $major] = [$major, HopRegistry::PHPUNIT_CHAIN[$i + 1] ?? null];
+        }
+        $cases['unknown major'] = ['8', null];
+
+        return $cases;
+    }
+
+    #[DataProvider('phpunitChainNeighbours')]
+    public function test_next_phpunit_walks_the_chain_and_returns_null_at_the_end(string $from, ?string $expected): void
+    {
+        self::assertSame($expected, HopRegistry::nextPhpunit($from));
+    }
+
+    public function test_phpunit_hops_cover_every_adjacent_pair_once(): void
+    {
+        $registry = new HopRegistry();
+        $chain = HopRegistry::PHPUNIT_CHAIN;
+
+        for ($i = 0; $i < count($chain) - 1; $i++) {
+            $hop = $registry->get(HopRegistry::phpunitHopId($chain[$i], $chain[$i + 1]));
+            self::assertSame(HopKind::Phpunit, $hop->kind);
+            self::assertSame($chain[$i], $hop->from);
+            self::assertSame($chain[$i + 1], $hop->to);
+        }
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function phpunitMajors(): array
+    {
+        $cases = [];
+        foreach (HopRegistry::PHPUNIT_CHAIN as $major) {
+            $cases['phpunit ' . $major] = [$major];
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('phpunitMajors')]
+    public function test_every_major_in_the_phpunit_chain_has_a_php_floor(string $major): void
+    {
+        self::assertArrayHasKey($major, HopRegistry::PHPUNIT_PHP);
+        self::assertIsString(HopRegistry::PHPUNIT_PHP[$major]);
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function laravelPhpunitFloors(): array
+    {
+        $cases = [];
+        foreach (HopRegistry::LARAVEL_PHPUNIT as $laravel => $floor) {
+            $cases['laravel ' . $laravel] = [(string) $laravel, (string) $floor];
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('laravelPhpunitFloors')]
+    public function test_every_laravel_phpunit_floor_is_a_major_in_the_chain(string $laravel, string $floor): void
+    {
+        self::assertContains($floor, HopRegistry::PHPUNIT_CHAIN, sprintf('Laravel %s ships PHPUnit %s, which is not in the chain.', $laravel, $floor));
     }
 
     public function test_unknown_hop_is_a_tool_error(): void
