@@ -4,12 +4,11 @@
 #
 # The phar lets PREFLIGHT and apps without Composer access run BOOSTER as one
 # file. The script:
-#   1. installs the full dependency set in the project (so vendor/bin/box exists),
+#   1. installs the build tool (Box, pinned in tools/box) so the compiler exists,
 #   2. copies the runtime sources into a temp dir and installs only the no-dev
 #      (runtime) dependencies there,
-#   3. runs Box (pinned in require-dev) against that temp copy, so the phar
-#      contains src/, config/, docker/, resources/ and the runtime vendor deps
-#      only (no dev deps),
+#   3. runs Box against that temp copy, so the phar contains src/, config/,
+#      docker/, resources/ and the runtime vendor deps only (no dev deps),
 #   4. copies the built phar back into build/,
 #   5. verifies it runs by printing BOOSTER's version.
 #
@@ -31,8 +30,8 @@ PHP_IMAGE='php:8.4-cli'
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-echo '==> Installing project dependencies (full, for vendor/bin/box)...'
-docker run --rm -v "$ROOT:/app" -w /app "$COMPOSER_IMAGE" composer install --no-interaction --no-progress
+echo '==> Installing the build tool (Box) in tools/box...'
+docker run --rm -v "$ROOT:/app" -w /app "$COMPOSER_IMAGE" composer install --working-dir=tools/box --no-interaction --no-progress
 
 echo '==> Copying runtime sources into a temp build dir...'
 cp -R "$ROOT/src" "$TMP/src"
@@ -50,7 +49,7 @@ docker run --rm -v "$TMP:/app" -w /app "$COMPOSER_IMAGE" composer install --no-d
 echo '==> Compiling the phar with Box...'
 # Box's Composer compatibility check needs a composer executable, so run it
 # from the composer image (which ships both PHP and composer).
-docker run --rm -v "$ROOT:/app" -v "$TMP:/tmpcopy" -w /tmpcopy "$COMPOSER_IMAGE" php -d phar.readonly=0 /app/vendor/bin/box compile
+docker run --rm -v "$ROOT:/app" -v "$TMP:/tmpcopy" -w /tmpcopy "$COMPOSER_IMAGE" php -d phar.readonly=0 /app/tools/box/vendor/bin/box compile
 
 echo '==> Copying the built phar into build/...'
 mkdir -p "$ROOT/build"

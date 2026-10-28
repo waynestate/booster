@@ -6,12 +6,11 @@
 .DESCRIPTION
     The phar lets PREFLIGHT and apps without Composer access run BOOSTER as one
     file. The script:
-      1. installs the full dependency set in the project (so vendor/bin/box exists),
+      1. installs the build tool (Box, pinned in tools/box) so the compiler exists,
       2. copies the runtime sources into a temp dir and installs only the no-dev
          (runtime) dependencies there,
-      3. runs Box (pinned in require-dev) against that temp copy, so the phar
-         contains src/, config/, docker/, resources/ and the runtime vendor deps
-         only (no dev deps),
+      3. runs Box against that temp copy, so the phar contains src/, config/,
+         docker/, resources/ and the runtime vendor deps only (no dev deps),
       4. copies the built phar back into build/,
       5. verifies it runs by printing BOOSTER's version.
 
@@ -47,13 +46,13 @@ $Tmp = Join-Path $env:TEMP ("booster-phar-" + [System.Guid]::NewGuid().ToString(
 New-Item -ItemType Directory -Path $Tmp | Out-Null
 
 try {
-    Write-Host '==> Installing project dependencies (full, for vendor/bin/box)...'
+    Write-Host '==> Installing the build tool (Box) in tools/box...'
     Invoke-Docker -DockerArgs @(
         'run', '--rm',
         "-v", "${Root}:/app",
         '-w', '/app',
         $ComposerImage,
-        'composer', 'install', '--no-interaction', '--no-progress'
+        'composer', 'install', '--working-dir=tools/box', '--no-interaction', '--no-progress'
     )
 
     Write-Host '==> Copying runtime sources into a temp build dir...'
@@ -84,7 +83,7 @@ try {
         "-v", "${Tmp}:/tmpcopy",
         '-w', '/tmpcopy',
         $ComposerImage,
-        'php', '-d', 'phar.readonly=0', '/app/vendor/bin/box', 'compile'
+        'php', '-d', 'phar.readonly=0', '/app/tools/box/vendor/bin/box', 'compile'
     )
 
     Write-Host '==> Copying the built phar into build/...'

@@ -1,0 +1,8 @@
+{
+    "name": "waynestate/booster-build-tools",
+    "description": "Build tools for BOOSTER (Box, the PHAR compiler), kept out of the root composer.json so a build tool never constrains what users install.",
+    "private": true,
+    "require": {
+        "humbug/box": "4.7.1"
+    }
+}
