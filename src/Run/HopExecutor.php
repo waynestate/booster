@@ -32,9 +32,23 @@ final class HopExecutor
             $this->assertCleanGitTree($path);
         }
 
+        $baseline = $this->runBaseline($plan, $path, $options);
+        if ($baseline->failed() && !$options->allowFailingBaseline) {
+            // The suite is red before BOOSTER touches anything, so a later red gate would be
+            // unprovable. Stop before the first hop and say so plainly.
+            $results = [];
+            foreach ($plan->steps as $step) {
+                $results[] = new StepResult($step->number, $step->hop->id, StepResult::NOT_RUN, [], [
+                    'Not run because the baseline failed: the app\'s tests fail before any change. Fix them or pass --allow-failing-baseline.',
+                ]);
+            }
+
+            return new RunReport($plan, $options->dryRun, $baseline, $results);
+        }
+
         $results = [];
         foreach ($plan->steps as $step) {
-            $result = $this->runStep($step, $path, $plan, $options);
+            $result = $this->runStep($step, $path, $plan, $options, $baseline);
             $results[] = $result;
             if ($result->failed()) {
                 // Later steps assume this one worked, so they are not attempted.
@@ -47,10 +61,68 @@ final class HopExecutor
             }
         }
 
-        return new RunReport($plan, $options->dryRun, $results);
+        return new RunReport($plan, $options->dryRun, $baseline, $results);
     }
 
-    private function runStep(PlanStep $step, string $path, Plan $plan, RunOptions $options): StepResult
+    /**
+     * Runs the app's own tests on the PHP the app is on now, before the first
+     * hop, so a later red gate can be told apart from a suite that was already
+     * red. Skipped (not run) for a dry run or when the gate is skipped.
+     */
+    private function runBaseline(Plan $plan, string $path, RunOptions $options): BaselineResult
+    {
+        $php = $this->startingPhp($plan);
+        if ($options->dryRun || $options->skipGate || $php === null) {
+            return new BaselineResult(BaselineResult::SKIPPED, $php, null);
+        }
+
+        $test = $options->testCommand ?? $this->defaultTestCommand($path);
+        $result = $this->gate->run($path, $php, $test, $options->proctorCommand);
+        $output = self::lastLines($result->stdout . "\n" . $result->stderr, 20);
+
+        return new BaselineResult(
+            $result->successful() ? BaselineResult::PASSED : BaselineResult::FAILED,
+            $php,
+            $result->exitCode,
+            $output,
+        );
+    }
+
+    /**
+     * The PHP the planner starts from: the first step's starting version, or the
+     * manifest's when the plan has no steps.
+     */
+    private function startingPhp(Plan $plan): ?string
+    {
+        if ($plan->steps === []) {
+            return $plan->project->phpVersion;
+        }
+
+        return $plan->steps[0]->phpBefore ?? $plan->project->phpVersion;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function lastLines(string $text, int $count): array
+    {
+        $text = trim($text);
+        if ($text === '') {
+            return [];
+        }
+        $lines = explode("\n", $text);
+        if (count($lines) <= $count) {
+            return $lines;
+        }
+        $kept = [];
+        foreach (array_slice($lines, -$count) as $line) {
+            $kept[] = $line;
+        }
+
+        return $kept;
+    }
+
+    private function runStep(PlanStep $step, string $path, Plan $plan, RunOptions $options, BaselineResult $baseline): StepResult
     {
         $hop = $step->hop;
         if ($hop->isManual()) {
@@ -80,7 +152,7 @@ final class HopExecutor
             }
 
             if (!$options->skipGate) {
-                $gate = $this->runGate($step, $path, $options);
+                $gate = $this->runGate($step, $path, $options, $baseline);
                 if ($gate !== null) {
                     return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $applied->files, [...$messages, ...$gate]);
                 }
@@ -98,7 +170,7 @@ final class HopExecutor
     /**
      * @return list<string>|null failure messages, or null when the gate passed
      */
-    private function runGate(PlanStep $step, string $path, RunOptions $options): ?array
+    private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): ?array
     {
         $php = $step->phpAfter ?? '';
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
@@ -107,11 +179,16 @@ final class HopExecutor
             return null;
         }
 
-        return [
+        $messages = [
             sprintf('Gate failed: "%s" exited %d on PHP %s. The working copy keeps the changes so you can read them.', $test, $result->exitCode, $php),
             trim($result->stdout . "\n" . $result->stderr),
             'Undo with: git checkout . (inside the app).',
         ];
+        if ($baseline->failed()) {
+            $messages[] = 'The baseline was already failing, so this gate failure may predate the upgrade.';
+        }
+
+        return $messages;
     }
 
     private function defaultTestCommand(string $path): string

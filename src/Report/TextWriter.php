@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Report;
 
 use Waynestate\Booster\Plan\Plan;
+use Waynestate\Booster\Run\BaselineResult;
 use Waynestate\Booster\Run\RunReport;
 
 /**
@@ -49,6 +50,10 @@ final class TextWriter
     public function run(RunReport $report): string
     {
         $lines = [$report->dryRun ? 'BOOSTER dry run (nothing was changed)' : 'BOOSTER run', ''];
+        foreach ($this->baselineLines($report->baseline) as $line) {
+            $lines[] = $line;
+        }
+        $lines[] = '';
         foreach ($report->results as $r) {
             $lines[] = sprintf('%d. %s: %s (%d files)', $r->step, $r->hopId, strtoupper($r->status), count($r->files));
             foreach ($r->messages as $message) {
@@ -76,6 +81,30 @@ final class TextWriter
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function baselineLines(BaselineResult $baseline): array
+    {
+        $php = $baseline->php ?? '?';
+        $lines = match ($baseline->status) {
+            BaselineResult::PASSED => [sprintf('Baseline: PASS on PHP %s (tests green before any change).', $php)],
+            BaselineResult::FAILED => [
+                sprintf('Baseline: FAIL on PHP %s (exit %d).', $php, $baseline->exitCode ?? -1),
+                "The app's tests fail before any change; fix them or pass --allow-failing-baseline.",
+            ],
+            BaselineResult::SKIPPED => ['Baseline: SKIPPED (no gate in this run).'],
+            default => [sprintf('Baseline: %s.', $baseline->status)],
+        };
+        if ($baseline->status === BaselineResult::FAILED) {
+            foreach ($baseline->output as $line) {
+                $lines[] = '   ' . self::clean($line);
+            }
+        }
+
+        return $lines;
     }
 
     /** Drops control characters except newline and tab. */

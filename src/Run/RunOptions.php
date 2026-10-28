@@ -10,6 +10,7 @@ final readonly class RunOptions
         public bool $dryRun = false,
         public bool $skipGate = false,
         public bool $allowDirty = false,
+        public bool $allowFailingBaseline = false,
         public int $maxChanges = 50,
         public ?string $testCommand = null,
         public ?string $proctorCommand = null,

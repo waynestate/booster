@@ -32,6 +32,7 @@ final class RunCommand extends BaseCommand
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Show the diffs Rector would make and change nothing.')
             ->addOption('max-changes', null, InputOption::VALUE_REQUIRED, 'Stop a hop that would change more than this many files.', '50')
             ->addOption('skip-gate', null, InputOption::VALUE_NONE, 'Do not run the tests in the target image after each hop.')
+            ->addOption('allow-failing-baseline', null, InputOption::VALUE_NONE, 'Continue even when the baseline (the app\'s tests on its current PHP) fails; later gate failures are labelled as pre-existing.')
             ->addOption('allow-dirty', null, InputOption::VALUE_NONE, 'Run even when the working copy has uncommitted changes.')
             ->addOption('test-command', null, InputOption::VALUE_REQUIRED, 'Command that runs the app tests inside the image (default: composer test, else vendor/bin/phpunit).')
             ->addOption('proctor-command', null, InputOption::VALUE_REQUIRED, 'Extra command run in the image after the tests, for example a PROCTOR check.');
@@ -57,6 +58,7 @@ final class RunCommand extends BaseCommand
             dryRun: (bool) $input->getOption('dry-run'),
             skipGate: (bool) $input->getOption('skip-gate'),
             allowDirty: (bool) $input->getOption('allow-dirty'),
+            allowFailingBaseline: (bool) $input->getOption('allow-failing-baseline'),
             maxChanges: (int) $cap,
             testCommand: $this->stringOption($input, 'test-command'),
             proctorCommand: $this->stringOption($input, 'proctor-command'),

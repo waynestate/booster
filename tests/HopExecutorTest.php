@@ -23,19 +23,28 @@ final class HopExecutorTest extends TestCase
     /**
      * @param int            $changedPerHop files Rector reports per run
      * @param string         $gitStatus     what `git status --porcelain` prints
-     * @param int            $gateExit      exit code of the docker run
+     * @param int            $gateExit      exit code of each hop's gate docker run
      * @param list<string>   $rectorErrors
+     * @param int            $baselineExit  exit code of the baseline docker run (the first one)
      */
-    private function fake(int $changedPerHop = 1, string $gitStatus = '', int $gateExit = 0, array $rectorErrors = []): FakeProcessRunner
+    private function fake(int $changedPerHop = 1, string $gitStatus = '', int $gateExit = 0, array $rectorErrors = [], int $baselineExit = 0): FakeProcessRunner
     {
-        return new FakeProcessRunner(static function (array $command) use ($changedPerHop, $gitStatus, $gateExit, $rectorErrors): ProcessResult {
+        $dockerRuns = 0;
+
+        return new FakeProcessRunner(static function (array $command) use ($changedPerHop, $gitStatus, $gateExit, $rectorErrors, $baselineExit, &$dockerRuns): ProcessResult {
             if ($command[0] === 'git') {
                 return new ProcessResult(0, $gitStatus, '');
             }
             if ($command[0] === 'docker') {
                 $isRun = ($command[1] ?? '') === 'run';
+                if (!$isRun) {
+                    return new ProcessResult(0, '', '');
+                }
+                // The first docker run is the baseline; the rest are the per-hop gates.
+                $exit = $dockerRuns === 0 ? $baselineExit : $gateExit;
+                $dockerRuns++;
 
-                return new ProcessResult($isRun ? $gateExit : 0, $isRun && $gateExit !== 0 ? 'FAILURES!' : '', '');
+                return new ProcessResult($exit, $exit !== 0 ? 'FAILURES!' : '', '');
             }
             $files = [];
             for ($i = 0; $i < $changedPerHop; $i++) {
@@ -44,6 +53,14 @@ final class HopExecutorTest extends TestCase
 
             return new ProcessResult(2, (string) json_encode(['file_diffs' => $files, 'errors' => array_map(static fn(string $m): array => ['message' => $m], $rectorErrors)]), '');
         });
+    }
+
+    /**
+     * @return list<list<string>> the docker run commands, in order
+     */
+    private function dockerRuns(FakeProcessRunner $fake): array
+    {
+        return array_values(array_filter($fake->calls, static fn(array $c): bool => $c['command'][0] === 'docker' && ($c['command'][1] ?? '') === 'run'));
     }
 
     private function execute(FakeProcessRunner $fake, RunOptions $options, string $example = 'raw-php', ?PlanOptions $plan = null): RunReport
@@ -83,10 +100,105 @@ final class HopExecutorTest extends TestCase
         $fake = $this->fake();
         $this->execute($fake, new RunOptions());
 
-        $runs = array_values(array_filter($fake->calls, static fn(array $c): bool => $c['command'][0] === 'docker' && ($c['command'][1] ?? '') === 'run'));
-        self::assertCount(2, $runs);
-        self::assertContains('booster-target:8.2', $runs[0]['command']);
-        self::assertContains('booster-target:8.3', $runs[1]['command']);
+        $runs = $this->dockerRuns($fake);
+        self::assertCount(3, $runs);
+        self::assertContains('booster-target:8.1', $runs[0]['command']);
+        self::assertContains('booster-target:8.2', $runs[1]['command']);
+        self::assertContains('booster-target:8.3', $runs[2]['command']);
+    }
+
+    public function test_the_baseline_runs_on_the_current_php_before_any_hop(): void
+    {
+        $fake = $this->fake();
+        $report = $this->execute($fake, new RunOptions());
+
+        self::assertSame('passed', $report->baseline->status);
+        self::assertSame('8.1', $report->baseline->php);
+        self::assertSame(0, $report->baseline->exitCode);
+        self::assertSame(['applied', 'applied'], $this->statuses($report));
+
+        $dockerAt = $rectorAt = null;
+        foreach ($fake->calls as $i => $call) {
+            if ($dockerAt === null && $call['command'][0] === 'docker' && ($call['command'][1] ?? '') === 'run') {
+                $dockerAt = $i;
+            }
+            if ($rectorAt === null && in_array('process', $call['command'], true)) {
+                $rectorAt = $i;
+            }
+        }
+        self::assertNotNull($dockerAt);
+        self::assertNotNull($rectorAt);
+        self::assertLessThan($rectorAt, $dockerAt);
+    }
+
+    public function test_a_failing_baseline_stops_before_the_first_hop(): void
+    {
+        $fake = $this->fake(baselineExit: 1);
+        $report = $this->execute($fake, new RunOptions());
+
+        self::assertSame('failed', $report->baseline->status);
+        self::assertSame(1, $report->baseline->exitCode);
+        self::assertSame(['not-run', 'not-run'], $this->statuses($report));
+        self::assertTrue($report->failed());
+        self::assertSame([], array_filter($fake->calls, static fn(array $c): bool => in_array('process', $c['command'], true)));
+        self::assertStringContainsString('--allow-failing-baseline', implode(' ', $report->results[0]->messages));
+    }
+
+    public function test_allow_failing_baseline_continues_and_labels_gate_failures(): void
+    {
+        $report = $this->execute($this->fake(baselineExit: 1, gateExit: 1), new RunOptions(allowFailingBaseline: true));
+
+        self::assertSame('failed', $report->baseline->status);
+        self::assertSame(['gate-failed', 'not-run'], $this->statuses($report));
+        self::assertStringContainsString('baseline was already failing', implode(' ', $report->results[0]->messages));
+    }
+
+    public function test_skip_gate_reports_a_skipped_baseline(): void
+    {
+        $fake = $this->fake();
+        $report = $this->execute($fake, new RunOptions(skipGate: true));
+
+        self::assertSame('skipped', $report->baseline->status);
+        self::assertNull($report->baseline->exitCode);
+        self::assertSame([], array_filter($fake->calls, static fn(array $c): bool => $c['command'][0] === 'docker'));
+    }
+
+    public function test_the_report_array_contains_the_baseline(): void
+    {
+        $array = $this->execute($this->fake(), new RunOptions())->toArray();
+
+        self::assertArrayHasKey('baseline', $array);
+        self::assertSame('passed', $array['baseline']['status']);
+        self::assertSame('8.1', $array['baseline']['php']);
+        self::assertSame(0, $array['baseline']['exit_code']);
+    }
+
+    public function test_the_baseline_keeps_only_the_last_twenty_lines(): void
+    {
+        $lines = '';
+        for ($i = 1; $i <= 30; $i++) {
+            $lines .= "line {$i}\n";
+        }
+        $fake = new FakeProcessRunner(static function (array $command) use ($lines): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                // Only the baseline `docker run` produces output; version/inspect succeed.
+                if (($command[1] ?? '') !== 'run') {
+                    return new ProcessResult(0, '', '');
+                }
+
+                return new ProcessResult(1, $lines, '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+        $report = $this->execute($fake, new RunOptions(allowFailingBaseline: true));
+
+        self::assertCount(20, $report->baseline->output);
+        self::assertSame('line 11', $report->baseline->output[0]);
+        self::assertSame('line 30', $report->baseline->output[19]);
     }
 
     public function test_rector_is_asked_for_a_preview_before_it_applies(): void
