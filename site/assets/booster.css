@@ -1098,6 +1098,7 @@ html:not(.motion) .dose__no,
 }
 
 .pairs__copy p {
+  margin: 0 0 1rem;
   font-size: 1.05rem;
   line-height: 1.65;
 }
@@ -1129,16 +1130,22 @@ html:not(.motion) .dose__no,
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem 0.6rem;
+  gap: 0.5rem 1.25rem;
   font-size: 0.9rem !important;
   color: var(--b-slate-ink);
 }
 
+.pairs__legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 .key {
+  flex: none;
   display: inline-block;
   inline-size: 14px;
   block-size: 14px;
-  margin-inline-start: 0.4rem;
   border-radius: 3px;
 }
 
@@ -1183,10 +1190,13 @@ html:not(.motion) .dose__no,
 }
 
 .grid__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
   gap: 0.2rem;
-  padding-block-end: 0.3rem;
+  min-block-size: 3.2rem;
   font-size: clamp(1rem, 0.8rem + 0.8vw, 1.4rem);
-  align-content: end;
 }
 
 .grid__row {
@@ -1436,14 +1446,11 @@ html:not(.motion) .dose__no,
 .printout__feed--l { inset-inline-start: 0; border-inline-end: 1px dashed #e6e0d2; }
 .printout__feed--r { inset-inline-end: 0; border-inline-start: 1px dashed #e6e0d2; }
 
-.printout__paper {
+.out {
   min-block-size: 420px;
-  /* Greenbar: bands of mint every two lines. */
+  /* Greenbar: a band of mint every two lines (line-height 1.6, so 3.2em). */
   background: repeating-linear-gradient(180deg, var(--b-mint) 0 3.2em, transparent 3.2em 6.4em);
   background-position: 0 1.2rem;
-}
-
-.out {
   margin: 0;
   padding: 1.2rem 1.1rem 1.5rem;
   font-family: var(--b-mono);
@@ -1912,6 +1919,7 @@ html:not(.motion) .dose__no,
   .install { grid-template-columns: minmax(0, 1fr); grid-template-areas: "tabs" "panel" "side"; }
   .install__side { margin-block-start: 1.25rem; }
   .printout { rotate: 0deg; }
+  .out { min-block-size: 0; }
 }
 
 @media (max-width: 640px) {
