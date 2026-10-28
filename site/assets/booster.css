@@ -2095,3 +2095,13 @@ html:not(.motion) .dose__no,
   animation: seg-grow-y 0.28s var(--b-ease-out) both;
   animation-delay: calc(var(--n) * 0.32s + 0.18s);
 }
+
+/* Part names in the stack list link to each part's own front page. They keep
+   this page's colours; the underline is the only new thing. */
+.part-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: .18em;
+}
+.part-link:hover { text-decoration-thickness: 2px; }
