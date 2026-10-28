@@ -29,10 +29,39 @@ final class PolicyTest extends TestCase
         self::assertSame(['12', '13'], $p->supported('laravel', $this->today()));
     }
 
-    public function test_unknown_version_and_component_are_errors(): void
+    public function test_a_version_above_every_listed_line_is_active(): void
+    {
+        $p = $this->policy();
+
+        self::assertSame(State::Active, $p->stateOf('php', '9.9', $this->today()));
+        self::assertTrue($p->isAheadOfPolicy('php', '9.9'));
+    }
+
+    public function test_a_version_below_the_listed_lines_is_an_error(): void
     {
         $this->expectException(PolicyException::class);
-        $this->policy()->stateOf('php', '9.9', $this->today());
+        $this->policy()->stateOf('php', '8.0', $this->today());
+    }
+
+    public function test_a_version_between_listed_lines_is_an_error(): void
+    {
+        $file = $this->tempDir() . '/gap.json';
+        file_put_contents($file, (string) json_encode([
+            'schema_version' => 1,
+            'components' => [
+                'php' => [
+                    'versions' => [
+                        '8.1' => ['active_until' => '2023-11-23', 'security_until' => '2024-12-31'],
+                        '8.9' => ['active_until' => '2029-11-21', 'security_until' => '2030-12-31'],
+                    ],
+                ],
+            ],
+            'rules' => ['eol_grace_days' => 90],
+        ]));
+        $p = PolicyLocator::locate($file, null);
+
+        $this->expectException(PolicyException::class);
+        $p->stateOf('php', '8.5', $this->today());
     }
 
     public function test_unknown_component_is_an_error(): void

@@ -8,6 +8,7 @@ use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanOptions;
 use Waynestate\Booster\Plan\Planner;
+use Waynestate\Booster\Policy\PolicyLocator;
 use Waynestate\Booster\Project\ProjectDetector;
 use Waynestate\Booster\ToolError;
 
@@ -127,6 +128,31 @@ final class PlannerTest extends TestCase
         $plan = $this->plan('raw-php', new PlanOptions(toPhp: '8.3'));
 
         self::assertStringContainsString('security fixes', implode(' ', $plan->warnings));
+    }
+
+    public function test_a_target_ahead_of_the_policy_is_treated_as_current_with_a_warning(): void
+    {
+        $file = $this->tempDir() . '/ahead.json';
+        file_put_contents($file, (string) json_encode([
+            'schema_version' => 1,
+            'components' => [
+                'php' => [
+                    'versions' => [
+                        '8.1' => ['active_until' => '2023-11-23', 'security_until' => '2024-12-31'],
+                        '8.2' => ['active_until' => '2024-12-31', 'security_until' => '2026-12-31'],
+                        '8.3' => ['active_until' => '2025-12-31', 'security_until' => '2027-12-31'],
+                    ],
+                ],
+            ],
+            'rules' => ['eol_grace_days' => 90],
+        ]));
+        $project = (new ProjectDetector())->detect($this->example('raw-php'));
+        $planner = new Planner(PolicyLocator::locate($file, null), new HopRegistry());
+
+        $plan = $planner->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.4'), $this->today());
+
+        self::assertSame('8.4', $plan->targetPhp);
+        self::assertSame(['PHP 8.4 is newer than CREED\'s policy; treated as current.'], $plan->warnings);
     }
 
     public function test_a_php_laravel_target_pair_that_cannot_exist_is_refused(): void
