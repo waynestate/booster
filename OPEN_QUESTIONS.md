@@ -36,7 +36,7 @@ BOOSTER holds no secrets and calls no API.
 
 ## Not built yet
 
-- **PHAR build** (`ADR-0009`). 0.1 ships `vendor/bin/booster` and `bin/booster` only. A PHAR needs a packaging decision
+- **PHAR build** (a distribution decision). 0.1 ships `vendor/bin/booster` and `bin/booster` only. A PHAR needs a packaging decision
   (box or similar) and a way to find `config/rector.php` and `docker/` inside it.
 - **`booster mcp`**, the read-only tool server. Waiting on the shared MCP conventions.
 - **PROCTOR as a built-in gate step.** PROCTOR is not on Packagist and needs `--policy`; `--proctor-command` runs it today.

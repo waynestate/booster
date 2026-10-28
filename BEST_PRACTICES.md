@@ -1,6 +1,6 @@
 # BOOSTER best practices
 
-The short version of the stack's upgrade guide (`design/best-practices/booster.md` in the coordination repo), with the
+The short version of the stack's upgrade guide, with the
 tag for how BOOSTER holds each rule today.
 
 | Tag | Meaning |
