@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Cross-project links are committed as production hrefs. assets/stack-env.js
+     points them at a local stack server in dev; content: auto, production or dev. -->
+<meta name="stack-env" content="auto">
+<script src="assets/stack-env.js" defer></script>
 <title>BOOSTER: Boosts your versions.</title>
 <meta name="description" content="BOOSTER plans and runs PHP and Laravel upgrades one hop at a time on Rector, gates every hop with your tests on the target PHP, and never commits or pushes for you.">
 <meta name="theme-color" content="#0c5449">
