@@ -29,6 +29,25 @@ final class PlannerTest extends TestCase
         return array_map(static fn($s): string => $s->hop->id, $plan->steps);
     }
 
+    /**
+     * Copies an example into a temp dir, merges $composer into its composer.json, and plans the result.
+     *
+     * @param array<string, mixed> $composer
+     */
+    private function planWithComposer(string $example, array $composer, PlanOptions $options = new PlanOptions()): Plan
+    {
+        $dir = $this->copyExample($example);
+        $file = $dir . '/composer.json';
+        $data = json_decode((string) file_get_contents($file), true);
+        self::assertIsArray($data);
+        $data = array_replace_recursive($data, $composer);
+        file_put_contents($file, (string) json_encode($data));
+
+        $project = (new ProjectDetector())->detect($dir);
+
+        return (new Planner($this->policy(), new HopRegistry()))->plan($project, $options, $this->today());
+    }
+
     public function test_php_74_to_84_lists_each_minor_step_with_its_gate(): void
     {
         $plan = $this->plan('raw-php', new PlanOptions(toPhp: '8.4'));
@@ -79,6 +98,67 @@ final class PlannerTest extends TestCase
         }
         self::assertSame(
             ['laravel-9-to-10', 'php-81-to-82', 'laravel-10-to-11', 'phpunit-10-to-11', 'laravel-11-to-12', 'php-82-to-83', 'phpunit-11-to-12', 'laravel-12-to-13'],
+            $this->ids($plan),
+        );
+    }
+
+    public function test_a_phpunit_9_app_plans_up_to_the_newest_major_its_target_php_runs(): void
+    {
+        $plan = $this->planWithComposer(
+            'raw-php',
+            ['require-dev' => ['phpunit/phpunit' => '^9.0']],
+            new PlanOptions(toPhp: '8.4'),
+        );
+
+        // Target PHP 8.4 runs PHPUnit 13 (floor 8.4), so the plan walks 9 to 13; each
+        // PHPUnit hop lands only once a PHP hop has raised the floor high enough.
+        self::assertSame(
+            ['php-74-to-80', 'php-80-to-81', 'phpunit-9-to-10', 'php-81-to-82', 'phpunit-10-to-11', 'php-82-to-83', 'phpunit-11-to-12', 'php-83-to-84', 'phpunit-12-to-13'],
+            $this->ids($plan),
+        );
+        self::assertSame('13', $plan->targetPhpunit);
+    }
+
+    public function test_to_phpunit_stops_the_phpunit_hops_where_asked(): void
+    {
+        $plan = $this->planWithComposer(
+            'raw-php',
+            ['require-dev' => ['phpunit/phpunit' => '^9.0']],
+            new PlanOptions(toPhp: '8.4', toPhpunit: '11'),
+        );
+
+        self::assertSame(
+            ['php-74-to-80', 'php-80-to-81', 'phpunit-9-to-10', 'php-81-to-82', 'phpunit-10-to-11', 'php-82-to-83', 'php-83-to-84'],
+            $this->ids($plan),
+        );
+        self::assertSame('11', $plan->targetPhpunit);
+    }
+
+    public function test_an_app_already_on_the_newest_phpunit_major_plans_no_phpunit_hop(): void
+    {
+        $plan = $this->planWithComposer(
+            'raw-php',
+            ['require' => ['php' => '^8.3'], 'require-dev' => ['phpunit/phpunit' => '^13.0']],
+            new PlanOptions(toPhp: '8.4'),
+        );
+
+        self::assertSame(['php-83-to-84'], $this->ids($plan));
+        foreach ($this->ids($plan) as $id) {
+            self::assertStringStartsNotWith('phpunit-', $id);
+        }
+        self::assertSame('13', $plan->targetPhpunit);
+    }
+
+    public function test_a_laravel_target_above_the_apps_phpunit_plans_phpunit_hops_in_laravel_then_phpunit_then_php_order(): void
+    {
+        $plan = $this->plan('laravel-blade', new PlanOptions(toPhp: '8.4', toLaravel: '13', toPhpunit: '10'));
+
+        // Laravel 13 ships PHPUnit 12, above the app's PHPUnit 10, so the requested
+        // target of 10 is raised to 12. Today's order tries a Laravel hop first at
+        // every step, then a PHPUnit hop, then a PHP hop.
+        self::assertSame('12', $plan->targetPhpunit);
+        self::assertSame(
+            ['laravel-10-to-11', 'phpunit-10-to-11', 'laravel-11-to-12', 'php-82-to-83', 'phpunit-11-to-12', 'laravel-12-to-13', 'php-83-to-84'],
             $this->ids($plan),
         );
     }
