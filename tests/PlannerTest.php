@@ -60,12 +60,14 @@ final class PlannerTest extends TestCase
     {
         $plan = $this->plan('laravel-blade');
 
-        // Laravel 10 on PHP 8.2: 11 and 12 run on 8.2, but 13 needs 8.3 first.
+        // Laravel 10 on PHP 8.2 with PHPUnit 10: Laravel 11 and 12 run on 8.2, but 13 needs 8.3 first;
+        // PHPUnit 11 runs on 8.2, and 12 and 13 wait for 8.3.
         self::assertSame(
-            ['laravel-10-to-11', 'laravel-11-to-12', 'php-82-to-83', 'laravel-12-to-13', 'php-83-to-84', 'php-84-to-85'],
+            ['laravel-10-to-11', 'phpunit-10-to-11', 'laravel-11-to-12', 'php-82-to-83', 'phpunit-11-to-12', 'laravel-12-to-13', 'php-83-to-84', 'phpunit-12-to-13', 'php-84-to-85'],
             $this->ids($plan),
         );
         self::assertSame('13', $plan->targetLaravel);
+        self::assertSame('13', $plan->targetPhpunit);
     }
 
     public function test_an_old_app_never_rests_on_a_pair_laravel_does_not_support(): void
@@ -76,7 +78,7 @@ final class PlannerTest extends TestCase
             self::assertTrue(HopRegistry::laravelSupportsPhp((string) $step->laravelAfter, (string) $step->phpAfter), $step->hop->id);
         }
         self::assertSame(
-            ['laravel-9-to-10', 'php-81-to-82', 'laravel-10-to-11', 'laravel-11-to-12', 'php-82-to-83', 'laravel-12-to-13'],
+            ['laravel-9-to-10', 'php-81-to-82', 'laravel-10-to-11', 'phpunit-10-to-11', 'laravel-11-to-12', 'php-82-to-83', 'phpunit-11-to-12', 'laravel-12-to-13'],
             $this->ids($plan),
         );
     }

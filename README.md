@@ -149,7 +149,7 @@ supports at every step):
 
 | Command | What it does |
 |---|---|
-| `booster detect` | Reads `composer.json` and `package.json`; prints the app type, PHP, Laravel and Vue versions |
+| `booster detect` | Reads `composer.json` and `package.json`; prints the app type, PHP, Laravel, PHPUnit and Vue versions |
 | `booster plan` | Prints the ordered hops and the warnings. Changes nothing. |
 | `booster run` | Runs the plan. `--dry-run` previews every hop |
 | `booster hops` | Lists every hop BOOSTER knows |
@@ -165,7 +165,7 @@ Options shared by `plan` and `run`:
 | `--today` | Override today's date (`YYYY-MM-DD`) so runs are repeatable |
 | `--goal` | Shorthand such as `php-74-to-84` (sets `--from-php` and `--to-php`) |
 | `--from-php`, `--from-laravel` | Say what the app runs on when the manifest does not |
-| `--to-php`, `--to-laravel` | The target. Default: the newest version the policy supports today |
+| `--to-php`, `--to-laravel`, `--to-phpunit` | The target. Default: the newest version the policy supports today (PHPUnit: the newest that runs on the target PHP) |
 | `--sesame` | Include the `wayne-cas` to SESAME swap |
 | `--skip` | A hop id to leave out (repeat it) |
 
@@ -219,9 +219,9 @@ guide, and a person does the work.
 
 ### Hops BOOSTER knows
 
-PHP one minor at a time from 5.6 to 8.5; Laravel one major at a time from 8 to 13; `cas-to-sesame` (a stub recipe that
-renames the `wayne-cas` classes to SESAME's compatibility classes and swaps the Composer requirement); and
-`vue-2-to-3` (playbook). `booster hops` prints them all.
+PHP one minor at a time from 5.6 to 8.5; Laravel one major at a time from 8 to 13; PHPUnit one major at a time from 9
+to 13; `cas-to-sesame` (a stub recipe that renames the `wayne-cas` classes to SESAME's compatibility classes and swaps
+the Composer requirement); and `vue-2-to-3` (playbook). `booster hops` prints them all.
 
 BOOSTER plans only what the policy supports as a target. Moving to PHP 8.1 is refused because 8.1 is past security
 support; passing through it on the way to a newer version is fine.

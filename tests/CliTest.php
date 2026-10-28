@@ -101,7 +101,7 @@ final class CliTest extends TestCase
         self::assertStringContainsString('[playbook]', $out);
 
         [, $json] = $this->booster(['command' => 'hops', '--format' => 'json']);
-        self::assertCount(18, json_decode($json, true)['hops']);
+        self::assertCount(22, json_decode($json, true)['hops']);
     }
 
     public function test_detect_names_the_permutation(): void

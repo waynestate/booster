@@ -10,7 +10,10 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
 - App-type detection for the five stack permutations from `composer.json` and `package.json`.
 - A hop registry: PHP one minor at a time from 5.6 to 8.5, Laravel one major at a time from 8 to 13, a `wayne-cas` to
   SESAME stub recipe, and a Vue 2 to 3 playbook.
-- A planner that interleaves PHP and Laravel hops inside Laravel's supported PHP range and refuses unsupported targets.
+- PHPUnit hops, one major at a time from 9 to 13, planned when the app's `phpunit/phpunit` constraint is detected and
+  the target PHP can run them; a `--to-phpunit` target option and a `PHPUnit:` line in the plan.
+- A planner that interleaves PHP, Laravel and PHPUnit hops inside Laravel's supported PHP range and refuses
+  unsupported targets.
 - Policy loading from `--policy`, `BOOSTER_POLICY`, or a bundled snapshot of CREED's `policy.json`.
 - A generated copy of CREED's policy reader under `src/Creed/` (namespace `Waynestate\Booster\Creed`), written by
   CREED's `bin/export.php` and verified by `composer creed-copy:check`; BOOSTER's own reader is gone.

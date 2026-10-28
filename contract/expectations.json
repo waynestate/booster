@@ -25,12 +25,16 @@
             "app_type": "laravel-blade",
             "php": "8.2",
             "laravel": "10",
+            "phpunit": "10",
             "vue": null,
-            "plan": ["laravel-10-to-11", "laravel-11-to-12", "php-82-to-83", "laravel-12-to-13", "php-83-to-84", "php-84-to-85"],
+            "plan": ["laravel-10-to-11", "phpunit-10-to-11", "laravel-11-to-12", "php-82-to-83", "phpunit-11-to-12", "laravel-12-to-13", "php-83-to-84", "phpunit-12-to-13", "php-84-to-85"],
             "stub_vendor": true,
             "rector": {
                 "laravel-10-to-11": ["app/Models/Post.php"],
-                "laravel-11-to-12": []
+                "phpunit-10-to-11": ["tests/PostTest.php"],
+                "laravel-11-to-12": [],
+                "phpunit-11-to-12": ["tests/PostTest.php"],
+                "phpunit-12-to-13": ["tests/PostTest.php"]
             }
         },
         "laravel-blade-vue": {

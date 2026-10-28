@@ -30,6 +30,10 @@ Playbooks:
 - `booster-laravel-10-to-11`: Move a Laravel 10 app to Laravel 11.
 - `booster-laravel-11-to-12`: Move a Laravel 11 app to Laravel 12.
 - `booster-laravel-12-to-13`: Move a Laravel 12 app to Laravel 13.
+- `booster-phpunit-9-to-10`: Move PHPUnit 9 tests to PHPUnit 10.
+- `booster-phpunit-10-to-11`: Move PHPUnit 10 tests to PHPUnit 11.
+- `booster-phpunit-11-to-12`: Move PHPUnit 11 tests to PHPUnit 12.
+- `booster-phpunit-12-to-13`: Move PHPUnit 12 tests to PHPUnit 13.
 - `booster-cas-to-sesame`: Swap the wayne-cas package for SESAME using its compatibility classes (stub recipe).
 - `booster-vue-2-to-3`: Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue).
 

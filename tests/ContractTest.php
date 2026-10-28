@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Tests;
 
 use PHPUnit\Framework\Attributes\DataProvider;
+use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Plan\PlanOptions;
 use Waynestate\Booster\Plan\Planner;
@@ -94,7 +95,10 @@ final class ContractTest extends TestCase
             }
             self::assertNotNull($step, "{$hopId} is not in the plan for {$name}.");
 
-            $result = $runner->run($step->hop, (string) realpath($dir), true, (string) $step->phpAfter, $step->laravelAfter);
+            // A PHPUnit hop pins the synthetic installed.json to the hop's target major so the
+            // version-bound rules apply; other hops leave PHPUnit at the app's own version.
+            $phpunitTarget = $step->hop->kind === HopKind::Phpunit ? $step->phpunitAfter : null;
+            $result = $runner->run($step->hop, (string) realpath($dir), true, (string) $step->phpAfter, $step->laravelAfter, $phpunitTarget);
             $changed = array_map(static fn(array $f): string => $f['file'], $result->files);
             sort($changed);
 
