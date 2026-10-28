@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en" data-theme="wsu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BOOSTER: Boosts your versions.</title>
+<meta name="description" content="BOOSTER plans and runs PHP and Laravel upgrades one hop at a time on Rector, gates every hop with your tests on the target PHP, and never commits or pushes for you.">
+<meta name="theme-color" content="#0c5449">
+<link rel="icon" href="brand/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="brand/favicon-32.png">
+<link rel="apple-touch-icon" href="brand/booster-avatar-256.png">
+<meta property="og:title" content="BOOSTER: Boosts your versions.">
+<meta property="og:description" content="PHP and Laravel upgrades, one dose at a time.">
+<meta property="og:image" content="brand/booster-avatar-512.png">
+<!--
+  WayneUI 2.0.8, copied from its documented static path
+  (wayne-ui/apps/site/public/v2) so this page works offline. WayneUI is the
+  base (tokens, container, buttons, skip link, focus floor); booster.css
+  overrides the look. Display type is Barlow Condensed (OFL), self-hosted.
+-->
+<link rel="preload" href="assets/fonts/barlow-condensed-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/wayne-ui/wayne-ui.css">
+<link rel="stylesheet" href="assets/booster.css">
+<script>
+  /* Countdowns and lift-offs only for people who are happy with motion.
+     Everyone else gets the finished record: every dose already stamped. */
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: no-preference)").matches) {
+    document.documentElement.classList.add("motion");
+  }
+</script>
+</head>
+<body>
+<a class="wsu-skip-link" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="wsu-container masthead__row">
+    <a class="masthead__brand" href="#main">
+      <img src="brand/booster-avatar-256.png" width="36" height="36" alt="">
+      <span class="masthead__name">BOOSTER</span>
+      <span class="masthead__ver">0.1</span>
+    </a>
+    <nav class="masthead__nav" aria-label="On this page">
+      <a href="#record">Record</a>
+      <a href="#pairs">Pairs</a>
+      <a href="#commands">Commands</a>
+      <a class="masthead__install" href="#install">Install</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ================================================================ hero -->
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wsu-container hero__grid">
+
+      <div class="hero__copy">
+        <p class="label"><span class="label__dot" aria-hidden="true"></span>PHP and Laravel upgrades · WELD stack</p>
+        <h1 class="hero__title" id="hero-title">BOOSTER</h1>
+        <p class="hero__tagline">Boosts your versions.</p>
+        <p class="hero__blurb">A booster shot keeps your immunity current. This one keeps your PHP current, and it stings less. BOOSTER plans the hops from the version your app runs today to one the policy still supports, then gives them one dose at a time: <a href="https://getrector.com">Rector</a> rewrites the code, BOOSTER raises <code>composer.json</code>, and your tests must pass on the target PHP before the next hop starts.</p>
+        <ul class="hero__facts">
+          <li><strong>One hop</strong> per dose</li>
+          <li><strong>50 files</strong> cap per hop</li>
+          <li><strong>0</strong> commits made for you</li>
+        </ul>
+        <p class="hero__cta">
+          <a class="wsu-btn btn-launch" href="#record"><span>Watch a plan launch</span><span class="btn-launch__arrow" aria-hidden="true">↑</span></a>
+          <a class="btn-quiet" href="#install">Install</a>
+        </p>
+      </div>
+
+      <!-- The launch pad. With motion on: T-3, T-2, T-1, lift-off, and the
+           altimeter climbs 7.4 to 8.5. Without it: already in orbit. -->
+      <div class="pad" data-pad>
+        <div class="pad__hud" aria-hidden="true">
+          <span class="pad__count" data-pad-count>T+0</span>
+          <span class="pad__status" data-pad-status>Boosted</span>
+        </div>
+        <div class="pad__stage">
+          <ol class="pad__scale" aria-hidden="true">
+            <li>8.5</li><li>8.4</li><li>8.3</li><li>8.2</li><li>8.1</li><li>8.0</li><li>7.4</li>
+          </ol>
+          <span class="pad__marker" aria-hidden="true" data-pad-marker style="--lvl:6"></span>
+          <div class="pad__craft" data-pad-craft>
+            <img class="pad__mark" src="brand/booster-avatar-512.png" width="512" height="512" alt="BOOSTER mark: a syringe that is also a rocket, gold flame below">
+            <span class="pad__plume" aria-hidden="true"><span></span><span></span><span></span></span>
+          </div>
+          <span class="pad__ground" aria-hidden="true"></span>
+        </div>
+        <dl class="pad__readout">
+          <div><dt>Altitude</dt><dd>PHP <span data-pad-alt>8.5</span></dd></div>
+          <div><dt>Stage</dt><dd><span data-pad-stage>6</span> of 6</dd></div>
+          <div><dt>Gate</dt><dd>target-image tests</dd></div>
+        </dl>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ========================================================= record card -->
+  <!-- The magic: pick an app, press Run the plan, and watch the countdown,
+       each dose stamped as its gate passes, and the version climb. The data is
+       real BOOSTER 0.1 output for the example apps in examples/. -->
+  <section class="section section--record" id="record" aria-labelledby="record-title">
+    <div class="wsu-container">
+      <div class="head head--split">
+        <div>
+          <p class="label"><span class="label__dot" aria-hidden="true"></span>Dose by dose</p>
+          <h2 id="record-title">Every hop a dose. Every gate a stamp.</h2>
+        </div>
+        <p class="head__note">This is <code>booster plan</code> for the example apps that ship with BOOSTER, written up the way your doctor would. Pick a patient, then launch.</p>
+      </div>
+
+      <div class="record" data-record>
+        <div class="record__controls">
+          <div class="patients" role="group" aria-label="Example app">
+            <button type="button" class="patient" aria-pressed="true" data-scenario="blade">Laravel 10 on PHP 8.2</button>
+            <button type="button" class="patient" aria-pressed="false" data-scenario="raw">Raw PHP 7.4</button>
+            <button type="button" class="patient" aria-pressed="false" data-scenario="cas">wayne-cas app, <code>--sesame</code></button>
+            <button type="button" class="patient" aria-pressed="false" data-scenario="capped">A capped hop</button>
+          </div>
+          <button type="button" class="wsu-btn btn-run" data-run>
+            <span class="btn-run__label">Run the plan</span>
+          </button>
+        </div>
+
+        <div class="record__body">
+          <!-- Altimeter: where the app is after each dose. -->
+          <div class="alt" aria-hidden="true">
+            <p class="alt__label">Now on</p>
+            <p class="alt__value"><span class="alt__k">PHP</span> <span data-alt-php>8.5</span></p>
+            <p class="alt__value" data-alt-lara-row><span class="alt__k">Laravel</span> <span data-alt-lara>13</span></p>
+            <div class="alt__track" style="--steps:6; --lvl:6" data-alt-track>
+              <span class="alt__fill"></span>
+              <img class="alt__rocket" src="brand/booster-avatar-256.png" width="40" height="40" alt="">
+            </div>
+          </div>
+
+          <article class="card" aria-labelledby="card-title">
+            <span class="card__holes" aria-hidden="true"></span>
+            <header class="card__head">
+              <div class="card__heading">
+                <p class="card__form">Form B-01 · Version immunization record</p>
+                <h3 class="card__title" id="card-title" data-card-title>examples/laravel-blade</h3>
+              </div>
+              <dl class="card__fields">
+                <div><dt>App type</dt><dd data-card-type>laravel-blade</dd></div>
+                <div><dt>Course</dt><dd data-card-course>PHP 8.2 → 8.5 · Laravel 10 → 13</dd></div>
+                <div><dt>Policy</dt><dd>CREED snapshot</dd></div>
+                <div><dt>Next booster due</dt><dd data-card-due>17 Mar 2028</dd></div>
+              </dl>
+            </header>
+
+            <div class="card__cols" aria-hidden="true">
+              <span>Dose</span><span>Hop</span><span>Pair after</span><span>Gate</span><span>Stamp</span>
+            </div>
+            <ol class="doses" data-doses>
+              <li class="dose">
+                <span class="dose__no">01</span>
+                <span class="dose__hop"><code>laravel-10-to-11</code><span class="dose__sum">Move a Laravel 10 app to Laravel 11.</span></span>
+                <span class="dose__pair">PHP 8.2 · Laravel 11</span>
+                <span class="dose__gate">booster-target:8.2</span>
+                <span class="stamp"><span class="stamp__top">Gate passed</span><span class="stamp__mid">PHP 8.2</span><span class="stamp__date" data-date>28 Oct 2026</span></span>
+              </li>
+              <li class="dose">
+                <span class="dose__no">02</span>
+                <span class="dose__hop"><code>laravel-11-to-12</code><span class="dose__sum">Move a Laravel 11 app to Laravel 12.</span></span>
+                <span class="dose__pair">PHP 8.2 · Laravel 12</span>
+                <span class="dose__gate">booster-target:8.2</span>
+                <span class="stamp"><span class="stamp__top">Gate passed</span><span class="stamp__mid">PHP 8.2</span><span class="stamp__date" data-date>28 Oct 2026</span></span>
+              </li>
+              <li class="dose">
+                <span class="dose__no">03</span>
+                <span class="dose__hop"><code>php-82-to-83</code><span class="dose__sum">Move PHP 8.2 code to PHP 8.3.</span></span>
+                <span class="dose__pair">PHP 8.3 · Laravel 12</span>
+                <span class="dose__gate">booster-target:8.3</span>
+                <span class="stamp"><span class="stamp__top">Gate passed</span><span class="stamp__mid">PHP 8.3</span><span class="stamp__date" data-date>28 Oct 2026</span></span>
+              </li>
+              <li class="dose">
+                <span class="dose__no">04</span>
+                <span class="dose__hop"><code>laravel-12-to-13</code><span class="dose__sum">Move a Laravel 12 app to Laravel 13.</span></span>
+                <span class="dose__pair">PHP 8.3 · Laravel 13</span>
+                <span class="dose__gate">booster-target:8.3</span>
+                <span class="stamp"><span class="stamp__top">Gate passed</span><span class="stamp__mid">PHP 8.3</span><span class="stamp__date" data-date>28 Oct 2026</span></span>
+              </li>
+              <li class="dose">
+                <span class="dose__no">05</span>
+                <span class="dose__hop"><code>php-83-to-84</code><span class="dose__sum">Move PHP 8.3 code to PHP 8.4.</span></span>
+                <span class="dose__pair">PHP 8.4 · Laravel 13</span>
+                <span class="dose__gate">booster-target:8.4</span>
+                <span class="stamp"><span class="stamp__top">Gate passed</span><span class="stamp__mid">PHP 8.4</span><span class="stamp__date" data-date>28 Oct 2026</span></span>
+              </li>
+              <li class="dose">
+                <span class="dose__no">06</span>
+                <span class="dose__hop"><code>php-84-to-85</code><span class="dose__sum">Move PHP 8.4 code to PHP 8.5.</span></span>
+                <span class="dose__pair">PHP 8.5 · Laravel 13</span>
+                <span class="dose__gate">booster-target:8.5</span>
+                <span class="stamp"><span class="stamp__top">Gate passed</span><span class="stamp__mid">PHP 8.5</span><span class="stamp__date" data-date>28 Oct 2026</span></span>
+              </li>
+            </ol>
+
+            <footer class="card__foot">
+              <p class="card__result" data-card-result><span class="result result--pass">RESULT: PASS</span> Review with <code>git diff</code>, run your own checks, then commit. BOOSTER never commits or pushes.</p>
+            </footer>
+
+            <!-- The countdown lands on the card itself. -->
+            <div class="countdown" aria-hidden="true" data-countdown><span data-countdown-text>3</span></div>
+          </article>
+        </div>
+        <p class="wsu-sr-only" role="status" aria-live="polite" data-record-status></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================================== pairs -->
+  <section class="section section--pairs" id="pairs" aria-labelledby="pairs-title">
+    <div class="wsu-container pairs">
+      <div class="pairs__copy">
+        <p class="label"><span class="label__dot" aria-hidden="true"></span>The overlap</p>
+        <h2 id="pairs-title">Never on a pair Laravel doesn't support.</h2>
+        <p>BOOSTER interleaves the PHP and Laravel hops so the app sits on a supported pair after every dose: Laravel 10 on PHP 8.1 to 8.3, 11 on 8.2 to 8.4, 12 on 8.2 to 8.5, 13 on 8.3 or newer. A target pair that cannot exist is refused before anything runs.</p>
+        <p>Targets must still be supported by CREED's policy. Passing through PHP 8.1 is fine; stopping there is not:</p>
+        <pre class="snip"><span class="snip__p">$</span> bin/booster plan --path=examples/raw-php --to-php=8.1
+Php 8.1 is past security support; pick a version the policy still supports.
+<span class="snip__p">exit 2</span></pre>
+        <p class="pairs__legend">
+          <span class="key key--ok" aria-hidden="true"></span> supported pair
+          <span class="key key--no" aria-hidden="true"></span> not a pair Laravel supports
+          <span class="key key--path" aria-hidden="true"></span> the six doses for Laravel 10 on PHP 8.2
+        </p>
+      </div>
+
+      <figure class="grid" data-grid>
+        <figcaption class="wsu-sr-only">Grid of Laravel versions 10 to 13 against PHP 8.1 to 8.5. The path starts at Laravel 10 on PHP 8.2, moves to Laravel 11 and then 12 on PHP 8.2, PHP 8.3, Laravel 13, then PHP 8.4 and PHP 8.5.</figcaption>
+        <div class="grid__table" aria-hidden="true">
+          <span class="grid__corner">Laravel ↓ PHP →</span>
+          <span class="grid__col">8.1<em class="pill pill--eol">EOL</em></span>
+          <span class="grid__col">8.2<em class="pill pill--sec">security</em></span>
+          <span class="grid__col">8.3</span>
+          <span class="grid__col">8.4</span>
+          <span class="grid__col">8.5</span>
+
+          <span class="grid__row">13</span>
+          <span class="cell cell--no"></span>
+          <span class="cell cell--no"></span>
+          <span class="cell cell--ok cell--path seg-right" style="--n:4"><b>4</b></span>
+          <span class="cell cell--ok cell--path seg-right" style="--n:5"><b>5</b></span>
+          <span class="cell cell--ok cell--path cell--end" style="--n:6"><b>6</b></span>
+
+          <span class="grid__row">12</span>
+          <span class="cell cell--no"></span>
+          <span class="cell cell--ok cell--path seg-right" style="--n:2"><b>2</b></span>
+          <span class="cell cell--ok cell--path seg-up" style="--n:3"><b>3</b></span>
+          <span class="cell cell--ok"></span>
+          <span class="cell cell--ok"></span>
+
+          <span class="grid__row">11</span>
+          <span class="cell cell--no"></span>
+          <span class="cell cell--ok cell--path seg-up" style="--n:1"><b>1</b></span>
+          <span class="cell cell--ok"></span>
+          <span class="cell cell--ok"></span>
+          <span class="cell cell--no"></span>
+
+          <span class="grid__row">10</span>
+          <span class="cell cell--ok"></span>
+          <span class="cell cell--ok cell--path cell--start seg-up" style="--n:0"><b>0</b></span>
+          <span class="cell cell--ok"></span>
+          <span class="cell cell--no"></span>
+          <span class="cell cell--no"></span>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ========================================================= inside a hop -->
+  <section class="section section--hop" aria-labelledby="hop-title">
+    <div class="wsu-container">
+      <div class="head">
+        <p class="label"><span class="label__dot" aria-hidden="true"></span>Inside one dose</p>
+        <h2 id="hop-title">Four checks before the next stage fires.</h2>
+      </div>
+      <ol class="sequence">
+        <li class="seq">
+          <span class="seq__t">T−4</span>
+          <h3>Dry run and cap</h3>
+          <p>Rector previews the hop. If it reports errors, or wants to change more files than <code>--max-changes</code> (50 by default), the run stops before anything is written.</p>
+        </li>
+        <li class="seq">
+          <span class="seq__t">T−3</span>
+          <h3>Rector for real</h3>
+          <p>Only that hop's rules, from BOOSTER's own <code>vendor/</code>, with the hop's PHP target set on purpose. An app on PHP 7.4 is rewritten by a Rector running on 8.3 or newer.</p>
+        </li>
+        <li class="seq">
+          <span class="seq__t">T−2</span>
+          <h3>Raise the constraint</h3>
+          <p>The <code>php</code> or <code>laravel/framework</code> constraint in <code>composer.json</code> goes up, and <code>config.platform.php</code> moves with it. BOOSTER never runs <code>composer update</code>.</p>
+        </li>
+        <li class="seq">
+          <span class="seq__t">T−1</span>
+          <h3>The gate</h3>
+          <p>Your tests run inside <code>booster-target:&lt;php&gt;</code>, built from <code>docker/Dockerfile</code> on the PHP the hop moves to. Red stops the run and leaves the changes for you to read; <code>git checkout .</code> undoes them.</p>
+        </li>
+      </ol>
+      <p class="sequence__after">Some hops are playbooks, not code: Rector does not read Vue, so <code>vue-2-to-3</code> lists the steps and the official guide, and a person does the work. The PHP 7.4 to 8.0 hop is flagged as the one that needs the most review time.</p>
+    </div>
+  </section>
+
+  <!-- ============================================================ commands -->
+  <section class="section section--commands" id="commands" aria-labelledby="commands-title">
+    <div class="wsu-container commands">
+      <div class="commands__list">
+        <p class="label"><span class="label__dot" aria-hidden="true"></span>Five commands</p>
+        <h2 id="commands-title">The whole kit.</h2>
+        <div class="cmds" role="tablist" aria-label="Commands">
+          <button class="cmd" role="tab" id="tab-detect" aria-controls="out-detect" aria-selected="true" tabindex="0"><span class="cmd__name">detect</span><span class="cmd__does">Which of the five stack shapes, and which versions</span></button>
+          <button class="cmd" role="tab" id="tab-plan" aria-controls="out-plan" aria-selected="false" tabindex="-1"><span class="cmd__name">plan</span><span class="cmd__does">The ordered hops and the warnings. Changes nothing.</span></button>
+          <button class="cmd" role="tab" id="tab-run" aria-controls="out-run" aria-selected="false" tabindex="-1"><span class="cmd__name">run</span><span class="cmd__does">Runs the plan; <code>--dry-run</code> previews every hop</span></button>
+          <button class="cmd" role="tab" id="tab-hops" aria-controls="out-hops" aria-selected="false" tabindex="-1"><span class="cmd__name">hops</span><span class="cmd__does">Every hop BOOSTER knows</span></button>
+          <button class="cmd" role="tab" id="tab-init" aria-controls="out-init" aria-selected="false" tabindex="-1"><span class="cmd__name">init</span><span class="cmd__does">Writes the coding-tab playbooks to <code>.agents/skills</code></span></button>
+        </div>
+        <p class="commands__exits">Exit codes: <strong>0</strong> pass · <strong>1</strong> a hop was capped, errored or failed its gate · <strong>2</strong> bad usage or a target the policy does not support.</p>
+      </div>
+
+      <!-- A greenbar printout, tractor-feed holes and all. Output is real
+           BOOSTER 0.1 output against the bundled example apps. -->
+      <div class="printout">
+        <span class="printout__feed printout__feed--l" aria-hidden="true"></span>
+        <span class="printout__feed printout__feed--r" aria-hidden="true"></span>
+        <div class="printout__paper">
+<pre class="out" role="tabpanel" id="out-detect" aria-labelledby="tab-detect" tabindex="0"><span class="out__cmd">$ bin/booster detect --path=examples/vue-spa</span>
+path           examples/vue-spa
+app_type       raw-php-vue
+composer_json  yes
+php            8.0
+laravel        unknown
+vue            2
+wayne_cas      no</pre>
+<pre class="out" role="tabpanel" id="out-plan" aria-labelledby="tab-plan" tabindex="0" hidden><span class="out__cmd">$ bin/booster plan --path=examples/raw-php</span>
+BOOSTER plan for examples/raw-php
+  app type: raw-php
+  PHP: 7.4 -> 8.5
+  policy: bundled snapshot (today 2026-10-28)
+
+1. php-74-to-80  [target-image-tests]
+   Move PHP 7.4 code to PHP 8.0.
+   Give this hop the most review time.
+2. php-80-to-81  [target-image-tests]
+   Move PHP 8.0 code to PHP 8.1.
+3. php-81-to-82  [target-image-tests]
+   Move PHP 8.1 code to PHP 8.2.
+4. php-82-to-83  [target-image-tests]
+   Move PHP 8.2 code to PHP 8.3.
+5. php-83-to-84  [target-image-tests]
+   Move PHP 8.3 code to PHP 8.4.
+6. php-84-to-85  [target-image-tests]
+   Move PHP 8.4 code to PHP 8.5.</pre>
+<pre class="out" role="tabpanel" id="out-run" aria-labelledby="tab-run" tabindex="0" hidden><span class="out__cmd">$ bin/booster run --path=examples/raw-php --to-php=8.2 --dry-run</span>
+BOOSTER dry run (nothing was changed)
+
+1. php-74-to-80: PREVIEWED (1 files)
+   Dry run: nothing was changed.
+   --- src/Legacy.php
+<span class="out__del">   -    public function __construct(string $name)</span>
+<span class="out__add">   +    public function __construct(private string $name)</span>
+<span class="out__del">   -        return strpos($text, 'admin') !== false;</span>
+<span class="out__add">   +        return str_contains($text, 'admin');</span>
+<span class="out__del">   -        return get_class($object);</span>
+<span class="out__add">   +        return $object::class;</span>
+2. php-80-to-81: PREVIEWED (0 files)
+3. php-81-to-82: PREVIEWED (0 files)
+
+RESULT: PASS</pre>
+<pre class="out" role="tabpanel" id="out-hops" aria-labelledby="tab-hops" tabindex="0" hidden><span class="out__cmd">$ bin/booster hops</span>
+php-56-to-70       Move PHP 5.6 code to PHP 7.0.
+php-70-to-71       Move PHP 7.0 code to PHP 7.1.
+  …                one PHP minor at a time …
+php-84-to-85       Move PHP 8.4 code to PHP 8.5.
+laravel-8-to-9     Move a Laravel 8 app to Laravel 9.
+  …                one Laravel major at a time …
+laravel-12-to-13   Move a Laravel 12 app to Laravel 13.
+cas-to-sesame      Swap the wayne-cas package for SESAME
+                   using its compatibility classes (stub recipe).
+vue-2-to-3         Move a Vue 2 front end to Vue 3. [playbook]</pre>
+<pre class="out" role="tabpanel" id="out-init" aria-labelledby="tab-init" tabindex="0" hidden><span class="out__cmd">$ bin/booster init --path=../my-app</span>
+Wrote 19 playbooks, 19 changed.
+
+<span class="out__cmd">$ bin/booster init --path=../my-app --check</span>
+<span class="out__note"># exits 1 when a playbook is stale, so CI notices</span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= install -->
+  <section class="section section--install" id="install" aria-labelledby="install-title">
+    <div class="wsu-container">
+      <div class="head head--split">
+        <div>
+          <p class="label"><span class="label__dot" aria-hidden="true"></span>Get the shot</p>
+          <h2 id="install-title">Install, then plan.</h2>
+        </div>
+        <p class="head__note">BOOSTER needs PHP 8.3 or newer. The app it upgrades does not: an app on PHP 7.4 is fine. The gate in <code>run</code> starts Docker itself, so the machine needs a Docker daemon.</p>
+      </div>
+
+      <div class="install" data-install>
+        <div class="os" role="tablist" aria-label="Operating system">
+          <button class="os__tab" role="tab" id="os-unix" aria-controls="os-unix-panel" aria-selected="true" tabindex="0">Linux and macOS</button>
+          <button class="os__tab" role="tab" id="os-win" aria-controls="os-win-panel" aria-selected="false" tabindex="-1">Windows</button>
+          <button class="os__tab" role="tab" id="os-docker" aria-controls="os-docker-panel" aria-selected="false" tabindex="-1">Docker, no PHP</button>
+        </div>
+
+        <div class="os__panel" role="tabpanel" id="os-unix-panel" aria-labelledby="os-unix" tabindex="0">
+          <div class="code">
+<pre id="code-unix">git clone https://github.com/waynestate/booster.git
+cd booster &amp;&amp; composer install
+bin/booster detect --path=../my-app
+bin/booster plan   --path=../my-app
+bin/booster run    --path=../my-app --dry-run
+bin/booster run    --path=../my-app</pre>
+            <button class="copy" type="button" data-copy="#code-unix">Copy</button>
+          </div>
+        </div>
+        <div class="os__panel" role="tabpanel" id="os-win-panel" aria-labelledby="os-win" tabindex="0" hidden>
+          <div class="code">
+<pre id="code-win"># PowerShell; no bash or WSL needed
+git clone https://github.com/waynestate/booster.git
+cd booster; composer install
+php bin\booster detect --path=..\my-app
+php bin\booster plan   --path=..\my-app
+php bin\booster run    --path=..\my-app --dry-run
+php bin\booster run    --path=..\my-app</pre>
+            <button class="copy" type="button" data-copy="#code-win">Copy</button>
+          </div>
+        </div>
+        <div class="os__panel" role="tabpanel" id="os-docker-panel" aria-labelledby="os-docker" tabindex="0" hidden>
+          <div class="code">
+<pre id="code-docker"># inside the booster clone; the path after the second -v is your app
+docker run --rm -v "${PWD}:/booster" -w /booster composer:2 composer install --no-interaction
+docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-cli php bin/booster plan --path=/app</pre>
+            <button class="copy" type="button" data-copy="#code-docker">Copy</button>
+          </div>
+          <p class="os__note">When BOOSTER itself runs in a container, pass <code>--skip-gate</code> to <code>run</code> and run the tests yourself.</p>
+        </div>
+
+        <div class="install__side">
+          <div class="oneshot">
+            <p class="oneshot__label">The one-shot form, for a forced image upgrade</p>
+            <code>bin/booster run --path=../my-app --goal=php-74-to-84</code>
+          </div>
+          <div class="soon">
+            <p class="soon__label"><span class="chip chip--soon">Coming soon</span></p>
+            <p><code>composer require</code> from Packagist, waiting on the package name. Until then, clone it.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== contraindications -->
+  <section class="section section--never" aria-labelledby="never-title">
+    <div class="wsu-container">
+      <div class="head">
+        <p class="label label--on-green"><span class="label__dot" aria-hidden="true"></span>Contraindications</p>
+        <h2 id="never-title">What BOOSTER will not do.</h2>
+        <p class="head__sub">Side effects are limited to the diff in your working copy. Read it, then merge it yourself.</p>
+      </div>
+      <ul class="never">
+        <li><span class="never__x" aria-hidden="true"></span><h3>Commit, push or open a merge request</h3><p>It edits the working copy and prints a report. A person reads the diff and merges it.</p></li>
+        <li><span class="never__x" aria-hidden="true"></span><h3>Start on a dirty tree</h3><p><code>run</code> refuses a working copy that is not under git or has uncommitted changes, so the upgrade diff stands alone. <code>--allow-dirty</code> if you must.</p></li>
+        <li><span class="never__x" aria-hidden="true"></span><h3>Aim at an unsupported version</h3><p>An end-of-life target is refused; a security-only one comes with a warning. The dates come from CREED's <code>policy.json</code>, never from BOOSTER's code.</p></li>
+        <li><span class="never__x" aria-hidden="true"></span><h3>Run <code>composer update</code></h3><p>It raises constraints. Resolving them is your call.</p></li>
+        <li><span class="never__x" aria-hidden="true"></span><h3>Pass quietly</h3><p>An unreadable policy, broken JSON, missing Docker or a Rector error fails closed with exit 1 or 2.</p></li>
+        <li><span class="never__x" aria-hidden="true"></span><h3>Trust your file names</h3><p>Subprocesses take argument arrays, and control characters are stripped from everything printed. It reads no secrets and makes no network calls of its own.</p></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============================================================ care team -->
+  <section class="section section--team" aria-labelledby="team-title">
+    <div class="wsu-container">
+      <div class="head head--split">
+        <div>
+          <p class="label"><span class="label__dot" aria-hidden="true"></span>The care team</p>
+          <h2 id="team-title">BOOSTER's place in WELD.</h2>
+        </div>
+        <p class="head__note">WELD is the Wayne State application stack. BOOSTER is its upgrade layer, and it works for all five shapes: raw PHP, raw PHP with a Vue SPA, Laravel with Blade, Blade with Vue islands, and Inertia with Vue.</p>
+      </div>
+      <ul class="team">
+        <li class="member"><span class="member__mark member__mark--tile"><img src="assets/marks/wayneui.svg" width="40" height="40" alt=""></span><span class="member__name">WayneUI</span><span class="member__role">The interface layer under everything, this page included.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/creed.png" width="56" height="56" alt=""></span><span class="member__name">CREED</span><span class="member__role">Writes the version policy BOOSTER reads.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/proctor.png" width="56" height="56" alt=""></span><span class="member__name">PROCTOR</span><span class="member__role">Measures an app against that policy; can ride in the gate.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/preflight.png" width="56" height="56" alt=""></span><span class="member__name">PREFLIGHT</span><span class="member__role">The CI templates BOOSTER's own checks run on.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/sesame.png" width="56" height="56" alt=""></span><span class="member__name">SESAME</span><span class="member__role">Sign-in; <code>--sesame</code> moves wayne-cas apps to it.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/helmet.png" width="56" height="56" alt=""></span><span class="member__name">HELMET</span><span class="member__role">The baseline runtime and its headers.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/pinstripe.png" width="56" height="56" alt=""></span><span class="member__name">Pinstripe</span><span class="member__role">The coding standard BOOSTER is held to.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/sourdough.png" width="56" height="56" alt=""></span><span class="member__name">Sourdough</span><span class="member__role">Starters that are born current.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/weld.png" width="56" height="56" alt=""></span><span class="member__name">WELD</span><span class="member__role">The whole stack, joined. BOOSTER keeps it current.</span></li>
+        <li class="member member--self"><span class="member__mark"><img src="brand/booster-avatar-256.png" width="56" height="56" alt=""></span><span class="member__name">BOOSTER</span><span class="member__role">Moves apps forward, one dose at a time.</span><span class="member__here">You are here</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/squire.png" width="56" height="56" alt=""></span><span class="member__name">SQUIRE</span><span class="member__role">Carries the release out the door.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/rollcall.png" width="56" height="56" alt=""></span><span class="member__name">ROLLCALL</span><span class="member__role">Every app answers “present”, with its PHP version.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/advisor.png" width="56" height="56" alt=""></span><span class="member__name">ADVISOR</span><span class="member__role">Ask what applies to your app, and what to do next.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/drawbridge.png" width="56" height="56" alt=""></span><span class="member__name">DRAWBRIDGE</span><span class="member__role">The sign-in gateway, lowered on request.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============================================================= not yet -->
+  <section class="section section--next" aria-labelledby="next-title">
+    <div class="wsu-container next">
+      <div>
+        <p class="label"><span class="label__dot" aria-hidden="true"></span>Version 0.1</p>
+        <h2 id="next-title">Not yet given.</h2>
+        <p>The plumbing is proven on the example apps; the hit rate on real apps is not measured yet. What is still to come, from <a href="https://github.com/waynestate/booster/blob/main/OPEN_QUESTIONS.md">OPEN_QUESTIONS.md</a>:</p>
+      </div>
+      <ul class="schedule">
+        <li><span class="chip chip--soon">Coming soon</span> A PHAR build, so BOOSTER is one file</li>
+        <li><span class="chip chip--soon">Coming soon</span> <code>booster mcp</code>, a read-only tool server</li>
+        <li><span class="chip chip--soon">Coming soon</span> A recorded green baseline before the first hop</li>
+        <li><span class="chip chip--soon">Coming soon</span> PHPCompatibility and target-version PHPStan as advisory scans</li>
+        <li><span class="chip chip--soon">Coming soon</span> Vue 2 to 3 beyond a playbook, and Inertia checks per Laravel hop</li>
+        <li><span class="chip chip--soon">Coming soon</span> A full wayne-cas migration (today's recipe is a stub)</li>
+      </ul>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="wsu-container foot__row">
+    <p class="foot__joke">Side effects may include passing tests.</p>
+    <p class="foot__org">Wayne State University · Enterprise Applications · MIT licence</p>
+  </div>
+</footer>
+
+<script src="assets/booster.js" defer></script>
+</body>
+</html>

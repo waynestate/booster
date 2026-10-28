@@ -1,0 +1,4791 @@
+/*!
+ * WayneUI 2.0.8: Wayne State University design system
+ *
+ * Self-contained: this file plus ./fonts, ./marks and ./icons.svg need no
+ * network access and no build step. Link it and write HTML.
+ *
+ * Colors come from the WSU Identity Style Guide and every semantic pairing in
+ * here is contrast-tested in both light and dark themes before release.
+ *
+ * MIT licensed. Wayne State trademarks are not covered by that license.
+ */
+
+@layer wsu.base, wsu.components, wsu.chrome;
+
+/**
+ * WayneUI design tokens: GENERATED, DO NOT EDIT.
+ *
+ * Source: packages/tokens/src/*.json
+ * Rebuild: pnpm --filter @waynestate/wayne-ui-tokens build
+ *
+ * Colors come from the Wayne State Identity Style Guide. Contrast minima are
+ * declared alongside the tokens themselves and enforced by
+ * packages/tokens/test/contrast.test.js: a value changed here without
+ * satisfying its declared minimum will fail the build.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* Layer 0: primitives. Components must not reference these directly. */
+  --wsu-green-25: #F2F7F6;
+  --wsu-green-50: #cedddb;
+  --wsu-green-100: #9ebbb6;
+  --wsu-green-200: #6d9892;
+  --wsu-green-300: #3d766d;
+  --wsu-green-400: #0c5449;
+  --wsu-green-500: #0b4a40;
+  --wsu-green-600: #094038;
+  --wsu-green-700: #08352f;
+  --wsu-green-800: #062b27;
+  --wsu-green-900: #05211e;
+  --wsu-gold-50: #fff5d6;
+  --wsu-gold-100: #ffebad;
+  --wsu-gold-200: #ffe085;
+  --wsu-gold-300: #ffd65c;
+  --wsu-gold-400: #ffcc33;
+  --wsu-gold-500: #edbd2c;
+  --wsu-gold-600: #dbae25;
+  --wsu-gold-700: #c89f1f;
+  --wsu-gold-800: #b69018;
+  --wsu-gold-900: #a48111;
+  --wsu-gold-950: #634D00;
+  --wsu-neutral-50: #fafafa;
+  --wsu-neutral-100: #f4f4f5;
+  --wsu-neutral-200: #e4e4e7;
+  --wsu-neutral-300: #d4d4d8;
+  --wsu-neutral-400: #a1a1aa;
+  --wsu-neutral-500: #71717a;
+  --wsu-neutral-600: #52525b;
+  --wsu-neutral-700: #3f3f46;
+  --wsu-neutral-800: #27272a;
+  --wsu-neutral-900: #18181b;
+  --wsu-neutral-950: #09090b;
+  --wsu-ink-700: #314842;
+  --wsu-ink-800: #1F322E;
+  --wsu-ink-900: #142521;
+  --wsu-ink-950: #0A1916;
+  --wsu-ink-975: #050D0B;
+  --wsu-white: #FFFFFF;
+  --wsu-black: #09090b;
+  --wsu-functional-danger-dark: #9B1C2E;
+  --wsu-functional-danger-light: #FFB4AB;
+  --wsu-functional-success-dark: #0F5132;
+  --wsu-functional-success-light: #8FE0AE;
+  --wsu-functional-warning-dark: #634D00;
+  --wsu-functional-warning-light: #FFD65C;
+  --wsu-functional-info-dark: #0E5A7D;
+  --wsu-functional-info-light: #8CC8E8;
+  --wsu-functional-nonproduction-dark: #8B2145;
+  --wsu-functional-nonproduction-light: #F5A3B8;
+
+  /* Dimensions, type and motion. Theme-independent. */
+  --wsu-space-0: 0rem;
+  --wsu-space-1: 0.25rem;
+  --wsu-space-2: 0.5rem;
+  --wsu-space-3: 0.75rem;
+  --wsu-space-4: 1rem;
+  --wsu-space-5: 1.25rem;
+  --wsu-space-6: 1.5rem;
+  --wsu-space-8: 2rem;
+  --wsu-space-10: 2.5rem;
+  --wsu-space-12: 3rem;
+  --wsu-space-16: 4rem;
+  --wsu-space-20: 5rem;
+  --wsu-space-24: 6rem;
+  --wsu-space-px: 0.0625rem;
+  --wsu-radius-none: 0rem;
+  --wsu-radius-sm: 0.25rem;
+  --wsu-radius-field: 0.375rem;
+  --wsu-radius-box: 0.75rem;
+  --wsu-radius-selector: 0.5rem;
+  --wsu-radius-full: 9999rem;
+  --wsu-size-tap-min: 2.75rem;
+  --wsu-size-tap-compact: 2.25rem;
+  --wsu-size-focus-ring-width: 0.1875rem;
+  --wsu-size-focus-ring-offset: 0.125rem;
+  --wsu-size-border-width: 0.0625rem;
+  --wsu-size-border-width-strong: 0.125rem;
+  --wsu-size-content-max: 75rem;
+  --wsu-size-gutter: 0.9375rem;
+  --wsu-size-prose-max: 42rem;
+  --wsu-size-sidebar: 17rem;
+  --wsu-size-sidebar-collapsed: 4rem;
+  --wsu-shadow-none: none;
+  --wsu-shadow-sm: 0 1px 2px 0 rgb(16 18 18 / 0.06);
+  --wsu-shadow-md: 0 2px 4px -1px rgb(16 18 18 / 0.08), 0 1px 2px -1px rgb(16 18 18 / 0.06);
+  --wsu-shadow-lg: 0 8px 16px -4px rgb(16 18 18 / 0.10), 0 2px 4px -2px rgb(16 18 18 / 0.06);
+  --wsu-shadow-overlay: 0 16px 40px -8px rgb(16 18 18 / 0.24);
+  --wsu-bp-xs: 20rem;
+  --wsu-bp-sm: 40rem;
+  --wsu-bp-md: 48rem;
+  --wsu-bp-lg: 64rem;
+  --wsu-bp-xl: 80rem;
+  --wsu-duration-instant: 0ms;
+  --wsu-duration-fast: 120ms;
+  --wsu-duration-base: 200ms;
+  --wsu-duration-slow: 320ms;
+  --wsu-z-base: 0;
+  --wsu-z-sticky: 100;
+  --wsu-z-drawer: 200;
+  --wsu-z-overlay: 300;
+  --wsu-z-toast: 400;
+  --wsu-z-skip-link: 500;
+  --wsu-font-family-display: "Stratium 1", Lato, "Lato Fallback", Calibri, "Helvetica Neue", Arial, sans-serif;
+  --wsu-font-family-body: Lato, "Lato Fallback", Calibri, "Helvetica Neue", Arial, sans-serif;
+  --wsu-font-family-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --wsu-font-weight-light: 300;
+  --wsu-font-weight-regular: 400;
+  --wsu-font-weight-bold: 700;
+  --wsu-font-weight-black: 900;
+  --wsu-font-size-xs: 0.75rem;
+  --wsu-font-size-sm: 0.875rem;
+  --wsu-font-size-base: 1rem;
+  --wsu-font-size-lg: 1.125rem;
+  --wsu-font-size-xl: 1.25rem;
+  --wsu-font-size-2xl: 1.5rem;
+  --wsu-font-size-3xl: 1.875rem;
+  --wsu-font-size-4xl: 2.25rem;
+  --wsu-font-size-5xl: 3rem;
+  --wsu-font-lineHeight-tight: 1.2;
+  --wsu-font-lineHeight-snug: 1.35;
+  --wsu-font-lineHeight-base: 1.5;
+  --wsu-font-lineHeight-relaxed: 1.75;
+  --wsu-font-letterSpacing-tight: -0.015em;
+  --wsu-font-letterSpacing-normal: 0em;
+  --wsu-font-letterSpacing-wide: 0.025em;
+  --wsu-font-letterSpacing-caps: 0.06em;
+
+  /* Layer 1: semantics, light theme. */
+  --wsu-surface: #FFFFFF;
+  --wsu-surface-sunken: #fafafa;
+  --wsu-surface-raised: #FFFFFF;
+  --wsu-surface-overlay: #FFFFFF;
+  --wsu-surface-inverse: #18181b;
+  --wsu-text: #18181b;
+  --wsu-text-muted: #3f3f46;
+  --wsu-text-subtle: #71717a;
+  --wsu-text-on-inverse: #f4f4f5;
+  --wsu-brand: #0c5449;
+  --wsu-brand-hover: #0b4a40;
+  --wsu-brand-active: #094038;
+  --wsu-brand-subtle: #F2F7F6;
+  --wsu-on-brand: #FFFFFF;
+  --wsu-accent: #ffcc33;
+  --wsu-accent-subtle: #ffebad;
+  --wsu-on-accent: #09090b;
+  --wsu-border: #d4d4d8;
+  --wsu-border-strong: #71717a;
+  --wsu-border-brand: #0c5449;
+  --wsu-focus-ring: #0c5449;
+  --wsu-focus-offset: #FFFFFF;
+  --wsu-chrome-masthead: #094038;
+  --wsu-chrome-masthead-text: #FFFFFF;
+  --wsu-chrome-masthead-muted: #F2F7F6;
+  --wsu-chrome-bar: #0c5449;
+  --wsu-chrome-bar-hover: #0b4a40;
+  --wsu-chrome-bar-text: #FFFFFF;
+  --wsu-chrome-bar-muted: #F2F7F6;
+  --wsu-chrome-on-chrome-focus: #ffd65c;
+  --wsu-chrome-mark: #0c5449;
+  --wsu-mockup-device: #09090b;
+  --wsu-mockup-bezel: #71717a;
+  --wsu-mockup-panel: #050D0B;
+  --wsu-mockup-screen: #18181b;
+  --wsu-on-mockup: #f4f4f5;
+  --wsu-danger: #9B1C2E;
+  --wsu-on-danger: #FFFFFF;
+  --wsu-success: #0F5132;
+  --wsu-on-success: #FFFFFF;
+  --wsu-warning: #634D00;
+  --wsu-on-warning: #FFFFFF;
+  --wsu-info: #0E5A7D;
+  --wsu-on-info: #FFFFFF;
+  --wsu-nonproduction: #8B2145;
+  --wsu-on-nonproduction: #FFFFFF;
+}
+
+/**
+ * Dark theme.
+ *
+ * Both selectors are emitted because the two ecosystems WayneUI supports
+ * disagree: daisyUI switches on [data-theme], Tailwind and shadcn-vue switch on
+ * a .dark class. Honoring both means one toggle drives the whole page no
+ * matter which flavour is installed.
+ */
+[data-theme='wsu-dark'],
+.dark {
+  color-scheme: dark;
+  --wsu-surface: #142521;
+  --wsu-surface-sunken: #0A1916;
+  --wsu-surface-raised: #1F322E;
+  --wsu-surface-overlay: #1F322E;
+  --wsu-surface-inverse: #f4f4f5;
+  --wsu-text: #f4f4f5;
+  --wsu-text-muted: #d4d4d8;
+  --wsu-text-subtle: #a1a1aa;
+  --wsu-text-on-inverse: #142521;
+  --wsu-brand: #cedddb;
+  --wsu-brand-hover: #F2F7F6;
+  --wsu-brand-active: #FFFFFF;
+  --wsu-brand-subtle: #062b27;
+  --wsu-on-brand: #0A1916;
+  --wsu-accent: #ffd65c;
+  --wsu-accent-subtle: #a48111;
+  --wsu-on-accent: #0A1916;
+  --wsu-border: #314842;
+  --wsu-border-strong: #a1a1aa;
+  --wsu-border-brand: #cedddb;
+  --wsu-focus-ring: #ffd65c;
+  --wsu-focus-offset: #09090b;
+  --wsu-chrome-masthead: #094038;
+  --wsu-chrome-masthead-text: #FFFFFF;
+  --wsu-chrome-masthead-muted: #F2F7F6;
+  --wsu-chrome-bar: #0c5449;
+  --wsu-chrome-bar-hover: #0b4a40;
+  --wsu-chrome-bar-text: #FFFFFF;
+  --wsu-chrome-bar-muted: #F2F7F6;
+  --wsu-chrome-on-chrome-focus: #ffd65c;
+  --wsu-chrome-mark: #FFFFFF;
+  --wsu-mockup-device: #09090b;
+  --wsu-mockup-bezel: #71717a;
+  --wsu-mockup-panel: #050D0B;
+  --wsu-mockup-screen: #18181b;
+  --wsu-on-mockup: #f4f4f5;
+  --wsu-danger: #FFB4AB;
+  --wsu-on-danger: #0A1916;
+  --wsu-success: #8FE0AE;
+  --wsu-on-success: #0A1916;
+  --wsu-warning: #FFD65C;
+  --wsu-on-warning: #0A1916;
+  --wsu-info: #8CC8E8;
+  --wsu-on-info: #0A1916;
+  --wsu-nonproduction: #F5A3B8;
+  --wsu-on-nonproduction: #0A1916;
+}
+
+/**
+ * Honor the operating system when the page has not been told otherwise.
+ *
+ * The :not() guards keep this out of the way once a theme has been set
+ * explicitly, whether by the pre-paint script or by the user's own choice.
+ * Without JavaScript this rule is the only thing that reads the preference, so
+ * a no-script page still follows the machine.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='wsu']):not([data-theme='wsu-dark']):not(.light) {
+    --wsu-surface: #142521;
+    --wsu-surface-sunken: #0A1916;
+    --wsu-surface-raised: #1F322E;
+    --wsu-surface-overlay: #1F322E;
+    --wsu-surface-inverse: #f4f4f5;
+    --wsu-text: #f4f4f5;
+    --wsu-text-muted: #d4d4d8;
+    --wsu-text-subtle: #a1a1aa;
+    --wsu-text-on-inverse: #142521;
+    --wsu-brand: #cedddb;
+    --wsu-brand-hover: #F2F7F6;
+    --wsu-brand-active: #FFFFFF;
+    --wsu-brand-subtle: #062b27;
+    --wsu-on-brand: #0A1916;
+    --wsu-accent: #ffd65c;
+    --wsu-accent-subtle: #a48111;
+    --wsu-on-accent: #0A1916;
+    --wsu-border: #314842;
+    --wsu-border-strong: #a1a1aa;
+    --wsu-border-brand: #cedddb;
+    --wsu-focus-ring: #ffd65c;
+    --wsu-focus-offset: #09090b;
+    --wsu-chrome-masthead: #094038;
+    --wsu-chrome-masthead-text: #FFFFFF;
+    --wsu-chrome-masthead-muted: #F2F7F6;
+    --wsu-chrome-bar: #0c5449;
+    --wsu-chrome-bar-hover: #0b4a40;
+    --wsu-chrome-bar-text: #FFFFFF;
+    --wsu-chrome-bar-muted: #F2F7F6;
+    --wsu-chrome-on-chrome-focus: #ffd65c;
+    --wsu-chrome-mark: #FFFFFF;
+    --wsu-mockup-device: #09090b;
+    --wsu-mockup-bezel: #71717a;
+    --wsu-mockup-panel: #050D0B;
+    --wsu-mockup-screen: #18181b;
+    --wsu-on-mockup: #f4f4f5;
+    --wsu-danger: #FFB4AB;
+    --wsu-on-danger: #0A1916;
+    --wsu-success: #8FE0AE;
+    --wsu-on-success: #0A1916;
+    --wsu-warning: #FFD65C;
+    --wsu-on-warning: #0A1916;
+    --wsu-info: #8CC8E8;
+    --wsu-on-info: #0A1916;
+    --wsu-nonproduction: #F5A3B8;
+    --wsu-on-nonproduction: #0A1916;
+  }
+}
+
+
+/* ======================================================================
+   fonts.css
+   ====================================================================== */
+
+/**
+ * Lato, self-hosted.
+ *
+ * The Identity Style Guide names Lato for body copy and calls it out as web
+ * friendly. It is self-hosted rather than loaded from Google Fonts for three
+ * reasons: the static-site path must work with no network access to anything
+ * but the copied files, internal WSU applications should not leak visitor IPs
+ * to a third party, and a CDN outage should not restyle every Wayne State app
+ * at once.
+ *
+ * Latin and Latin Extended are both included: WSU serves names that need the
+ * extended range, and dropping it would silently fall back mid-word.
+ *
+ * Stratium 1 Black, the headline face, is proprietary and is NOT shipped here.
+ * --wsu-font-family-display falls through to Lato Black until a web licence
+ * exists; see packages/tokens/src/typography.json.
+ *
+ * Lato is licensed under the SIL Open Font License 1.1.
+ */
+
+@font-face {
+  font-family: Lato;
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('./fonts/lato-300-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: Lato;
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('./fonts/lato-300-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: Lato;
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/lato-400-italic-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: Lato;
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/lato-400-italic-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: Lato;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/lato-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: Lato;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/lato-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: Lato;
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./fonts/lato-700-italic-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: Lato;
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./fonts/lato-700-italic-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: Lato;
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./fonts/lato-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: Lato;
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./fonts/lato-700-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: Lato;
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url('./fonts/lato-900-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: Lato;
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url('./fonts/lato-900-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/**
+ * Metric-compatible fallback. Without this the swap from the system font to
+ * Lato shifts layout, which is both an unpleasant flash and a stability
+ * problem for anyone reading with magnification.
+ */
+@font-face {
+  font-family: 'Lato Fallback';
+  src: local('Helvetica Neue'), local('Arial'), local('Liberation Sans');
+  ascent-override: 101%;
+  descent-override: 21.8%;
+  line-gap-override: 0%;
+  size-adjust: 97.5%;
+}
+
+
+/* ======================================================================
+   base.css: @layer wsu.base
+   ====================================================================== */
+
+@layer wsu.base {
+  /**
+   * WayneUI base layer.
+   *
+   * A small, opinionated reset plus the accessibility primitives that every
+   * consumer path depends on. This file assumes tokens.css is already loaded and
+   * references only semantic (--wsu-*) tokens, never a raw ramp value.
+   *
+   * Everything here is expressed in rem and in logical properties, so that zoom,
+   * user font sizing, text-spacing overrides and right-to-left all work without
+   * per-component effort.
+   */
+
+  /* -------------------------------------------------------------- 1. Reset */
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  * {
+    margin: 0;
+  }
+
+  html {
+    /* Never set a px font-size on :root: it breaks the user's browser setting,
+       which is the most common real-world accessibility need there is. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    tab-size: 4;
+    scroll-padding-block-start: 6rem; /* clears the sticky app bar on anchor jumps */
+  }
+
+  body {
+    min-block-size: 100svb;
+    margin: 0;
+    font-family: var(--wsu-font-family-body);
+    font-size: var(--wsu-font-size-base);
+    font-weight: var(--wsu-font-weight-regular);
+    line-height: var(--wsu-font-lineHeight-base);
+    color: var(--wsu-text);
+    background-color: var(--wsu-surface);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  img,
+  picture,
+  video,
+  canvas,
+  svg {
+    display: block;
+    max-inline-size: 100%;
+    block-size: auto;
+  }
+
+  /**
+   * The UA stylesheet's `[hidden] { display: none }` only applies to HTML
+   * elements, so a hidden <svg> still renders, and the rule above, which gives
+   * svg `display: block`, would override it even where it did apply. Any element
+   * marked hidden must actually be hidden, from sighted users and assistive
+   * technology alike.
+   *
+   * Deliberately NOT `!important`. Inside cascade layers `!important` inverts the
+   * layer order, so an important rule here would outrank the chrome layer and
+   * break the docked sidebar, which used to be `[hidden]` in markup and
+   * re-shown at the docked breakpoint by a media query alone. Attribute
+   * specificity (0,1,0) already beats the `svg` type selector above, and chrome
+   * can still override it deliberately.
+   *
+   * That media-query override was never enough on its own, important or not:
+   * a consumer's own reset can put `!important` on its own `[hidden]` rule
+   * (Tailwind's preflight does, in every Vite-based Laravel application, which
+   * is the default rather than an edge case), and if that reset's stylesheet
+   * loads before WayneUI's, its important declaration outranks anything WayneUI
+   * writes in the chrome layer in reply, at any specificity, with or without
+   * `!important` of its own; a later-declared layer only wins the normal-weight
+   * half of the cascade, and importance is compared before layers ever come
+   * into it. No rule in this file could have fixed that, staying non-important
+   * or not. `theme.js` now removes `hidden` from the sidebar outright wherever
+   * the layout is docked, including on arrival, rather than leaving CSS to
+   * relitigate an attribute a consumer's reset has already settled; see
+   * `initDrawers` there. The media query here is a fallback for the genuinely
+   * no-JavaScript case, not the mechanism the docked sidebar depends on.
+   */
+  [hidden] {
+    display: none;
+  }
+
+  /**
+   * Wrapped in Tailwind's own `base` layer, by name, rather than left unlayered
+   * like the rest of this file.
+   *
+   * Every other rule here is deliberately unlayered so it beats anything a
+   * framework adapter ships in a layer, which is what makes WayneUI's focus ring
+   * win over daisyUI's own further down this cascade (see daisy.css). This one
+   * rule needs the opposite outcome: daisyUI and shadcn-vue components built on
+   * a native `button`, `input`, `select` or `textarea` set their own `color` and
+   * `font-weight` inside a layer, and an unlayered `color: inherit` here always
+   * outranks a layered declaration regardless of specificity or source order, so
+   * it was winning against every filled daisy control and leaving its text at
+   * or below 2:1 contrast. `@layer base` names the same layer Tailwind itself
+   * declares (`@layer theme, base, components, utilities`) for its own preflight,
+   * so this reset takes that layer's place in the order Tailwind already
+   * established rather than inventing a new one: still above the user-agent
+   * stylesheet, still below `components` and `utilities`, so a daisy or shadcn
+   * control's own layered color wins, and a bare `<button>` with no framework
+   * present still inherits the page's text color instead of the browser
+   * default. Where no bundler ever sees this file (`dist/wayne-ui.css`), the
+   * build wraps the whole file one layer deeper (`wsu.base`); nesting a named
+   * layer inside another is valid CSS and this rule keeps the same relative
+   * position there too.
+   */
+  @layer base {
+    input,
+    button,
+    textarea,
+    select {
+      font: inherit;
+      color: inherit;
+    }
+  }
+
+  /* Long words and URLs must not force horizontal scrolling at 320px (1.4.10). */
+  p,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  li,
+  dd,
+  dt,
+  figcaption {
+    overflow-wrap: break-word;
+  }
+
+  /* --------------------------------------------------------- 2. Typography */
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--wsu-font-family-display);
+    font-weight: var(--wsu-font-weight-black);
+    line-height: var(--wsu-font-lineHeight-tight);
+    letter-spacing: var(--wsu-font-letterSpacing-tight);
+    text-wrap: balance;
+    color: var(--wsu-text);
+  }
+
+  h1 { font-size: var(--wsu-font-size-4xl); }
+  h2 { font-size: var(--wsu-font-size-3xl); }
+  h3 { font-size: var(--wsu-font-size-2xl); }
+  h4 { font-size: var(--wsu-font-size-xl); }
+  h5 { font-size: var(--wsu-font-size-lg); }
+  h6 { font-size: var(--wsu-font-size-base); }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  small {
+    font-size: var(--wsu-font-size-sm);
+  }
+
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--wsu-font-family-mono);
+    font-size: 0.9375em;
+  }
+
+  :where(a) {
+    color: var(--wsu-brand);
+    text-decoration-line: underline;
+    text-decoration-thickness: max(0.08em, 1px);
+    text-underline-offset: 0.15em;
+  }
+
+  :where(a):hover {
+    color: var(--wsu-brand-hover);
+    text-decoration-thickness: max(0.14em, 2px);
+  }
+
+  /* ------------------------------------------------------------- 3. Focus */
+
+  /**
+   * One focus treatment for the entire system.
+   *
+   * The ring is drawn with an outline plus an offset in the page's own surface
+   * colour, so it contrasts against the control AND against whatever the control
+   * sits on. That is what WCAG 2.4.13 asks for, and doing it once here means no
+   * component can quietly ship a weaker indicator.
+   *
+   * :focus-visible rather than :focus, so pointer users do not see rings, but the
+   * fallback below keeps them for browsers without support.
+   */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible,
+  .wsu-focus-ring:focus-visible {
+    outline: var(--wsu-size-focus-ring-width) solid var(--wsu-focus-ring);
+    outline-offset: var(--wsu-size-focus-ring-offset);
+    /* The offset gap is transparent by default; painting it guarantees the ring
+       is separated from the control even on a same-coloured background. */
+    box-shadow: 0 0 0 var(--wsu-size-focus-ring-offset) var(--wsu-focus-offset);
+    border-radius: inherit;
+  }
+
+  /* Never remove the indicator without replacing it. */
+  :where(a, button, input, select, textarea, summary):focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  @supports not selector(:focus-visible) {
+    :where(a, button, input, select, textarea, summary):focus {
+      outline: var(--wsu-size-focus-ring-width) solid var(--wsu-focus-ring);
+      outline-offset: var(--wsu-size-focus-ring-offset);
+    }
+  }
+
+  /* ------------------------------------------------- 4. Targets and motion */
+
+  /**
+   * WCAG 2.5.5 (AAA) target size. Applied as a minimum, not a fixed height, so
+   * controls still grow with their content and with the user's font size.
+   * Inline links in running text are exempt from the success criterion and are
+   * excluded here, since padding them out would wreck paragraph rhythm.
+   */
+  /**
+   * The official Wayne State header and footer are excluded.
+   *
+   * They are not ours to restyle, and forcing their controls to 44px actively
+   * breaks them: the official search submit is a 35x30 absolutely-positioned
+   * button carrying its glyph as a background image, so stretching it to 44x44
+   * distorts the magnifier. Their targets are already conformant: every
+   * undersized one passes 2.5.8 via the spacing exception.
+   *
+   * This is the same failure WayneUI 1.x had in reverse: 1.x applied a global
+   * `*` reset from inside its header partial and changed layout for every page
+   * that included it. A reset that reaches into someone else's component is a bug
+   * whichever direction it travels.
+   */
+  :where(button, [role='button'], input[type='checkbox'], input[type='radio'], select, summary):not(
+      .wsuheader *,
+      .wsufooter *
+    ),
+  .wsu-target {
+    min-block-size: var(--wsu-size-tap-min);
+    min-inline-size: var(--wsu-size-tap-min);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /**
+     * Honour the preference globally rather than per component. Animations are
+     * reduced to near-instant rather than removed outright, so that transitions
+     * which communicate state (a drawer opening) still read as a change.
+     *
+     * The delays are reset too, not only the durations. A sequenced transition
+     * (the checkbox tick's second stroke waiting for the first to finish) uses
+     * transition-delay to stage itself, and that delay is real wall-clock time
+     * regardless of how short the duration it is delaying becomes: without this,
+     * a reduced-motion user would still sit through the gap between stages and
+     * see a checked box arrive with only its first stroke drawn, which is a
+     * state that was never meant to be visible on its own.
+     */
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-delay: 0s !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      transition-delay: 0s !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* ------------------------------------------- 5. Accessibility utilities */
+
+  /**
+   * Visually hidden but available to assistive technology. Uses the clip-path
+   * technique rather than `display:none` (which hides from screen readers too)
+   * or a negative text-indent (which breaks in RTL).
+   */
+  .wsu-sr-only {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  /** Hidden until focused, the pattern skip links use. */
+  .wsu-sr-only-focusable:not(:focus):not(:focus-within) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  /**
+   * Skip link (WCAG 2.4.1).
+   *
+   * Sits above every other layer, because a skip link that renders behind a
+   * sticky masthead technically exists and practically does not.
+   */
+  .wsu-skip-link {
+    position: absolute;
+    z-index: var(--wsu-z-skip-link);
+    inset-block-start: var(--wsu-space-2);
+    inset-inline-start: var(--wsu-space-2);
+    padding: var(--wsu-space-3) var(--wsu-space-4);
+    font-weight: var(--wsu-font-weight-bold);
+    color: var(--wsu-on-brand);
+    text-decoration: none;
+    background-color: var(--wsu-brand);
+    border-radius: var(--wsu-radius-field);
+    box-shadow: var(--wsu-shadow-lg);
+    /* Slides down rather than appearing, so the first Tab on a page shows where
+       the control came from. `translate` rather than `transform` so it composes
+       with anything else that needs a transform later. */
+    translate: 0 -200%;
+    transition: translate var(--wsu-duration-fast) cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .wsu-skip-link:focus {
+    translate: 0 0;
+  }
+
+  /**
+   * The generic focus ring is unreadable here. In the light theme
+   * --wsu-focus-ring resolves to the exact value of --wsu-brand, which is also
+   * this control's own background and the masthead's it sits above: a ring
+   * declared in the stylesheet and absent on screen, in one theme only, which is
+   * why source inspection alone did not find it.
+   *
+   * The fix is the same pairing chrome.css already uses for a control whose own
+   * surface is brand-coloured, extended so the painted halo covers the ring's
+   * own footprint rather than only the gap beside it. Without that widening the
+   * ring still fails wherever this link is shown outside the masthead, such as
+   * its own entry in the component gallery, because the halo would stop short
+   * of the ring and the page's true background would touch it directly.
+   */
+  .wsu-skip-link:focus-visible {
+    outline-color: var(--wsu-chrome-on-chrome-focus);
+    box-shadow:
+      var(--wsu-shadow-lg),
+      0 0 0
+        calc(var(--wsu-size-focus-ring-offset) + var(--wsu-size-focus-ring-width) + 0.0625rem)
+        var(--wsu-chrome-bar);
+  }
+
+  /** Force-colors / Windows High Contrast mode. */
+  @media (forced-colors: active) {
+    .wsu-skip-link {
+      border: 1px solid CanvasText;
+    }
+
+    :where(a, button, input, select, textarea, summary):focus-visible {
+      outline: 3px solid CanvasText;
+    }
+  }
+
+  /* ------------------------------------------------------- 6. Layout aids */
+
+  .wsu-container {
+    inline-size: 100%;
+    max-inline-size: var(--wsu-size-content-max);
+    margin-inline: auto;
+    padding-inline: var(--wsu-size-gutter);
+  }
+
+  /** WCAG 1.4.8: caps measure at roughly 70 characters. */
+  .wsu-prose {
+    max-inline-size: var(--wsu-size-prose-max);
+  }
+
+  .wsu-prose > * + * {
+    margin-block-start: var(--wsu-space-4);
+  }
+
+  .wsu-stack > * + * {
+    margin-block-start: var(--wsu-space-4);
+  }
+
+}
+
+
+/* ======================================================================
+   components.css: @layer wsu.components
+   ====================================================================== */
+
+@layer wsu.components {
+  /**
+   * WayneUI components.
+   *
+   * These are the Tier 2 application patterns (buttons, forms, tables, alerts
+   * and so on) styled directly against the semantic tokens.
+   *
+   * They exist so that the static-site and raw-PHP paths get a complete, usable
+   * component set with no build step and no framework. Projects running daisyUI
+   * or shadcn-vue can ignore this file entirely and use their own primitives; the
+   * adapters make those render in the same WSU colours. Nothing here reimplements
+   * a daisyUI or shadcn component for its own sake.
+   */
+
+  /* ================================================================ Buttons */
+
+  .wsu-btn {
+    display: inline-flex;
+    gap: var(--wsu-space-2);
+    align-items: center;
+    justify-content: center;
+    min-block-size: var(--wsu-size-tap-min);
+    padding: var(--wsu-space-2) var(--wsu-space-4);
+    font-family: var(--wsu-font-family-body);
+    font-size: var(--wsu-font-size-base);
+    font-weight: var(--wsu-font-weight-bold);
+    line-height: var(--wsu-font-lineHeight-snug);
+    color: var(--wsu-text);
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    background-color: transparent;
+    border: var(--wsu-size-border-width) solid transparent;
+    border-radius: var(--wsu-radius-field);
+    transition:
+      background-color var(--wsu-duration-fast) ease-out,
+      border-color var(--wsu-duration-fast) ease-out,
+      translate var(--wsu-duration-fast) ease-out;
+  }
+
+  /* A 1px press. Enough to feel like the control responded, not enough to move
+     the layout or to be noticed as an effect. */
+  .wsu-btn:active:not(:disabled) {
+    translate: 0 1px;
+  }
+
+  .wsu-btn:disabled,
+  .wsu-btn[aria-disabled='true'] {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  /**
+   * A busy button spins its icon.
+   *
+   * Driven off `aria-busy`, so the state a screen reader is told about and the
+   * state that is drawn are the same attribute: a spinner that keeps turning
+   * after the work finished is a lie the accessibility tree would not be telling.
+   * The global prefers-reduced-motion rule stops it after one turn, which is the
+   * right outcome: a stationary marker rather than an indefinite one.
+   */
+  .wsu-btn[aria-busy='true'] .wsu-icon {
+    animation: wsu-spin 1s linear infinite;
+  }
+
+  @keyframes wsu-spin {
+    to {
+      rotate: 1turn;
+    }
+  }
+
+  .wsu-btn--primary {
+    color: var(--wsu-on-brand);
+    background-color: var(--wsu-brand);
+  }
+
+  .wsu-btn--primary:hover:not(:disabled) {
+    color: var(--wsu-on-brand);
+    background-color: var(--wsu-brand-hover);
+  }
+
+  /**
+   * Gold is an accent, and PMS 1225c carries ink rather than white: hardcoded
+   * here through the token rather than left to the author, because white-on-gold
+   * (1.51:1) is the most likely branding mistake in a WSU application.
+   */
+  .wsu-btn--accent {
+    color: var(--wsu-on-accent);
+    background-color: var(--wsu-accent);
+  }
+
+  .wsu-btn--accent:hover:not(:disabled) {
+    color: var(--wsu-on-accent);
+    filter: brightness(0.94);
+  }
+
+  .wsu-btn--outline {
+    color: var(--wsu-brand);
+    border-color: currentcolor;
+  }
+
+  .wsu-btn--outline:hover:not(:disabled) {
+    background-color: var(--wsu-brand-subtle);
+  }
+
+  .wsu-btn--ghost {
+    color: var(--wsu-text);
+  }
+
+  .wsu-btn--ghost:hover:not(:disabled) {
+    background-color: var(--wsu-surface-sunken);
+  }
+
+  .wsu-btn--danger {
+    color: var(--wsu-on-danger);
+    background-color: var(--wsu-danger);
+  }
+
+  /**
+   * The destructive action is the one control that most needs to feel like it
+   * responded to a pointer, and it was the only variant with no hover rule at
+   * all: hovered and idle were pixel-identical.
+   *
+   * --wsu-danger flips direction between themes the same way --wsu-brand does,
+   * dark ink on a light red in dark mode rather than white on a dark red, so a
+   * single fixed hover colour cannot be right in both. A brightness filter
+   * moves with whichever value is actually in force instead of picking one:
+   * light theme, #9B1C2E against white on-danger text goes to #921A2B, 8.73:1
+   * (was 8.08:1); dark theme, #FFB4AB against dark-ink on-danger text goes to
+   * #F0A9A1, 9.36:1 (was 10.63:1). Both stay well past the 7:1 the base colour
+   * itself is held to.
+   */
+  .wsu-btn--danger:hover:not(:disabled) {
+    color: var(--wsu-on-danger);
+    filter: brightness(0.94);
+  }
+
+  .wsu-btn--sm {
+    min-block-size: var(--wsu-size-tap-min);
+    padding-inline: var(--wsu-space-3);
+    font-size: var(--wsu-font-size-sm);
+  }
+
+  .wsu-btn--lg {
+    padding: var(--wsu-space-3) var(--wsu-space-6);
+    font-size: var(--wsu-font-size-lg);
+  }
+
+  /** Icon-only. Keeps the AAA target size and requires an accessible name. */
+  .wsu-btn--icon {
+    inline-size: var(--wsu-size-tap-min);
+    padding: 0;
+  }
+
+  /* ================================================================== Cards */
+
+  .wsu-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wsu-space-3);
+    padding: var(--wsu-space-5);
+    background-color: var(--wsu-surface-raised);
+    border: var(--wsu-size-border-width) solid var(--wsu-border);
+    border-radius: var(--wsu-radius-box);
+    transition:
+      border-color var(--wsu-duration-fast) ease-out,
+      box-shadow var(--wsu-duration-fast) ease-out;
+  }
+
+  /**
+   * Only cards that are themselves a link or button lift. A static card that
+   * responds to the pointer suggests it does something, which is a small lie told
+   * on every page.
+   */
+  .wsu-card:is(a, button):hover {
+    border-color: var(--wsu-border-strong);
+    box-shadow: var(--wsu-shadow-md);
+  }
+
+  .wsu-card__title {
+    font-size: var(--wsu-font-size-lg);
+  }
+
+  .wsu-card__footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wsu-space-2);
+    padding-block-start: var(--wsu-space-3);
+    margin-block-start: auto;
+    border-block-start: var(--wsu-size-border-width) solid var(--wsu-border);
+  }
+
+  /* ================================================================= Alerts */
+
+  /**
+   * Status is carried by an icon and a visible label as well as by colour, so the
+   * meaning survives for anyone who cannot distinguish the hues (1.4.1).
+   */
+  .wsu-alert {
+    display: flex;
+    gap: var(--wsu-space-3);
+    align-items: flex-start;
+    padding: var(--wsu-space-4);
+    border: var(--wsu-size-border-width) solid currentcolor;
+    border-inline-start-width: var(--wsu-space-1);
+    border-radius: var(--wsu-radius-box);
+  }
+
+  /**
+   * Claims whatever the row has left over, so a trailing control sitting after
+   * it (a toast's dismiss button) lands flush against the row's own trailing
+   * edge instead of floating wherever the unclaimed space happens to end up. An
+   * alert carries no trailing control, so this claims space nothing else wanted
+   * and changes nothing there.
+   */
+  .wsu-alert__body {
+    flex-grow: 1;
+    color: var(--wsu-text);
+  }
+
+  .wsu-alert__title {
+    font-family: var(--wsu-font-family-body);
+    font-size: var(--wsu-font-size-base);
+    font-weight: var(--wsu-font-weight-bold);
+    color: inherit;
+  }
+
+  .wsu-alert--info { color: var(--wsu-info); background-color: var(--wsu-surface-sunken); }
+  .wsu-alert--success { color: var(--wsu-success); background-color: var(--wsu-surface-sunken); }
+  .wsu-alert--warning { color: var(--wsu-warning); background-color: var(--wsu-surface-sunken); }
+  .wsu-alert--danger { color: var(--wsu-danger); background-color: var(--wsu-surface-sunken); }
+
+  /* ================================================================ Badges */
+
+  .wsu-badge {
+    display: inline-flex;
+    gap: var(--wsu-space-1);
+    align-items: center;
+    padding: var(--wsu-space-px) var(--wsu-space-2);
+    font-size: var(--wsu-font-size-xs);
+    font-weight: var(--wsu-font-weight-bold);
+    line-height: 1.6;
+    border-radius: var(--wsu-radius-full);
+  }
+
+  .wsu-badge--neutral { color: var(--wsu-text); background-color: var(--wsu-surface-sunken); border: var(--wsu-size-border-width) solid var(--wsu-border); }
+  .wsu-badge--brand { color: var(--wsu-on-brand); background-color: var(--wsu-brand); }
+  .wsu-badge--accent { color: var(--wsu-on-accent); background-color: var(--wsu-accent); }
+  .wsu-badge--success { color: var(--wsu-on-success); background-color: var(--wsu-success); }
+  .wsu-badge--danger { color: var(--wsu-on-danger); background-color: var(--wsu-danger); }
+
+  /* =========================================================== Status dot */
+
+  /**
+   * A coloured dot with a text label beside it, the same division of labour as
+   * wsu-badge: the word is the status, the colour only reinforces it (1.4.1).
+   * `.wsu-status-dot__dot` is generated markup a screen reader is never asked to
+   * read on its own (the label already says what it says), so it is marked
+   * aria-hidden rather than given a second, redundant name.
+   *
+   * Every variant carries the same neutral ring regardless of its own fill.
+   * --wsu-accent is validated for text sitting on top of it, not for its own
+   * edge against the page, and there is no text on top of a dot this small to
+   * fall back on: an unringed gold dot on a light surface all but disappears.
+   * The ring is --wsu-border-strong, the token already proven at 3:1 against
+   * both surfaces, not --wsu-border, which is decorative and explicitly not.
+   */
+  .wsu-status-dot {
+    display: inline-flex;
+    gap: var(--wsu-space-2);
+    align-items: center;
+    font-size: var(--wsu-font-size-sm);
+    color: var(--wsu-text);
+  }
+
+  .wsu-status-dot__dot {
+    display: inline-block;
+    flex: none;
+    inline-size: 0.5rem;
+    block-size: 0.5rem;
+    border-radius: var(--wsu-radius-full);
+    box-shadow: 0 0 0 var(--wsu-size-border-width) var(--wsu-border-strong);
+  }
+
+  .wsu-status-dot--neutral .wsu-status-dot__dot { background-color: var(--wsu-text-subtle); }
+  .wsu-status-dot--brand .wsu-status-dot__dot { background-color: var(--wsu-brand); }
+  .wsu-status-dot--accent .wsu-status-dot__dot { background-color: var(--wsu-accent); }
+  .wsu-status-dot--success .wsu-status-dot__dot { background-color: var(--wsu-success); }
+  .wsu-status-dot--danger .wsu-status-dot__dot { background-color: var(--wsu-danger); }
+
+  /* ============================================================ Keyboard key */
+
+  /**
+   * A literal key or shortcut: `<kbd class="wsu-kbd">&#8984;K</kbd>`. `<kbd>`
+   * already carries the right semantics on its own, so this only supplies the
+   * key-cap look; nothing here is interactive, and none of the target-size
+   * rules apply to a label nobody presses.
+   */
+  .wsu-kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 var(--wsu-space-1);
+    font-family: var(--wsu-font-family-mono);
+    font-size: var(--wsu-font-size-xs);
+    line-height: 1.6;
+    color: var(--wsu-text-muted);
+    background-color: var(--wsu-surface-sunken);
+    border: var(--wsu-size-border-width) solid var(--wsu-border);
+    border-radius: var(--wsu-radius-sm);
+  }
+
+  /* ================================================================== Forms */
+
+  .wsu-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wsu-space-2);
+  }
+
+  .wsu-field__label {
+    font-size: var(--wsu-font-size-sm);
+    font-weight: var(--wsu-font-weight-bold);
+    color: var(--wsu-text);
+  }
+
+  /**
+   * Required is marked with a word, not just an asterisk. A bare `*` is announced
+   * as "star" or skipped entirely depending on the screen reader.
+   */
+  .wsu-field__required {
+    font-weight: var(--wsu-font-weight-regular);
+    color: var(--wsu-text-muted);
+  }
+
+  .wsu-field__hint {
+    font-size: var(--wsu-font-size-sm);
+    color: var(--wsu-text-muted);
+  }
+
+  .wsu-input,
+  .wsu-select,
+  .wsu-textarea {
+    inline-size: 100%;
+    min-block-size: var(--wsu-size-tap-min);
+    padding: var(--wsu-space-2) var(--wsu-space-3);
+    color: var(--wsu-text);
+    background-color: var(--wsu-surface);
+    border: var(--wsu-size-border-width) solid var(--wsu-border-strong);
+    border-radius: var(--wsu-radius-field);
+    transition:
+      border-color var(--wsu-duration-fast) ease-out,
+      background-color var(--wsu-duration-fast) ease-out;
+  }
+
+  .wsu-textarea {
+    min-block-size: 6rem;
+    resize: vertical;
+  }
+
+  .wsu-input::placeholder,
+  .wsu-textarea::placeholder {
+    color: var(--wsu-text-subtle);
+  }
+
+  .wsu-input:disabled,
+  .wsu-select:disabled,
+  .wsu-textarea:disabled {
+    cursor: not-allowed;
+    background-color: var(--wsu-surface-sunken);
+    opacity: 0.7;
+  }
+
+  /**
+   * Invalid state is a thicker border AND an inline message AND aria-invalid:
+   * never the red border alone (1.4.1, 3.3.1).
+   */
+  .wsu-input[aria-invalid='true'],
+  .wsu-select[aria-invalid='true'],
+  .wsu-textarea[aria-invalid='true'] {
+    border-color: var(--wsu-danger);
+    border-width: var(--wsu-size-border-width-strong);
+  }
+
+  /**
+   * The message arrives rather than simply being there.
+   *
+   * A message that appears between one frame and the next reads as though it had
+   * always been on the page and had been missed; a 120ms settle marks it as the
+   * response to what was just submitted. Short enough that a field validating on
+   * blur never feels laggy.
+   */
+  .wsu-field__error {
+    display: flex;
+    gap: var(--wsu-space-2);
+    align-items: flex-start;
+    font-size: var(--wsu-font-size-sm);
+    font-weight: var(--wsu-font-weight-bold);
+    color: var(--wsu-danger);
+    animation: wsu-settle-in var(--wsu-duration-fast) ease-out;
+  }
+
+  /**
+   * Error summary: focused on submit so the failure is announced, not hunted.
+   *
+   * The same settle, at the slower duration: this one is the answer to a submit
+   * that just failed, and it takes focus as it appears. The movement is 4px, so
+   * it cannot be mistaken for the page reflowing under the cursor.
+   */
+  .wsu-error-summary {
+    padding: var(--wsu-space-4);
+    color: var(--wsu-danger);
+    border: var(--wsu-size-border-width-strong) solid currentcolor;
+    border-radius: var(--wsu-radius-box);
+    animation: wsu-settle-in var(--wsu-duration-base) ease-out;
+  }
+
+  .wsu-error-summary:focus-visible {
+    outline: var(--wsu-size-focus-ring-width) solid var(--wsu-focus-ring);
+    outline-offset: var(--wsu-size-focus-ring-offset);
+  }
+
+  .wsu-error-summary__list {
+    margin-block-start: var(--wsu-space-2);
+    padding-inline-start: var(--wsu-space-5);
+  }
+
+  .wsu-checkbox,
+  .wsu-radio {
+    display: flex;
+    gap: var(--wsu-space-3);
+    align-items: center;
+    min-block-size: var(--wsu-size-tap-min);
+  }
+
+  /**
+   * Drawn rather than native.
+   *
+   * The tick and the dot a browser paints for `accent-color` are drawn by the
+   * operating system with no hook this stylesheet can transition: there is no
+   * property to put a duration on. `appearance: none` hands the paint to this
+   * file instead, so the state change can say something. The label still wraps
+   * the input, so the 44px target and the native keyboard and screen reader
+   * behaviour this already relied on are untouched, only the drawing is.
+   */
+  .wsu-checkbox input,
+  .wsu-radio input {
+    position: relative;
+    display: inline-block;
+    flex: none;
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+    min-inline-size: 0;
+    min-block-size: 0;
+    margin: 0;
+    appearance: none;
+    background-color: var(--wsu-surface);
+    border: var(--wsu-size-border-width-strong) solid var(--wsu-border-strong);
+    /* The housing answers first, just ahead of the mark inside it, the way a
+       switch's own body settles before its mark does. */
+    transition:
+      background-color var(--wsu-duration-fast) ease-out,
+      border-color var(--wsu-duration-fast) ease-out;
+  }
+
+  .wsu-checkbox input {
+    border-radius: var(--wsu-radius-selector);
+  }
+
+  .wsu-radio input {
+    border-radius: var(--wsu-radius-full);
+  }
+
+  .wsu-checkbox input:checked,
+  .wsu-radio input:checked {
+    background-color: var(--wsu-brand);
+    border-color: var(--wsu-brand);
+  }
+
+  .wsu-checkbox input:disabled,
+  .wsu-radio input:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  /**
+   * The tick draws itself, one stroke at a time.
+   *
+   * A single border corner, only the right and bottom edges of an otherwise
+   * empty box, rotated 45deg, is a checkmark with nothing to repaint: growing
+   * `width` traces the short stroke, growing `height` traces the long one, in
+   * the order a hand would draw them. `right`/`bottom` (not `top`/`left`) anchor
+   * the corner where the two edges meet, and `transform-origin: 100% 100%` puts
+   * the rotation's pivot on that same corner, so it is the one point of the mark
+   * that never moves; everything else swings out from it. A single fixed shape
+   * merely scaling up, which is what this replaced, arrives all at once and
+   * reads as "revealed" rather than "written".
+   *
+   * `border-color` is not in the transition list, and toggles between
+   * transparent and on-brand exactly when :checked does. Without that, a
+   * resting, unchecked box would show a permanent hairline dot at the corner,
+   * two 2px borders with nowhere to hide even at zero width and height. The
+   * snap costs nothing: at the moment it fires, the mark is either still sized
+   * at zero (checking, about to grow from nothing) or already fully grown and
+   * about to shrink invisibly back to zero behind it (unchecking), so neither
+   * direction shows a flash.
+   *
+   * Both stage durations are fractions of --wsu-duration-base, calculated
+   * rather than given a second hardcoded number, so the two stages stay in step
+   * with each other if that token ever changes. --wsu-duration-fast alone, tried
+   * first, was correct in devtools and imperceptible in use: 120ms of a shape
+   * scaling is not long enough for a person to register that anything was drawn
+   * at all, only that it appeared.
+   */
+  .wsu-checkbox input::before {
+    content: '';
+    position: absolute;
+
+    /**
+     * Centred by construction rather than by tuned offsets.
+     *
+     * This used to sit at a hand picked right and bottom percentage with the
+     * rotation pinned to the bottom right corner, which put the finished tick
+     * visibly off centre in the box: the percentages were chosen for one size
+     * and the corner origin moves the whole shape as the strokes grow, so there
+     * was no single pair of numbers that stayed right through the animation.
+     *
+     * Half the box, then back by half the tick's own size, so the element is
+     * centred whatever size it currently is, and the rotation happens about its
+     * own middle. The strokes still arrive in sequence, short then long, so it
+     * still reads as being drawn rather than appearing.
+     */
+    /**
+     * The rotation pivots on the corner where the two strokes meet, which is
+     * what makes this read as a tick being drawn: the vertex lands first and the
+     * strokes run out from it. Pivoting on the shape's own centre instead does
+     * centre it for free, and was tried, but then both strokes grow outward at
+     * once and it reads as a mark appearing rather than one being made.
+     *
+     * So the offsets place that pivot where the finished tick ends up centred.
+     * They are measured rather than derived, because deriving them got it wrong
+     * twice: the arithmetic is easy to get backwards, and more importantly an
+     * absolutely positioned pseudo element resolves its insets against the
+     * padding box, which on a bordered control is not the box you can see. Doing
+     * the sums against the visible 1.25rem box put the tick two pixels up and two
+     * left, exactly the border width, in both directions at once.
+     *
+     * The numbers come from putting markers on the two stroke ends and the vertex
+     * and reading back where the rotation actually lands them, then correcting
+     * until the ink's centre and the visible box's centre agree.
+     */
+    inset-inline-end: 0.6106rem;
+    inset-block-end: 0.2394rem;
+    width: 0.4375rem;
+    height: 0.75rem;
+    border-style: solid;
+    border-width: 0 var(--wsu-size-border-width-strong) var(--wsu-size-border-width-strong) 0;
+    border-color: transparent;
+    transform: rotate(45deg);
+    transform-origin: 100% 100%;
+
+    /**
+     * Hidden by clipping it away, not by having no size.
+     *
+     * Growing the strokes from nothing was the obvious way to draw this and it
+     * cannot also stay centred: the shape's position depends on how big it
+     * currently is, so a tick that grows is a tick that moves, and no fixed pair
+     * of offsets is right at more than one instant. Chasing that with animated
+     * offsets means position and size racing each other on two different clocks.
+     *
+     * At full size throughout, with a clip revealing it instead, both hold at
+     * once. The offsets above are correct at every frame because the shape never
+     * changes, and the clip runs along the two stroke directions, so it is still
+     * drawn rather than revealed all at once.
+     */
+    clip-path: inset(100% 0 0 100%);
+  }
+
+  .wsu-checkbox input:checked::before {
+    border-color: var(--wsu-on-brand);
+
+    /**
+     * Two stages on one clock. The clip opens from the left first, which runs
+     * the short stroke out of the vertex, then from the top, which runs the long
+     * one up. The percentages are where in the whole duration each stroke
+     * finishes, so the split stays in proportion if the duration token changes.
+     *
+     * An animation rather than a transition because a transition interpolates
+     * one clip straight to the other and both strokes would arrive together.
+     * `both` holds the last frame, so the finished tick stays drawn.
+     */
+    animation: wsu-check-draw var(--wsu-duration-base) ease-out both;
+  }
+
+  @keyframes wsu-check-draw {
+    0% {
+      clip-path: inset(100% 0 0 100%);
+    }
+
+    40% {
+      clip-path: inset(100% 0 0 0);
+    }
+
+    100% {
+      clip-path: inset(0 0 0 0);
+    }
+  }
+
+  /**
+   * The dot lands rather than fading in: it scales past full size and settles
+   * back, the way something dropped into place overshoots and catches rather
+   * than arriving already at rest. `cubic-bezier(0.34, 1.56, 0.64, 1)` is what
+   * supplies the overshoot; --wsu-duration-base gives it room to be seen, since
+   * the settle is most of what reads as motion here and the fast token left too
+   * little of it to catch. Scaling from nothing rather than fading in still says
+   * "this one, now" the way opacity does not: a radio is one of a set, and only
+   * the option just chosen has anything to announce.
+   */
+  .wsu-radio input::before {
+    content: '';
+    position: absolute;
+    inset: 25%;
+    background-color: var(--wsu-on-brand);
+    border-radius: var(--wsu-radius-full);
+    transform: scale(0);
+    transition: transform var(--wsu-duration-base) cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .wsu-radio input:checked::before {
+    transform: scale(1);
+  }
+
+  /**
+   * Forced colours (Windows High Contrast) replaces authored colour with system
+   * colour, and a background painted by this stylesheet is exactly what gets
+   * flattened to Canvas. The native control is handed back here rather than
+   * left to disappear: the operating system draws its own accessible checkbox
+   * and radio instead.
+   */
+  @media (forced-colors: active) {
+    .wsu-checkbox input,
+    .wsu-radio input {
+      appearance: auto;
+      forced-color-adjust: auto;
+    }
+
+    .wsu-checkbox input::before,
+    .wsu-radio input::before {
+      content: none;
+    }
+  }
+
+  /* ================================================================= Tables */
+
+  .wsu-table-wrap {
+    /**
+     * Positioned so that it is the containing block for what is inside it.
+     *
+     * `overflow` clips a descendant only when the clipping element is also that
+     * descendant's containing block. `.wsu-sr-only` is `position: absolute`, and
+     * without this line its containing block is the initial one, so a visually
+     * hidden label inside a wide table is laid out at its static position, past
+     * the right edge of the viewport, and is not clipped by the scroller it sits
+     * in. It extends the document's scroll width instead, and the page gains a
+     * horizontal scrollbar at narrow widths. That is a 1.4.10 failure produced
+     * by a 1px element nobody can see.
+     *
+     * Measured on the showcase site's token page at a 320px viewport: three sort
+     * hints inside a 660px table put `documentElement.scrollWidth` at 488
+     * against a 320px client width. With this line the document does not scroll.
+     */
+    position: relative;
+
+    /* A table is allowed to scroll inside its own box: the page body is not
+       (1.4.10). tabindex + role make the scroller keyboard reachable. */
+    overflow-x: auto;
+    border: var(--wsu-size-border-width) solid var(--wsu-border);
+    border-radius: var(--wsu-radius-box);
+  }
+
+  .wsu-table {
+    inline-size: 100%;
+    border-collapse: collapse;
+    font-size: var(--wsu-font-size-sm);
+  }
+
+  .wsu-table caption {
+    padding: var(--wsu-space-3) var(--wsu-space-4);
+    font-weight: var(--wsu-font-weight-bold);
+    text-align: start;
+    color: var(--wsu-text);
+  }
+
+  .wsu-table th,
+  .wsu-table td {
+    padding: var(--wsu-space-3) var(--wsu-space-4);
+    text-align: start;
+    border-block-end: var(--wsu-size-border-width) solid var(--wsu-border);
+  }
+
+  .wsu-table thead th {
+    font-weight: var(--wsu-font-weight-bold);
+    color: var(--wsu-text);
+    background-color: var(--wsu-surface-sunken);
+    white-space: nowrap;
+  }
+
+  .wsu-table tbody tr:last-child th,
+  .wsu-table tbody tr:last-child td {
+    border-block-end: none;
+  }
+
+  .wsu-table--zebra tbody tr:nth-child(even) {
+    background-color: var(--wsu-surface-sunken);
+  }
+
+  /**
+   * Row hover is a pointer affordance, so it is applied on hover only and kept
+   * fast. It is not a selection state: selection would need to survive the
+   * pointer leaving and be exposed to assistive technology.
+   */
+  .wsu-table tbody tr {
+    transition: background-color var(--wsu-duration-fast) ease-out;
+  }
+
+  .wsu-table--hoverable tbody tr:hover {
+    background-color: var(--wsu-brand-subtle);
+  }
+
+  /**
+   * Sort buttons live inside the th so the sort control is a real control.
+   *
+   * Rather than opt out of --wsu-size-tap-min, the button is grown to fill the
+   * header cell: a negative margin the same size as the th's own padding
+   * (space-3 block, space-4 inline) cancels that padding out, and the button's
+   * own matching padding puts the glyph and label back exactly where they were.
+   * Only the hit area changes. Measured on a 46px header cell, hit-testing found
+   * the button living at offsets 13 to 31, 12px dead above it and 13px below,
+   * inside a cell it visually appeared to fill; the fill now reaches all the way
+   * to the cell's own border, comfortably past the 44px --wsu-size-tap-min this
+   * system holds everywhere else.
+   */
+  .wsu-table__sort {
+    display: inline-flex;
+    gap: var(--wsu-space-1);
+    align-items: center;
+    margin: calc(var(--wsu-space-3) * -1) calc(var(--wsu-space-4) * -1);
+    padding: var(--wsu-space-3) var(--wsu-space-4);
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    background: none;
+    border: none;
+  }
+
+  /**
+   * The arrow turns over when the direction reverses.
+   *
+   * Driven off `aria-sort` on the header cell, so the glyph and the announced sort
+   * state are the same fact rather than two that can disagree. The rotation is
+   * what makes a re-sort read as the same column reversing rather than as the
+   * table having been replaced, which, with the rows moving underneath, is
+   * otherwise genuinely ambiguous.
+   *
+   * The glyph is decorative either way; aria-sort is what carries the meaning
+   * (1.4.1).
+   */
+  .wsu-table__sort .wsu-icon {
+    transition: rotate var(--wsu-duration-base) cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .wsu-table th[aria-sort='descending'] .wsu-table__sort .wsu-icon {
+    rotate: 180deg;
+  }
+
+  /* ================================================================ Dialogs */
+
+  /* Dialogs fade and rise the same way the search popover does. */
+  .wsu-dialog {
+    opacity: 0;
+    translate: 0 -0.5rem;
+    transition:
+      opacity var(--wsu-duration-base) ease-out,
+      translate var(--wsu-duration-base) ease-out,
+      overlay var(--wsu-duration-base) allow-discrete,
+      display var(--wsu-duration-base) allow-discrete;
+  }
+
+  .wsu-dialog[open] {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  @starting-style {
+    .wsu-dialog[open] {
+      opacity: 0;
+      translate: 0 -0.5rem;
+    }
+  }
+
+  .wsu-dialog {
+    /**
+     * Centred, because the base reset took the centring away.
+     *
+     * The user agent stylesheet centres a modal dialog with `dialog:modal {
+     * inset: 0; margin: auto }`. `* { margin: 0 }` in base.css is more specific
+     * than nothing and lands in an earlier layer, so it wins, and every modal in
+     * WayneUI renders pinned to the top-left corner of the viewport with its
+     * `inset: 0` still in force.
+     *
+     * Measured on the showcase site's gallery at 1440x760: the open dialog's
+     * bounding box was at 0, 0. It is the sort of thing that is invisible in the
+     * source and obvious on screen, and no gate had opened a dialog to look.
+     *
+     * `auto` on all four sides rather than restating `inset`, so the UA's own
+     * `inset: 0` keeps doing the work and this only restores what the reset
+     * removed.
+     */
+    margin: auto;
+
+    inline-size: min(32rem, calc(100vw - var(--wsu-space-8)));
+    max-block-size: calc(100svb - var(--wsu-space-16));
+    padding: var(--wsu-space-6);
+    color: var(--wsu-text);
+    background-color: var(--wsu-surface-overlay);
+    border: var(--wsu-size-border-width) solid var(--wsu-border);
+    border-radius: var(--wsu-radius-box);
+    box-shadow: var(--wsu-shadow-overlay);
+  }
+
+  /* Native <dialog> gives focus trapping, Esc, and inert backdrop for free,
+     which is why WayneUI uses it rather than a hand-rolled modal. */
+  .wsu-dialog::backdrop {
+    background-color: rgb(0 0 0 / 0.55);
+  }
+
+  .wsu-dialog__header {
+    display: flex;
+    gap: var(--wsu-space-4);
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-block-end: var(--wsu-space-4);
+  }
+
+  .wsu-dialog__footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wsu-space-2);
+    justify-content: flex-end;
+    margin-block-start: var(--wsu-space-6);
+  }
+
+  /* ================================================================== Tabs */
+
+  .wsu-tabs__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wsu-space-1);
+    border-block-end: var(--wsu-size-border-width) solid var(--wsu-border);
+  }
+
+  .wsu-tabs__tab {
+    min-block-size: var(--wsu-size-tap-min);
+    padding: var(--wsu-space-2) var(--wsu-space-4);
+    font-weight: var(--wsu-font-weight-bold);
+    color: var(--wsu-text-muted);
+    cursor: pointer;
+    background: none;
+    border: none;
+    border-radius: var(--wsu-radius-field) var(--wsu-radius-field) 0 0;
+    /* The rule slides and darkens into place rather than jumping between tabs,
+       which is what makes it read as one indicator moving rather than two
+       indicators blinking. */
+    transition:
+      color var(--wsu-duration-fast) ease-out,
+      box-shadow var(--wsu-duration-fast) ease-out;
+  }
+
+  .wsu-tabs__tab[aria-selected='true'] {
+    color: var(--wsu-brand);
+    box-shadow: inset 0 -3px 0 0 var(--wsu-brand);
+  }
+
+  .wsu-tabs__panel {
+    padding-block-start: var(--wsu-space-4);
+  }
+
+  /**
+   * The incoming panel fades.
+   *
+   * An animation rather than a transition, because the panel is toggled with
+   * `hidden`: there is no state to transition from when the element was
+   * `display: none` a frame ago. Kept to 120ms and opacity only: a panel that
+   * slides in makes the tab list look like it is scrolling.
+   */
+  .wsu-tabs__panel:not([hidden]) {
+    animation: wsu-fade-in var(--wsu-duration-fast) ease-out;
+  }
+
+  /* ============================================================ Stat / meta */
+
+  .wsu-stat {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wsu-space-1);
+    padding: var(--wsu-space-4);
+    background-color: var(--wsu-surface-raised);
+    border: var(--wsu-size-border-width) solid var(--wsu-border);
+    border-radius: var(--wsu-radius-box);
+  }
+
+  .wsu-stat__label {
+    font-size: var(--wsu-font-size-sm);
+    color: var(--wsu-text-muted);
+  }
+
+  .wsu-stat__value {
+    font-family: var(--wsu-font-family-display);
+    font-size: var(--wsu-font-size-3xl);
+    font-weight: var(--wsu-font-weight-black);
+    line-height: var(--wsu-font-lineHeight-tight);
+    color: var(--wsu-text);
+  }
+
+  /* ================================================= Empty / loading states */
+
+  .wsu-empty {
+    transition: border-color var(--wsu-duration-fast) ease-out;
+    display: grid;
+    gap: var(--wsu-space-3);
+    place-items: center;
+    padding: var(--wsu-space-12) var(--wsu-space-4);
+    text-align: center;
+    color: var(--wsu-text-muted);
+    border: var(--wsu-size-border-width) dashed var(--wsu-border-strong);
+    border-radius: var(--wsu-radius-box);
+  }
+
+  .wsu-skeleton {
+    background-color: var(--wsu-surface-sunken);
+    border-radius: var(--wsu-radius-field);
+    animation: wsu-pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes wsu-pulse {
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  /* ================================================================= Motion */
+
+  /**
+   * Two shared entrances, for elements that are inserted into the page rather
+   * than toggled with an attribute. An inserted element has nothing to transition
+   * *from*, so these are animations; anything that flips a `hidden` attribute uses
+   * a transition with `display … allow-discrete` instead. See the drawer and the
+   * search row in chrome.css.
+   *
+   * Durations come from the tokens on purpose. The global prefers-reduced-motion
+   * rule in base.css collapses every one of them to near-instant, which only works
+   * because no component invents a duration of its own.
+   */
+  @keyframes wsu-fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  /** A 4px settle. Enough to register as arriving, not enough to read as a slide. */
+  @keyframes wsu-settle-in {
+    from {
+      opacity: 0;
+      translate: 0 -0.25rem;
+    }
+  }
+
+  /* ============================================================ Pagination */
+
+  .wsu-pagination__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wsu-space-1);
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+
+  .wsu-pagination__link {
+    transition: background-color var(--wsu-duration-fast) ease-out;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-block-size: var(--wsu-size-tap-min);
+    min-inline-size: var(--wsu-size-tap-min);
+    padding-inline: var(--wsu-space-2);
+    color: var(--wsu-text);
+    text-decoration: none;
+    border-radius: var(--wsu-radius-field);
+  }
+
+  /**
+   * The ellipsis between page ranges shares this class but is a plain
+   * `aria-hidden` span, not a link or a button: correctly out of the tab order
+   * and inert to a click, but with nothing qualifying this rule it still painted
+   * the same hover pill as a real page link, promising an affordance the
+   * element cannot deliver. Qualified to the interactive elements only.
+   */
+  .wsu-pagination__link:not([aria-hidden='true']):hover {
+    background-color: var(--wsu-surface-sunken);
+  }
+
+  .wsu-pagination__link[aria-current='page'] {
+    color: var(--wsu-on-brand);
+    background-color: var(--wsu-brand);
+  }
+
+  /* ================================================================== Icons */
+
+  .wsu-icon {
+    inline-size: 1.25em;
+    block-size: 1.25em;
+    flex: none;
+    stroke-width: 2;
+  }
+
+  /**
+   * Display-sized icon, for empty states and other places where the glyph is the
+   * illustration rather than a marker next to a label.
+   *
+   * A class rather than an inline style, so the Blade and Vue components can emit
+   * the same markup and neither has to carry CSS of its own.
+   */
+  .wsu-icon--lg {
+    inline-size: 2rem;
+    block-size: 2rem;
+  }
+
+  /* =============================================================== Toasts */
+
+  /**
+   * Bounded rather than left to grow forever. Fixed to the bottom of the
+   * viewport with nothing capping it, the stack has no ceiling: eight toasts at
+   * 320x568 measured an 840px-tall region whose top sat at -288, carrying the
+   * oldest toasts and their dismiss buttons above the viewport where a `fixed`
+   * region can never be reached, and running the whole stack up over the app
+   * bar on the way.
+   *
+   * Capped to scroll rather than capped to a fixed count: how many toasts a page
+   * is allowed to queue at once is a decision for whatever is pushing them, and
+   * a hard limit in the stylesheet would silently drop a toast with no way to
+   * say so. Bounding the region's height and letting it scroll keeps every
+   * toast, oldest included, present and dismissible no matter how many arrive.
+   *
+   * The height comes off --wsu-app-bar-height, the same custom property
+   * chrome.css already reads for the sidebar, with the same 3.5rem fallback for
+   * a page with no app bar to measure, so the stack can never grow tall enough
+   * to sit under the bar it would otherwise cover.
+   */
+  .wsu-toasts {
+    position: fixed;
+    inset-block-end: var(--wsu-space-4);
+    inset-inline-end: var(--wsu-space-4);
+    z-index: var(--wsu-z-toast);
+    display: flex;
+    flex-direction: column;
+    gap: var(--wsu-space-2);
+    inline-size: min(24rem, calc(100vw - var(--wsu-space-8)));
+    max-block-size: calc(100svb - var(--wsu-app-bar-height, 3.5rem) - var(--wsu-space-8));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /**
+   * A toast appears without being asked for, so it slides in from the edge it
+   * lives on: the movement is what tells you something arrived rather than
+   * having been there all along. @starting-style animates the first frame of a
+   * newly inserted element, which a plain transition cannot.
+   */
+  @starting-style {
+    .wsu-toast {
+      opacity: 0;
+      translate: 0 var(--wsu-space-4);
+    }
+  }
+
+  .wsu-toast {
+    transition:
+      opacity var(--wsu-duration-base) ease-out,
+      translate var(--wsu-duration-base) cubic-bezier(0.2, 0, 0, 1);
+    display: flex;
+    gap: var(--wsu-space-3);
+    align-items: flex-start;
+    padding: var(--wsu-space-3) var(--wsu-space-4);
+    background-color: var(--wsu-surface-overlay);
+    border: var(--wsu-size-border-width) solid var(--wsu-border);
+    border-inline-start: var(--wsu-space-1) solid currentcolor;
+    border-radius: var(--wsu-radius-box);
+    box-shadow: var(--wsu-shadow-lg);
+  }
+
+  /**
+   * Leaving.
+   *
+   * @starting-style covers arrival, but an element being removed from the DOM has
+   * no exit state to transition into: the departure has to be driven by whatever
+   * is doing the removing. These are the class names Vue's <TransitionGroup>
+   * applies, defined here rather than scoped in the component so that the same
+   * names, and the same motion, are available to any other consumer that manages
+   * a toast list.
+   *
+   * The exit mirrors the entry: it settles back down the way it came, so a
+   * dismissal reads as the reverse of the arrival rather than as a separate
+   * effect. Faster than the entry, because nobody needs to watch something they
+   * have already dealt with.
+   */
+  .wsu-toast-leave-active {
+    /* Out of flow while it goes, so the toasts above slide down into the gap it
+       leaves instead of snapping into place. */
+    position: absolute;
+    inline-size: 100%;
+    transition:
+      opacity var(--wsu-duration-fast) ease-out,
+      translate var(--wsu-duration-fast) ease-out;
+  }
+
+  .wsu-toast-leave-to {
+    opacity: 0;
+    translate: 0 var(--wsu-space-4);
+  }
+
+  /* Vue's FLIP pass sets an inline `transform`, so the move transition must name
+     that property rather than `translate`. */
+  .wsu-toast-move {
+    transition: transform var(--wsu-duration-base) cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  /* ================================================================ Divider */
+
+  /**
+   * A labelled or unlabelled rule between blocks of content.
+   *
+   * `role="separator"` rather than `<hr>`, because `<hr>` cannot contain the
+   * label: a divider that reads "OR" between two form paths needs the word in
+   * the accessibility tree, not painted as a pseudo-element nobody but a sighted
+   * mouse user receives. Unlabelled and labelled dividers share the same markup
+   * so a page never has to choose which tag a divider is before it knows whether
+   * it has text.
+   */
+  .wsu-divider {
+    display: flex;
+    align-items: center;
+    gap: var(--wsu-space-3);
+    color: var(--wsu-text-subtle);
+    font-size: var(--wsu-font-size-sm);
+  }
+
+  .wsu-divider::before,
+  .wsu-divider::after {
+    content: '';
+    flex: 1 1 0%;
+    block-size: var(--wsu-size-border-width);
+    background-color: var(--wsu-border);
+  }
+
+  /* No label: the two rule segments meet with nothing between them, so the gap
+     that would otherwise leave a visible notch collapses to zero. */
+  .wsu-divider:empty {
+    gap: 0;
+  }
+
+  .wsu-divider--vertical {
+    flex-direction: column;
+    align-self: stretch;
+    inline-size: var(--wsu-size-border-width);
+    block-size: auto;
+  }
+
+  .wsu-divider--vertical::before,
+  .wsu-divider--vertical::after {
+    inline-size: var(--wsu-size-border-width);
+    flex: 1 1 0%;
+  }
+
+  /* ================================================================ Progress */
+
+  /**
+   * A determinate progress bar. `<progress>` carries the right role and value
+   * text to assistive technology on its own, so this only ever adds colour and
+   * shape; the accessible name still has to come from the caller, because
+   * "progress bar, 40 percent" with nothing to say 40 percent of WHAT tells a
+   * screen reader user less than the sighted heading sitting next to it does.
+   *
+   * `accent-color` styles the native fill in one line and keeps the browser's
+   * own paint pipeline, which is also why the value transitions smoothly: the
+   * webkit/moz pseudo-elements exist only as a fallback for the one engine that
+   * does not yet support `accent-color` on `<progress>`.
+   */
+  .wsu-progress {
+    inline-size: 100%;
+    block-size: var(--wsu-space-2);
+    accent-color: var(--wsu-brand);
+    color: var(--wsu-brand);
+    overflow: hidden;
+    background-color: var(--wsu-surface-sunken);
+    border: 0;
+    border-radius: var(--wsu-radius-full);
+  }
+
+  .wsu-progress::-webkit-progress-bar {
+    background-color: transparent;
+    border-radius: var(--wsu-radius-full);
+  }
+
+  .wsu-progress::-webkit-progress-value {
+    background-color: var(--wsu-brand);
+    border-radius: var(--wsu-radius-full);
+    transition: width var(--wsu-duration-base) ease-out;
+  }
+
+  .wsu-progress::-moz-progress-bar {
+    background-color: var(--wsu-brand);
+    border-radius: var(--wsu-radius-full);
+  }
+
+  .wsu-progress--brand { accent-color: var(--wsu-brand); color: var(--wsu-brand); }
+
+  .wsu-progress--brand::-webkit-progress-value,
+  .wsu-progress--brand::-moz-progress-bar { background-color: var(--wsu-brand); }
+
+  .wsu-progress--accent { accent-color: var(--wsu-accent); color: var(--wsu-accent); }
+
+  .wsu-progress--accent::-webkit-progress-value,
+  .wsu-progress--accent::-moz-progress-bar { background-color: var(--wsu-accent); }
+
+  .wsu-progress--success { accent-color: var(--wsu-success); color: var(--wsu-success); }
+
+  .wsu-progress--success::-webkit-progress-value,
+  .wsu-progress--success::-moz-progress-bar { background-color: var(--wsu-success); }
+
+  .wsu-progress--danger { accent-color: var(--wsu-danger); color: var(--wsu-danger); }
+
+  .wsu-progress--danger::-webkit-progress-value,
+  .wsu-progress--danger::-moz-progress-bar { background-color: var(--wsu-danger); }
+
+  /* ================================================================= Loading */
+
+  /**
+   * An in-progress marker with a text label beside it: the same division of
+   * labour as the status dot, because a spinner nobody can read the meaning of
+   * is exactly as informative as a colour with no word next to it (1.4.1).
+   *
+   * `role="status"` makes the element a polite live region, so a label that
+   * changes ("Loading courses…" to "3 courses found") is announced without the
+   * page moving focus. The spinner itself is `aria-hidden`, reuses the same
+   * `wsu-spin` keyframe the busy button already turns its icon with, and is
+   * slowed to near-instant by the same global prefers-reduced-motion rule.
+   */
+  .wsu-loading {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wsu-space-2);
+    color: var(--wsu-text-muted);
+  }
+
+  .wsu-loading__spinner {
+    display: inline-block;
+    inline-size: 1.25em;
+    block-size: 1.25em;
+    flex: none;
+    border: 0.1875em solid var(--wsu-border);
+    border-block-start-color: var(--wsu-brand);
+    border-radius: var(--wsu-radius-full);
+    animation: wsu-spin 0.75s linear infinite;
+  }
+
+  .wsu-loading--brand .wsu-loading__spinner { border-block-start-color: var(--wsu-brand); }
+  .wsu-loading--accent .wsu-loading__spinner { border-block-start-color: var(--wsu-accent); }
+  .wsu-loading--success .wsu-loading__spinner { border-block-start-color: var(--wsu-success); }
+  .wsu-loading--danger .wsu-loading__spinner { border-block-start-color: var(--wsu-danger); }
+
+  /* ================================================================== Avatar */
+
+  /**
+   * A person, as a photo or as initials.
+   *
+   * Always named, never decorative: an avatar identifies someone, so `name`
+   * carries that identity to assistive technology either way. A photo puts it
+   * in the image's `alt`; initials put it in `aria-label` on the avatar itself,
+   * because two capital letters read aloud as two letters are not the name they
+   * stand for.
+   */
+  .wsu-avatar {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    inline-size: 2.5rem;
+    block-size: 2.5rem;
+    overflow: hidden;
+    font-size: var(--wsu-font-size-sm);
+    font-weight: var(--wsu-font-weight-bold);
+    color: var(--wsu-on-brand);
+    background-color: var(--wsu-brand);
+    border-radius: var(--wsu-radius-full);
+  }
+
+  .wsu-avatar--sm {
+    inline-size: 2rem;
+    block-size: 2rem;
+    font-size: var(--wsu-font-size-xs);
+  }
+
+  .wsu-avatar--lg {
+    inline-size: 3.5rem;
+    block-size: 3.5rem;
+    font-size: var(--wsu-font-size-lg);
+  }
+
+  .wsu-avatar__image {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+  }
+
+  /* ================================================================ Timeline */
+
+  /**
+   * A sequence of dated events, read as one history rather than a table of two
+   * columns pretending to be visual.
+   *
+   * `<ol>` because the order is the information: reordering these entries
+   * changes what happened when (1.3.2). The connecting line is one border on
+   * the list itself rather than a segment per item, so it reads as continuous
+   * even where the gap between two entries is uneven.
+   *
+   * The marker is a plain generated dot, always `aria-hidden`. It never carries
+   * a status of its own, unlike the step marker below: a timeline is a record
+   * of what already happened, not a position in a process, so there is nothing
+   * for it to announce beyond the date and title that already sit in text.
+   */
+  .wsu-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wsu-space-6);
+    margin: 0;
+    padding-block: var(--wsu-space-1);
+    padding-inline-start: var(--wsu-space-6);
+    list-style: none;
+    border-inline-start: var(--wsu-size-border-width-strong) solid var(--wsu-border);
+  }
+
+  .wsu-timeline__item {
+    position: relative;
+  }
+
+  .wsu-timeline__marker {
+    position: absolute;
+    inset-block-start: 0.35em;
+    inset-inline-start: calc(-1 * var(--wsu-space-6) - 0.34375rem);
+    inline-size: 0.625rem;
+    block-size: 0.625rem;
+    background-color: var(--wsu-brand);
+    border: var(--wsu-size-border-width) solid var(--wsu-surface);
+    border-radius: var(--wsu-radius-full);
+  }
+
+  .wsu-timeline__time {
+    display: block;
+    font-size: var(--wsu-font-size-sm);
+    color: var(--wsu-text-subtle);
+  }
+
+  .wsu-timeline__title {
+    margin: 0;
+    font-weight: var(--wsu-font-weight-bold);
+  }
+
+  /* =============================================================== Accordion */
+
+  /**
+   * `<details>`/`<summary>` rather than a hand-rolled disclosure widget: the
+   * browser already tracks the open state, exposes `<summary>` as a button with
+   * `aria-expanded` derived from it, and moves focus and Space/Enter for free.
+   * Nothing here needs a script on any of the four paths, which is why there is
+   * no `data-wsu-*` hook: styling follows `[open]`, the one property that is
+   * ever true, exactly the rule in _shared.md about driving off accessible state.
+   */
+  .wsu-accordion {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .wsu-accordion__item {
+    border-block-end: var(--wsu-size-border-width) solid var(--wsu-border);
+  }
+
+  .wsu-accordion__item:first-of-type {
+    border-block-start: var(--wsu-size-border-width) solid var(--wsu-border);
+  }
+
+  .wsu-accordion__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--wsu-space-4);
+    padding-block: var(--wsu-space-4);
+    font-weight: var(--wsu-font-weight-bold);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  /* Chrome and Firefox honour `list-style: none` above; WebKit draws its own
+     triangle through this pseudo-element instead and ignores that rule. */
+  .wsu-accordion__summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .wsu-accordion__icon {
+    flex: none;
+    transition: rotate var(--wsu-duration-fast) ease-out;
+  }
+
+  .wsu-accordion__item[open] .wsu-accordion__icon {
+    rotate: 180deg;
+  }
+
+  .wsu-accordion__panel {
+    padding-block-end: var(--wsu-space-4);
+    color: var(--wsu-text-muted);
+  }
+
+  /* =============================================================== Chat log */
+
+  /**
+   * A conversation, read in the order it happened, which is why the wrapper is
+   * an `<ol>` rather than a `<div>` full of bubbles (1.3.2, the same reasoning
+   * as the timeline).
+   *
+   * `aria-live="polite"` marks this as a region that grows: a static transcript
+   * rendered once announces nothing extra, because a live region only speaks up
+   * about changes made after it exists, but an application that appends a new
+   * message to `items` gets it read out without moving focus. It is set on the
+   * list itself, not a wrapping `role="log"` container, because giving the
+   * `<ol>` a non-list role would leave its `<li>` children without the list
+   * context that makes them read as list items at all.
+   *
+   * The speaker's name is always real text, in `<time>`-adjacent header text,
+   * never only the side of the screen a bubble sits on: alignment is a visual
+   * convenience, not the only way to tell who sent a message (1.4.1).
+   */
+  .wsu-chat {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wsu-space-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .wsu-chat__message {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--wsu-space-2);
+    max-inline-size: 32rem;
+    transition: opacity var(--wsu-duration-base) ease-out, translate var(--wsu-duration-base) ease-out;
+  }
+
+  @starting-style {
+    .wsu-chat__message {
+      opacity: 0;
+      translate: 0 0.5rem;
+    }
+  }
+
+  .wsu-chat__message--sent {
+    flex-direction: row-reverse;
+    margin-inline-start: auto;
+  }
+
+  .wsu-chat__avatar {
+    flex: none;
+  }
+
+  .wsu-chat__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wsu-space-1);
+    min-inline-size: 0;
+  }
+
+  .wsu-chat__message--sent .wsu-chat__content {
+    align-items: flex-end;
+  }
+
+  /**
+   * `--wsu-text-muted`, not `--wsu-text-subtle`, even though this is caption
+   * text and `--wsu-text-subtle` is the token built for that (its own declared
+   * minimum is 4.5:1, AA, nothing to spare). `.wsu-chat__message` fades in on
+   * arrival by animating `opacity` on the whole message, this header included,
+   * and a token sitting exactly on the 4.5:1 floor drops below it for every
+   * frame the fade is still short of fully opaque, which axe caught mid-fade at
+   * 4.37:1. `--wsu-text-muted` clears 4.5:1 by enough margin (10.44:1 light,
+   * 10.79:1 dark, against 4.83:1 and 6.22:1 for `--wsu-text-subtle` at rest) to
+   * still read as AA through the fade, not only once it settles.
+   */
+  .wsu-chat__header {
+    display: flex;
+    align-items: baseline;
+    gap: var(--wsu-space-2);
+    font-size: var(--wsu-font-size-xs);
+    color: var(--wsu-text-muted);
+  }
+
+  .wsu-chat__name {
+    font-weight: var(--wsu-font-weight-bold);
+    color: var(--wsu-text-muted);
+  }
+
+  .wsu-chat__bubble {
+    margin: 0;
+    padding: var(--wsu-space-2) var(--wsu-space-4);
+    overflow-wrap: break-word;
+    background-color: var(--wsu-surface-sunken);
+    border-radius: var(--wsu-radius-box);
+  }
+
+  .wsu-chat__message--sent .wsu-chat__bubble {
+    color: var(--wsu-on-brand);
+    background-color: var(--wsu-brand);
+  }
+
+  /* Same reasoning as `.wsu-chat__header`: this fades in with the message it
+     belongs to, so it needs the margin `--wsu-text-muted` has over 4.5:1 and
+     `--wsu-text-subtle` does not. */
+  .wsu-chat__status {
+    font-size: var(--wsu-font-size-xs);
+    color: var(--wsu-text-muted);
+  }
+
+  /* ============================================================== Code block */
+
+  /**
+   * A block of code with a button that copies it.
+   *
+   * The button sits in its own row above the code, in normal document flow,
+   * never floated over it: a floating button has no width reserved for it, and
+   * the "Press Control or Command C" fallback label is far wider than "Copy",
+   * so no fixed padding sized for one is safe from the other. The border,
+   * radius and sunken background belong to the wrapper rather than the code
+   * alone, so the head row and the code still read as one box.
+   *
+   * The three states are real elements, shown and hidden with `hidden` rather
+   * than written in by script, the same reason a tab panel is. `theme.js`
+   * only ever flips which one is visible; a reader inspecting the DOM sees the
+   * same state a screen reader is told about. The result is also spoken
+   * through a `role="status"` region beside the button: a live region a
+   * screen reader user is not currently focused on is the only reliable way to
+   * hear that a press worked, because a button whose own text changes while it
+   * already has focus is not guaranteed to be re-announced.
+   */
+  .wsu-codeblock {
+    /* A flex or grid item defaults to a minimum width of its own content, which
+       for a <pre> holding one long, unbreakable line is the whole line: the box
+       would rather overflow its container than shrink, and the pre's own
+       overflow-x: auto never gets the chance to scroll it. Zeroing this is what
+       lets the container actually constrain it. */
+    min-inline-size: 0;
+    background-color: var(--wsu-surface-sunken);
+    border-radius: var(--wsu-radius-box);
+  }
+
+  .wsu-codeblock__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--wsu-space-4);
+    padding: var(--wsu-space-2) var(--wsu-space-2) var(--wsu-space-2) var(--wsu-space-4);
+    border-block-end: var(--wsu-size-border-width) solid var(--wsu-border);
+  }
+
+  .wsu-codeblock__lang {
+    font-family: var(--wsu-font-family-mono);
+    font-size: var(--wsu-font-size-xs);
+    color: var(--wsu-text-subtle);
+    text-transform: uppercase;
+    letter-spacing: var(--wsu-font-letterSpacing-caps);
+  }
+
+  .wsu-codeblock__copy-state {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wsu-space-2);
+  }
+
+  /* Otherwise this class's own `display: inline-flex` outranks the UA
+     stylesheet's `[hidden] { display: none }` at equal specificity, since an
+     author rule wins that tie, and all three results show at once. */
+  .wsu-codeblock__copy-state[hidden] {
+    display: none;
+  }
+
+  .wsu-codeblock__pre {
+    margin: 0;
+    padding: var(--wsu-space-4);
+    overflow-x: auto;
+  }
+
+  .wsu-codeblock__code {
+    font-family: var(--wsu-font-family-mono);
+    font-size: var(--wsu-font-size-sm);
+    color: var(--wsu-text);
+    white-space: pre;
+  }
+
+  /* =============================================================== Countdown */
+
+  /**
+   * A count to a fixed moment: a registration deadline, an application closing.
+   *
+   * The digits are wrapped in one `<time>` rather than announced individually,
+   * so a screen reader user gets one reading of the whole remaining duration
+   * instead of four separate numbers with no stated unit relationship between
+   * them. `aria-live="off"` on that element is deliberate: a live region
+   * repeating itself every second would drown out the rest of the page, so this
+   * is readable on demand (a screen reader user can visit it and hear the
+   * current value) rather than spoken automatically. `role="timer"` names what
+   * it is without claiming the automatic-announcement behaviour `role="status"`
+   * carries.
+   *
+   * The pause control is the WCAG 2.2.2 answer for content that moves on its
+   * own for more than five seconds: ticking every second, indefinitely, with no
+   * exemption available, since nothing about an application deadline requires
+   * the display itself to keep moving for the page to do its job. Pausing
+   * freezes the digits and the `<time>` text alike; it never touches the actual
+   * target moment, which keeps arriving on schedule whether the display is
+   * paused or not. Once that moment passes, the digits settle at zero, the
+   * ticking stops on its own, and the button is removed because there is
+   * nothing left to pause.
+   */
+  .wsu-countdown {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--wsu-space-4);
+  }
+
+  .wsu-countdown__label {
+    margin: 0;
+    font-weight: var(--wsu-font-weight-bold);
+  }
+
+  .wsu-countdown__value {
+    display: flex;
+    gap: var(--wsu-space-4);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .wsu-countdown__segment {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-inline-size: 2.5rem;
+  }
+
+  .wsu-countdown__number {
+    font-size: var(--wsu-font-size-xl);
+    font-weight: var(--wsu-font-weight-bold);
+    color: var(--wsu-brand);
+  }
+
+  .wsu-countdown__unit {
+    font-size: var(--wsu-font-size-xs);
+    color: var(--wsu-text-subtle);
+    text-transform: uppercase;
+    letter-spacing: var(--wsu-font-letterSpacing-caps);
+  }
+
+  .wsu-countdown__pause-state {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wsu-space-2);
+  }
+
+  /* See the identical rule on .wsu-codeblock__copy-state: this class's own
+     `display` otherwise ties with the UA stylesheet's `[hidden]` rule at equal
+     specificity, and an author rule wins that tie. */
+  .wsu-countdown__pause-state[hidden] {
+    display: none;
+  }
+
+  /* ================================================================ Rotator */
+
+  /**
+   * A short list of short facts, shown one at a time: an announcement strip
+   * rather than a marketing carousel.
+   *
+   * Every item stays in the document and in the accessibility tree the whole
+   * time; only `opacity` changes which one reads as "on screen" to a sighted
+   * user. A screen reader user who reaches this control gets the full list, in
+   * document order, whichever one happens to be showing at that moment, so
+   * nothing here depends on catching a phrase before it rotates away. That is
+   * the same reasoning the countdown above applies with a single `<time>`
+   * instead: give assistive technology the complete, stable answer rather than
+   * a moving target.
+   *
+   * The pause control exists for the same WCAG 2.2.2 reason as the countdown's:
+   * this moves on its own, indefinitely, with nothing essential about the
+   * rotation itself, so a person reading it, or distracted by the movement, can
+   * stop it.
+   */
+  .wsu-rotator {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--wsu-space-3);
+  }
+
+  .wsu-rotator__label {
+    margin: 0;
+    font-weight: var(--wsu-font-weight-bold);
+  }
+
+  .wsu-rotator__list {
+    position: relative;
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    min-inline-size: 12rem;
+  }
+
+  .wsu-rotator__item {
+    grid-area: 1 / 1;
+    align-self: center;
+    opacity: 0;
+    transition: opacity var(--wsu-duration-base) ease-out;
+  }
+
+  .wsu-rotator__item[data-wsu-rotate-active] {
+    opacity: 1;
+  }
+
+  .wsu-rotator__pause-state {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .wsu-rotator__pause-state[hidden] {
+    display: none;
+  }
+
+  /* ================================================================ Carousel */
+
+  /**
+   * A carousel is `Tabs` wearing arrow buttons: the dots are a tablist with a
+   * roving tabindex, each slide is the panel its dot controls, and Previous and
+   * Next move the same selection rather than a second one of their own.
+   * `data-wsu-carousel` hands that to the same `selectTab()` the tab set uses in
+   * packages/css/src/theme.js, so a dot, an arrow key on a dot, and a press of
+   * Next all keep `aria-selected`, `tabindex` and `hidden` in agreement.
+   *
+   * It never advances on its own. WCAG 2.2.2 requires a way to stop anything
+   * that moves without being asked; a carousel that only moves because someone
+   * pressed Previous, Next or a dot never triggers that, so there is no
+   * autoplay here and nothing to pause. `TextRotate` is the component for
+   * content that should rotate unattended, and it carries the pause control
+   * that decision requires.
+   */
+  .wsu-carousel__slide {
+    padding-block: var(--wsu-space-2);
+  }
+
+  /* The panel is switched with `hidden`, so there is no prior state to
+     transition from; an animation plays on arrival instead, the same technique
+     the tab panel above uses for the same reason. */
+  .wsu-carousel__slide:not([hidden]) {
+    animation: wsu-fade-in var(--wsu-duration-base) ease-out;
+  }
+
+  .wsu-carousel__controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--wsu-space-3);
+    margin-block-start: var(--wsu-space-4);
+  }
+
+  .wsu-carousel__prev,
+  .wsu-carousel__next {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    inline-size: var(--wsu-size-tap-min);
+    block-size: var(--wsu-size-tap-min);
+    color: var(--wsu-text-muted);
+    cursor: pointer;
+    background: none;
+    border: var(--wsu-size-border-width) solid var(--wsu-border);
+    border-radius: var(--wsu-radius-full);
+    transition:
+      color var(--wsu-duration-fast) ease-out,
+      border-color var(--wsu-duration-fast) ease-out;
+  }
+
+  .wsu-carousel__prev:hover,
+  .wsu-carousel__next:hover {
+    color: var(--wsu-brand);
+    border-color: var(--wsu-brand);
+  }
+
+  .wsu-carousel__dots {
+    display: flex;
+    gap: var(--wsu-space-1);
+  }
+
+  /**
+   * The dot everyone sees is 10px; the button under it is the full 44px tap
+   * target (2.5.8). Sizing the visible mark with a pseudo-element rather than
+   * the button itself keeps the two independent, the same split `wsu-pagination`
+   * makes between its own hit area and the number printed on it.
+   */
+  .wsu-carousel__tab {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    min-inline-size: var(--wsu-size-tap-min);
+    min-block-size: var(--wsu-size-tap-min);
+    padding: 0;
+    cursor: pointer;
+    background: none;
+    border: none;
+  }
+
+  .wsu-carousel__tab::after {
+    content: '';
+    inline-size: 0.625rem;
+    block-size: 0.625rem;
+    background-color: var(--wsu-border);
+    border-radius: var(--wsu-radius-full);
+    transition: background-color var(--wsu-duration-fast) ease-out;
+  }
+
+  .wsu-carousel__tab[aria-selected='true']::after {
+    background-color: var(--wsu-brand);
+  }
+
+  /* ================================================================ Mockups */
+
+  /**
+   * Frames that stand in for a device or an application chrome around whatever
+   * a caller puts inside them: a browser around a page, a plain window around
+   * any content, a phone body around a screen. All three are chrome around
+   * someone else's content, the same relationship wsu-card has to what it
+   * wraps, so none of them constrain what goes in the content slot.
+   *
+   * Accessibility is decided per frame rather than by one rule for all three.
+   * The browser's toolbar repeats what a real one looks like and names nothing
+   * the application controls, so the whole bar is aria-hidden. The window's
+   * dots are the same kind of decoration, but its title is not: a title can
+   * genuinely say what the window is (a filename, a session name), so it stays
+   * in reading order as real text rather than being hidden with the dots that
+   * sit next to it. See wsu-phone below for the third answer.
+   *
+   * A browser has a toolbar because a real one does: an address bar sits in a
+   * filled strip with its own edge, separate from the page it is showing. A
+   * plain window is not a browser and gets no toolbar of its own; its dots sit
+   * directly on the frame's own background, with padding around them rather
+   * than a second surface under them, and the content underneath is what
+   * carries the border, not the row above it. Rebuilding the window with the
+   * browser's filled, bordered strip was the defect: it read as a browser with
+   * the address bar deleted rather than as a different kind of frame. The
+   * title stays on the dots' row (it is real information the same way a
+   * filename on a real title bar is) but reads directly off the window's own
+   * background now, the same as the dots beside it, rather than off a strip
+   * that no longer exists.
+   *
+   * Both frames, and wsu-terminal and wsu-phone below, also carry colour
+   * modifiers now. An earlier version of this file argued a mockup should
+   * never offer one, decoration carrying no information the content inside it
+   * did not already carry, and that argument has been overruled: ADR-0012 lets
+   * a page style its own blocks but never reach into a wsu- class, so a page
+   * that wants a coloured terminal or a branded browser frame and finds no
+   * variant here does not stop wanting one, it either writes `.wsu-terminal {
+   * background: ... }` in its own stylesheet, the exact fork ADR-0012 exists to
+   * prevent, or hand-rolls a panel that drifts from this system a little more
+   * with every page that does it. Withholding the variant does not withhold
+   * the decoration, it just moves it somewhere this system cannot theme,
+   * cannot gate for contrast, and cannot fix in one place later.
+   *
+   * The colour is a fixed set drawn from the semantic layer, the same choice
+   * wsu-badge and wsu-alert already made, rather than a custom property the
+   * caller sets freely. A free property hands a consumer a background with no
+   * matching foreground and trusts them to also pick one that clears contrast
+   * against it; a fixed set only ever offers pairs already proven at 7:1 in
+   * both themes by the token suite (brand.on/brand, accent.on/accent,
+   * status.success-on/success, status.danger-on/danger), so there is no
+   * combination through this API that produces an unreadable panel. Less
+   * flexible, and that is the point: a system-wide brand or accent value
+   * changing later still updates every coloured terminal and browser with it,
+   * which a caller's own custom property would not.
+   *
+   * Two colour surfaces exist on this file's frames, and they get two separate
+   * modifiers because they answer different questions. --bordered recolours
+   * only the frame's own edge to border.brand, a single accent rather than a
+   * fixed set, because an edge is not read as "this frame is red" the way a
+   * filled surface is; it is a quieter "this frame is branded" and one colour
+   * says that. The colour modifiers (--brand, --accent, --success, --danger)
+   * recolour the toolbar strip this file already owns: the bar's own fill, its
+   * dots, and (window only) its title text. They never touch
+   * wsu-browser__content or wsu-window__content, which is a caller's own
+   * slot with a caller's own markup this file cannot see the foreground colour
+   * of; painting a background behind text this file does not control is how a
+   * contrast pairing goes unproven. wsu-terminal and wsu-phone do not have
+   * this problem: a terminal's lines are always plain text this file itself
+   * colours (never the caller's own markup), and a phone's case carries no
+   * text at all, so both can safely recolour their entire surface.
+   */
+  .wsu-browser,
+  .wsu-window {
+    overflow: hidden;
+    background-color: var(--wsu-surface-raised);
+    border: var(--wsu-size-border-width) solid var(--wsu-border-strong);
+    border-radius: var(--wsu-radius-box);
+  }
+
+  .wsu-browser__bar,
+  .wsu-window__bar {
+    display: flex;
+    align-items: center;
+    gap: var(--wsu-space-3);
+    padding: var(--wsu-space-4);
+  }
+
+  .wsu-browser__bar {
+    background-color: var(--wsu-surface-sunken);
+    border-block-end: var(--wsu-size-border-width) solid var(--wsu-border);
+  }
+
+  /**
+   * Three dots drawn as one circle plus two shadow copies, which costs two
+   * elements less than drawing three, and leaves nothing here a screen reader
+   * could meet three times.
+   *
+   * The element itself stays a circle: block-size and aspect-ratio: 1 rather
+   * than a fixed inline-size, so nothing stretches it into a pill. A shadow
+   * paints outside its element and takes up no space, and an earlier version of
+   * this rule tried to reserve that space by widening the element instead of
+   * the space around it, which drew one long pill rather than three circles.
+   * The real fix is a margin: margin-inline-end reserves the span the two
+   * shadow copies actually paint into (the second copy's offset plus its own
+   * width), so the address field starts clear of both without the dot itself
+   * changing shape.
+   */
+  .wsu-browser__dots,
+  .wsu-window__dots {
+    flex: none;
+    block-size: 0.75rem;
+    aspect-ratio: 1;
+    margin-inline-end: 2.25rem;
+    background-color: var(--wsu-border-strong);
+    border-radius: var(--wsu-radius-full);
+    box-shadow:
+      1rem 0 0 var(--wsu-border-strong),
+      2rem 0 0 var(--wsu-border-strong);
+  }
+
+  /**
+   * Wraps rather than truncates. An ellipsis reads fine at a glance, but WCAG
+   * 1.4.12 requires that widening line height, letter spacing and word spacing
+   * never cut text off, and a fixed single line with overflow: hidden does
+   * exactly that the moment a user's own stylesheet makes the text wider than
+   * the box. Nothing here is real navigation to lose, so letting it grow is
+   * free.
+   *
+   * Centred, with a magnifier drawn ahead of the text, because an address field
+   * flush against the left edge of the bar reads as a text input rather than as
+   * the thing every browser toolbar actually draws: a pill carrying an icon. The
+   * whole bar is already aria-hidden, so the icon needs no label of its own.
+   */
+  /**
+   * A pill sitting in the middle of the bar, not a field stretched across it.
+   *
+   * flex: 0 1 auto with auto inline margins, rather than 1 1 auto: growing to
+   * fill made it read as a search input spanning the whole toolbar, which is not
+   * what an address bar looks like. It may still shrink, so a long address
+   * narrows rather than pushing the dots out of the bar, and it stops growing at
+   * a width that keeps the shape recognisable on a wide screen.
+   */
+  .wsu-browser__url {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    justify-content: center;
+    gap: var(--wsu-space-1);
+    min-inline-size: 0;
+    max-inline-size: 24rem;
+    margin-inline: auto;
+    overflow-wrap: anywhere;
+    padding: var(--wsu-space-1) var(--wsu-space-3);
+    font-size: var(--wsu-font-size-xs);
+    color: var(--wsu-text-subtle);
+    text-align: center;
+    background-color: var(--wsu-surface);
+    border: var(--wsu-size-border-width) solid var(--wsu-border);
+    border-radius: var(--wsu-radius-full);
+  }
+
+  .wsu-browser__url::before {
+    content: '';
+    flex: none;
+    inline-size: 0.75rem;
+    block-size: 0.75rem;
+    background-color: currentColor;
+    opacity: 0.6;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M9.965 11.026a5 5 0 1 1 1.06-1.06l2.755 2.754a.75.75 0 1 1-1.06 1.06l-2.755-2.754ZM10.5 7a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z' clip-rule='evenodd'/%3E%3C/svg%3E") center / contain no-repeat;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M9.965 11.026a5 5 0 1 1 1.06-1.06l2.755 2.754a.75.75 0 1 1-1.06 1.06l-2.755-2.754ZM10.5 7a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z' clip-rule='evenodd'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+
+  .wsu-window__title {
+    overflow-wrap: anywhere;
+    margin-inline: auto;
+    font-size: var(--wsu-font-size-sm);
+    color: var(--wsu-text-muted);
+  }
+
+  /**
+   * A single accent edge, not a fixed set: border.brand is proven at 3:1
+   * (WCAG 1.4.11) against both surface.base and surface.raised in both
+   * themes, the same minimum border.strong already carries, so swapping to it
+   * never drops the frame below its usual legibility.
+   */
+  .wsu-browser--bordered,
+  .wsu-window--bordered {
+    border-color: var(--wsu-border-brand);
+  }
+
+  /**
+   * The background-colour variant. Scoped to the toolbar strip this file
+   * already owns (the bar's own fill, its dots, and the window's title text),
+   * never to wsu-browser__content or wsu-window__content, which is a
+   * caller's own slot this file cannot see the foreground colour of. See the
+   * comment above wsu-browser for why that split is where it is.
+   *
+   * The dots switch to currentColor here rather than repeating each on-X
+   * token: the bar around them already sets its own text colour to the
+   * matching on-X value, so the same declaration that makes the title
+   * readable is what the dots inherit their fill from, and there is nothing
+   * left to keep in step by hand if a fifth colour is ever added.
+   */
+  .wsu-browser--brand .wsu-browser__bar,
+  .wsu-window--brand .wsu-window__bar {
+    color: var(--wsu-on-brand);
+    background-color: var(--wsu-brand);
+    border-block-end-color: var(--wsu-brand);
+  }
+
+  .wsu-browser--accent .wsu-browser__bar,
+  .wsu-window--accent .wsu-window__bar {
+    color: var(--wsu-on-accent);
+    background-color: var(--wsu-accent);
+    border-block-end-color: var(--wsu-accent);
+  }
+
+  .wsu-browser--success .wsu-browser__bar,
+  .wsu-window--success .wsu-window__bar {
+    color: var(--wsu-on-success);
+    background-color: var(--wsu-success);
+    border-block-end-color: var(--wsu-success);
+  }
+
+  .wsu-browser--danger .wsu-browser__bar,
+  .wsu-window--danger .wsu-window__bar {
+    color: var(--wsu-on-danger);
+    background-color: var(--wsu-danger);
+    border-block-end-color: var(--wsu-danger);
+  }
+
+  .wsu-browser--brand .wsu-browser__dots,
+  .wsu-window--brand .wsu-window__dots,
+  .wsu-browser--accent .wsu-browser__dots,
+  .wsu-window--accent .wsu-window__dots,
+  .wsu-browser--success .wsu-browser__dots,
+  .wsu-window--success .wsu-window__dots,
+  .wsu-browser--danger .wsu-browser__dots,
+  .wsu-window--danger .wsu-window__dots {
+    background-color: currentColor;
+    box-shadow:
+      1rem 0 0 currentColor,
+      2rem 0 0 currentColor;
+  }
+
+  .wsu-window--brand .wsu-window__title { color: var(--wsu-on-brand); }
+  .wsu-window--accent .wsu-window__title { color: var(--wsu-on-accent); }
+  .wsu-window--success .wsu-window__title { color: var(--wsu-on-success); }
+  .wsu-window--danger .wsu-window__title { color: var(--wsu-on-danger); }
+
+  /**
+   * No padding of its own. A full-bleed screenshot and a padded paragraph are
+   * both reasonable things to put in a browser or a window, so that choice stays
+   * with whatever the caller puts in the slot rather than being decided here.
+   *
+   * display: grid; place-items: center is the one default this content area
+   * does carry, and it is the same default wsu-phone__screen below already
+   * uses, for the same reason: a caller's own capped-width text (a wsu-prose
+   * paragraph, most of the demos on this page) has no margin of its own, so
+   * without this it sits flush at the frame's inline-start rather than in the
+   * middle of it, a real defect measured across every one of these frames at
+   * every width. It costs a full-bleed screenshot or a live embed nothing:
+   * something already given its own inline-size: 100% is already the size of
+   * the grid area before place-items is asked anything.
+   *
+   * The window's content also carries the border the removed toolbar strip
+   * used to: border-block-start where the bar's own border-block-end used to
+   * sit, so the frame is still legibly two parts, a header row and a body,
+   * without a second surface colour to draw the line. The browser keeps its
+   * separation on the bar itself, because the bar itself still exists there.
+   */
+  .wsu-browser__content,
+  .wsu-window__content {
+    display: grid;
+    place-items: center;
+    overflow: auto;
+  }
+
+  .wsu-window__content {
+    border-block-start: var(--wsu-size-border-width) solid var(--wsu-border);
+  }
+
+  /**
+   * Traced from a real device rather than drawn as a diagram of one: a fixed
+   * 462:978 aspect ratio, a black body, a grey bezel, and a camera notch that
+   * sits over the display by occupying the same grid cell rather than beside
+   * it. Sizing follows the ratio down from a maximum rather than a fixed pixel
+   * width, so the frame itself never forces horizontal scroll at 320px (1.4.10).
+   * The maximum is 28.875rem (462px), the same 462 the aspect ratio is traced
+   * from at its own natural size: capping it any smaller was shrinking the
+   * traced device rather than just scaling it down for narrow viewports.
+   *
+   * Unlike the browser and window bars, this frame's shape is itself the
+   * information: it is how a sighted reader knows the content inside is being
+   * shown as a phone screen rather than as a page. Hiding the whole thing with
+   * aria-hidden, the way the browser's toolbar is hidden, would remove that
+   * fact for anyone not looking at it, so the frame carries role="group" and a
+   * label instead of being hidden. The notch has nothing of its own to say, so
+   * it alone is aria-hidden.
+   *
+   * The body and bezel read from semantic.mockup, not the surface-inverse pair
+   * this used before. surface-inverse flips with the theme by design, which is
+   * right for a card or a tooltip and wrong for a phone case: a device does not
+   * repaint itself when the page around it changes theme, any more than a real
+   * phone would.
+   *
+   * No wallpaper modifier, and this is a confirmation rather than a gap: a
+   * wallpaper is already just whatever the caller puts in wsu-phone__screen,
+   * an <img> sized to the slot the same way a full-bleed browser screenshot
+   * is, so there is nothing here to build for it.
+   *
+   * A coloured case is a different question and does get a modifier
+   * (--brand, --accent, --success, --danger), the fixed set drawn from the
+   * semantic layer explained above wsu-browser. The bezel stays
+   * mockup-bezel always: it reads as hardware, grey plastic around whatever
+   * colour the case itself is, the same way a real phone case's rim usually
+   * does not match the shell. Only the case (wsu-phone) and the notch, which
+   * has to match the case exactly to still read as a cutout rather than a
+   * second colour block, take the colour. Neither carries text, so there is no
+   * foreground to prove against it the way wsu-terminal below has to.
+   */
+  .wsu-phone {
+    position: relative;
+    display: inline-grid;
+    justify-items: center;
+    inline-size: 100%;
+    max-inline-size: 28.875rem;
+    aspect-ratio: 462 / 978;
+    padding: 0.375rem;
+    overflow: hidden;
+    background-color: var(--wsu-mockup-device);
+    border: 0.3125rem solid var(--wsu-mockup-bezel);
+    border-radius: 4.0625rem;
+  }
+
+  .wsu-phone--brand,
+  .wsu-phone--brand .wsu-phone__notch { background-color: var(--wsu-brand); }
+
+  .wsu-phone--accent,
+  .wsu-phone--accent .wsu-phone__notch { background-color: var(--wsu-accent); }
+
+  .wsu-phone--success,
+  .wsu-phone--success .wsu-phone__notch { background-color: var(--wsu-success); }
+
+  .wsu-phone--danger,
+  .wsu-phone--danger .wsu-phone__notch { background-color: var(--wsu-danger); }
+
+  .wsu-phone__notch {
+    z-index: 1;
+    grid-area: 1 / 1;
+    align-self: start;
+    margin-block-start: 3%;
+    inline-size: 28%;
+    block-size: 3.7%;
+    background-color: var(--wsu-mockup-device);
+    border-radius: 1.0625rem;
+  }
+
+  /**
+   * padding-block-start only, not padding on every side.
+   *
+   * The notch physically overlaps the top of this element, the same as it would
+   * on a real phone, so default content needs clearance there or it renders
+   * under the cutout. Left, right and bottom stay at zero: a screenshot filling
+   * the screen is expected to run to those edges, and reserving space it does
+   * not need would just be a WayneUI-shaped margin around someone else's image.
+   *
+   * display: grid and place-items: center read as a default for a short line of
+   * status text, the same relationship a locked phone's own status text has to
+   * its screen, without taking that choice away from a full-bleed image: an
+   * <img> given its own width: 100%; height: 100% (the usual way to fill this
+   * slot) is already the size of the grid area before place-items is asked
+   * anything, so there is nothing left for centering to do to it. Only content
+   * that has not sized itself, ordinary text, is affected. text-align: center
+   * follows the same reasoning for text that wraps to more than one line.
+   *
+   * background-color and color read from semantic.mockup, the same
+   * theme-invariant pair the terminal panel uses, not --wsu-surface and
+   * --wsu-text. Those two flip with the page's theme, and a phone screen that
+   * flipped with them was just showing the light theme's white page background
+   * through a phone-shaped hole, which is not a phone screen at all: a real
+   * device does not repaint its display because the room around it got
+   * brighter. --wsu-on-mockup is proven at 7:1 against this exact background in
+   * both themes (see semantic.color.json), so default content set in it stays
+   * readable without the caller doing anything.
+   */
+  .wsu-phone__screen {
+    grid-area: 1 / 1;
+    display: grid;
+    place-items: center;
+    overflow: auto;
+    inline-size: 100%;
+    block-size: 100%;
+    padding-block: 2.5rem;
+    color: var(--wsu-on-mockup);
+    text-align: center;
+    background-color: var(--wsu-mockup-screen);
+    border-radius: 3.375rem;
+  }
+
+  /**
+   * A recorded terminal session, not a code sample: there is no language label
+   * and no copy button, because nobody copies a screenshot of a terminal and
+   * offering to would claim the lines are something to take rather than
+   * something to look at. wsu-codeblock stays the component for code someone is
+   * meant to copy; this is for showing what running it looked like.
+   *
+   * The panel is a fixed dark surface rather than surface-inverse: a terminal
+   * does not turn light just because the page around it switches to a light
+   * theme, any more than a real terminal emulator would, so it reads from the
+   * same theme-invariant semantic.mockup tokens the phone body uses.
+   *
+   * The three dots are drawn on a pseudo-element with the same box-shadow
+   * technique the browser and window bars use, so there is nothing here for a
+   * screen reader to meet at all. Dim opacity keeps them a texture rather than
+   * something competing with the text underneath.
+   *
+   * The prompt character at the start of a line is part of the illustration in
+   * the same way a timeline's marker is: it carries no information the line's
+   * own text does not already carry, so it is aria-hidden, and user-select:
+   * none keeps it out of a manual copy of the line the way aria-hidden already
+   * keeps it out of a screen reader's. Its column is a fixed width so prompts of
+   * different widths ($, >) still line their text up on the same edge.
+   *
+   * padding-block only, no padding-inline: measured against daisyUI's own
+   * mockup-code (padding-block: 1.25rem, padding-inline: 0, its lines flush
+   * against the left edge with only a padding-right reserved on each line for
+   * the scroll gutter), a horizontal inset on top of that block padding was
+   * what made this read as a padded card rather than a terminal. The dots and
+   * every line now start at the panel's own inline-start edge the same way
+   * daisy's do; .wsu-terminal__line below carries the trailing gutter instead,
+   * so a line that scrolls (see --nowrap) still ends clear of the panel edge.
+   *
+   * "Multi line" is the one daisyUI mockup-code variant that earned no rule
+   * here: their pre is one line each, ours already takes an array, so a caller
+   * gets a multi-line transcript by passing more than one line, nothing to add.
+   *
+   * The colour modifiers (--brand, --accent, --success, --danger) are the
+   * fixed set explained above wsu-browser, and this component can offer them
+   * on the whole panel rather than only on a strip: every line in it is plain
+   * text this file itself sets `color` on, never a caller's own markup, so the
+   * on-X/X pairing that is proven at 7:1 for a badge is proven for this panel
+   * too, at any length of transcript.
+   *
+   * The three dots read background-color and box-shadow from currentColor
+   * rather than repeating --wsu-on-mockup or a variant's own on-X token: the
+   * element's own `color` is already whichever of those is active, default or
+   * variant, so the dots follow it for free instead of needing four more rules
+   * that could drift from the four above.
+   */
+  .wsu-terminal {
+    display: block;
+    margin: 0;
+    /**
+     * Inset on all four sides, not just top and bottom.
+     *
+     * The inline padding was taken out to match daisyUI, whose own panel has
+     * none, and that left the window controls sitting hard against the left
+     * edge with nothing between them and the corner. Their lines look indented
+     * only because the prompt column pushes the text across; the dots have no
+     * such column and had nowhere to go.
+     *
+     * A long line still scrolls: the padding is on the panel, so the scroll
+     * container clips at the padding edge, which is where a terminal's text
+     * stops anyway. The trailing space on each line below keeps the last
+     * character off that edge when it does.
+     */
+    padding: var(--wsu-space-5);
+    overflow-x: auto;
+    font-family: var(--wsu-font-family-mono);
+    font-size: var(--wsu-font-size-sm);
+    color: var(--wsu-on-mockup);
+    background-color: var(--wsu-mockup-panel);
+    border-radius: var(--wsu-radius-box);
+  }
+
+  .wsu-terminal--brand { color: var(--wsu-on-brand); background-color: var(--wsu-brand); }
+  .wsu-terminal--accent { color: var(--wsu-on-accent); background-color: var(--wsu-accent); }
+  .wsu-terminal--success { color: var(--wsu-on-success); background-color: var(--wsu-success); }
+  .wsu-terminal--danger { color: var(--wsu-on-danger); background-color: var(--wsu-danger); }
+
+  .wsu-terminal::before {
+    content: '';
+    display: block;
+    inline-size: 0.625rem;
+    block-size: 0.625rem;
+    margin-block-end: var(--wsu-space-4);
+    background-color: currentColor;
+    opacity: 0.3;
+    border-radius: var(--wsu-radius-full);
+    box-shadow:
+      1rem 0 0 currentColor,
+      2rem 0 0 currentColor;
+  }
+
+  .wsu-terminal__line {
+    display: block;
+    padding-inline-end: var(--wsu-space-5);
+  }
+
+  .wsu-terminal__line + .wsu-terminal__line {
+    margin-block-start: var(--wsu-space-1);
+  }
+
+  /**
+   * A pointer at the one line an example is actually about, the same job a
+   * highlighted line in a diff or a debugger does. Colour alone would rest a
+   * WCAG 1.4.1 fact on colour alone, so a heavier weight travels with the
+   * fill, the same pairing the current-page nav item uses for the same reason.
+   * --wsu-warning and --wsu-on-warning are already proven at 7:1 against each
+   * other (see semantic.color.json), a pairing that holds regardless of which
+   * theme the page around the terminal is in, since the terminal itself never
+   * changes with it.
+   */
+  .wsu-terminal__line--highlight {
+    padding-inline-start: var(--wsu-space-2);
+    margin-inline-start: calc(var(--wsu-space-2) * -1);
+    font-weight: var(--wsu-font-weight-bold);
+    color: var(--wsu-on-warning);
+    background-color: var(--wsu-warning);
+    border-radius: var(--wsu-radius-sm);
+  }
+
+  /**
+   * Opts a whole session out of the default wrap. Most transcripts are short
+   * commands and letting them reflow is free (1.4.10), but a line whose own
+   * length is part of what it is showing, a long path, a long URL, reads
+   * truthfully only if it is kept exactly as recorded, scrolling inside the
+   * overflow-x this panel already has rather than folding into extra lines
+   * that were never really there.
+   */
+  .wsu-terminal--nowrap .wsu-terminal__line {
+    white-space: pre;
+  }
+
+  .wsu-terminal__prompt {
+    display: inline-block;
+    inline-size: 2rem;
+    margin-inline-end: var(--wsu-space-2);
+    text-align: right;
+    opacity: 0.5;
+    user-select: none;
+  }
+
+}
+
+
+/* ======================================================================
+   chrome.css: @layer wsu.chrome
+   ====================================================================== */
+
+@layer wsu.chrome {
+  /**
+   * WayneUI chrome, the university masthead, application bar, shell, sidebar,
+   * breadcrumbs, page header and footer.
+   *
+   * This is the layer that makes an application look like Wayne State, and it is
+   * written once here. The Vue components, the Blade components and the plain
+   * HTML partials all emit the same class names against this stylesheet, which is
+   * why the four consumer paths look identical rather than merely similar.
+   *
+   * Layout uses grid and sticky positioning. WayneUI 1.x used a fixed-position
+   * bar with a hardcoded `body { margin-top: 50px }` compensator and absolutely
+   * positioned sidebars at `top: 51px`; those numbers drift the moment anything
+   * wraps, and they break outright at large text sizes. Nothing here depends on a
+   * magic offset.
+   */
+
+  /* ==================================================== Application layout */
+
+  /**
+   * The shell is a five-row grid, one row per landmark it can ever hold: the
+   * ribbon, the masthead, the bar, the body, the footer. Each child is placed
+   * by what it is rather than by where it falls among its siblings, so the row
+   * that takes the slack is always the body, whichever of the optional rows
+   * above it are present.
+   *
+   * The internal template never has a masthead row and the public template
+   * never has a compact bar sharing space with one; the ribbon is conditional
+   * on the environment either way. A row nobody is placed in has nothing to
+   * measure and sizes to nothing, so an absent ribbon or masthead simply is not
+   * there rather than leaving a gap or shifting which row is 1fr.
+   *
+   * `min-block-size: 100svb` with the body row taking the remaining space keeps
+   * a short page's footer at the bottom of the viewport without the
+   * `position: absolute` footer tricks that break when content grows.
+   */
+  .wsu-shell {
+    display: grid;
+    grid-template-areas:
+      'ribbon'
+      'masthead'
+      'bar'
+      'body'
+      'footer';
+    grid-template-rows: auto auto auto 1fr auto;
+    min-block-size: 100svb;
+  }
+
+  .wsu-shell > .wsu-env-ribbon {
+    grid-area: ribbon;
+  }
+
+  /* The native masthead and the official wayne.edu fragment are the two ways
+     this row is ever filled; never both on the same page. */
+  .wsu-shell > :is(.wsu-masthead, .wsuheader) {
+    grid-area: masthead;
+  }
+
+  .wsu-shell > .wsu-app-bar {
+    grid-area: bar;
+  }
+
+  .wsu-shell > .wsu-shell__body {
+    grid-area: body;
+  }
+
+  /*
+   * The footer landmark, whichever component built it: WayneUI's own
+   * `.wsu-footer`, `.wsu-university-footer`, or the plain `<footer>` that wraps
+   * the official fragment. The tag is what makes it a footer regardless of
+   * which of those it wraps, so that is what is matched rather than a class
+   * that varies with which one is in use.
+   */
+  .wsu-shell > footer {
+    grid-area: footer;
+  }
+
+  .wsu-shell__body {
+    display: grid;
+    inline-size: 100%;
+  }
+
+  /* With a sidebar, the body becomes two columns above the medium breakpoint. */
+  .wsu-shell--sidebar .wsu-shell__body {
+    grid-template-columns: 1fr;
+  }
+
+  @media (min-width: 48rem) {
+    .wsu-shell--sidebar .wsu-shell__body {
+      grid-template-columns: var(--wsu-size-sidebar) minmax(0, 1fr);
+    }
+  }
+
+  .wsu-shell__main {
+    min-inline-size: 0; /* lets long content shrink instead of forcing page scroll */
+    padding: var(--wsu-space-8) var(--wsu-size-gutter) var(--wsu-space-16);
+  }
+
+  /**
+   * Without a sidebar the main column carries the page's own container, so its
+   * content lines up with the wordmark in the header above rather than running to
+   * the full viewport width.
+   */
+  .wsu-shell:not(.wsu-shell--sidebar) .wsu-shell__main {
+    inline-size: 100%;
+    max-inline-size: var(--wsu-size-content-max);
+    margin-inline: auto;
+  }
+
+  /** Centred shell, for sign-in and other single-purpose pages. */
+  .wsu-shell--centered .wsu-shell__main {
+    display: grid;
+    place-items: center;
+    padding-block: var(--wsu-space-12);
+  }
+
+  .wsu-shell--centered .wsu-shell__panel {
+    inline-size: 100%;
+    max-inline-size: 26rem;
+  }
+
+  /* ===================================================== University masthead */
+
+  /**
+   * The official wayne.edu bar. Always green, in both themes: it is the
+   * university's signature rather than the application's furniture.
+   */
+  .wsu-masthead {
+    color: var(--wsu-chrome-masthead-text);
+    background-color: var(--wsu-chrome-masthead);
+  }
+
+  .wsu-masthead__inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wsu-space-4);
+    align-items: center;
+    justify-content: space-between;
+    inline-size: 100%;
+    max-inline-size: var(--wsu-size-content-max);
+    margin-inline: auto;
+    padding: var(--wsu-space-2) var(--wsu-size-gutter);
+  }
+
+  .wsu-masthead__wordmark {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--wsu-space-1);
+    margin-inline-start: calc(var(--wsu-space-1) * -1);
+    color: inherit;
+    text-decoration: none;
+    border-radius: var(--wsu-radius-sm);
+  }
+
+  .wsu-masthead__wordmark :is(svg, img) {
+    block-size: 2rem;
+    inline-size: auto;
+    /* The lockup is wide; below the small breakpoint it must be allowed to shrink
+       rather than force the masthead to scroll sideways (1.4.10). */
+    max-inline-size: min(100%, 24rem);
+  }
+
+  @media (max-width: 39.999rem) {
+    .wsu-masthead__wordmark :is(svg, img) {
+      block-size: 1.5rem;
+    }
+  }
+
+  .wsu-masthead__utility {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wsu-space-1);
+    align-items: center;
+  }
+
+  .wsu-masthead__link {
+    transition: background-color var(--wsu-duration-fast) ease-out;
+    display: inline-flex;
+    gap: var(--wsu-space-2);
+    align-items: center;
+    min-block-size: var(--wsu-size-tap-min);
+    padding-inline: var(--wsu-space-3);
+    font-size: var(--wsu-font-size-sm);
+    color: var(--wsu-chrome-masthead-text);
+    text-decoration: none;
+    border-radius: var(--wsu-radius-field);
+  }
+
+  .wsu-masthead__link:hover {
+    color: var(--wsu-chrome-masthead-text);
+    text-decoration: underline;
+    text-decoration-thickness: max(0.1em, 2px);
+    text-underline-offset: 0.2em;
+  }
+
+  /**
+   * Field and submit button are one seated control rather than an input with a
+   * button parked next to it. The wrapper owns the border, the background and the
+   * focus ring; the parts inside are transparent.
+   */
+  .wsu-masthead__search {
+    display: flex;
+    align-items: center;
+    min-block-size: var(--wsu-size-tap-min);
+    overflow: hidden;
+    background-color: var(--wsu-surface);
+    /* A control boundary, so it is held to 1.4.11's 3:1 rather than left as a
+       hairline that disappears against the green. */
+    border: var(--wsu-size-border-width) solid var(--wsu-border-strong);
+    border-radius: var(--wsu-radius-field);
+  }
+
+  .wsu-masthead__search-field {
+    min-inline-size: 0;
+    inline-size: clamp(7rem, 20vw, 13rem);
+    padding: var(--wsu-space-2) 0 var(--wsu-space-2) var(--wsu-space-3);
+    color: var(--wsu-text);
+    background-color: transparent;
+    border: none;
+  }
+
+  /**
+   * The wrapper owns the focus ring, so the field inside must draw neither an
+   * outline nor a shadow. Clearing only the outline leaves the chrome rule's
+   * box-shadow behind, which renders as a second ring in a different colour
+   * nested inside the first.
+   */
+  .wsu-masthead__search-field:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  /**
+   * The submit sits on the white field, not on the green bar, so it takes the page
+   * foreground. Qualified with the masthead class to outrank the blanket
+   * `color: inherit` given to controls inside the chrome, which would otherwise
+   * paint this white on white.
+   *
+   * `align-self: stretch` rather than a fixed height: the button fills the
+   * wrapper, keeping it a 44px target. Collapsing it to fit its icon would drop it
+   * to 22px, under the 24px floor in 2.5.8.
+   */
+  .wsu-masthead .wsu-masthead__search .wsu-btn {
+    align-self: stretch;
+    min-block-size: var(--wsu-size-tap-min);
+    padding-inline: var(--wsu-space-3);
+    color: var(--wsu-text-muted);
+    border-radius: 0;
+  }
+
+  .wsu-masthead .wsu-masthead__search .wsu-btn:hover:not(:disabled) {
+    color: var(--wsu-brand);
+    background-color: var(--wsu-surface-sunken);
+  }
+
+  /**
+   * Focus is drawn on the wrapper, since that is the control the user perceives.
+   * `:focus-within` rather than `:focus-visible` because the ring has to appear
+   * when the input inside receives focus, not the wrapper itself.
+   */
+  .wsu-masthead__search:focus-within {
+    outline: var(--wsu-size-focus-ring-width) solid var(--wsu-chrome-on-chrome-focus);
+    outline-offset: var(--wsu-size-focus-ring-offset);
+  }
+
+  /**
+   * The green chrome is a fixed dark surface, so anything placed inside it takes
+   * the chrome's own foreground rather than the page's. Without this a ghost
+   * button inside the masthead renders in --wsu-text, which in the light theme is
+   * near-black on dark green: a control that is technically present and
+   * practically invisible.
+   */
+  .wsu-masthead :is(.wsu-btn, .wsu-btn--ghost),
+  .wsu-app-bar :is(.wsu-btn, .wsu-btn--ghost) {
+    color: inherit;
+  }
+
+  .wsu-masthead .wsu-btn--ghost:hover:not(:disabled),
+  .wsu-app-bar .wsu-btn--ghost:hover:not(:disabled) {
+    background-color: var(--wsu-chrome-bar-hover);
+  }
+
+  /**
+   * Focus inside the green chrome switches to gold. The page focus ring is
+   * PMS 561c, which against a PMS 561c bar is invisible: a focus indicator that
+   * exists in the stylesheet and not on screen.
+   */
+  .wsu-masthead :focus-visible,
+  .wsu-app-bar :focus-visible {
+    outline-color: var(--wsu-chrome-on-chrome-focus);
+    box-shadow: 0 0 0 var(--wsu-size-focus-ring-offset) var(--wsu-chrome-masthead);
+  }
+
+  .wsu-app-bar :focus-visible {
+    box-shadow: 0 0 0 var(--wsu-size-focus-ring-offset) var(--wsu-chrome-bar);
+  }
+
+  /* ======================================================== Application bar */
+
+  .wsu-app-bar {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: var(--wsu-z-sticky);
+    color: var(--wsu-chrome-bar-text);
+    background-color: var(--wsu-chrome-bar);
+  }
+
+  /**
+   * `flex-wrap: wrap` is load-bearing rather than a precaution.
+   *
+   * A single-line flex row does not shrink below the sum of its items' minimum
+   * content sizes. It overflows instead, and a sticky bar that overflows takes the
+   * whole document's horizontal scrolling with it. At 320px the compact bar
+   * carries a menu toggle, the shield, the application name, a search toggle, a
+   * theme toggle and the user chip: around 500px of content in a 320px window,
+   * which is a 1.4.10 failure of the entire page rather than of one component.
+   *
+   * Wrapping makes the bar taller instead of wider. Nothing is hidden and nothing
+   * is truncated, and the layout below already survives a taller bar, because
+   * theme.js measures it and publishes --wsu-app-bar-height precisely so that
+   * nothing depends on the bar being one line high.
+   *
+   * This row only ever holds two things: the leading identity (menu toggle,
+   * mark, brand, nav) and the trailing controls, grouped as `.wsu-app-bar__end`
+   * below. Wrapping the leading and trailing content directly against each
+   * other, as siblings of one flat row, would let some trailing controls land
+   * on the leading group's line and the rest wrap away from it, so which of them
+   * ended up pushed to the trailing edge would depend on how many happened to
+   * fit next to the leading content at a given width, not on what they are.
+   * Grouping them means only one boundary can ever wrap, between the two
+   * groups, and whatever wraps inside the trailing group stays inside it.
+   */
+  .wsu-app-bar__inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wsu-space-3);
+    align-items: center;
+    inline-size: 100%;
+    max-inline-size: var(--wsu-size-content-max);
+    margin-inline: auto;
+    padding: var(--wsu-space-3) var(--wsu-size-gutter);
+  }
+
+  /**
+   * Controls inside the bar are 36px rather than the 44px used everywhere else.
+   *
+   * At 44px the search field fills the bar edge to edge, 8px of green above and
+   * below, which reads as cramped and makes the chrome taller on every page. At
+   * 36px with 12px of padding the bar is the same overall height but the controls
+   * sit in it rather than filling it.
+   *
+   * The trade-off is stated in the token: this clears the 24px AA requirement
+   * (2.5.8) by half again, while the 44px AAA figure stays the default for the
+   * rest of the system. See --wsu-size-tap-compact.
+   */
+  .wsu-app-bar :is(.wsu-btn, .wsu-app-bar__search, .wsu-app-bar__toggle, .wsu-app-bar__user) {
+    min-block-size: var(--wsu-size-tap-compact);
+  }
+
+  /**
+   * Icon-only buttons carry no inline padding.
+   *
+   * .wsu-app-bar__toggle sets padding-inline for the labelled toggles, which on a
+   * square icon button leaves a 12px content box inside a 36px control, and the
+   * base reset's `max-inline-size: 100%` then clamps the glyph to fit, squashing
+   * it to 12x20 rather than scaling it. The icon is centred by the flex box, so it
+   * needs no padding of its own.
+   */
+  .wsu-app-bar .wsu-btn--icon {
+    min-inline-size: var(--wsu-size-tap-compact);
+    inline-size: var(--wsu-size-tap-compact);
+    padding-inline: 0;
+  }
+
+  /**
+   * Compact bar: the default for internal applications.
+   *
+   * A public site stacks the university masthead above the site's own navigation,
+   * because the university's identity is the point. An internal tool is not a
+   * marketing surface: stacking a full masthead, a wayne.edu search box and an
+   * application bar spends roughly 140px of vertical space and a good deal of
+   * attention before the user reaches anything they came for, and a dashboard has
+   * neither to spare.
+   *
+   * So the two collapse into one bar: the shield establishes Wayne State, the
+   * application name establishes the tool, and everything else is the tool's.
+   * This is the "stripped" half of the flip.
+   */
+  .wsu-app-bar--compact .wsu-app-bar__inner {
+    max-inline-size: none;
+    padding-inline: var(--wsu-space-4);
+  }
+
+  .wsu-app-bar__mark {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    align-self: stretch;
+    padding-inline: var(--wsu-space-1);
+    border-radius: var(--wsu-radius-sm);
+  }
+
+  .wsu-app-bar__mark :is(svg, img) {
+    block-size: 1.75rem;
+    inline-size: auto;
+  }
+
+  /**
+   * A hairline between the university mark and the application's own name, so the
+   * bar reads as two things joined rather than one run-on title.
+   */
+  .wsu-app-bar__divider {
+    flex: none;
+    align-self: center;
+    inline-size: var(--wsu-size-border-width);
+    block-size: 1.5rem;
+    background-color: currentcolor;
+    opacity: 0.35;
+  }
+
+  /* ------------------------------------------------- Application search */
+
+  /**
+   * Search within the application (records, students, courses) as distinct from
+   * the wayne.edu site search in the official masthead. Most internal tools need
+   * this, and it is the one control users reach for constantly, so it lives in the
+   * bar rather than buried on a page.
+   *
+   * A solid field rather than a translucent one. Alpha over a gradient makes the
+   * effective contrast depend on whatever sits behind it, which cannot be verified
+   * by the token gate.
+   */
+  .wsu-app-bar__search {
+    display: flex;
+    flex: 0 1 22rem;
+    gap: var(--wsu-space-2);
+    align-items: center;
+    min-inline-size: 0;
+    padding-inline: var(--wsu-space-3);
+    color: var(--wsu-text-muted);
+    background-color: var(--wsu-surface);
+    border: var(--wsu-size-border-width) solid var(--wsu-border-strong);
+    border-radius: var(--wsu-radius-field);
+  }
+
+  .wsu-app-bar__search-field {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    padding-block: var(--wsu-space-1);
+    color: var(--wsu-text);
+    background-color: transparent;
+    border: none;
+  }
+
+  .wsu-app-bar__search-field::placeholder {
+    color: var(--wsu-text-subtle);
+  }
+
+  /* The wrapper draws the ring, since that is the control the user perceives. */
+  .wsu-app-bar__search-field:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  .wsu-app-bar__search:focus-within {
+    outline: var(--wsu-size-focus-ring-width) solid var(--wsu-chrome-on-chrome-focus);
+    outline-offset: var(--wsu-size-focus-ring-offset);
+  }
+
+  .wsu-app-bar__search .wsu-icon {
+    flex: none;
+    color: var(--wsu-text-subtle);
+  }
+
+  /**
+   * Keyboard hint. Decorative: the shortcut is announced by the input's own
+   * accessible description, so this is aria-hidden rather than read out as loose
+   * letters.
+   *
+   * Styled like `.wsu-kbd` but deliberately not carrying that class. The markup
+   * contract records required accessibility attributes per class as a union
+   * over every use it finds, and this is the one place a key cap is legitimately
+   * aria-hidden; wsu-kbd's other uses are real content and must never be. Wearing
+   * both classes on one element would have folded aria-hidden into what every
+   * `.wsu-kbd` is required to carry, which a meaningful use would then either
+   * have to fail or wrongly satisfy by hiding itself. The few declarations
+   * below are the cost of keeping the two apart; see `.wsu-kbd` in
+   * components.css for the shared shape.
+   */
+  .wsu-app-bar__search-hint {
+    flex: none;
+    padding: 0 var(--wsu-space-1);
+    font-family: var(--wsu-font-family-mono);
+    font-size: var(--wsu-font-size-xs);
+    line-height: 1.6;
+    color: var(--wsu-text-muted);
+    background-color: var(--wsu-surface-sunken);
+    border: var(--wsu-size-border-width) solid var(--wsu-border);
+    border-radius: var(--wsu-radius-sm);
+  }
+
+  /**
+   * Below the medium breakpoint the field would crowd out the application name,
+   * so it collapses to a button that reveals a full-width search row beneath the
+   * bar. The row is `hidden` rather than shifted off-screen, so its input is
+   * genuinely out of the tab order while collapsed.
+   */
+  .wsu-app-bar__search-toggle {
+    display: inline-flex;
+  }
+
+  /**
+   * The row unfolds from under the bar rather than appearing beneath it, which is
+   * what connects it to the icon that was just pressed.
+   *
+   * Same construction as the drawer: `display` is transitioned with
+   * `allow-discrete` because the row is `hidden` when collapsed, and without it
+   * the element is gone before anything can animate. `visibility` is deliberately
+   * not involved: the runtime focuses the field the moment the row opens, and a
+   * discrete flip does not commit synchronously.
+   */
+  .wsu-app-bar__search-row {
+    padding: var(--wsu-space-2) var(--wsu-space-4);
+    background-color: var(--wsu-chrome-bar);
+    border-block-start: var(--wsu-size-border-width) solid var(--wsu-chrome-bar-hover);
+    transition:
+      opacity var(--wsu-duration-fast) ease-out,
+      translate var(--wsu-duration-fast) ease-out,
+      display var(--wsu-duration-fast) allow-discrete;
+  }
+
+  .wsu-app-bar__search-row[hidden] {
+    display: none;
+    opacity: 0;
+    translate: 0 -0.25rem;
+  }
+
+  @starting-style {
+    .wsu-app-bar__search-row:not([hidden]) {
+      opacity: 0;
+      translate: 0 -0.25rem;
+    }
+  }
+
+  .wsu-app-bar__search-row .wsu-app-bar__search {
+    flex: 1 1 auto;
+  }
+
+  @media (min-width: 48rem) {
+    /*
+     * Qualified with the bar class so this outranks .wsu-app-bar__toggle's own
+     * display, which is declared later in this same layer. Without the qualifier
+     * the narrow-viewport search toggle stays visible on desktop, putting a second
+     * redundant magnifier next to the inline field.
+     */
+    .wsu-app-bar .wsu-app-bar__search-toggle {
+      display: none;
+    }
+
+    .wsu-app-bar__search-row {
+      display: none;
+    }
+  }
+
+  /**
+   * Expanding search.
+   *
+   * Used on publicly accessible applications, where the official masthead already
+   * carries a wayne.edu search field. Two search boxes side by side (different
+   * jobs, identical appearance) is a confusing thing to put in front of someone,
+   * so the application's own search rests as an icon and grows into a normal
+   * embedded field when reached for.
+   *
+   * The width animates rather than the field appearing instantly, because the
+   * growth is what communicates that the icon and the field are the same control.
+   * The global prefers-reduced-motion rule collapses it to near-instant.
+   */
+  .wsu-app-bar__search--expandable {
+    flex: none;
+    inline-size: var(--wsu-size-tap-compact);
+    padding-inline: 0;
+    background-color: transparent;
+    border-color: transparent;
+    transition:
+      inline-size var(--wsu-duration-base) cubic-bezier(0.2, 0, 0, 1),
+      background-color var(--wsu-duration-base) ease-out,
+      border-color var(--wsu-duration-base) ease-out;
+  }
+
+  .wsu-app-bar__search--expandable[data-expanded] {
+    inline-size: min(22rem, 45vw);
+    padding-inline-end: var(--wsu-space-2);
+    background-color: var(--wsu-surface);
+    border-color: var(--wsu-border-strong);
+  }
+
+  /**
+   * The trigger is the icon, and stays a 36px target in both states.
+   *
+   * Collapsed it sits on the green bar and takes the bar's foreground; the
+   * wrapper's own colour is the muted grey a field's placeholder uses, which on
+   * green is a barely-visible icon.
+   */
+  .wsu-app-bar__search-trigger {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    inline-size: var(--wsu-size-tap-compact);
+    min-inline-size: var(--wsu-size-tap-compact);
+    min-block-size: var(--wsu-size-tap-compact);
+    padding: 0;
+    color: var(--wsu-chrome-bar-text);
+    cursor: pointer;
+    background: none;
+    border: none;
+    border-radius: var(--wsu-radius-field);
+  }
+
+  .wsu-app-bar__search--expandable:not([data-expanded]) .wsu-app-bar__search-trigger:hover {
+    background-color: var(--wsu-chrome-bar-hover);
+  }
+
+  /*
+   * The glyph follows the trigger rather than the field. `.wsu-app-bar__search
+   * .wsu-icon` sets the muted placeholder grey for the icon that sits inside an
+   * always-open field, and at equal specificity it would otherwise win here,
+   * leaving a grey magnifier on the green bar.
+   */
+  .wsu-app-bar__search-trigger .wsu-icon {
+    color: inherit;
+  }
+
+  /* Once expanded the icon sits on the white field, not the green bar. */
+  .wsu-app-bar__search--expandable[data-expanded] .wsu-app-bar__search-trigger {
+    color: var(--wsu-text-subtle);
+  }
+
+  /**
+   * Collapsed, the field is `visibility: hidden` rather than merely zero-width.
+   * A zero-width input is still focusable, so tabbing would land on something
+   * invisible: a 2.4.3 failure that is easy to ship and hard to notice.
+   * `allow-discrete` lets visibility participate in the transition so the field
+   * does not vanish before the width has finished animating.
+   */
+  .wsu-app-bar__search--expandable .wsu-app-bar__search-field {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--wsu-duration-fast) ease-out;
+  }
+
+  /**
+   * `visibility` is deliberately NOT transitioned.
+   *
+   * It carries the accessibility behaviour: hidden keeps the collapsed field out
+   * of the tab order, so nobody lands on an invisible control (2.4.3). But the
+   * script focuses the field the instant it expands, and a discrete property with
+   * `allow-discrete` does not commit its flip synchronously: the focus call then
+   * runs against a still-hidden element and is silently ignored. Leaving
+   * visibility untransitioned makes the flip immediate in both directions.
+   *
+   * Nothing is lost visually: opacity still fades, and the shrinking box clips the
+   * field anyway.
+   */
+  .wsu-app-bar__search--expandable[data-expanded] .wsu-app-bar__search-field {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 60ms;
+  }
+
+  .wsu-app-bar__search--expandable:focus-within {
+    outline: var(--wsu-size-focus-ring-width) solid var(--wsu-chrome-on-chrome-focus);
+    outline-offset: var(--wsu-size-focus-ring-offset);
+  }
+
+  /**
+   * Only the plain, always-open field collapses to nothing here. That variant
+   * has its own compensator further up this file, a toggle button plus a row
+   * that unfolds beneath the bar, so nothing is lost.
+   *
+   * The expandable variant is excluded on purpose. It already collapses to its
+   * own 36px icon through the rules above, so it costs nothing at this width,
+   * and it carries no equivalent toggle of its own: hiding it here as well left
+   * the public template, which only ever uses the expandable variant, with no
+   * search control at all below this width rather than a narrower one.
+   */
+  @media (max-width: 47.999rem) {
+    .wsu-app-bar__end > .wsu-app-bar__search:not(.wsu-app-bar__search--expandable) {
+      display: none;
+    }
+  }
+
+  .wsu-app-bar__brand {
+    transition: background-color var(--wsu-duration-fast) ease-out;
+    display: inline-flex;
+    gap: var(--wsu-space-3);
+    align-items: center;
+    min-block-size: var(--wsu-size-tap-min);
+    padding-inline: var(--wsu-space-2);
+    margin-inline-start: calc(var(--wsu-space-2) * -1);
+    font-family: var(--wsu-font-family-display);
+    font-size: var(--wsu-font-size-lg);
+    font-weight: var(--wsu-font-weight-black);
+    color: var(--wsu-chrome-bar-text);
+    text-decoration: none;
+    white-space: nowrap;
+    border-radius: var(--wsu-radius-field);
+  }
+
+  .wsu-app-bar__brand:hover {
+    color: var(--wsu-chrome-bar-text);
+    background-color: var(--wsu-chrome-bar-hover);
+  }
+
+  /**
+   * The application name is allowed to wrap on a narrow viewport.
+   *
+   * `white-space: nowrap` keeps a short name on one line where there is room for
+   * it, but an application called something like "Graduate Admissions Application
+   * Review" is wider than 320px on its own, and a nowrap flex item cannot shrink.
+   * It pushes the document into horizontal scrolling (1.4.10). Wrapping is the
+   * only option here that loses nothing: truncating with an ellipsis would hide
+   * the name, and shrinking the type would fail 1.4.4.
+   */
+  @media (max-width: 47.999rem) {
+    .wsu-app-bar__brand {
+      min-inline-size: 0;
+      white-space: normal;
+    }
+  }
+
+  /**
+   * The bar's trailing controls: search, the search toggle, any actions a page
+   * adds, the theme toggle, the user chip. One cluster with one job, staying at
+   * the trailing edge of the bar whatever room is left for it.
+   *
+   * `margin-inline-start: auto` claims the row's free space the way a spacer
+   * element used to, but a spacer is a sibling, and a sibling can only push
+   * whatever happens to share its own line. Once the bar wrapped, some of these
+   * controls could land on the spacer's line and get pushed while the rest
+   * wrapped onto a line with nothing pushing them, so where they landed was an
+   * accident of how many fit rather than a decision. Grouping them removes the
+   * accident: the cluster itself is what wraps or does not, so it is always
+   * either beside the leading content, flush with the trailing edge, or alone on
+   * its own line, still flush with the trailing edge, and its own children wrap
+   * inside it under the same `justify-content` rather than escaping it.
+   */
+  .wsu-app-bar__end {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wsu-space-3);
+    align-items: center;
+    justify-content: flex-end;
+    min-inline-size: 0;
+    margin-inline-start: auto;
+  }
+
+  /**
+   * None of this cluster's own controls shrink; they wrap onto a second line of
+   * the cluster instead, the same choice `.wsu-app-bar__inner` already makes for
+   * the bar as a whole, and for the same reason: a squeezed search field or a
+   * squashed user chip is a worse outcome than a taller bar.
+   *
+   * This also keeps the cluster's own width honest. A shrinkable child changes
+   * what a browser measures as this flex item's content size while the bar is
+   * deciding whether the cluster fits beside the leading content, so a control
+   * could be measured as narrower than it will actually render and be pushed
+   * onto a second line it did not need. Non-shrinking children measure the same
+   * whether they end up beside the leading content or wrapped below it.
+   */
+  .wsu-app-bar__end > * {
+    flex-shrink: 0;
+  }
+
+  .wsu-app-bar__nav {
+    display: none;
+    gap: var(--wsu-space-1);
+    align-items: center;
+  }
+
+  @media (min-width: 48rem) {
+    .wsu-app-bar__nav {
+      display: flex;
+    }
+  }
+
+  .wsu-app-bar__item {
+    transition: background-color var(--wsu-duration-fast) ease-out;
+    display: inline-flex;
+    gap: var(--wsu-space-2);
+    align-items: center;
+    min-block-size: var(--wsu-size-tap-min);
+    padding-inline: var(--wsu-space-3);
+    font-size: var(--wsu-font-size-sm);
+    font-weight: var(--wsu-font-weight-bold);
+    color: var(--wsu-chrome-bar-muted);
+    text-decoration: none;
+    border-radius: var(--wsu-radius-field);
+  }
+
+  .wsu-app-bar__item:hover {
+    color: var(--wsu-chrome-bar-text);
+    background-color: var(--wsu-chrome-bar-hover);
+  }
+
+  /**
+   * The glyph beside a bar item's label.
+   *
+   * Sized in em rather than rem so it tracks the label it belongs to: an item is
+   * a lockup of a word and a mark, and the mark should not stay put when the
+   * reader scales the text (1.4.4).
+   *
+   * `flex-shrink: 0` because the icon is the part with no reading order to lose.
+   * When the bar runs short of room the label wraps or the item scrolls; the
+   * glyph never squashes into an ellipse.
+   *
+   * It carries slightly less weight than the label at rest, and comes up to full
+   * strength alongside it. Colour is never the only thing distinguishing the
+   * current item, so this is emphasis rather than state.
+   */
+  .wsu-app-bar__item-icon {
+    flex-shrink: 0;
+    inline-size: 1.15em;
+    block-size: 1.15em;
+    opacity: 0.85;
+    transition: opacity var(--wsu-duration-fast) ease-out;
+  }
+
+  .wsu-app-bar__item:hover .wsu-app-bar__item-icon,
+  .wsu-app-bar__item[aria-current='page'] .wsu-app-bar__item-icon {
+    opacity: 1;
+  }
+
+  /**
+   * The current page is marked with aria-current in the markup; the underline is
+   * driven off that attribute rather than a separate `.active` class, so the
+   * visual state and the accessible state cannot drift apart.
+   */
+  /**
+   * A seated pill rather than an underline.
+   *
+   * An underline drawn inside a control that is 44px tall to meet the target-size
+   * requirement sits well below its own text, reading as a stray mark rather than
+   * as state. Filling the control keeps the indicator attached to the thing it
+   * describes.
+   *
+   * Weight carries the state as well as fill, so it does not rely on colour
+   * perception (1.4.1). The attribute drives the styling, so the visual and
+   * accessible states cannot drift apart.
+   */
+  .wsu-app-bar__item[aria-current='page'] {
+    font-weight: var(--wsu-font-weight-black);
+    color: var(--wsu-chrome-bar-text);
+    background-color: var(--wsu-chrome-bar-hover);
+  }
+
+  .wsu-app-bar__user {
+    display: inline-flex;
+    gap: var(--wsu-space-2);
+    align-items: center;
+    min-block-size: var(--wsu-size-tap-min);
+    padding-inline: var(--wsu-space-3);
+    font-size: var(--wsu-font-size-sm);
+    color: var(--wsu-chrome-bar-text);
+    background: none;
+    border: none;
+    border-radius: var(--wsu-radius-field);
+  }
+
+  .wsu-app-bar__toggle {
+    transition: background-color var(--wsu-duration-fast) ease-out;
+    display: inline-flex;
+    gap: var(--wsu-space-2);
+    align-items: center;
+    justify-content: center;
+    padding-inline: var(--wsu-space-3);
+    color: var(--wsu-chrome-bar-text);
+    cursor: pointer;
+    background: none;
+    border: none;
+    border-radius: var(--wsu-radius-field);
+  }
+
+  .wsu-app-bar__toggle:hover {
+    background-color: var(--wsu-chrome-bar-hover);
+  }
+
+  @media (min-width: 48rem) {
+    .wsu-app-bar__toggle--nav {
+      display: none;
+    }
+  }
+
+  /* ================================================ Environment indication */
+
+  /**
+   * Non-production banner. WayneUI 1.x signalled this by recolouring the whole
+   * navbar maroon, which conveyed the state by colour alone: a 1.4.1 failure,
+   * and invisible to anyone who could not see the difference. Here the colour is
+   * retained as a familiar cue but it is a labelled strip with text, so the
+   * information survives without colour vision.
+   */
+  .wsu-env-ribbon {
+    display: flex;
+    gap: var(--wsu-space-2);
+    align-items: center;
+    justify-content: center;
+    padding: var(--wsu-space-1) var(--wsu-space-4);
+    font-size: var(--wsu-font-size-sm);
+    font-weight: var(--wsu-font-weight-bold);
+    color: var(--wsu-on-nonproduction);
+    text-align: center;
+    letter-spacing: var(--wsu-font-letterSpacing-wide);
+    background-color: var(--wsu-nonproduction);
+  }
+
+  /* ================================================================ Sidebar */
+
+  /**
+   * The sidebar element is the full-height column: it owns the background and
+   * the dividing rule, so the surface runs the whole length of the page rather
+   * than stopping wherever the navigation happens to end.
+   *
+   * The navigation inside it is what sticks. Sticking the column itself would
+   * force `block-size: fit-content`, which is what leaves the tell-tale gap of
+   * page background below a short menu.
+   */
+  .wsu-sidebar {
+    background-color: var(--wsu-surface-sunken);
+    border-inline-end: var(--wsu-size-border-width) solid var(--wsu-border);
+  }
+
+  .wsu-sidebar__inner {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wsu-space-4);
+    padding: var(--wsu-space-4) var(--wsu-space-3);
+  }
+
+  @media (min-width: 48rem) {
+    .wsu-sidebar__inner {
+      position: sticky;
+      /* Sits below the app bar without hardcoding its height: theme.js measures
+         the bar and publishes it, so this survives wrapping and large text. */
+      inset-block-start: var(--wsu-app-bar-height, 3.5rem);
+      max-block-size: calc(100svb - var(--wsu-app-bar-height, 3.5rem));
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+  }
+
+  /**
+   * The heading owns the space above its group.
+   *
+   * It sat flush on the first navigation item, a measured 0px gap, so the label
+   * looked attached to the item beneath rather than describing the group. Obvious
+   * in dark mode, where the active item is a filled pill butting straight up
+   * against the text.
+   */
+  /**
+   * The drawer's own copy of the bar's primary navigation.
+   *
+   * `.wsu-app-bar__nav` is `display: none` below the medium breakpoint, and
+   * nothing else on the page reaches those links at that width: the sections,
+   * filters or other groups the drawer already carries are a different set of
+   * links entirely. So the same primary links are repeated here, which is what
+   * makes the drawer toggle's "Open navigation menu" true rather than aspirational.
+   *
+   * Hidden again once the sidebar docks (`min-width: 48rem`), where the bar's
+   * own copy is showing again and repeating the same links a second time on the
+   * same page would serve nobody.
+   */
+  .wsu-sidebar__primary-nav {
+    padding-block-end: var(--wsu-space-2);
+    margin-block-end: var(--wsu-space-2);
+    border-block-end: var(--wsu-size-border-width) solid var(--wsu-border);
+  }
+
+  @media (min-width: 48rem) {
+    .wsu-sidebar__primary-nav {
+      display: none;
+    }
+  }
+
+  .wsu-sidebar__heading {
+    margin-block-end: var(--wsu-space-2);
+    padding-inline: var(--wsu-space-3);
+    font-size: var(--wsu-font-size-xs);
+    font-weight: var(--wsu-font-weight-bold);
+    color: var(--wsu-text-muted);
+    text-transform: uppercase;
+    letter-spacing: var(--wsu-font-letterSpacing-caps);
+  }
+
+  .wsu-sidebar__list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wsu-space-px);
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+
+  .wsu-sidebar__link {
+    transition: background-color var(--wsu-duration-fast) ease-out;
+    display: flex;
+    gap: var(--wsu-space-3);
+    align-items: center;
+    min-block-size: var(--wsu-size-tap-min);
+    padding: var(--wsu-space-2) var(--wsu-space-3);
+    font-size: var(--wsu-font-size-sm);
+    font-weight: var(--wsu-font-weight-bold);
+    color: var(--wsu-text);
+    text-decoration: none;
+    border-radius: var(--wsu-radius-selector);
+  }
+
+  .wsu-sidebar__link:hover {
+    color: var(--wsu-text);
+    background-color: var(--wsu-brand-subtle);
+  }
+
+  /**
+   * One indicator, not two. A tinted pill and an inset rail together read as
+   * indecision; the filled pill alone is calmer and just as clear.
+   *
+   * The heavier weight is what keeps this from depending on colour perception
+   * (1.4.1) now that the rail is gone.
+   */
+  .wsu-sidebar__link[aria-current='page'] {
+    font-weight: var(--wsu-font-weight-black);
+    color: var(--wsu-brand);
+    background-color: var(--wsu-brand-subtle);
+  }
+
+  .wsu-sidebar__link .wsu-icon {
+    flex: none;
+    color: var(--wsu-text-muted);
+    transition: color var(--wsu-duration-fast) ease-out;
+  }
+
+  .wsu-sidebar__link[aria-current='page'] .wsu-icon {
+    color: var(--wsu-brand);
+  }
+
+  /* Nested navigation, one level. */
+  .wsu-sidebar__sublist {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    margin: var(--wsu-space-px) 0 0;
+    margin-inline-start: var(--wsu-space-5);
+    list-style: none;
+    border-inline-start: var(--wsu-size-border-width) solid var(--wsu-border);
+  }
+
+  .wsu-sidebar__sublist .wsu-sidebar__link {
+    font-weight: var(--wsu-font-weight-regular);
+  }
+
+  /* ---------------------------------------------------- Sidebar as a drawer */
+
+  /**
+   * Below the medium breakpoint the sidebar becomes an overlay drawer. It is
+   * hidden with `display: none` rather than a transform, so that its links are
+   * genuinely absent from the tab order when closed: moving focus into an
+   * off-screen menu is a 2.4.3 failure that transform-based drawers make easy to
+   * ship. The drawer script adds `inert` to the rest of the page while open.
+   */
+  @media (max-width: 47.999rem) {
+    .wsu-sidebar {
+      position: fixed;
+      inset-block: 0;
+      inset-inline-start: 0;
+      z-index: var(--wsu-z-drawer);
+      inline-size: min(20rem, 85vw);
+      overflow-y: auto;
+      border-inline-end: var(--wsu-size-border-width) solid var(--wsu-border);
+      box-shadow: var(--wsu-shadow-overlay);
+    }
+
+    .wsu-sidebar[hidden] {
+      display: none;
+    }
+
+    .wsu-sidebar__inner {
+      min-block-size: 100%;
+    }
+
+    /**
+     * The drawer slides from the edge it is docked to, so it reads as having come
+     * from the side rather than appearing on top. `display` is transitioned with
+     * `allow-discrete` because the drawer is `hidden` when closed: without it the
+     * element vanishes before the slide can run.
+     *
+     * `visibility` is deliberately not involved: the script focuses inside the
+     * drawer on open, and a discrete flip does not commit synchronously.
+     */
+    .wsu-sidebar {
+      transition:
+        translate var(--wsu-duration-base) cubic-bezier(0.2, 0, 0, 1),
+        display var(--wsu-duration-base) allow-discrete;
+    }
+
+    .wsu-sidebar[hidden] {
+      display: none;
+      translate: -100% 0;
+    }
+
+    @starting-style {
+      .wsu-sidebar:not([hidden]) {
+        translate: -100% 0;
+      }
+    }
+
+    .wsu-drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: calc(var(--wsu-z-drawer) - 1);
+      background-color: rgb(0 0 0 / 0.5);
+      transition:
+        opacity var(--wsu-duration-base) ease-out,
+        display var(--wsu-duration-base) allow-discrete;
+    }
+
+    .wsu-drawer-backdrop[hidden] {
+      display: none;
+      opacity: 0;
+    }
+
+    @starting-style {
+      .wsu-drawer-backdrop:not([hidden]) {
+        opacity: 0;
+      }
+    }
+  }
+
+  @media (min-width: 48rem) {
+    /**
+     * The drawer's own [hidden] must not hide the docked sidebar.
+     *
+     * This is a no-JavaScript fallback, not the mechanism the docked sidebar
+     * actually depends on: `theme.js`'s `initDrawers` removes `hidden` from the
+     * sidebar outright as soon as it runs, on every page that loads docked, and
+     * on every crossing into this breakpoint after that. It has to, because
+     * this rule alone loses to a consumer's own `[hidden] { display: none
+     * !important }` (Tailwind's preflight, in every Vite-based Laravel
+     * application) whenever that consumer's stylesheet loads before WayneUI's:
+     * see base.css for why neither specificity nor `!important` here can win
+     * that back. Where nothing else styles `[hidden]`, this rule is what shows
+     * the sidebar with no script at all.
+     */
+    .wsu-sidebar[hidden] {
+      display: block;
+    }
+
+    .wsu-drawer-backdrop {
+      display: none;
+    }
+  }
+
+  .wsu-sidebar__close {
+    align-self: flex-end;
+  }
+
+  @media (min-width: 48rem) {
+    /* Docked, so there is nothing to close. This beats .wsu-btn's
+       display:inline-flex because chrome sits in a later cascade layer than
+       components, not because of a specificity fight. */
+    .wsu-sidebar__close {
+      display: none;
+    }
+  }
+
+  /* ============================================================ Breadcrumbs */
+
+  /**
+   * Breadcrumbs own the space beneath them.
+   *
+   * They sat flush against the page header, a 0px gap, so the header's action
+   * buttons crowded the trail directly above them. It only became obvious in dark
+   * mode, where the filled buttons read as solid blocks; in light mode the
+   * outlined buttons blended into the page and hid the problem.
+   */
+  .wsu-breadcrumbs {
+    display: block;
+    margin-block-end: var(--wsu-space-4);
+  }
+
+  .wsu-breadcrumbs__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wsu-space-1);
+    align-items: center;
+    padding: 0;
+    margin: 0;
+    font-size: var(--wsu-font-size-sm);
+    list-style: none;
+  }
+
+  .wsu-breadcrumbs__item {
+    display: inline-flex;
+    gap: var(--wsu-space-1);
+    align-items: center;
+  }
+
+  /**
+   * The separator is generated content and marked aria-hidden in the markup, so
+   * it is not announced. 1.x rendered separators as real text inside the list,
+   * which screen readers read out between every crumb.
+   */
+  .wsu-breadcrumbs__separator {
+    color: var(--wsu-text-subtle);
+  }
+
+  .wsu-breadcrumbs__link {
+    transition: color var(--wsu-duration-fast) ease-out;
+    display: inline-flex;
+    gap: var(--wsu-space-1);
+    align-items: center;
+    padding: var(--wsu-space-1);
+    color: var(--wsu-text-muted);
+    border-radius: var(--wsu-radius-sm);
+  }
+
+  .wsu-breadcrumbs__item [aria-current='page'] {
+    padding: var(--wsu-space-1);
+    font-weight: var(--wsu-font-weight-bold);
+    color: var(--wsu-text);
+  }
+
+  /* ============================================================ Page header */
+
+  .wsu-page-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wsu-space-4);
+    align-items: flex-end;
+    justify-content: space-between;
+    padding-block-end: var(--wsu-space-4);
+    margin-block-end: var(--wsu-space-6);
+    border-block-end: var(--wsu-size-border-width) solid var(--wsu-border);
+  }
+
+  .wsu-page-header__title {
+    font-size: var(--wsu-font-size-3xl);
+  }
+
+  .wsu-page-header__subtitle {
+    margin-block-start: var(--wsu-space-2);
+    font-family: var(--wsu-font-family-body);
+    font-size: var(--wsu-font-size-base);
+    font-weight: var(--wsu-font-weight-regular);
+    line-height: var(--wsu-font-lineHeight-base);
+    color: var(--wsu-text-muted);
+  }
+
+  .wsu-page-header__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wsu-space-2);
+    align-items: center;
+  }
+
+  /* ================================================================= Footer */
+
+  .wsu-footer {
+    padding-block: var(--wsu-space-8);
+    color: var(--wsu-text-muted);
+    background-color: var(--wsu-surface-sunken);
+    border-block-start: var(--wsu-size-border-width) solid var(--wsu-border);
+  }
+
+  .wsu-footer__inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wsu-space-6);
+    align-items: center;
+    justify-content: space-between;
+    inline-size: 100%;
+    max-inline-size: var(--wsu-size-content-max);
+    margin-inline: auto;
+    padding-inline: var(--wsu-size-gutter);
+  }
+
+  /**
+   * The Warrior Strong mark, drawn as a CSS mask rather than an image.
+   *
+   * It is monochrome, and it has to be green on a light footer and white on a dark
+   * one. An <img> cannot do that: it has no parent colour to inherit, which is
+   * exactly the trap that left the wordmark rendering dark-on-dark earlier. A mask
+   * takes the element's background-color, so the mark follows the theme token and
+   * switches with `data-theme` rather than only with the OS.
+   *
+   * The element needs role="img" and an accessible name in the markup, since a
+   * mask carries no alt text.
+   */
+  /**
+   * Width leads and height follows, rather than the other way round.
+   *
+   * The lockup is 380x30, so a fixed `block-size: 1.75rem` resolves the width to
+   * about 355px through the aspect ratio, and a 355px box does not fit in a 320px
+   * viewport. Because that width is derived rather than declared it has no
+   * max-inline-size to clamp it, so the footer forced the whole document into
+   * horizontal scrolling at 320px (1.4.10) while looking perfectly correct on a
+   * desktop. Driving the inline size instead keeps the mark at its intended
+   * 1.75rem height wherever there is room, and lets it scale down proportionally
+   * where there is not.
+   */
+  .wsu-footer__mark {
+    display: block;
+    inline-size: min(calc(1.75rem * 380 / 30), 100%);
+    block-size: auto;
+    /* From the mark's own viewBox, so it scales without distortion. */
+    aspect-ratio: 380 / 30;
+    /*
+     * Two coloured variants rather than one masked file.
+     *
+     * A mask resolves an SVG source by luminance, so a mark filled in PMS 561c
+     * masks to almost nothing and renders as hairline outlines. That was wrong in
+     * both themes; the dark footer is simply where it became visible.
+     *
+     * Same conclusion as the wordmark and the WayneUI mark: anything with a fixed
+     * colour needs a reversed file, not a clever single-asset trick.
+     */
+    background-image: url('./marks/warrior-strong.svg');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+  }
+
+  [data-theme='wsu-dark'] .wsu-footer__mark,
+  .dark .wsu-footer__mark {
+    background-image: url('./marks/warrior-strong-reverse.svg');
+  }
+
+  /* Forced-colors mode replaces the mask with a system colour, since a masked
+     element would otherwise disappear entirely. */
+  @media (forced-colors: active) {
+    .wsu-footer__mark {
+      background-color: CanvasText;
+    }
+  }
+
+  .wsu-footer__links a,
+  .wsu-university-footer__list a {
+    transition: color var(--wsu-duration-fast) ease-out;
+  }
+
+  .wsu-footer__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wsu-space-4);
+    padding: 0;
+    margin: 0;
+    font-size: var(--wsu-font-size-sm);
+    list-style: none;
+  }
+
+  .wsu-footer__meta {
+    font-size: var(--wsu-font-size-sm);
+    color: var(--wsu-text-subtle);
+  }
+
+  /* ================================================== University footer */
+
+  /**
+   * The full university footer, for publicly accessible sites.
+   *
+   * WayneUI 1.x had a `use-wsu-header` switch that overlaid the official
+   * wayne.edu masthead, which is the right idea: a public site should be
+   * unmistakably Wayne State, an internal tool does not need to be. But 1.x only
+   * ever did the header; its "footer" was a Warrior Strong image and a credit
+   * link back to the package. A public site with official branding at the top and
+   * nothing at the bottom is missing the contact, accessibility and
+   * non-discrimination information the university is expected to publish.
+   *
+   * So the pairing is explicit here:
+   *   internal application  -> .wsu-app-bar  + .wsu-footer
+   *   publicly accessible   -> .wsu-masthead + .wsu-university-footer
+   *
+   * Both are green, fixed identity, and unaffected by the light/dark theme.
+   */
+  .wsu-university-footer {
+    padding-block: var(--wsu-space-10) var(--wsu-space-6);
+    color: var(--wsu-chrome-masthead-text);
+    background-color: var(--wsu-chrome-masthead);
+  }
+
+  .wsu-university-footer__inner {
+    inline-size: 100%;
+    max-inline-size: var(--wsu-size-content-max);
+    margin-inline: auto;
+    padding-inline: var(--wsu-size-gutter);
+  }
+
+  .wsu-university-footer__top {
+    display: grid;
+    gap: var(--wsu-space-8);
+    grid-template-columns: 1fr;
+    padding-block-end: var(--wsu-space-8);
+    /* The lighter green of the app bar, used here as a divider against the darker
+       footer, a semantic token, not the raw ramp value behind it. */
+    border-block-end: var(--wsu-size-border-width) solid var(--wsu-chrome-bar);
+  }
+
+  @media (min-width: 48rem) {
+    .wsu-university-footer__top {
+      grid-template-columns: minmax(0, 1.4fr) repeat(auto-fit, minmax(9rem, 1fr));
+    }
+  }
+
+  /**
+   * Matches .wsu-masthead__wordmark's own color: inherit. Without it the global
+   * `:where(a) { color: var(--wsu-brand) }` rule wins, because it is a direct
+   * declaration on the element rather than an inherited one, and direct beats
+   * inherited regardless of specificity. That painted the text fallback (no
+   * `mark` image given) brand green on the footer's dark green background, a
+   * 1.32:1 contrast axe caught the first time this fallback was ever exercised
+   * live: nothing had used UniversityFooter without an image mark before.
+   */
+  .wsu-university-footer__mark {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .wsu-university-footer__mark :is(svg, img) {
+    block-size: 2.25rem;
+    inline-size: auto;
+    max-inline-size: 100%;
+  }
+
+  .wsu-university-footer__address {
+    margin-block-start: var(--wsu-space-4);
+    font-size: var(--wsu-font-size-sm);
+    font-style: normal;
+    line-height: var(--wsu-font-lineHeight-relaxed);
+    color: var(--wsu-chrome-masthead-muted);
+  }
+
+  .wsu-university-footer__heading {
+    margin-block-end: var(--wsu-space-3);
+    font-family: var(--wsu-font-family-body);
+    font-size: var(--wsu-font-size-xs);
+    font-weight: var(--wsu-font-weight-bold);
+    color: var(--wsu-chrome-masthead-muted);
+    text-transform: uppercase;
+    letter-spacing: var(--wsu-font-letterSpacing-caps);
+  }
+
+  .wsu-university-footer__list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wsu-space-1);
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+
+  .wsu-university-footer__list a,
+  .wsu-university-footer__legal a {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--wsu-size-tap-min);
+    font-size: var(--wsu-font-size-sm);
+    color: var(--wsu-chrome-masthead-text);
+    text-decoration: none;
+  }
+
+  .wsu-university-footer__list a:hover,
+  .wsu-university-footer__legal a:hover {
+    color: var(--wsu-chrome-masthead-text);
+    text-decoration: underline;
+    text-decoration-thickness: max(0.1em, 2px);
+    text-underline-offset: 0.2em;
+  }
+
+  .wsu-university-footer__bottom {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wsu-space-2) var(--wsu-space-5);
+    align-items: center;
+    justify-content: space-between;
+    padding-block-start: var(--wsu-space-4);
+  }
+
+  .wsu-university-footer__legal {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wsu-space-2) var(--wsu-space-5);
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+
+  .wsu-university-footer__copyright {
+    font-size: var(--wsu-font-size-sm);
+    color: var(--wsu-chrome-masthead-muted);
+  }
+
+  /* Focus inside the green footer uses the gold ring, as elsewhere in the chrome. */
+  .wsu-university-footer :focus-visible {
+    outline-color: var(--wsu-chrome-on-chrome-focus);
+    box-shadow: 0 0 0 var(--wsu-size-focus-ring-offset) var(--wsu-chrome-masthead);
+  }
+
+}
