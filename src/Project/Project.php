@@ -17,6 +17,7 @@ final readonly class Project
         public bool $hasComposer,
         public ?string $phpVersion,
         public ?string $laravelMajor,
+        public ?string $phpunitMajor,
         public ?string $vueMajor,
         public AppType $type,
         public bool $usesWayneCas,
@@ -34,6 +35,7 @@ final readonly class Project
             'composer_json' => $this->hasComposer,
             'php' => $this->phpVersion,
             'laravel' => $this->laravelMajor,
+            'phpunit' => $this->phpunitMajor,
             'vue' => $this->vueMajor,
             'wayne_cas' => $this->usesWayneCas,
         ];

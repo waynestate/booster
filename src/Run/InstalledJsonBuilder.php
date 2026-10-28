@@ -20,12 +20,15 @@ final class InstalledJsonBuilder
     /**
      * @return array{packages: list<array{name: string, version: string, version_normalized: string}>}
      */
-    public function build(string $appPath, ?string $laravelMajor): array
+    public function build(string $appPath, ?string $laravelMajor, ?string $phpunitMajor = null): array
     {
         $packages = $this->fromLock($appPath) ?? $this->fromComposerJson($appPath);
 
         if ($laravelMajor !== null) {
             $packages['laravel/framework'] = $laravelMajor . '.0.0.0';
+        }
+        if ($phpunitMajor !== null) {
+            $packages['phpunit/phpunit'] = $phpunitMajor . '.0.0.0';
         }
 
         $out = [];

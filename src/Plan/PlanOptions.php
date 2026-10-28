@@ -18,6 +18,7 @@ final readonly class PlanOptions
         public ?string $fromLaravel = null,
         public ?string $toPhp = null,
         public ?string $toLaravel = null,
+        public ?string $toPhpunit = null,
         public bool $sesame = false,
         public array $skip = [],
     ) {}

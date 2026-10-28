@@ -22,6 +22,8 @@ final readonly class PlanStep
         public ?string $phpAfter,
         public ?string $laravelBefore,
         public ?string $laravelAfter,
+        public ?string $phpunitBefore,
+        public ?string $phpunitAfter,
         public array $gates,
     ) {}
 
@@ -37,6 +39,8 @@ final readonly class PlanStep
             'php_after' => $this->phpAfter,
             'laravel_before' => $this->laravelBefore,
             'laravel_after' => $this->laravelAfter,
+            'phpunit_before' => $this->phpunitBefore,
+            'phpunit_after' => $this->phpunitAfter,
             'gates' => $this->gates,
         ];
     }

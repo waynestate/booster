@@ -26,6 +26,9 @@ final class TextWriter
         if ($plan->targetLaravel !== null) {
             $lines[] = sprintf('  Laravel: %s -> %s', $p->laravelMajor ?? 'unknown', $plan->targetLaravel);
         }
+        if ($plan->targetPhpunit !== null) {
+            $lines[] = sprintf('  PHPUnit: %s -> %s', $p->phpunitMajor ?? 'unknown', $plan->targetPhpunit);
+        }
         $lines[] = sprintf('  policy: %s (today %s)', self::clean($plan->policyOrigin), $plan->today);
         $lines[] = '';
 

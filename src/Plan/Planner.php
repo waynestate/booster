@@ -76,34 +76,72 @@ final class Planner
             throw new ToolError(sprintf('Target PHP %s is older than the current PHP %s.', $toPhp, $fromPhp));
         }
 
+        $fromPhpunit = $project->phpunitMajor;
+        $toPhpunit = null;
+        if ($fromPhpunit !== null) {
+            if (!in_array($fromPhpunit, HopRegistry::PHPUNIT_CHAIN, true)) {
+                if (version_compare($fromPhpunit, HopRegistry::PHPUNIT_CHAIN[0], '<')) {
+                    $warnings[] = sprintf('PHPUnit %s is below what BOOSTER can plan (%s to %s); PHPUnit hops are skipped.', $fromPhpunit, HopRegistry::PHPUNIT_CHAIN[0], HopRegistry::PHPUNIT_CHAIN[count(HopRegistry::PHPUNIT_CHAIN) - 1]);
+                    $fromPhpunit = null;
+                } else {
+                    throw new ToolError(sprintf('PHPUnit %s is outside what BOOSTER can plan (%s to %s).', $fromPhpunit, HopRegistry::PHPUNIT_CHAIN[0], HopRegistry::PHPUNIT_CHAIN[count(HopRegistry::PHPUNIT_CHAIN) - 1]));
+                }
+            }
+        }
+        if ($fromPhpunit !== null) {
+            $toPhpunit = $options->toPhpunit ?? $this->newestPhpunitForPhp($toPhp);
+            if (!in_array($toPhpunit, HopRegistry::PHPUNIT_CHAIN, true)) {
+                throw new ToolError(sprintf('--to-phpunit "%s" is not a PHPUnit version BOOSTER knows (use a major from %s to %s).', $toPhpunit, HopRegistry::PHPUNIT_CHAIN[0], HopRegistry::PHPUNIT_CHAIN[count(HopRegistry::PHPUNIT_CHAIN) - 1]));
+            }
+            if ($toLaravel !== null && isset(HopRegistry::LARAVEL_PHPUNIT[$toLaravel]) && version_compare($toPhpunit, HopRegistry::LARAVEL_PHPUNIT[$toLaravel], '<')) {
+                $toPhpunit = HopRegistry::LARAVEL_PHPUNIT[$toLaravel];
+            }
+            if (version_compare($toPhp, HopRegistry::PHPUNIT_PHP[$toPhpunit], '<')) {
+                throw new ToolError(sprintf('PHPUnit %s needs PHP %s or newer, but the target PHP is %s.', $toPhpunit, HopRegistry::PHPUNIT_PHP[$toPhpunit], $toPhp));
+            }
+            if (version_compare($toPhpunit, $fromPhpunit, '<')) {
+                throw new ToolError(sprintf('Target PHPUnit %s is older than the current PHPUnit %s.', $toPhpunit, $fromPhpunit));
+            }
+        }
+
         $steps = [];
         $php = $fromPhp;
         $laravel = $fromLaravel;
+        $phpunit = $fromPhpunit;
         $n = 0;
 
         for ($guard = 0; $guard < 64; $guard++) {
             $nextLaravel = $laravel !== null && $toLaravel !== null && $laravel !== $toLaravel ? HopRegistry::nextLaravel($laravel) : null;
+            $nextPhpunit = $phpunit !== null && $toPhpunit !== null && $phpunit !== $toPhpunit ? HopRegistry::nextPhpunit($phpunit) : null;
             $nextPhp = $php !== $toPhp ? HopRegistry::nextPhp($php) : null;
 
-            if ($nextLaravel !== null && HopRegistry::laravelSupportsPhp($nextLaravel, $php)) {
+            if ($nextLaravel !== null && HopRegistry::laravelSupportsPhp($nextLaravel, $php) && $this->phpunitMeetsLaravelFloor($phpunit, $nextLaravel)) {
                 $hop = $this->registry->get(HopRegistry::laravelHopId((string) $laravel, $nextLaravel));
-                $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $nextLaravel);
+                $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $nextLaravel, $phpunit, $phpunit);
                 $laravel = $nextLaravel;
+                continue;
+            }
+            if ($nextPhpunit !== null && version_compare($php, HopRegistry::PHPUNIT_PHP[$nextPhpunit], '>=')) {
+                $hop = $this->registry->get(HopRegistry::phpunitHopId($phpunit, $nextPhpunit));
+                $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $laravel, $phpunit, $nextPhpunit);
+                $phpunit = $nextPhpunit;
                 continue;
             }
             if ($nextPhp !== null && ($laravel === null || HopRegistry::laravelSupportsPhp($laravel, $nextPhp))) {
                 $hop = $this->registry->get(HopRegistry::phpHopId($php, $nextPhp));
-                $steps[] = $this->step(++$n, $hop, $php, $nextPhp, $laravel, $laravel);
+                $steps[] = $this->step(++$n, $hop, $php, $nextPhp, $laravel, $laravel, $phpunit, $phpunit);
                 $php = $nextPhp;
                 continue;
             }
-            if ($nextLaravel !== null || $nextPhp !== null) {
+            if ($nextLaravel !== null || $nextPhpunit !== null || $nextPhp !== null) {
                 throw new ToolError(sprintf(
-                    'No safe next step from PHP %s and Laravel %s toward PHP %s and Laravel %s.',
+                    'No safe next step from PHP %s, Laravel %s and PHPUnit %s toward PHP %s, Laravel %s and PHPUnit %s.',
                     $php,
                     (string) $laravel,
+                    (string) $phpunit,
                     $toPhp,
                     (string) $toLaravel,
+                    (string) $toPhpunit,
                 ));
             }
             break;
@@ -115,14 +153,14 @@ final class Planner
             } elseif (version_compare($php, '8.3', '<')) {
                 $warnings[] = 'SESAME needs PHP 8.3 or newer; the swap was left out because the plan ends below that.';
             } else {
-                $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel);
+                $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
             }
         } elseif ($project->usesWayneCas) {
             $warnings[] = 'The app uses wayne-cas. Add --sesame to plan the swap to SESAME.';
         }
 
         if ($project->vueMajor === '2') {
-            $steps[] = $this->step(++$n, $this->registry->get('vue-2-to-3'), $php, $php, $laravel, $laravel);
+            $steps[] = $this->step(++$n, $this->registry->get('vue-2-to-3'), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
         }
 
         $steps = $this->withoutSkipped($steps, $options->skip);
@@ -131,7 +169,7 @@ final class Planner
             $warnings[] = 'Nothing to do: the app is already at the target.';
         }
 
-        return new Plan($project, $today->format('Y-m-d'), $this->policy->origin(), $toPhp, $toLaravel, $steps, $warnings);
+        return new Plan($project, $today->format('Y-m-d'), $this->policy->origin(), $toPhp, $toLaravel, $toPhpunit, $steps, $warnings);
     }
 
     /**
@@ -151,16 +189,16 @@ final class Planner
         $kept = [];
         foreach ($steps as $step) {
             if (!in_array($step->hop->id, $skip, true)) {
-                $kept[] = new PlanStep(count($kept) + 1, $step->hop, $step->phpBefore, $step->phpAfter, $step->laravelBefore, $step->laravelAfter, $step->gates);
+                $kept[] = new PlanStep(count($kept) + 1, $step->hop, $step->phpBefore, $step->phpAfter, $step->laravelBefore, $step->laravelAfter, $step->phpunitBefore, $step->phpunitAfter, $step->gates);
             }
         }
 
         return $kept;
     }
 
-    private function step(int $n, \Waynestate\Booster\Hop\Hop $hop, string $phpBefore, string $phpAfter, ?string $lBefore, ?string $lAfter): PlanStep
+    private function step(int $n, \Waynestate\Booster\Hop\Hop $hop, string $phpBefore, string $phpAfter, ?string $lBefore, ?string $lAfter, ?string $puBefore, ?string $puAfter): PlanStep
     {
-        return new PlanStep($n, $hop, $phpBefore, $phpAfter, $lBefore, $lAfter, $hop->isManual() ? [self::GATE_MANUAL] : [self::GATE_TESTS]);
+        return new PlanStep($n, $hop, $phpBefore, $phpAfter, $lBefore, $lAfter, $puBefore, $puAfter, $hop->isManual() ? [self::GATE_MANUAL] : [self::GATE_TESTS]);
     }
 
     /**
@@ -208,5 +246,30 @@ final class Planner
     private function componentName(string $component): string
     {
         return $component === 'php' ? 'PHP' : ucfirst($component);
+    }
+
+    private function phpunitMeetsLaravelFloor(?string $phpunit, string $laravel): bool
+    {
+        if ($phpunit === null) {
+            return true;
+        }
+        $floor = HopRegistry::LARAVEL_PHPUNIT[$laravel] ?? null;
+        if ($floor === null) {
+            return true;
+        }
+
+        return version_compare($phpunit, $floor, '>=');
+    }
+
+    private function newestPhpunitForPhp(string $php): string
+    {
+        $newest = HopRegistry::PHPUNIT_CHAIN[0];
+        foreach (HopRegistry::PHPUNIT_CHAIN as $version) {
+            if (version_compare($php, HopRegistry::PHPUNIT_PHP[$version], '>=')) {
+                $newest = $version;
+            }
+        }
+
+        return $newest;
     }
 }

@@ -57,6 +57,7 @@ abstract class BaseCommand extends Command
             ->addOption('to-php', null, InputOption::VALUE_REQUIRED, 'Target PHP version (default: the newest the policy supports).')
             ->addOption('from-laravel', null, InputOption::VALUE_REQUIRED, 'The Laravel major the app runs on.')
             ->addOption('to-laravel', null, InputOption::VALUE_REQUIRED, 'Target Laravel major (default: the newest the policy supports).')
+            ->addOption('to-phpunit', null, InputOption::VALUE_REQUIRED, 'Target PHPUnit major (default: the newest that runs on the target PHP).')
             ->addOption('sesame', null, InputOption::VALUE_NONE, 'Include the wayne-cas to SESAME swap.')
             ->addOption('skip', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hop id to leave out (repeatable).');
     }
@@ -108,6 +109,7 @@ abstract class BaseCommand extends Command
             fromLaravel: $this->stringOption($input, 'from-laravel'),
             toPhp: $toPhp,
             toLaravel: $this->stringOption($input, 'to-laravel'),
+            toPhpunit: $this->stringOption($input, 'to-phpunit'),
             sesame: (bool) $input->getOption('sesame'),
             skip: is_array($skip) ? array_values(array_map('strval', $skip)) : [],
         );

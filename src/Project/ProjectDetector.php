@@ -34,6 +34,9 @@ final class ProjectDetector
         $laravelConstraint = $all['laravel/framework'] ?? null;
         $laravel = is_string($laravelConstraint) ? $this->lowerBound($laravelConstraint, 1) : null;
 
+        $phpunitConstraint = $requireDev['phpunit/phpunit'] ?? null;
+        $phpunit = is_string($phpunitConstraint) ? $this->lowerBound($phpunitConstraint, 1) : null;
+
         $deps = $this->section($package, 'dependencies') + $this->section($package, 'devDependencies');
         $vueConstraint = $deps['vue'] ?? null;
         $hasVue = array_key_exists('vue', $deps);
@@ -60,6 +63,7 @@ final class ProjectDetector
             hasComposer: $composer !== [],
             phpVersion: is_string($phpConstraint) ? $this->lowerBound($phpConstraint, 2) : null,
             laravelMajor: $laravel,
+            phpunitMajor: $phpunit,
             vueMajor: $vue,
             type: $type,
             usesWayneCas: array_key_exists(self::WAYNE_CAS_PACKAGE, $all),

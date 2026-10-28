@@ -35,8 +35,9 @@ final class RectorRunner
     /**
      * @param string  $phpTarget     the PHP version the rules may assume (major.minor); Rector otherwise reads the old version from the app composer.json and skips the new rules
      * @param ?string $laravelTarget the Laravel major the version-bound rules should assume, or null for a non-Laravel app
+     * @param ?string $phpunitTarget the PHPUnit major the version-bound rules should assume, or null for a non-PhpUnit hop
      */
-    public function run(Hop $hop, string $appPath, bool $dryRun, string $phpTarget, ?string $laravelTarget = null): RectorResult
+    public function run(Hop $hop, string $appPath, bool $dryRun, string $phpTarget, ?string $laravelTarget = null, ?string $phpunitTarget = null): RectorResult
     {
         $appPath = rtrim($appPath, '/\\');
         $command = [
@@ -81,7 +82,7 @@ final class RectorRunner
         try {
             file_put_contents(
                 $installed . '/installed.json',
-                json_encode((new InstalledJsonBuilder())->build($appPath, $laravelTarget), JSON_THROW_ON_ERROR),
+                json_encode((new InstalledJsonBuilder())->build($appPath, $laravelTarget, $phpunitTarget), JSON_THROW_ON_ERROR),
             );
             $result = $this->processes->run($command, $work, $env, 1800);
         } finally {

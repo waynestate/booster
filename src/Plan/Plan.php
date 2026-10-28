@@ -22,6 +22,7 @@ final readonly class Plan
         public string $policyOrigin,
         public ?string $targetPhp,
         public ?string $targetLaravel,
+        public ?string $targetPhpunit,
         public array $steps,
         public array $warnings,
     ) {}
@@ -37,6 +38,7 @@ final readonly class Plan
             'policy' => $this->policyOrigin,
             'target_php' => $this->targetPhp,
             'target_laravel' => $this->targetLaravel,
+            'target_phpunit' => $this->targetPhpunit,
             'steps' => array_map(static fn(PlanStep $s): array => $s->toArray(), $this->steps),
             'warnings' => $this->warnings,
         ];
