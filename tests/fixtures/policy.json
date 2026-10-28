@@ -1,0 +1,28 @@
+{
+    "schema_version": 1,
+    "components": {
+        "php": {
+            "versions": {
+                "8.1": {
+                    "active_until": "2024-11-21",
+                    "security_until": "2025-12-01"
+                },
+                "8.2": {
+                    "active_until": "2025-11-20",
+                    "security_until": "2026-12-31"
+                },
+                "8.3": {
+                    "active_until": "2026-11-20",
+                    "security_until": "2027-11-24"
+                },
+                "8.4": {
+                    "active_until": "2027-11-20",
+                    "security_until": "2028-11-29"
+                }
+            }
+        }
+    },
+    "rules": {
+        "eol_grace_days": 90
+    }
+}

@@ -33,6 +33,7 @@
         "lint": "pint --test",
         "fix": "pint",
         "analyse": "phpstan analyse --memory-limit=1G",
+        "creed-copy:check": "php \"$CREED_PATH/bin/export.php\" --check --namespace='Waynestate\\Booster\\Creed' --to=src/Creed",
         "ci": [
             "@composer validate --strict",
             "phpunit",
@@ -42,7 +43,8 @@
         ]
     },
     "scripts-descriptions": {
-        "ci": "Run every CI check: manifest, tests, style, static analysis, audit"
+        "ci": "Run every CI check: manifest, tests, style, static analysis, audit",
+        "creed-copy:check": "Verify src/Creed still matches a fresh export from the CREED checkout in $CREED_PATH"
     },
     "bin": [
         "bin/booster"

@@ -6,7 +6,7 @@ namespace Waynestate\Booster\Tests;
 
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase as PhpUnitTestCase;
-use Waynestate\Booster\Policy\JsonFilePolicySource;
+use Waynestate\Booster\Policy\Policy;
 use Waynestate\Booster\Policy\PolicyLocator;
 
 abstract class TestCase extends PhpUnitTestCase
@@ -22,9 +22,9 @@ abstract class TestCase extends PhpUnitTestCase
         return new DateTimeImmutable(self::TODAY);
     }
 
-    protected function policy(): JsonFilePolicySource
+    protected function policy(): Policy
     {
-        return new JsonFilePolicySource(PolicyLocator::bundledPath());
+        return PolicyLocator::locate(null, null);
     }
 
     protected function example(string $name): string

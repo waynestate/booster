@@ -8,19 +8,27 @@
                 },
                 "8.2": {
                     "active_until": "2024-12-31",
-                    "security_until": "2026-12-31"
+                    "security_until": "2026-12-31",
+                    "latest_patch": "8.2.35",
+                    "latest_patch_checked": "2026-10-28"
                 },
                 "8.3": {
                     "active_until": "2025-12-31",
-                    "security_until": "2027-12-31"
+                    "security_until": "2027-12-31",
+                    "latest_patch": "8.3.36",
+                    "latest_patch_checked": "2026-10-28"
                 },
                 "8.4": {
                     "active_until": "2026-12-31",
-                    "security_until": "2028-12-31"
+                    "security_until": "2028-12-31",
+                    "latest_patch": "8.4.27",
+                    "latest_patch_checked": "2026-10-28"
                 },
                 "8.5": {
                     "active_until": "2027-12-31",
-                    "security_until": "2029-12-31"
+                    "security_until": "2029-12-31",
+                    "latest_patch": "8.5.12",
+                    "latest_patch_checked": "2026-10-28"
                 }
             }
         },
@@ -28,19 +36,27 @@
             "versions": {
                 "10": {
                     "active_until": "2024-08-06",
-                    "security_until": "2025-02-04"
+                    "security_until": "2025-02-04",
+                    "latest_patch": "10.50.4",
+                    "latest_patch_checked": "2026-10-28"
                 },
                 "11": {
                     "active_until": "2025-09-03",
-                    "security_until": "2026-03-12"
+                    "security_until": "2026-03-12",
+                    "latest_patch": "11.57.1",
+                    "latest_patch_checked": "2026-10-28"
                 },
                 "12": {
                     "active_until": "2026-08-13",
-                    "security_until": "2027-02-24"
+                    "security_until": "2027-02-24",
+                    "latest_patch": "12.70.2",
+                    "latest_patch_checked": "2026-10-28"
                 },
                 "13": {
                     "active_until": "2027-09-17",
-                    "security_until": "2028-03-17"
+                    "security_until": "2028-03-17",
+                    "latest_patch": "13.39.0",
+                    "latest_patch_checked": "2026-10-28"
                 }
             }
         },
@@ -48,19 +64,27 @@
             "versions": {
                 "20": {
                     "active_until": "2024-10-22",
-                    "security_until": "2026-04-30"
+                    "security_until": "2026-04-30",
+                    "latest_patch": "20.20.2",
+                    "latest_patch_checked": "2026-10-28"
                 },
                 "22": {
                     "active_until": "2025-10-21",
-                    "security_until": "2027-04-30"
+                    "security_until": "2027-04-30",
+                    "latest_patch": "22.23.4",
+                    "latest_patch_checked": "2026-10-28"
                 },
                 "24": {
                     "active_until": "2026-10-20",
-                    "security_until": "2028-04-30"
+                    "security_until": "2028-04-30",
+                    "latest_patch": "24.22.1",
+                    "latest_patch_checked": "2026-10-28"
                 },
                 "26": {
                     "active_until": "2027-10-20",
-                    "security_until": "2029-04-30"
+                    "security_until": "2029-04-30",
+                    "latest_patch": "26.12.1",
+                    "latest_patch_checked": "2026-10-28"
                 }
             }
         },

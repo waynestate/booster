@@ -6,8 +6,8 @@ BOOSTER 0.1 is built and `composer ci` passes. What follows needs a person.
 
 | # | Question | Who can answer | Blocks | Default built |
 |---|---|---|---|---|
-| 1 | Where does BOOSTER read `policy.json` from once CREED is on Packagist? | CREED owner | Removing the bundled snapshot | `--policy`, then `BOOSTER_POLICY`, then `resources/policy.json`, a copy of CREED's file (schema_version 1). The snapshot goes stale; refresh it on each CREED release. |
-| 2 | Should the bundled snapshot be refreshed by a script, or replaced by `require waynestate/creed`? | CREED owner, Pantry owner | The snapshot going stale | Manual copy. |
+| 1 | Where does BOOSTER read `policy.json` from once CREED is on Packagist? | CREED owner | Removing the bundled copy | `--policy`, then `BOOSTER_POLICY`, then the generated copy in `src/Creed/policy.json` (schema_version 1). The copy goes stale; refresh it from a CREED checkout with `bin/export.php`. |
+| 2 | Should the bundled copy be refreshed by a script, or replaced by `require waynestate/creed`? | CREED owner, Pantry owner | The copy going stale | CREED's `bin/export.php` writes the copy; `composer creed-copy:check` verifies it. |
 | 3 | What Composer vendor name will the packages publish under (`waynestate/booster`)? | Pantry owner | `composer require` for users | `waynestate/booster` in `composer.json`; install from the VCS repository until then. |
 | 4 | PHP test matrix: 8.3, 8.4, 8.5 or 8.3 and 8.5 only? | Stack lead | Nothing | 8.3, 8.4 and 8.5, as decided. |
 | 5 | Is PHPCompatibility wanted as an advisory signal? | Stack lead | A second scan for what Rector misses | Left out of 0.1. The design guide says advisory only. |

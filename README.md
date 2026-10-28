@@ -199,7 +199,11 @@ support; passing through it on the way to a newer version is fine.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `BOOSTER_POLICY` | Path to CREED's `policy.json` | the snapshot in `resources/policy.json` |
+| `BOOSTER_POLICY` | Path to CREED's `policy.json` | the generated copy in `src/Creed/policy.json` |
+
+The copy in `src/Creed/` (reader, `policy.json` and manifest) is generated from CREED by its `bin/export.php`, not
+written by hand: point `CREED_PATH` at a CREED checkout and run `composer creed-copy:check` to verify the copy has
+not drifted (it exits non-zero on a hand edit or a newer CREED).
 
 `.env.example` holds the placeholder. BOOSTER reads no secrets, makes no network calls of its own and talks to no
 Citadel host. Everything it prints from an app (file names, diffs) has control characters stripped.
