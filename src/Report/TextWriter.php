@@ -54,8 +54,10 @@ final class TextWriter
             $lines[] = $line;
         }
         $lines[] = '';
+        $previewedFiles = [];
         foreach ($report->results as $r) {
-            $lines[] = sprintf('%d. %s: %s (%d files)', $r->step, $r->hopId, strtoupper($r->status), count($r->files));
+            $count = $r->incomplete ? '(incomplete)' : sprintf('(%d files)', count($r->files));
+            $lines[] = sprintf('%d. %s: %s %s', $r->step, $r->hopId, strtoupper($r->status), $count);
             foreach ($r->messages as $message) {
                 foreach (explode("\n", self::clean($message)) as $line) {
                     $lines[] = '   ' . $line;
@@ -63,6 +65,7 @@ final class TextWriter
             }
             if ($report->dryRun) {
                 foreach ($r->files as $file) {
+                    $previewedFiles[$file['file']] = true;
                     $lines[] = '   --- ' . self::clean($file['file']);
                     foreach (explode("\n", self::clean($file['diff'])) as $line) {
                         $lines[] = '   ' . $line;
@@ -75,8 +78,14 @@ final class TextWriter
             }
         }
         $lines[] = '';
+        if ($report->dryRun && $previewedFiles !== []) {
+            $lines[] = sprintf('Unique files across hops: %d. Later hops were previewed against the original tree, so the same file can appear in several hops.', count($previewedFiles));
+            $lines[] = '';
+        }
         $lines[] = 'RESULT: ' . ($report->failed() ? 'FAIL' : 'PASS');
-        if (!$report->dryRun && !$report->failed()) {
+        if ($report->dryRun && $previewedFiles !== []) {
+            $lines[] = 'Dry run: these changes were previewed, none were applied.';
+        } elseif (!$report->dryRun && !$report->failed()) {
             $lines[] = 'Review with `git diff`, run your own checks, then commit. BOOSTER never commits or pushes.';
         }
 

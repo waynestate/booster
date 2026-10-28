@@ -375,4 +375,51 @@ final class HopExecutorTest extends TestCase
         $this->expectException(ToolError::class);
         (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), '/srv/app', true, '8.0');
     }
+
+    public function test_a_laravel_dry_run_without_vendor_is_incomplete(): void
+    {
+        $fake = $this->fake();
+        $report = $this->execute($fake, new RunOptions(dryRun: true), 'laravel-blade');
+
+        $incomplete = array_filter($report->results, static fn(StepResult $r): bool => $r->incomplete);
+        self::assertNotEmpty($incomplete);
+        foreach ($incomplete as $r) {
+            self::assertStringStartsWith('laravel-', $r->hopId);
+            self::assertStringContainsString('Preview incomplete', implode(' ', $r->messages));
+        }
+    }
+
+    public function test_a_laravel_dry_run_with_vendor_is_complete(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        mkdir($dir . '/vendor', 0775, true);
+        file_put_contents($dir . '/vendor/autoload.php', "<?php\n");
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $fake = $this->fake();
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions(dryRun: true));
+
+        foreach ($report->results as $r) {
+            self::assertFalse($r->incomplete);
+        }
+    }
+
+    public function test_a_hop_that_changes_nothing_is_nothing_to_do_and_skips_the_gate(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        $composer['require']['php'] = '^8.3';
+        file_put_contents($dir . '/composer.json', (string) json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $fake = $this->fake(changedPerHop: 0);
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions());
+
+        self::assertSame(['nothing-to-do', 'nothing-to-do'], $this->statuses($report));
+        self::assertFalse($report->failed());
+        self::assertCount(1, $this->dockerRuns($fake));
+        self::assertStringContainsString('Nothing to do', implode(' ', $report->results[0]->messages));
+    }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Run;
 
+use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanStep;
 use Waynestate\Booster\ToolError;
@@ -142,13 +143,31 @@ final class HopExecutor
                 )]);
             }
             if ($options->dryRun) {
-                return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $preview->files, ['Dry run: nothing was changed.', ...$hop->notes]);
+                // A Laravel hop previews through the app's own autoloader; without vendor/ Rector
+                // cannot see the app's classes, so the diff is a lower bound, not the whole change.
+                $incomplete = $hop->kind === HopKind::Laravel && !is_file($path . '/vendor/autoload.php');
+                if ($incomplete) {
+                    $messages = [sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$hop->notes];
+                } elseif ($preview->files === []) {
+                    $messages = ['Dry run: nothing was changed.', ...$hop->notes];
+                } else {
+                    $messages = $hop->notes;
+                }
+
+                return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $preview->files, $messages, $incomplete);
             }
 
             $applied = $this->rector->run($hop, $path, false, $step->phpAfter ?? '', $step->laravelAfter);
             $messages = $this->composer->apply($hop, $path);
             if ($applied->errors !== []) {
                 return new StepResult($step->number, $hop->id, StepResult::ERROR, $applied->files, ['Rector reported errors while applying.', ...$applied->errors]);
+            }
+            if ($applied->changedCount() === 0 && $messages === []) {
+                // Nothing changed, so there is nothing for the gate to prove; skip it.
+                return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
+                    'Nothing to do: Rector changed no files and composer.json already allows the target, so the gate was skipped.',
+                    ...$hop->notes,
+                ]);
             }
 
             if (!$options->skipGate) {

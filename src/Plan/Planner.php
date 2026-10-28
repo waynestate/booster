@@ -183,13 +183,16 @@ final class Planner
         try {
             $state = $this->policy->stateOf($component, $version, $today);
         } catch (PolicyException) {
-            throw new ToolError(sprintf('%s %s is not a version the policy supports. Pick one of: %s.', ucfirst($component), $version, implode(', ', $this->policy->supported($component, $today))));
+            throw new ToolError(sprintf('%s %s is not a version the policy supports. Pick one of: %s.', $this->componentName($component), $version, implode(', ', $this->policy->supported($component, $today))));
         }
         if ($state === State::Eol || $state === State::EolGraceExpired) {
-            throw new ToolError(sprintf('%s %s is past security support; pick a version the policy still supports.', ucfirst($component), $version));
+            throw new ToolError(sprintf('%s %s is past security support; pick a version the policy still supports.', $this->componentName($component), $version));
         }
         if ($state === State::Security) {
-            $warnings[] = sprintf('%s %s only gets security fixes now; a newer version is a better place to stop.', ucfirst($component), $version);
+            $warnings[] = sprintf('%s %s only gets security fixes now; a newer version is a better place to stop.', $this->componentName($component), $version);
+        }
+        if ($state === State::Active && $this->policy->isAheadOfPolicy($component, $version)) {
+            $warnings[] = sprintf('%s %s is newer than CREED\'s policy; treated as current.', $this->componentName($component), $version);
         }
     }
 
@@ -200,5 +203,10 @@ final class Planner
         }
 
         return $version;
+    }
+
+    private function componentName(string $component): string
+    {
+        return $component === 'php' ? 'PHP' : ucfirst($component);
     }
 }

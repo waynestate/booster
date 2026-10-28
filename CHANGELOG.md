@@ -24,3 +24,7 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
 - Coding-tab playbooks generated into `.agents/skills`, with `booster init --check`.
 - A contract (`contract/expectations.json`) and example apps for all five permutations.
 - GitLab and GitHub CI that both call `composer ci`.
+- A plan warning when the target is newer than CREED's policy (treated as current).
+- A `nothing-to-do` status for a hop that changes no files and skips the gate.
+- An incomplete-preview marker for a Laravel hop whose app has no `vendor/`, plus a unique-files summary and a
+  closing line in the dry-run report.

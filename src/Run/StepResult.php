@@ -23,9 +23,12 @@ final readonly class StepResult
 
     public const NOT_RUN = 'not-run';
 
+    public const NOTHING_TO_DO = 'nothing-to-do';
+
     /**
      * @param list<array{file: string, diff: string}> $files
      * @param list<string>                            $messages
+     * @param bool                                    $incomplete true when a dry-run preview could not see the whole app (a Laravel hop without vendor/)
      */
     public function __construct(
         public int $step,
@@ -33,6 +36,7 @@ final readonly class StepResult
         public string $status,
         public array $files = [],
         public array $messages = [],
+        public bool $incomplete = false,
     ) {}
 
     public function failed(): bool
@@ -52,6 +56,7 @@ final readonly class StepResult
             'changed_files' => count($this->files),
             'files' => $this->files,
             'messages' => $this->messages,
+            'incomplete' => $this->incomplete,
         ];
     }
 }

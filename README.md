@@ -147,7 +147,7 @@ Options for `run`:
 
 | Option | Meaning |
 |---|---|
-| `--dry-run` | Show the diffs; change nothing; skip git, the baseline and the gate |
+| `--dry-run` | Show the diffs; change nothing; skip git, the baseline and the gate. A Laravel hop without `vendor/` is marked incomplete |
 | `--max-changes` | Stop a hop that would change more than this many files (default 50) |
 | `--skip-gate` | Do not run the tests in the target image (skips the baseline too) |
 | `--allow-failing-baseline` | Continue when the baseline fails; later gate failures are labelled as pre-existing |
@@ -182,6 +182,11 @@ suite was red before any change, so a later red gate is not proof of a bad hop. 
 
 `run` refuses to start on a working copy that is not under git or has uncommitted changes, so the upgrade diff stands
 alone. `--dry-run` has no such limit.
+
+A dry run previews every hop against the original tree, so the same file can appear in several hops. The report ends
+with the number of unique files and a reminder that nothing was applied. A Laravel hop whose app has no `vendor/`
+cannot see the framework's classes, so its preview is marked incomplete and the report says to run `composer install`
+first.
 
 Some hops are playbooks only (`vue-2-to-3`): Rector does not read Vue, so BOOSTER lists the steps and the official
 guide, and a person does the work.

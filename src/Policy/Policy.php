@@ -56,6 +56,23 @@ final class Policy
         }
     }
 
+    /**
+     * Whether $version sorts above every line the policy lists.
+     *
+     * Such a version is treated as current (stateOf() reports it Active), so a
+     * target the policy has not caught up to yet is never refused.
+     *
+     * @throws PolicyException if the component is not in the policy
+     */
+    public function isAheadOfPolicy(string $component, string $version): bool
+    {
+        try {
+            return $this->creed->isAheadOfPolicy($component, $version);
+        } catch (InvalidArgumentException $e) {
+            throw new PolicyException($e->getMessage());
+        }
+    }
+
     /** Where the policy came from (a path, or "bundled snapshot"), for the report. */
     public function origin(): string
     {

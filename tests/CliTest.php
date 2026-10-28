@@ -140,6 +140,33 @@ final class CliTest extends TestCase
         self::assertStringContainsString('CAPPED', $out);
     }
 
+    public function test_dry_run_reports_unique_files_and_a_closing_line(): void
+    {
+        $files = [['file' => '/x/src/A.php', 'diff' => 'd'], ['file' => '/x/src/B.php', 'diff' => 'd']];
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, (string) json_encode(['file_diffs' => $files]), ''));
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--dry-run' => true, '--goal' => 'php-74-to-84',
+        ], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Unique files across hops: 2', $out);
+        self::assertStringContainsString('Dry run: these changes were previewed, none were applied.', $out);
+    }
+
+    public function test_dry_run_with_no_changes_reports_no_unique_files(): void
+    {
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, (string) json_encode(['file_diffs' => []]), ''));
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--dry-run' => true, '--goal' => 'php-74-to-84',
+        ], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringNotContainsString('Unique files across hops', $out);
+        self::assertStringNotContainsString('these changes were previewed', $out);
+    }
+
     public function test_run_rejects_a_bad_cap(): void
     {
         [$exit] = $this->booster(['command' => 'run', '--path' => $this->example('raw-php'), '--max-changes' => 'lots']);
