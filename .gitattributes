@@ -4,3 +4,5 @@
 *.cmd text eol=crlf
 /tests export-ignore
 *.sh text eol=lf
+/docs/readme export-ignore
+/scripts/readme-art export-ignore

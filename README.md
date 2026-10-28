@@ -1,6 +1,17 @@
+<div align="center">
+  <a href="site/index.html"><img src="docs/readme/hero.jpg" width="100%" alt="BOOSTER's front page: the headline 'Boosts your versions.' beside a launch pad where the syringe-rocket mark sits above a PHP altimeter reading 8.5, stage 6 of 6, gate: target-image tests."></a>
+</div>
+
 # BOOSTER
 
-[![GitHub CI](https://github.com/waynestate/booster/actions/workflows/ci.yml/badge.svg)](https://github.com/waynestate/booster/actions/workflows/ci.yml)
+<p>
+  <img src="docs/readme/badges/php.svg" alt="php ^8.3">
+  <img src="docs/readme/badges/license.svg" alt="licence MIT">
+  <img src="docs/readme/badges/cap.svg" alt="cap per hop: 50 files">
+  <a href="https://github.com/waynestate/booster/actions/workflows/ci.yml"><img src="https://github.com/waynestate/booster/actions/workflows/ci.yml/badge.svg" alt="GitHub CI"></a>
+</p>
+
+**Boosts your versions.** One dose at a time, and every dose gets a stamp.
 
 Checks: `composer ci` (the same command runs on GitLab and GitHub).
 
@@ -118,6 +129,21 @@ supports at every step):
 5. php-83-to-84      [target-image-tests]
 6. php-84-to-85      [target-image-tests]
 ```
+
+<div align="center">
+  <img src="docs/readme/record.svg" width="100%" alt="BOOSTER's immunization record for the Laravel 10 example app: after a short countdown, a Gate passed stamp lands on each hop in turn, laravel-10-to-11, laravel-11-to-12, php-82-to-83, laravel-12-to-13, php-83-to-84 and php-84-to-85, ending in RESULT: PASS.">
+  <br><sub>The plan above, written up the way your doctor would: one stamp per hop, one hop at a time.</sub>
+</div>
+
+<details>
+<summary><b>Chart review</b>: the record card and the PHP by Laravel grid, from the front page</summary>
+<br>
+<div align="center">
+  <img src="docs/readme/card.jpg" width="100%" alt="The front page's Form B-01 record card for examples/laravel-blade, six hops from laravel-10-to-11 to php-84-to-85, each with its pair, gate image and a Gate passed stamp, ending in RESULT: PASS.">
+  <br><br>
+  <img src="docs/readme/pairs.jpg" width="100%" alt="The overlap grid of Laravel 10 to 13 against PHP 8.1 to 8.5. Unsupported pairs are hatched, and a numbered path 0 to 6 climbs from Laravel 10 on PHP 8.2 to Laravel 13 on PHP 8.5.">
+</div>
+</details>
 
 ## Commands
 
@@ -246,3 +272,30 @@ Version 0.1. See [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) for what a person must a
 ## Licence
 
 MIT, Wayne State University, Enterprise Applications.
+
+<details>
+<summary><b>The brand board</b>: the syringe that is also a rocket, lockups, palette and type</summary>
+<br>
+<div align="center"><img src="docs/readme/board.jpg" width="100%" alt="BOOSTER's brand board: the syringe-rocket mark on a green tile, lockups, the palette of Wayne State green, gold and cream, Barlow Condensed type, and favicon sizes."></div>
+</details>
+
+<div align="center"><b>The whole course</b><br><sub>WayneUI and the stack. Each one is on its own schedule; this one keeps the schedule.</sub></div>
+
+<div align="center">
+  <a href="https://github.com/waynestate/wayne-ui" title="WayneUI"><img src="docs/readme/cast/wayneui.png" width="40" alt="WayneUI"></a>
+  <a href="https://github.com/waynestate/creed" title="CREED"><img src="docs/readme/cast/creed.png" width="40" alt="CREED"></a>
+  <a href="https://github.com/waynestate/proctor" title="PROCTOR"><img src="docs/readme/cast/proctor.png" width="40" alt="PROCTOR"></a>
+  <a href="https://github.com/waynestate/sesame" title="SESAME"><img src="docs/readme/cast/sesame.png" width="40" alt="SESAME"></a>
+  <a href="https://github.com/waynestate/helmet" title="HELMET"><img src="docs/readme/cast/helmet.png" width="40" alt="HELMET"></a>
+  <a href="https://github.com/waynestate/sourdough" title="Sourdough"><img src="docs/readme/cast/sourdough.png" width="40" alt="Sourdough"></a>
+  <a href="https://github.com/waynestate/squire" title="SQUIRE"><img src="docs/readme/cast/squire.png" width="40" alt="SQUIRE"></a>
+  <a href="https://github.com/waynestate/preflight" title="PREFLIGHT"><img src="docs/readme/cast/preflight.png" width="40" alt="PREFLIGHT"></a>
+  <a href="https://github.com/waynestate/pinstripe" title="Pinstripe"><img src="docs/readme/cast/pinstripe.png" width="40" alt="Pinstripe"></a>
+  <a href="https://github.com/waynestate/booster" title="BOOSTER"><img src="docs/readme/cast/booster.png" width="40" alt="BOOSTER"></a>
+  <a href="https://github.com/waynestate/rollcall" title="ROLLCALL"><img src="docs/readme/cast/rollcall.png" width="40" alt="ROLLCALL"></a>
+  <a href="https://github.com/waynestate/drawbridge" title="DRAWBRIDGE"><img src="docs/readme/cast/drawbridge.png" width="40" alt="DRAWBRIDGE"></a>
+  <a href="https://github.com/waynestate/advisor" title="ADVISOR"><img src="docs/readme/cast/advisor.png" width="40" alt="ADVISOR"></a>
+  <a href="https://github.com/waynestate/weld" title="WELD"><img src="docs/readme/cast/weld.png" width="40" alt="WELD"></a>
+</div>
+
+<div align="center"><sub>Images are regenerated from the front page by <a href="scripts/readme-art/README.md"><code>scripts/readme-art</code></a>. Please hold still; this will only sting a little.</sub></div>

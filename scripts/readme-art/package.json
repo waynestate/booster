@@ -1,0 +1,13 @@
+{
+  "name": "booster-readme-art",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "badge-maker": "^4.1.0",
+    "playwright": "1.64.1",
+    "sharp": "^0.34.0"
+  }
+}
