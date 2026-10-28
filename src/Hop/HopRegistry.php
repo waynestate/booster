@@ -21,6 +21,36 @@ final class HopRegistry
     /** @var list<string> */
     public const LARAVEL_CHAIN = ['8', '9', '10', '11', '12', '13'];
 
+    /** @var list<string> */
+    public const PHPUNIT_CHAIN = ['9', '10', '11', '12', '13'];
+
+    /**
+     * The lowest PHP version each PHPUnit major runs on
+     * (sebastianbergmann/phpunit composer.json).
+     *
+     * @var array<int, string>
+     */
+    public const PHPUNIT_PHP = [
+        '9' => '7.3',
+        '10' => '8.1',
+        '11' => '8.2',
+        '12' => '8.3',
+        '13' => '8.4',
+    ];
+
+    /**
+     * The lowest PHPUnit major each Laravel major's skeleton ships
+     * (laravel.com upgrade guides).
+     *
+     * @var array<int, string>
+     */
+    public const LARAVEL_PHPUNIT = [
+        '10' => '9',
+        '11' => '10',
+        '12' => '11',
+        '13' => '12',
+    ];
+
     /**
      * PHP versions each Laravel major runs on (laravel.com/docs/<n>.x/releases,
      * support policy), lowest and highest.
@@ -43,6 +73,7 @@ final class HopRegistry
     {
         $this->addPhpHops();
         $this->addLaravelHops();
+        $this->addPhpunitHops();
         $this->add($this->sesameHop());
         $this->add($this->vueHop());
     }
@@ -55,6 +86,11 @@ final class HopRegistry
     public static function laravelHopId(string $from, string $to): string
     {
         return sprintf('laravel-%s-to-%s', $from, $to);
+    }
+
+    public static function phpunitHopId(string $from, string $to): string
+    {
+        return sprintf('phpunit-%s-to-%s', $from, $to);
     }
 
     public function get(string $id): Hop
@@ -88,6 +124,13 @@ final class HopRegistry
         $i = array_search($from, self::LARAVEL_CHAIN, true);
 
         return $i === false ? null : (self::LARAVEL_CHAIN[$i + 1] ?? null);
+    }
+
+    public static function nextPhpunit(string $from): ?string
+    {
+        $i = array_search($from, self::PHPUNIT_CHAIN, true);
+
+        return $i === false ? null : (self::PHPUNIT_CHAIN[$i + 1] ?? null);
     }
 
     public static function laravelSupportsPhp(string $laravel, string $php): bool
@@ -175,6 +218,29 @@ final class HopRegistry
                     'Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.',
                 ],
                 links: [sprintf('https://laravel.com/docs/%s.x/upgrade', $to)],
+            ));
+        }
+    }
+
+    private function addPhpunitHops(): void
+    {
+        foreach (self::PHPUNIT_CHAIN as $i => $from) {
+            $to = self::PHPUNIT_CHAIN[$i + 1] ?? null;
+            if ($to === null) {
+                break;
+            }
+            $this->add(new Hop(
+                id: self::phpunitHopId($from, $to),
+                kind: HopKind::Phpunit,
+                from: $from,
+                to: $to,
+                summary: sprintf('Move PHPUnit %s tests to PHPUnit %s.', $from, $to),
+                rectorSets: ['Rector\PHPUnit\Set\PHPUnitSetList::COMPOSER_BASED'],
+                composerSet: ['phpunit/phpunit' => '^' . $to . '.0'],
+                notes: [
+                    'Run phpunit --migrate-configuration after this hop; Rector rewrites the test code but not phpunit.xml.',
+                ],
+                links: [sprintf('https://phpunit.de/articles/migrating-to-phpunit-%s.html', $to)],
             ));
         }
     }
