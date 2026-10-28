@@ -1,0 +1,8 @@
+{
+    "preset": "per",
+    "exclude": [
+        "vendor",
+        "tests/fixtures",
+        "examples"
+    ]
+}

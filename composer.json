@@ -1,0 +1,61 @@
+{
+    "name": "waynestate/booster",
+    "description": "WELD's upgrade tool: plans and runs PHP and Laravel upgrade hops on top of Rector, using CREED's version policy.",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Wayne State University, Enterprise Applications"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "composer/semver": "^3.4",
+        "driftingly/rector-laravel": "^2.7",
+        "rector/rector": "^2.8",
+        "symfony/console": "^7.1",
+        "symfony/process": "^7.1"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.32",
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^11.5"
+    },
+    "config": {
+        "audit": {
+            "abandoned": "report"
+        },
+        "platform": {
+            "php": "8.3.0"
+        }
+    },
+    "scripts": {
+        "lint": "pint --test",
+        "fix": "pint",
+        "analyse": "phpstan analyse --memory-limit=1G",
+        "ci": [
+            "@composer validate --strict",
+            "phpunit",
+            "pint --test",
+            "phpstan analyse --memory-limit=1G",
+            "@composer audit"
+        ]
+    },
+    "scripts-descriptions": {
+        "ci": "Run every CI check: manifest, tests, style, static analysis, audit"
+    },
+    "bin": [
+        "bin/booster"
+    ],
+    "autoload": {
+        "psr-4": {
+            "Waynestate\\Booster\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Waynestate\\Booster\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "stable"
+}
