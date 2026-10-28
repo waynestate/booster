@@ -15,6 +15,8 @@
 
 Checks: `composer ci` (the same command runs on GitLab and GitHub).
 
+Development happens on Wayne State's GitLab; this repository is a release mirror. Changes land there first.
+
 > A booster shot keeps your immunity current. This one keeps your PHP current, and it stings less.
 
 Front page: [`site/index.html`](site/index.html), a static page you can open in a browser or serve from `site/`.

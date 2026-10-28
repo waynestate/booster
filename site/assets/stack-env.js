@@ -17,7 +17,7 @@
  *      production everywhere else.
  *
  * In dev every link to a part becomes <devBase>/<project>/site/, for a static
- * server whose root is the stack folder. devBase defaults to
+ * server whose root is the folder that holds every project. devBase defaults to
  * http://127.0.0.1:18432; ?devBase=http://127.0.0.1:18931 overrides and is
  * remembered ("stack-dev-base"), and ?devBase=auto forgets it. WayneUI stays
  * on production: its site needs its own build and does not run from a
