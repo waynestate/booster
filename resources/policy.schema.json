@@ -1,0 +1,115 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "CREED version policy",
+    "type": "object",
+    "required": [
+        "schema_version",
+        "components",
+        "rules"
+    ],
+    "additionalProperties": false,
+    "properties": {
+        "schema_version": {
+            "const": 1
+        },
+        "components": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+                "type": "object",
+                "required": [
+                    "versions"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                    "versions": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "released": {
+                                    "type": "string",
+                                    "format": "date"
+                                },
+                                "active_until": {
+                                    "type": "string",
+                                    "format": "date"
+                                },
+                                "security_until": {
+                                    "type": "string",
+                                    "format": "date"
+                                },
+                                "images": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "citadel": {
+                                            "type": "string",
+                                            "minLength": 1
+                                        },
+                                        "docker": {
+                                            "type": "string",
+                                            "minLength": 1
+                                        },
+                                        "openshift": {
+                                            "type": "string",
+                                            "minLength": 1
+                                        },
+                                        "coolify": {
+                                            "type": "string",
+                                            "minLength": 1
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "tools": {
+            "type": "object",
+            "propertyNames": {
+                "pattern": "^[a-z][a-z0-9-]*$"
+            },
+            "additionalProperties": {
+                "type": "object",
+                "required": [
+                    "minimum"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                    "minimum": {
+                        "type": "string",
+                        "pattern": "^\\d+\\.\\d+\\.\\d+$"
+                    }
+                }
+            }
+        },
+        "rules": {
+            "type": "object",
+            "required": [
+                "audit_severity_threshold",
+                "banned_constraints",
+                "eol_grace_days"
+            ],
+            "additionalProperties": false,
+            "properties": {
+                "audit_severity_threshold": {
+                    "type": "string"
+                },
+                "banned_constraints": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "eol_grace_days": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        }
+    }
+}
