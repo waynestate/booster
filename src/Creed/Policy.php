@@ -18,7 +18,7 @@ use RuntimeException;
  */
 final class Policy
 {
-    /** @var array<string, array{versions: array<string, array<string, string>>}> */
+    /** @var array<string, array{versions: array<string, array<string, mixed>>}> */
     private array $components;
 
     /** @var array<string, array<string, string>> */
@@ -119,8 +119,15 @@ final class Policy
      * next day it is Eol, for eol_grace_days more days. The day after the
      * last grace day is EolGraceExpired.
      *
-     * @throws InvalidArgumentException if the component or version is unknown,
-     *                                  or the version has no security_until
+     * A version is first resolved to its policy line: 8.3.12 is judged as
+     * 8.3. A line marked current is Active on every date. A version that
+     * resolves to no line and sorts above every listed line is Active too:
+     * current versions are never refused. A version that falls between
+     * listed lines is unknown and throws.
+     *
+     * @throws InvalidArgumentException if the component is unknown, the
+     *                                  version is unknown, or the version's
+     *                                  line has no security_until
      */
     public function stateOf(string $component, string $version, DateTimeImmutable $on): State
     {
@@ -128,11 +135,19 @@ final class Policy
         if ($versions === null) {
             throw new InvalidArgumentException("Unknown component: {$component}");
         }
-        if (!array_key_exists($version, $versions)) {
+        $line = $this->resolveVersion($component, $version);
+        if ($line === null) {
+            if ($this->isAheadOfPolicy($component, $version)) {
+                return State::Active;
+            }
             throw new InvalidArgumentException("Unknown version of {$component}: {$version}");
         }
-        $entry = $versions[$version];
-        if (!isset($entry['security_until'])) {
+        $entry = $versions[$line];
+        if (($entry['current'] ?? null) === true) {
+            return State::Active;
+        }
+        $securityUntil = $entry['security_until'] ?? null;
+        if (!is_string($securityUntil)) {
             throw new InvalidArgumentException(
                 "Version {$version} of {$component} has no security_until, and this reader does not guess.",
             );
@@ -140,9 +155,8 @@ final class Policy
 
         $day = $on->format('Y-m-d');
         $activeUntil = $entry['active_until'] ?? null;
-        $securityUntil = $entry['security_until'];
 
-        if ($activeUntil !== null && $day <= $activeUntil) {
+        if (is_string($activeUntil) && $day <= $activeUntil) {
             return State::Active;
         }
         if ($day <= $securityUntil) {
@@ -162,6 +176,43 @@ final class Policy
         }
 
         return State::EolGraceExpired;
+    }
+
+    /**
+     * Whether a version sorts above every line the policy lists.
+     *
+     * The version must not resolve to a listed line: 8.3.12 is not ahead of
+     * a policy that lists 8.3. A version is ahead when, for every listed
+     * line, the version's own prefix of that line's depth compares greater:
+     * 28 is ahead of 20/22/24/26, and 9.0 is ahead of 8.1-8.5, but 8.5 is
+     * not ahead of a policy that lists 8.1 and 8.9, because it falls
+     * between them.
+     *
+     * @throws InvalidArgumentException if the component is unknown
+     */
+    public function isAheadOfPolicy(string $component, string $version): bool
+    {
+        $versions = $this->components[$component]['versions'] ?? null;
+        if ($versions === null) {
+            throw new InvalidArgumentException("Unknown component: {$component}");
+        }
+        if ($this->resolveVersion($component, $version) !== null) {
+            return false;
+        }
+        if ($versions === []) {
+            return true;
+        }
+        foreach (array_keys($versions) as $listed) {
+            // json_decode turns keys like "10" into ints; versions are strings.
+            $listed = (string) $listed;
+            $depth = substr_count($listed, '.') + 1;
+            $prefix = implode('.', array_slice(explode('.', $version), 0, $depth));
+            if (version_compare($prefix, $listed) <= 0) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -321,12 +372,13 @@ final class Policy
     }
 
     /**
-     * One version line, with exactly the four fields the policy may carry.
+     * One version line, with exactly the five fields the policy may carry.
      *
-     * Each field is a string or null, as in the JSON. Null when the component
-     * or version is unknown.
+     * The date and patch fields are strings or null, as in the JSON. current
+     * is true when the line is marked current, null otherwise. Null when the
+     * component or version is unknown.
      *
-     * @return array{active_until: ?string, security_until: ?string, latest_patch: ?string, latest_patch_checked: ?string}|null
+     * @return array{active_until: ?string, security_until: ?string, latest_patch: ?string, latest_patch_checked: ?string, current: ?bool}|null
      */
     public function line(string $component, string $version): ?array
     {
@@ -343,6 +395,7 @@ final class Policy
             'security_until' => $this->stringOrNull($entry['security_until'] ?? null),
             'latest_patch' => $this->stringOrNull($entry['latest_patch'] ?? null),
             'latest_patch_checked' => $this->stringOrNull($entry['latest_patch_checked'] ?? null),
+            'current' => $this->currentOrNull($entry['current'] ?? null),
         ];
     }
 
@@ -446,5 +499,13 @@ final class Policy
     private function stringOrNull(mixed $value): ?string
     {
         return is_string($value) ? $value : null;
+    }
+
+    /**
+     * A policy field as a boolean, or null when it is not one.
+     */
+    private function currentOrNull(mixed $value): ?bool
+    {
+        return $value === true ? true : null;
     }
 }

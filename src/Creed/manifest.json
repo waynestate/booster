@@ -1,17 +1,17 @@
 {
     "schema_version": 1,
     "source": "creed",
-    "creed_version": "0.1.0-60-g3b82955",
+    "creed_version": "unknown",
     "namespace": "Waynestate\\Booster\\Creed",
     "files": {
         "Policy.php": {
-            "sha256": "93e026deb09467888aa4730fd475cd1c6a845449fff4c9c3d43c2712c7e18c87"
+            "sha256": "b79bf896e5ace2e56c5968a87aeb9f4aa76afb37924bdf5ca161fcb5907a6b20"
         },
         "State.php": {
             "sha256": "fd68305684b76143c58ba495c84941576c803a2398c2084dcd8f7ff47ccf636e"
         },
         "policy.json": {
-            "sha256": "712b2f72f1b60b9cbfa288a02b0f1791f3d9dd4967e8b069e68f774ec42ada94"
+            "sha256": "5b6e1e4752a01fc99a8cf6dcbda15a9e33c635e367ea3f6408be880ca8b1e072"
         }
     }
 }

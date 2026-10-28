@@ -117,11 +117,18 @@
                 "2": {
                     "active_until": "2023-12-31",
                     "security_until": "2023-12-31"
+                },
+                "3": {
+                    "current": true
                 }
             }
         },
         "inertia": {
-            "versions": {}
+            "versions": {
+                "2": {
+                    "current": true
+                }
+            }
         }
     },
     "tools": {
