@@ -1,0 +1,8 @@
+{
+    "name": "example/laravel-inertia-vue",
+    "require": {
+        "php": "^8.3",
+        "laravel/framework": "^12.0",
+        "inertiajs/inertia-laravel": "^2.0"
+    }
+}

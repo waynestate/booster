@@ -1,0 +1,19 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use Waynestate\Booster\Console\BoosterApplication;
+
+// Works from a clone (vendor next to bin) and as a Composer dependency
+// (vendor/waynestate/booster/bin, autoloader two levels up).
+$candidates = [__DIR__ . '/../vendor/autoload.php', __DIR__ . '/../../../autoload.php'];
+foreach ($candidates as $autoload) {
+    if (is_file($autoload)) {
+        require $autoload;
+        exit((new BoosterApplication())->run());
+    }
+}
+
+fwrite(STDERR, "vendor/autoload.php not found. Run `composer install` first.\n");
+exit(2);
