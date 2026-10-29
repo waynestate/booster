@@ -37,10 +37,9 @@ final class PolicyTest extends TestCase
         self::assertTrue($p->isAheadOfPolicy('php', '9.9'));
     }
 
-    public function test_a_version_below_the_listed_lines_is_an_error(): void
+    public function test_a_version_below_the_oldest_listed_line_is_eol(): void
     {
-        $this->expectException(PolicyException::class);
-        $this->policy()->stateOf('php', '8.0', $this->today());
+        self::assertSame(State::Eol, $this->policy()->stateOf('php', '8.0', $this->today()));
     }
 
     public function test_a_version_between_listed_lines_is_an_error(): void
