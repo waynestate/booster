@@ -88,6 +88,37 @@ final class MixFileTest extends TestCase
         ], $build->outputMap());
     }
 
+    public function test_directory_outputs_resolve_to_the_files_mix_writes(): void
+    {
+        $build = MixFile::parse(<<<'JS'
+        const mix = require('laravel-mix');
+
+        mix.js('resources/js/app.js', 'public/js')
+            .vue()
+            .sass('resources/sass/app.scss', 'public/css');
+        JS);
+
+        self::assertSame([
+            'js/app.js' => 'resources/js/app.js',
+            'css/app.css' => 'resources/sass/app.scss',
+        ], $build->outputMap());
+    }
+
+    public function test_explicit_file_outputs_win_over_the_derived_name(): void
+    {
+        $build = MixFile::parse(<<<'JS'
+        const mix = require('laravel-mix');
+
+        mix.js('resources/js/app.js', 'public/js/bundle.js')
+            .sass('resources/sass/app.scss', 'public/css/main.css');
+        JS);
+
+        self::assertSame([
+            'js/bundle.js' => 'resources/js/app.js',
+            'css/main.css' => 'resources/sass/app.scss',
+        ], $build->outputMap());
+    }
+
     public function test_it_refuses_webpack_config_naming_the_call(): void
     {
         $this->expectException(ToolError::class);

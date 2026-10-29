@@ -37,10 +37,17 @@ final readonly class Hop
         public bool $buildGate = false,
     ) {}
 
-    /** A hop with no Rector rules and no manifest edit is a playbook a person follows. */
+    /**
+     * A non-Node hop with no Rector rules and no manifest edit is a playbook
+     * a person follows. Node hops always edit manifests, so they are never
+     * playbooks even when they carry no npmSet values.
+     */
     public function isManual(): bool
     {
-        return $this->rectorSets === [] && $this->classRenames === [] && $this->npmSet === [];
+        return $this->kind !== HopKind::Node
+            && $this->rectorSets === []
+            && $this->classRenames === []
+            && $this->npmSet === [];
     }
 
     /**

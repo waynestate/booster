@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Run;
 
+use FilesystemIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Waynestate\Booster\Hop\Hop;
 use Waynestate\Booster\Hop\HopKind;
+use Waynestate\Booster\Hop\HopRegistry;
+use Waynestate\Booster\Node\MixBuild;
+use Waynestate\Booster\Node\MixFile;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanStep;
 use Waynestate\Booster\ToolError;
@@ -134,7 +140,9 @@ final class HopExecutor
 
         try {
             if ($hop->kind === HopKind::Node) {
-                return $this->runNodeHop($step, $path, $options, $baseline);
+                return $hop->id === HopRegistry::MIX_TO_VITE_ID
+                    ? $this->runMixHop($step, $path, $plan, $options, $baseline)
+                    : $this->runNodeHop($step, $path, $options, $baseline);
             }
 
             $phpunitTarget = $hop->kind === HopKind::Phpunit ? $hop->to : null;
@@ -258,6 +266,424 @@ final class HopExecutor
 
         return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$changes, ...$hop->notes]);
     }
+
+    /**
+     * The Mix to Vite hop. It converts the simple shape of webpack.mix.js:
+     * write vite.config.js, swap laravel-mix for vite and laravel-vite-plugin
+     * in package.json, rename MIX_ keys to VITE_ in .env.example, rewrite
+     * Blade mix() tags where the mapping is unambiguous, delete
+     * webpack.mix.js. Anything outside the simple shape is refused with a
+     * message that names the offending call.
+     */
+    private function runMixHop(PlanStep $step, string $path, Plan $plan, RunOptions $options, BaselineResult $baseline): StepResult
+    {
+        $hop = $step->hop;
+        $mixFile = $path . '/' . MixFile::FILE;
+        if (!is_file($mixFile)) {
+            throw new ToolError(sprintf('%s is missing, so there is nothing to convert.', MixFile::FILE));
+        }
+
+        try {
+            $build = MixFile::parse((string) file_get_contents($mixFile));
+        } catch (ToolError $e) {
+            return $options->dryRun
+                ? new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [], ['Dry run: ' . $e->getMessage(), ...$hop->notes])
+                : new StepResult($step->number, $hop->id, StepResult::ERROR, [], [$e->getMessage(), ...$hop->notes]);
+        }
+
+        if ($build->vue && $plan->project->vueMajor === '2') {
+            $message = sprintf(
+                'Refusing to convert %s: the front end uses Vue 2, but @vitejs/plugin-vue is Vue 3 only. Move to Vue 3 first with the vue-2-to-3 hop, then run this hop again.',
+                MixFile::FILE,
+            );
+
+            return $options->dryRun
+                ? new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [], ['Dry run: ' . $message, ...$hop->notes])
+                : new StepResult($step->number, $hop->id, StepResult::ERROR, [], [$message, ...$hop->notes]);
+        }
+
+        if ($options->dryRun) {
+            return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [], [
+                sprintf(
+                    'Dry run: would convert %s (%d entries%s) to Vite: write vite.config.js, swap laravel-mix for vite and laravel-vite-plugin in package.json, rename MIX_ keys in .env.example, rewrite Blade mix() tags where the mapping is unambiguous, delete %s.',
+                    MixFile::FILE,
+                    count($build->entries),
+                    $build->vue ? ' plus Vue' : '',
+                    MixFile::FILE,
+                ),
+                ...$this->bladeNotes($path, $build),
+                ...$hop->notes,
+            ]);
+        }
+
+        [$changes, $files] = $this->applyMixToVite($path, $build);
+        $changes = [...$changes, ...$this->bladeNotes($path, $build), ...$this->withoutMixNotes($path)];
+
+        if (!$options->skipGate) {
+            $failure = $this->runBuildGate($path);
+            if ($failure === null && !is_file($path . '/public/build/manifest.json')) {
+                $failure = ['Build gate failed: npm run build finished but public/build/manifest.json is missing. Vite writes it when the build succeeds, so check the build output.'];
+            }
+            if ($failure !== null) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$failure]);
+            }
+            $changes[] = 'Build gate passed: npm ci and npm run build are green in the Node container, and public/build/manifest.json exists.';
+            $gate = $this->runGate($step, $path, $options, $baseline);
+            if ($gate !== null) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate]);
+            }
+            $changes[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
+        } else {
+            $changes[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
+        }
+
+        return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$changes, ...$hop->notes]);
+    }
+
+    /**
+     * Writes the Vite shape into the app.
+     *
+     * @return array{0: list<string>, 1: list<array{file: string, diff: string}>} what changed and which files
+     */
+    private function applyMixToVite(string $path, MixBuild $build): array
+    {
+        $changes = [];
+        $files = [];
+        $mixFile = $path . '/' . MixFile::FILE;
+
+        $config = $this->viteConfig($build);
+        $configFile = $path . '/vite.config.js';
+        if (!is_file($configFile) || (string) file_get_contents($configFile) !== $config) {
+            file_put_contents($configFile, $config);
+            $changes[] = 'vite.config.js: written with the laravel-vite-plugin inputs from ' . MixFile::FILE . ($build->vue ? ' plus @vitejs/plugin-vue' : '') . '.';
+            $files[] = ['file' => 'vite.config.js', 'diff' => 'written'];
+        }
+
+        $packageFile = $path . '/package.json';
+        if (is_file($packageFile)) {
+            $package = json_decode((string) file_get_contents($packageFile), true);
+            if (!is_array($package)) {
+                throw new ToolError(sprintf('package.json is not valid JSON: %s', $packageFile));
+            }
+            $edited = false;
+            foreach (['dependencies', 'devDependencies'] as $section) {
+                if (is_array($package[$section] ?? null) && array_key_exists('laravel-mix', $package[$section])) {
+                    unset($package[$section]['laravel-mix']);
+                    $changes[] = 'package.json: removed laravel-mix from ' . $section . '.';
+                    $edited = true;
+                }
+            }
+            foreach ([
+                'vite' => HopRegistry::VITE_VERSION,
+                'laravel-vite-plugin' => HopRegistry::LARAVEL_VITE_PLUGIN_VERSION,
+            ] as $name => $version) {
+                if (($package['devDependencies'][$name] ?? null) !== $version) {
+                    $package['devDependencies'][$name] = $version;
+                    $changes[] = 'package.json: devDependencies ' . $name . ' to ' . $version . '.';
+                    $edited = true;
+                }
+            }
+            if ($build->vue && ($package['devDependencies']['@vitejs/plugin-vue'] ?? null) !== HopRegistry::VUE_PLUGIN_VERSION) {
+                $package['devDependencies']['@vitejs/plugin-vue'] = HopRegistry::VUE_PLUGIN_VERSION;
+                $changes[] = 'package.json: devDependencies @vitejs/plugin-vue to ' . HopRegistry::VUE_PLUGIN_VERSION . '.';
+                $edited = true;
+            }
+            foreach (['dev' => 'vite', 'build' => 'vite build'] as $script => $command) {
+                if (($package['scripts'][$script] ?? null) !== $command) {
+                    $package['scripts'][$script] = $command;
+                    $changes[] = 'package.json: scripts.' . $script . ' to ' . $command . '.';
+                    $edited = true;
+                }
+            }
+            if (($package['type'] ?? null) !== 'module') {
+                $package['type'] = 'module';
+                $changes[] = 'package.json: type to module.';
+                $edited = true;
+            }
+            if ($edited) {
+                file_put_contents($packageFile, json_encode($package, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+                $files[] = ['file' => 'package.json', 'diff' => 'swapped laravel-mix for vite and laravel-vite-plugin'];
+            }
+        }
+
+        $envFile = $path . '/.env.example';
+        if (is_file($envFile)) {
+            $lines = explode("\n", (string) file_get_contents($envFile));
+            $renamed = 0;
+            foreach ($lines as $i => $line) {
+                if (str_starts_with($line, 'MIX_')) {
+                    $lines[$i] = 'VITE_' . substr($line, 4);
+                    $renamed++;
+                }
+            }
+            if ($renamed > 0) {
+                file_put_contents($envFile, implode("\n", $lines));
+                $changes[] = '.env.example: renamed ' . $renamed . ' MIX_ key' . ($renamed === 1 ? '' : 's') . ' to VITE_.';
+                $files[] = ['file' => '.env.example', 'diff' => 'MIX_ keys to VITE_'];
+            }
+        }
+
+        $this->rewriteBlade($path, $build, $changes, $files);
+
+        unlink($mixFile);
+        $changes[] = MixFile::FILE . ': deleted.';
+        $files[] = ['file' => MixFile::FILE, 'diff' => 'deleted'];
+
+        return [$changes, $files];
+    }
+
+    /**
+     * Rewrites Blade mix() script and link tags into one @vite([...]) line per
+     * layout, but only when every referenced asset maps to a Mix entry. A file
+     * that cannot be moved cleanly is left untouched and earns a manual note.
+     *
+     * @param list<string>                           $changes
+     * @param list<array{file: string, diff: string}> $files
+     */
+    private function rewriteBlade(string $path, MixBuild $build, array &$changes, array &$files): void
+    {
+        $map = $build->outputMap();
+        foreach ($this->bladeFiles($path . '/resources/views') as $file) {
+            $content = (string) file_get_contents($file);
+            $tagRefs = self::mixTagRefs($content);
+            if ($tagRefs === []) {
+                continue;
+            }
+            // Files that cannot be moved cleanly are left untouched here;
+            // bladeNotes() reports them once, in the step result.
+            $bareRefs = self::bareMixRefs($content);
+            $unmapped = array_values(array_diff($tagRefs, array_keys($map)));
+            if ($unmapped !== [] || $bareRefs !== []) {
+                continue;
+            }
+            $inputs = [];
+            foreach ($tagRefs as $ref) {
+                $input = $map[$ref];
+                if (!in_array($input, $inputs, true)) {
+                    $inputs[] = $input;
+                }
+            }
+            $directive = '@vite([' . implode(', ', array_map(static fn(string $input): string => "'" . $input . "'", $inputs)) . '])';
+            $first = true;
+            $rewritten = preg_replace_callback(self::MIX_TAG, static function (array $m) use (&$first, $directive): string {
+                if (!$first) {
+                    return '';
+                }
+                $first = false;
+                // Groups 1 to 8 are guaranteed by MIX_TAG; PHPStan cannot see
+                // through the pattern, so the lookups default to empty.
+                $isScript = ($m[2] ?? '') !== '';
+
+                return ($isScript ? ($m[1] ?? '') : ($m[5] ?? '')) . $directive . ($isScript ? ($m[4] ?? '') : ($m[8] ?? ''));
+            }, $content);
+            if ($rewritten === null || $rewritten === $content) {
+                $changes[] = sprintf('%s: BOOSTER could not rewrite the mix() tags; move them by hand.', $this->relative($path, $file));
+
+                continue;
+            }
+            file_put_contents($file, $rewritten);
+            $changes[] = $this->relative($path, $file) . ': mix() tags replaced with ' . $directive . '.';
+            $files[] = ['file' => $this->relative($path, $file), 'diff' => 'mix() tags to @vite'];
+        }
+    }
+
+    /**
+     * Manual notes about Blade files BOOSTER will not touch: references with no
+     * matching Mix entry, or mix() calls that are not plain script or link tags.
+     *
+     * @return list<string>
+     */
+    private function bladeNotes(string $path, MixBuild $build): array
+    {
+        $map = $build->outputMap();
+        $notes = [];
+        foreach ($this->bladeFiles($path . '/resources/views') as $file) {
+            $content = (string) file_get_contents($file);
+            $tagRefs = self::mixTagRefs($content);
+            if ($tagRefs === []) {
+                continue;
+            }
+            $bareRefs = self::bareMixRefs($content);
+            $unmapped = array_values(array_diff($tagRefs, array_keys($map)));
+            if ($unmapped === [] && $bareRefs === []) {
+                continue;
+            }
+            $reason = $unmapped !== [] ? 'references an asset with no matching entry in ' . MixFile::FILE : 'has a mix() call that is not a plain script or link tag';
+            $notes[] = sprintf('%s: mix(%s) %s; move it by hand.', $this->relative($path, $file), implode("', '", $tagRefs), $reason);
+        }
+
+        return $notes;
+    }
+
+    /**
+     * Files that still call withoutMix(); the helper becomes withoutVite() and
+     * BOOSTER does not rename it on your behalf.
+     *
+     * @return list<string>
+     */
+    private function withoutMixNotes(string $path): array
+    {
+        $notes = [];
+        foreach ($this->withoutMixFiles($path) as $file) {
+            $notes[] = $file . ': replace withoutMix() with withoutVite() by hand.';
+        }
+
+        return $notes;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function withoutMixFiles(string $path): array
+    {
+        $hits = [];
+        foreach ($this->phpFiles($path) as $relative => $absolute) {
+            if (str_contains((string) file_get_contents($absolute), 'withoutMix(')) {
+                $hits[] = $relative;
+            }
+        }
+        sort($hits);
+
+        return $hits;
+    }
+
+    /**
+     * The vite.config.js the hop writes: the Mix entries as laravel-vite-plugin
+     * inputs, plus the Vue plugin when the Mix file compiled components.
+     */
+    private function viteConfig(MixBuild $build): string
+    {
+        $imports = "import { defineConfig } from 'vite';\nimport laravel from 'laravel-vite-plugin';\n";
+        $plugins = ['        laravel({', '            input: [', ...array_map(static fn(string $input): string => "                '" . $input . "'", $build->inputs()), '            ]', '            refresh: true', '        })'];
+        if ($build->vue) {
+            $imports .= "import vue from '@vitejs/plugin-vue';\n";
+            $plugins[] = '        vue()';
+        }
+        $body = [];
+        foreach ($plugins as $i => $line) {
+            $body[] = $line . ($i < count($plugins) - 1 ? ',' : '');
+        }
+
+        return $imports
+            . "\n"
+            . "export default defineConfig({\n    plugins: [\n"
+            . implode("\n", $body)
+            . "\n    ],\n});\n";
+    }
+
+    /**
+     * Every mix() reference inside a script or link tag, in document order.
+     *
+     * @return list<string>
+     */
+    private static function mixTagRefs(string $content): array
+    {
+        $refs = [];
+        if (preg_match_all(self::MIX_TAG, $content, $matches, PREG_OFFSET_CAPTURE) !== false) {
+            foreach ($matches[0] as $i => $match) {
+                $refs[] = [$match[1], $matches[2][$i][1] === -1 ? $matches[7][$i][0] : $matches[3][$i][0]];
+            }
+        }
+        sort($refs);
+
+        return array_map(static fn(array $ref): string => $ref[1], $refs);
+    }
+
+    /**
+     * mix() references that sit outside any script or link tag.
+     *
+     * @return list<string>
+     */
+    private static function bareMixRefs(string $content): array
+    {
+        $ranges = [];
+        if (preg_match_all(self::MIX_TAG, $content, $matches, PREG_OFFSET_CAPTURE) !== false) {
+            foreach ($matches[0] as $match) {
+                $ranges[] = [$match[1], $match[1] + strlen($match[0])];
+            }
+        }
+        $bare = [];
+        if (preg_match_all('/\{\{\s*mix\(\s*([\'"])([^\'"]+)\1\s*\)\s*\}\}/', $content, $calls, PREG_OFFSET_CAPTURE) !== false) {
+            foreach ($calls[0] as $i => $call) {
+                $inside = false;
+                foreach ($ranges as [$start, $end]) {
+                    if ($call[1] >= $start && $call[1] < $end) {
+                        $inside = true;
+
+                        break;
+                    }
+                }
+                if (!$inside) {
+                    $bare[] = $calls[2][$i][0];
+                }
+            }
+        }
+
+        return $bare;
+    }
+
+    /**
+     * @return list<string> absolute paths, sorted
+     */
+    private function bladeFiles(string $dir): array
+    {
+        if (!is_dir($dir)) {
+            return [];
+        }
+        $files = [];
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS));
+        foreach ($iterator as $file) {
+            if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+                $files[] = $file->getPathname();
+            }
+        }
+        sort($files);
+
+        return $files;
+    }
+
+    /**
+     * PHP files outside vendor/, node_modules/, public/ and storage/.
+     *
+     * @return array<string, string> relative path to absolute path
+     */
+    private function phpFiles(string $path): array
+    {
+        $files = [];
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS));
+        foreach ($iterator as $file) {
+            if (!$file->isFile() || !str_ends_with($file->getFilename(), '.php')) {
+                continue;
+            }
+            $relative = $this->relative($path, $file->getPathname());
+            foreach (['.git/', 'vendor/', 'node_modules/', 'public/', 'storage/', 'bootstrap/cache/'] as $skip) {
+                if (str_starts_with($relative, $skip)) {
+                    continue 2;
+                }
+            }
+            $files[$relative] = $file->getPathname();
+        }
+
+        return $files;
+    }
+
+    private function relative(string $base, string $file): string
+    {
+        $base = str_replace('\\', '/', rtrim($base, '/\\'));
+        $file = str_replace('\\', '/', $file);
+
+        return substr($file, strlen($base) + 1);
+    }
+
+    /**
+     * A script tag whose src is a Blade mix() call, or a link tag whose href
+     * is one. Groups 1 to 4 belong to the script branch (indent, quote, asset
+     * reference, trailing newline); groups 5 to 8 are the same for the link
+     * branch. The quote group can never be empty when its branch matched, so
+     * it doubles as the branch discriminator. The lookbehind keeps data-src
+     * and data-href out.
+     */
+    private const MIX_TAG = '/(^[ \t]*)<script\b[^>]*(?<![\w-])src="\{\{\s*mix\(\s*(\x27|\x22)([^\x27\x22]+)\2\s*\)\s*\}\}"[^>]*>\s*<\/script>[ \t]*(\r?\n)?|(^[ \t]*)<link\b[^>]*(?<![\w-])href="\{\{\s*mix\(\s*(\x27|\x22)([^\x27\x22]+)\6\s*\)\s*\}\}"[^>]*>[ \t]*(\r?\n)?/m';
 
     /**
      * Applies the hop's package.json values and .nvmrc pin.

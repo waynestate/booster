@@ -151,6 +151,10 @@ final class Planner
             $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::NODE_PIN_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
         }
 
+        if ($this->needsMixToVite($project, $laravel)) {
+            $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::MIX_TO_VITE_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+        }
+
         if ($options->sesame) {
             if (!$project->usesWayneCas) {
                 $warnings[] = 'Asked for the SESAME swap, but composer.json does not require cit-web-infra/wayne-cas; skipped.';
@@ -263,6 +267,21 @@ final class Planner
         }
 
         return version_compare($phpunit, $floor, '>=');
+    }
+
+    /**
+     * The app has a webpack.mix.js and will sit on Laravel 9 or newer (the
+     * first major whose upgrade guide ships Vite). The hop is added after the
+     * PHP and Laravel hops, so it lands after laravel-8-to-9 and after
+     * node-pin-24, which it requires.
+     */
+    private function needsMixToVite(Project $project, ?string $laravel): bool
+    {
+        if (!$project->hasMixFile || $laravel === null) {
+            return false;
+        }
+
+        return version_compare($laravel, HopRegistry::VITE_LARAVEL_FLOOR, '>=');
     }
 
     /** The app has a package.json without an engines.node floor at or above the pin target. */

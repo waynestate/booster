@@ -30,7 +30,8 @@ final readonly class MixBuild
 
     /**
      * Output path relative to public/ (what Blade's mix() helper is called
-     * with) to the input that produces it.
+     * with) to the input that produces it. Directory outputs are resolved to
+     * the file Mix would actually write, so the map matches real layouts.
      *
      * @return array<string, string>
      */
@@ -38,8 +39,7 @@ final readonly class MixBuild
     {
         $map = [];
         foreach ($this->entries as $entry) {
-            $relative = preg_replace('#^public/#', '', $entry->output) ?? $entry->output;
-            $map[$relative] = $entry->input;
+            $map[$entry->resolvedOutput()] = $entry->input;
         }
 
         return $map;
