@@ -1,6 +1,6 @@
 {
     "squire": "Written by SQUIRE. Commit this file: `vendor/bin/squire init --check` reads it to report drift.",
-    "version": "0.3.3",
+    "version": "0.3.4",
     "target": "raw",
     "groups": [
         "release",

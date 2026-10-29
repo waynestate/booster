@@ -8,6 +8,7 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
 
 - Changed: the scan skip message and the README say how to approve the PHPCompatibility installer plugin.
 - Changed: the deploy layer's Squire kit is refreshed to 0.3.3 (release options can now live in ./.env.squire).
+- Changed: the deploy layer's Squire kit is refreshed to 0.3.4 (the local .env.squire file is now git-ignored).
 
 ## [0.1.3] - 2026-10-29
 
