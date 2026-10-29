@@ -99,7 +99,7 @@ scripts/build-phar.sh
 ```
 
 Each script writes `build/booster.phar` and verifies it by printing BOOSTER's version. The phar is not published
-yet — there is no release step — so build it from a checkout rather than downloading it.
+yet (there is no release step), so build it from a checkout rather than downloading it.
 
 Every command works from the phar. `detect`, `plan`, `hops` and `init` read only what is bundled inside it. `run`
 copies Rector, its `config/rector.php` and `docker/` out of the phar into a temp directory first, because Rector and
