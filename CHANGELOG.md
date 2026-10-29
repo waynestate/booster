@@ -4,7 +4,7 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
-- Removed: the public proof page; proof results move to a private site.
+- Changed: the proof page moves to a private site that needs a Wayne State sign-in.
 
 ## [0.1.2] - 2026-10-29
 

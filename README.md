@@ -342,6 +342,10 @@ docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install
 `contract/expectations.json` says what BOOSTER must detect, plan and change for each example app in `examples/`;
 `tests/ContractTest.php` enforces it with the real Rector, so a Rector release that changes a hop shows up in CI.
 
+## Proof
+
+Proof runs against real Wayne State applications are on a private site, [proof.apps.wayne.edu/booster](https://proof.apps.wayne.edu/booster/), behind a Wayne State employee sign-in.
+
 ## Status
 
 Version 0.1. See [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) for what a person must answer and what is not built yet, and
