@@ -30,6 +30,7 @@ final class HopExecutor
         private readonly ProcessRunner $processes,
         private readonly ?NodeRunner $node = null,
         private readonly ?HopRegistry $registry = null,
+        private readonly ?ProctorRunner $proctor = null,
     ) {}
 
     private function registry(): HopRegistry
@@ -76,7 +77,35 @@ final class HopExecutor
             }
         }
 
-        return new RunReport($plan, $options->dryRun, $baseline, $results);
+        $proctor = $this->runProctorGate($plan, $path, $options, $results);
+
+        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $options->proctorAdvisory);
+    }
+
+    /**
+     * The PROCTOR gate: once every step finished without failing, measure the
+     * upgraded app against the CREED policy on the final PHP. Skipped for dry
+     * runs, when the gate is skipped, when the plan has no steps, or when a
+     * step left the run unfinished.
+     *
+     * @param list<StepResult> $results
+     */
+    private function runProctorGate(Plan $plan, string $path, RunOptions $options, array $results): ?ProctorResult
+    {
+        if ($options->dryRun || $options->skipGate || $plan->steps === [] || $this->proctor === null) {
+            return null;
+        }
+        foreach ($results as $result) {
+            if ($result->failed() || $result->status === StepResult::NOT_RUN) {
+                return null;
+            }
+        }
+        $php = $plan->targetPhp ?? $this->startingPhp($plan);
+        if ($php === null) {
+            return null;
+        }
+
+        return $this->proctor->run($path, $php, $plan->policyOrigin, $plan->today);
     }
 
     /**

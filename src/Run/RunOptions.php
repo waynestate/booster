@@ -14,5 +14,6 @@ final readonly class RunOptions
         public int $maxChanges = 50,
         public ?string $testCommand = null,
         public ?string $proctorCommand = null,
+        public bool $proctorAdvisory = false,
     ) {}
 }

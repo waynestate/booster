@@ -14,6 +14,7 @@ use Waynestate\Booster\Run\ComposerEditor;
 use Waynestate\Booster\Run\HopExecutor;
 use Waynestate\Booster\Run\NodeRunner;
 use Waynestate\Booster\Run\ProcessRunner;
+use Waynestate\Booster\Run\ProctorRunner;
 use Waynestate\Booster\Run\RectorRunner;
 use Waynestate\Booster\Run\RunOptions;
 use Waynestate\Booster\Run\TargetImageRunner;
@@ -33,11 +34,12 @@ final class RunCommand extends BaseCommand
         $this
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Show the diffs Rector would make and change nothing.')
             ->addOption('max-changes', null, InputOption::VALUE_REQUIRED, 'Stop a hop that would change more than this many files.', '50')
-            ->addOption('skip-gate', null, InputOption::VALUE_NONE, 'Do not run the tests in the target image after each hop.')
+            ->addOption('skip-gate', null, InputOption::VALUE_NONE, 'Do not run the tests in the target image after each hop, or the PROCTOR check at the end.')
             ->addOption('allow-failing-baseline', null, InputOption::VALUE_NONE, 'Continue even when the baseline (the app\'s tests on its current PHP) fails; later gate failures are labelled as pre-existing.')
             ->addOption('allow-dirty', null, InputOption::VALUE_NONE, 'Run even when the working copy has uncommitted changes.')
             ->addOption('test-command', null, InputOption::VALUE_REQUIRED, 'Command that runs the app tests inside the image (default: composer test, else vendor/bin/phpunit).')
-            ->addOption('proctor-command', null, InputOption::VALUE_REQUIRED, 'Extra command run in the image after the tests, for example a PROCTOR check.');
+            ->addOption('proctor-command', null, InputOption::VALUE_REQUIRED, 'Extra command run in the image after the tests, for example a PROCTOR check.')
+            ->addOption('proctor-advisory', null, InputOption::VALUE_NONE, 'Report the PROCTOR result but do not fail the run on it.');
     }
 
     protected function handle(InputInterface $input, OutputInterface $output): int
@@ -58,6 +60,7 @@ final class RunCommand extends BaseCommand
             $this->processes,
             new NodeRunner($this->processes, (int) $registry->nodePinTarget()),
             $registry,
+            new ProctorRunner($this->processes),
         );
         $report = $executor->execute($plan, new RunOptions(
             dryRun: (bool) $input->getOption('dry-run'),
@@ -67,6 +70,7 @@ final class RunCommand extends BaseCommand
             maxChanges: (int) $cap,
             testCommand: $this->stringOption($input, 'test-command'),
             proctorCommand: $this->stringOption($input, 'proctor-command'),
+            proctorAdvisory: (bool) $input->getOption('proctor-advisory'),
         ));
 
         $output->writeln(
