@@ -18,8 +18,9 @@ use Waynestate\Booster\ToolError;
 
 /**
  * Walks a plan. For each step: preview with Rector, stop if the diff is bigger
- * than the cap, apply, edit composer.json, then run the gate before the next
- * step. It edits the working copy only: no commits, no branches, no pushes.
+ * than the cap, apply, move the CAS config and model traits on the SESAME hop,
+ * edit composer.json, then run the gate before the next step. It edits the
+ * working copy only: no commits, no branches, no pushes.
  */
 final class HopExecutor
 {
@@ -30,6 +31,7 @@ final class HopExecutor
         private readonly ProcessRunner $processes,
         private readonly ?NodeRunner $node = null,
         private readonly ?HopRegistry $registry = null,
+        private readonly CasMigration $casMigration = new CasMigration(),
     ) {}
 
     private function registry(): HopRegistry
@@ -167,15 +169,17 @@ final class HopExecutor
                 // A Laravel hop previews through the app's own autoloader; without vendor/ Rector
                 // cannot see the app's classes, so the diff is a lower bound, not the whole change.
                 $incomplete = $hop->kind === HopKind::Laravel && !is_file($path . '/vendor/autoload.php');
+                $migration = $hop->kind === HopKind::Sesame ? $this->casMigration->migrate($path, true) : null;
+                $files = [...$preview->files, ...($migration->files ?? [])];
                 if ($incomplete) {
                     $messages = [sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$hop->notes];
-                } elseif ($preview->files === []) {
-                    $messages = ['Dry run: nothing was changed.', ...$hop->notes];
+                } elseif ($files === []) {
+                    $messages = ['Dry run: nothing was changed.', ...($migration->manual ?? []), ...$hop->notes];
                 } else {
-                    $messages = $hop->notes;
+                    $messages = [...($migration->changes ?? []), ...($migration->manual ?? []), ...$hop->notes];
                 }
 
-                return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $preview->files, $messages, $incomplete);
+                return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $files, $messages, $incomplete);
             }
 
             $applied = $this->rector->run($hop, $path, false, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget);
@@ -183,10 +187,15 @@ final class HopExecutor
             if ($applied->errors !== []) {
                 return new StepResult($step->number, $hop->id, StepResult::ERROR, $applied->files, ['Rector reported errors while applying.', ...$applied->errors]);
             }
-            if ($applied->changedCount() === 0 && $messages === []) {
+            // The CAS config and model traits move only after Rector succeeded,
+            // because they assume the class renames are in place.
+            $migration = $hop->kind === HopKind::Sesame ? $this->casMigration->migrate($path, false) : null;
+            $files = [...$applied->files, ...($migration->files ?? [])];
+            if ($applied->changedCount() === 0 && $messages === [] && ($migration->changes ?? []) === []) {
                 // Nothing changed, so there is nothing for the gate to prove; skip it.
                 return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
                     'Nothing to do: Rector changed no files and composer.json already allows the target, so the gate was skipped.',
+                    ...($migration->manual ?? []),
                     ...$hop->notes,
                 ]);
             }
@@ -194,14 +203,14 @@ final class HopExecutor
             if (!$options->skipGate) {
                 $gate = $this->runGate($step, $path, $options, $baseline);
                 if ($gate !== null) {
-                    return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $applied->files, [...$messages, ...$gate]);
+                    return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...($migration->manual ?? []), ...$gate]);
                 }
                 $messages[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
             } else {
                 $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
             }
 
-            return new StepResult($step->number, $hop->id, StepResult::APPLIED, $applied->files, [...$messages, ...$hop->notes]);
+            return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$messages, ...($migration->changes ?? []), ...($migration->manual ?? []), ...$hop->notes]);
         } catch (ToolError $e) {
             return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [$e->getMessage()]);
         }
