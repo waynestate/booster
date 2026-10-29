@@ -371,6 +371,8 @@ A booster shot keeps your immunity current. This one keeps your PHP current, and
 
 [Watch a plan launch](https://booster.apps.wayne.edu/#record) [Install](https://booster.apps.wayne.edu/#install)
 
+**Works alongside [WELD](https://weld.apps.wayne.edu/).** WELD and [Sourdough](https://sourdough.apps.wayne.edu/) start new apps; Booster moves the ones you already have to a supported PHP or Laravel, one hop at a time.
+
 ![Booster mark: a syringe that is also a rocket, gold flame below](https://booster.apps.wayne.edu/brand/booster-avatar-512.png)
 
 - **Altitude**: PHP 8.5
