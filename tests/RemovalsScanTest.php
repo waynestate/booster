@@ -227,4 +227,33 @@ final class RemovalsScanTest extends TestCase
         self::assertSame('php-83-to-84', $data['removals'][9]['hop']);
         self::assertSame(0, $data['removals'][9]['total']);
     }
+
+    public function test_scan_removals_prints_the_full_list(): void
+    {
+        $app = $this->copyExample('raw-php');
+        file_put_contents($app . '/src/legacy.php', "<?php\nmysql_query('SELECT 1');\neach([]);\n");
+
+        [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $app, '--php' => '8.0', '--removals' => true]);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Removed between PHP 5.6 and PHP 8.0: 2 hits (advisory).', $out);
+        self::assertStringContainsString('src/legacy.php:2 mysql_* functions (the mysql extension) -> mysqli or PDO', $out);
+        self::assertStringContainsString('src/legacy.php:3 each() function -> foreach', $out);
+    }
+
+    public function test_scan_removals_json_reports_the_result(): void
+    {
+        $app = $this->copyExample('raw-php');
+        file_put_contents($app . '/src/legacy.php', "<?php\nmysql_query('SELECT 1');\n");
+
+        [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $app, '--php' => '7.0', '--removals' => true, '--format' => 'json']);
+        $data = json_decode($out, true);
+
+        self::assertSame(0, $exit);
+        self::assertSame('5.6', $data['removals']['from']);
+        self::assertSame('7.0', $data['removals']['to']);
+        self::assertSame(1, $data['removals']['total']);
+        self::assertFalse($data['removals']['truncated']);
+        self::assertSame('mysql-functions', $data['removals']['findings'][0]['id']);
+    }
 }
