@@ -100,9 +100,10 @@ final class MixToViteTest extends TestCase
         $package = json_decode((string) file_get_contents($dir . '/package.json'), true);
         self::assertIsArray($package);
         self::assertArrayNotHasKey('laravel-mix', $package['devDependencies']);
-        self::assertSame(HopRegistry::VITE_VERSION, $package['devDependencies']['vite']);
-        self::assertSame(HopRegistry::LARAVEL_VITE_PLUGIN_VERSION, $package['devDependencies']['laravel-vite-plugin']);
-        self::assertSame(HopRegistry::VUE_PLUGIN_VERSION, $package['devDependencies']['@vitejs/plugin-vue']);
+        $registry = new HopRegistry();
+        self::assertSame($registry->viteVersion(), $package['devDependencies']['vite']);
+        self::assertSame($registry->laravelVitePluginVersion(), $package['devDependencies']['laravel-vite-plugin']);
+        self::assertSame($registry->vuePluginVersion(), $package['devDependencies']['@vitejs/plugin-vue']);
         self::assertSame('^3.5.0', $package['dependencies']['vue']);
         self::assertSame('vite', $package['scripts']['dev']);
         self::assertSame('vite build', $package['scripts']['build']);

@@ -29,7 +29,13 @@ final class HopExecutor
         private readonly TargetImageRunner $gate,
         private readonly ProcessRunner $processes,
         private readonly ?NodeRunner $node = null,
+        private readonly ?HopRegistry $registry = null,
     ) {}
+
+    private function registry(): HopRegistry
+    {
+        return $this->registry ?? new HopRegistry();
+    }
 
     public function execute(Plan $plan, RunOptions $options): RunReport
     {
@@ -373,9 +379,10 @@ final class HopExecutor
                     $edited = true;
                 }
             }
+            $registry = $this->registry();
             foreach ([
-                'vite' => HopRegistry::VITE_VERSION,
-                'laravel-vite-plugin' => HopRegistry::LARAVEL_VITE_PLUGIN_VERSION,
+                'vite' => $registry->viteVersion(),
+                'laravel-vite-plugin' => $registry->laravelVitePluginVersion(),
             ] as $name => $version) {
                 if (($package['devDependencies'][$name] ?? null) !== $version) {
                     $package['devDependencies'][$name] = $version;
@@ -383,9 +390,9 @@ final class HopExecutor
                     $edited = true;
                 }
             }
-            if ($build->vue && ($package['devDependencies']['@vitejs/plugin-vue'] ?? null) !== HopRegistry::VUE_PLUGIN_VERSION) {
-                $package['devDependencies']['@vitejs/plugin-vue'] = HopRegistry::VUE_PLUGIN_VERSION;
-                $changes[] = 'package.json: devDependencies @vitejs/plugin-vue to ' . HopRegistry::VUE_PLUGIN_VERSION . '.';
+            if ($build->vue && ($package['devDependencies']['@vitejs/plugin-vue'] ?? null) !== $registry->vuePluginVersion()) {
+                $package['devDependencies']['@vitejs/plugin-vue'] = $registry->vuePluginVersion();
+                $changes[] = 'package.json: devDependencies @vitejs/plugin-vue to ' . $registry->vuePluginVersion() . '.';
                 $edited = true;
             }
             foreach (['dev' => 'vite', 'build' => 'vite build'] as $script => $command) {

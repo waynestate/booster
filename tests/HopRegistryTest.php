@@ -36,7 +36,7 @@ final class HopRegistryTest extends PhpUnitTestCase
     public function test_php_hops_cover_every_adjacent_pair_once(): void
     {
         $registry = new HopRegistry();
-        $chain = HopRegistry::PHP_CHAIN;
+        $chain = $registry->phpChain();
 
         for ($i = 0; $i < count($chain) - 1; $i++) {
             $hop = $registry->get(HopRegistry::phpHopId($chain[$i], $chain[$i + 1]));
@@ -56,12 +56,13 @@ final class HopRegistryTest extends PhpUnitTestCase
 
     public function test_the_node_pin_hop_pins_engines_node_and_is_not_manual(): void
     {
-        $hop = (new HopRegistry())->get(HopRegistry::NODE_PIN_ID);
+        $registry = new HopRegistry();
+        $hop = $registry->get(HopRegistry::NODE_PIN_ID);
 
         self::assertSame(HopKind::Node, $hop->kind);
         self::assertSame('any', $hop->from);
-        self::assertSame(HopRegistry::NODE_PIN_TARGET, $hop->to);
-        self::assertSame(['engines.node' => '>=24'], $hop->npmSet);
+        self::assertSame($registry->nodePinTarget(), $hop->to);
+        self::assertSame(['engines.node' => '>=' . $registry->nodePinTarget()], $hop->npmSet);
         self::assertFalse($hop->buildGate);
         self::assertFalse($hop->isManual());
     }
@@ -74,18 +75,22 @@ final class HopRegistryTest extends PhpUnitTestCase
 
     public function test_laravel_support_table(): void
     {
-        self::assertTrue(HopRegistry::laravelSupportsPhp('12', '8.5'));
-        self::assertFalse(HopRegistry::laravelSupportsPhp('13', '8.2'));
-        self::assertFalse(HopRegistry::laravelSupportsPhp('7', '8.0'));
+        $registry = new HopRegistry();
+
+        self::assertTrue($registry->laravelSupportsPhp('12', '8.5'));
+        self::assertFalse($registry->laravelSupportsPhp('13', '8.2'));
+        self::assertFalse($registry->laravelSupportsPhp('7', '8.0'));
     }
 
     public function test_neighbours(): void
     {
-        self::assertSame('8.0', HopRegistry::nextPhp('7.4'));
-        self::assertNull(HopRegistry::nextPhp('8.5'));
-        self::assertNull(HopRegistry::nextPhp('4.0'));
-        self::assertSame('13', HopRegistry::nextLaravel('12'));
-        self::assertNull(HopRegistry::nextLaravel('13'));
+        $registry = new HopRegistry();
+
+        self::assertSame('8.0', $registry->nextPhp('7.4'));
+        self::assertNull($registry->nextPhp('8.5'));
+        self::assertNull($registry->nextPhp('4.0'));
+        self::assertSame('13', $registry->nextLaravel('12'));
+        self::assertNull($registry->nextLaravel('13'));
     }
 
     public function test_phpunit_hop_id(): void
@@ -98,9 +103,10 @@ final class HopRegistryTest extends PhpUnitTestCase
      */
     public static function phpunitChainNeighbours(): array
     {
+        $chain = (new HopRegistry())->phpunitChain();
         $cases = [];
-        foreach (HopRegistry::PHPUNIT_CHAIN as $i => $major) {
-            $cases['phpunit ' . $major] = [$major, HopRegistry::PHPUNIT_CHAIN[$i + 1] ?? null];
+        foreach ($chain as $i => $major) {
+            $cases['phpunit ' . $major] = [$major, $chain[$i + 1] ?? null];
         }
         $cases['unknown major'] = ['8', null];
 
@@ -110,13 +116,13 @@ final class HopRegistryTest extends PhpUnitTestCase
     #[DataProvider('phpunitChainNeighbours')]
     public function test_next_phpunit_walks_the_chain_and_returns_null_at_the_end(string $from, ?string $expected): void
     {
-        self::assertSame($expected, HopRegistry::nextPhpunit($from));
+        self::assertSame($expected, (new HopRegistry())->nextPhpunit($from));
     }
 
     public function test_phpunit_hops_cover_every_adjacent_pair_once(): void
     {
         $registry = new HopRegistry();
-        $chain = HopRegistry::PHPUNIT_CHAIN;
+        $chain = $registry->phpunitChain();
 
         for ($i = 0; $i < count($chain) - 1; $i++) {
             $hop = $registry->get(HopRegistry::phpunitHopId($chain[$i], $chain[$i + 1]));
@@ -132,7 +138,7 @@ final class HopRegistryTest extends PhpUnitTestCase
     public static function phpunitMajors(): array
     {
         $cases = [];
-        foreach (HopRegistry::PHPUNIT_CHAIN as $major) {
+        foreach ((new HopRegistry())->phpunitChain() as $major) {
             $cases['phpunit ' . $major] = [$major];
         }
 
@@ -142,8 +148,10 @@ final class HopRegistryTest extends PhpUnitTestCase
     #[DataProvider('phpunitMajors')]
     public function test_every_major_in_the_phpunit_chain_has_a_php_floor(string $major): void
     {
-        self::assertArrayHasKey($major, HopRegistry::PHPUNIT_PHP);
-        self::assertIsString(HopRegistry::PHPUNIT_PHP[$major]);
+        $registry = new HopRegistry();
+
+        self::assertArrayHasKey($major, $registry->phpunitPhp());
+        self::assertIsString($registry->phpunitPhp()[$major]);
     }
 
     /**
@@ -152,7 +160,7 @@ final class HopRegistryTest extends PhpUnitTestCase
     public static function laravelPhpunitFloors(): array
     {
         $cases = [];
-        foreach (HopRegistry::LARAVEL_PHPUNIT as $laravel => $floor) {
+        foreach ((new HopRegistry())->laravelPhpunit() as $laravel => $floor) {
             $cases['laravel ' . $laravel] = [(string) $laravel, (string) $floor];
         }
 
@@ -162,12 +170,18 @@ final class HopRegistryTest extends PhpUnitTestCase
     #[DataProvider('laravelPhpunitFloors')]
     public function test_every_laravel_phpunit_floor_is_a_major_in_the_chain(string $laravel, string $floor): void
     {
-        self::assertContains($floor, HopRegistry::PHPUNIT_CHAIN, sprintf('Laravel %s ships PHPUnit %s, which is not in the chain.', $laravel, $floor));
+        self::assertContains($floor, (new HopRegistry())->phpunitChain(), sprintf('Laravel %s ships PHPUnit %s, which is not in the chain.', $laravel, $floor));
     }
 
     public function test_unknown_hop_is_a_tool_error(): void
     {
         $this->expectException(ToolError::class);
         (new HopRegistry())->get('php-1-to-2');
+    }
+
+    public function test_missing_data_file_is_a_tool_error(): void
+    {
+        $this->expectException(ToolError::class);
+        new HopRegistry(__DIR__ . '/fixtures/no-such-versions.json');
     }
 }

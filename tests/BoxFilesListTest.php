@@ -6,15 +6,15 @@ namespace Waynestate\Booster\Tests;
 
 /**
  * Box auto-discovery only picks up autoloaded paths (bin/, src/, vendor/).
- * The non-autoloaded runtime files (config/, docker/, resources/) must be
- * listed explicitly in box.json.dist "files", or the phar silently ships
+ * The non-autoloaded runtime files (config/, data/, docker/, resources/) must
+ * be listed explicitly in box.json.dist "files", or the phar silently ships
  * without them and commands fail at runtime. This test fails if any file
  * under those directories is missing from the list.
  */
 final class BoxFilesListTest extends TestCase
 {
     /** @var list<string> */
-    private const DIRECTORIES = ['config', 'docker', 'resources'];
+    private const DIRECTORIES = ['config', 'data', 'docker', 'resources'];
 
     public function test_every_runtime_file_is_listed_in_box_files(): void
     {

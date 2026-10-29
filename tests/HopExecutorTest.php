@@ -341,11 +341,12 @@ final class HopExecutorTest extends TestCase
             ->execute($plan, new RunOptions(skipGate: true));
 
         self::assertSame(['applied', 'manual'], $this->statuses($report));
+        $target = (new HopRegistry())->nodePinTarget();
         $package = json_decode((string) file_get_contents($dir . '/package.json'), true);
-        self::assertSame('>=24', $package['engines']['node']);
+        self::assertSame('>=' . $target, $package['engines']['node']);
         self::assertSame('example-vue-spa', $package['name']);
-        self::assertSame("24\n", (string) file_get_contents($dir . '/.nvmrc'));
-        self::assertStringContainsString('engines.node to >=24', implode(' ', $report->results[0]->messages));
+        self::assertSame($target . "\n", (string) file_get_contents($dir . '/.nvmrc'));
+        self::assertStringContainsString('engines.node to >=' . $target, implode(' ', $report->results[0]->messages));
     }
 
     public function test_a_node_hop_dry_run_changes_nothing(): void
@@ -361,7 +362,8 @@ final class HopExecutorTest extends TestCase
         self::assertSame(['previewed', 'manual'], $this->statuses($report));
         self::assertSame($before, file_get_contents($dir . '/package.json'));
         self::assertFileDoesNotExist($dir . '/.nvmrc');
-        self::assertStringContainsString('Dry run: would set engines.node to >=24 in package.json and write .nvmrc with 24.', implode(' ', $report->results[0]->messages));
+        $target = (new HopRegistry())->nodePinTarget();
+        self::assertStringContainsString(sprintf('Dry run: would set engines.node to >=%s in package.json and write .nvmrc with %s.', $target, $target), implode(' ', $report->results[0]->messages));
     }
 
     public function test_a_node_hop_that_is_already_pinned_is_nothing_to_do(): void
@@ -371,9 +373,10 @@ final class HopExecutorTest extends TestCase
         $file = $dir . '/package.json';
         $data = json_decode((string) file_get_contents($file), true);
         self::assertIsArray($data);
-        $data['engines']['node'] = '>=24';
+        $target = (new HopRegistry())->nodePinTarget();
+        $data['engines']['node'] = '>=' . $target;
         file_put_contents($file, (string) json_encode($data));
-        file_put_contents($dir . '/.nvmrc', "24\n");
+        file_put_contents($dir . '/.nvmrc', $target . "\n");
         $step = new PlanStep(1, (new HopRegistry())->get(HopRegistry::NODE_PIN_ID), '8.3', '8.3', null, null, null, null, [Planner::GATE_TESTS]);
         $plan = new Plan((new ProjectDetector())->detect($dir), '2026-10-28', 'test', '8.3', null, null, [$step], []);
         $fake = $this->fake();
@@ -407,7 +410,7 @@ final class HopExecutorTest extends TestCase
         self::assertSame([StepResult::APPLIED], $this->statuses($report));
         self::assertStringContainsString('Build gate passed', implode(' ', $report->results[0]->messages));
         $package = json_decode((string) file_get_contents($dir . '/package.json'), true);
-        self::assertSame('>=24', $package['engines']['node']);
+        self::assertSame('>=' . (new HopRegistry())->nodePinTarget(), $package['engines']['node']);
     }
 
     public function test_a_failing_build_gate_fails_the_node_hop(): void
@@ -433,13 +436,14 @@ final class HopExecutorTest extends TestCase
 
     private function runBuildGateHop(string $dir, FakeProcessRunner $fake): RunReport
     {
+        $target = (new HopRegistry())->nodePinTarget();
         $hop = new Hop(
             id: HopRegistry::NODE_PIN_ID,
             kind: HopKind::Node,
             from: 'any',
-            to: HopRegistry::NODE_PIN_TARGET,
+            to: $target,
             summary: 'A pin hop that asks for a build gate.',
-            npmSet: ['engines.node' => '>=24'],
+            npmSet: ['engines.node' => '>=' . $target],
             buildGate: true,
         );
         $step = new PlanStep(1, $hop, '8.3', '8.3', null, null, null, null, [Planner::GATE_TESTS]);

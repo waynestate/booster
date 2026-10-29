@@ -4,90 +4,69 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Hop;
 
+use Waynestate\Booster\Packaging\PharFiles;
 use Waynestate\Booster\ToolError;
 
 /**
- * Every hop BOOSTER knows. PHP hops walk one minor at a time from 5.6; Laravel
- * hops walk one major at a time from 8. The Rector sets are the maintained
- * ones from rector/rector and driftingly/rector-laravel; BOOSTER adds notes
- * for what those sets cannot do, and one class-rename set of its own (CAS to
- * SESAME).
+ * Every hop BOOSTER knows. The version data lives in data/versions.json, which
+ * bin/refresh-hop-data.php regenerates from the public feeds and CREED's
+ * version policy, so a new major shows up here without anyone editing this
+ * class. The recipes themselves (Rector sets, notes, links) stay human work.
  */
 final class HopRegistry
 {
-    /** @var list<string> */
-    public const PHP_CHAIN = ['5.6', '7.0', '7.1', '7.2', '7.3', '7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5'];
-
-    /** @var list<string> */
-    public const LARAVEL_CHAIN = ['8', '9', '10', '11', '12', '13'];
-
-    /** @var list<string> */
-    public const PHPUNIT_CHAIN = ['9', '10', '11', '12', '13'];
-
-    /** The Node pin hop and the major it pins to (Node LTS today: 24 and 26). */
+    /** The Node pin hop. The major it pins to lives in the data file. */
     public const NODE_PIN_ID = 'node-pin-24';
 
-    public const NODE_PIN_TARGET = '24';
-
-    /** The Mix to Vite hop and the package versions it installs. */
+    /** The Mix to Vite hop. The package versions it installs live in the data file. */
     public const MIX_TO_VITE_ID = 'mix-to-vite';
-
-    public const VITE_VERSION = '^8.3';
-
-    public const LARAVEL_VITE_PLUGIN_VERSION = '^3.2';
-
-    public const VUE_PLUGIN_VERSION = '^6.0';
 
     /** The lowest Laravel major whose upgrade guide ships Vite as the front-end tool. */
     public const VITE_LARAVEL_FLOOR = '9';
 
-    /**
-     * The lowest PHP version each PHPUnit major runs on
-     * (sebastianbergmann/phpunit composer.json).
-     *
-     * @var array<int, string>
-     */
-    public const PHPUNIT_PHP = [
-        '9' => '7.3',
-        '10' => '8.1',
-        '11' => '8.2',
-        '12' => '8.3',
-        '13' => '8.4',
-    ];
+    /** @var list<string> */
+    private readonly array $phpChain;
 
-    /**
-     * The lowest PHPUnit major each Laravel major's skeleton ships
-     * (laravel.com upgrade guides).
-     *
-     * @var array<int, string>
-     */
-    public const LARAVEL_PHPUNIT = [
-        '10' => '9',
-        '11' => '10',
-        '12' => '11',
-        '13' => '12',
-    ];
+    /** @var list<string> */
+    private readonly array $laravelChain;
 
-    /**
-     * PHP versions each Laravel major runs on (laravel.com/docs/<n>.x/releases,
-     * support policy), lowest and highest.
-     *
-     * @var array<int, array{string, string}>
-     */
-    public const LARAVEL_PHP = [
-        '8' => ['7.3', '8.1'],
-        '9' => ['8.0', '8.2'],
-        '10' => ['8.1', '8.3'],
-        '11' => ['8.2', '8.4'],
-        '12' => ['8.2', '8.5'],
-        '13' => ['8.3', '8.5'],
-    ];
+    /** @var list<string> */
+    private readonly array $phpunitChain;
+
+    private readonly string $nodePinTarget;
+
+    private readonly string $viteVersion;
+
+    private readonly string $laravelVitePluginVersion;
+
+    private readonly string $vuePluginVersion;
+
+    /** @var array<string, string> */
+    private readonly array $phpunitPhp;
+
+    /** @var array<string, string> */
+    private readonly array $laravelPhpunit;
+
+    /** @var array<string, array{0: string, 1: string}> */
+    private readonly array $laravelPhp;
 
     /** @var array<string, Hop> */
     private array $hops = [];
 
-    public function __construct()
+    public function __construct(?string $dataPath = null)
     {
+        $data = self::load($dataPath ?? PharFiles::path('data/versions.json'));
+        $this->phpChain = self::chain($data, 'php');
+        $this->laravelChain = self::chain($data, 'laravel');
+        $this->phpunitChain = self::chain($data, 'phpunit');
+        $this->nodePinTarget = self::scalar($data, 'node_pin_target');
+        $this->viteVersion = self::scalar($data, 'vite_version');
+        $this->laravelVitePluginVersion = self::scalar($data, 'laravel_vite_plugin_version');
+        $this->vuePluginVersion = self::scalar($data, 'vue_plugin_version');
+        $this->phpunitPhp = self::stringTable($data, 'phpunit_php');
+        $this->laravelPhpunit = self::stringTable($data, 'laravel_phpunit');
+        $this->laravelPhp = self::rangeTable($data, 'laravel_php');
+
         $this->addPhpHops();
         $this->addLaravelHops();
         $this->addPhpunitHops();
@@ -130,36 +109,202 @@ final class HopRegistry
         return array_values($this->hops);
     }
 
+    /** @return list<string> */
+    public function phpChain(): array
+    {
+        return $this->phpChain;
+    }
+
+    /** @return list<string> */
+    public function laravelChain(): array
+    {
+        return $this->laravelChain;
+    }
+
+    /** @return list<string> */
+    public function phpunitChain(): array
+    {
+        return $this->phpunitChain;
+    }
+
+    public function nodePinTarget(): string
+    {
+        return $this->nodePinTarget;
+    }
+
+    public function viteVersion(): string
+    {
+        return $this->viteVersion;
+    }
+
+    public function laravelVitePluginVersion(): string
+    {
+        return $this->laravelVitePluginVersion;
+    }
+
+    public function vuePluginVersion(): string
+    {
+        return $this->vuePluginVersion;
+    }
+
+    /**
+     * The lowest PHP version each PHPUnit major runs on
+     * (sebastianbergmann/phpunit composer.json).
+     *
+     * @return array<string, string>
+     */
+    public function phpunitPhp(): array
+    {
+        return $this->phpunitPhp;
+    }
+
+    /**
+     * The lowest PHPUnit major each Laravel major's skeleton ships
+     * (laravel.com upgrade guides).
+     *
+     * @return array<string, string>
+     */
+    public function laravelPhpunit(): array
+    {
+        return $this->laravelPhpunit;
+    }
+
+    /**
+     * PHP versions each Laravel major runs on (laravel.com/docs/<n>.x/releases,
+     * support policy), lowest and highest.
+     *
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public function laravelPhp(): array
+    {
+        return $this->laravelPhp;
+    }
+
     /** The PHP version BOOSTER can move to from $from, or null at the end of the chain. */
-    public static function nextPhp(string $from): ?string
+    public function nextPhp(string $from): ?string
     {
-        $i = array_search($from, self::PHP_CHAIN, true);
-
-        return $i === false ? null : (self::PHP_CHAIN[$i + 1] ?? null);
+        return self::nextIn($this->phpChain, $from);
     }
 
-    public static function nextLaravel(string $from): ?string
+    public function nextLaravel(string $from): ?string
     {
-        $i = array_search($from, self::LARAVEL_CHAIN, true);
-
-        return $i === false ? null : (self::LARAVEL_CHAIN[$i + 1] ?? null);
+        return self::nextIn($this->laravelChain, $from);
     }
 
-    public static function nextPhpunit(string $from): ?string
+    public function nextPhpunit(string $from): ?string
     {
-        $i = array_search($from, self::PHPUNIT_CHAIN, true);
-
-        return $i === false ? null : (self::PHPUNIT_CHAIN[$i + 1] ?? null);
+        return self::nextIn($this->phpunitChain, $from);
     }
 
-    public static function laravelSupportsPhp(string $laravel, string $php): bool
+    public function laravelSupportsPhp(string $laravel, string $php): bool
     {
-        if (!isset(self::LARAVEL_PHP[$laravel])) {
+        if (!isset($this->laravelPhp[$laravel])) {
             return false;
         }
-        [$low, $high] = self::LARAVEL_PHP[$laravel];
+        [$low, $high] = $this->laravelPhp[$laravel];
 
         return version_compare($php, $low, '>=') && version_compare($php, $high, '<=');
+    }
+
+    /** @return array<string, mixed> */
+    private static function load(string $path): array
+    {
+        if (!is_file($path)) {
+            throw new ToolError(sprintf('Hop data file "%s" is missing.', $path));
+        }
+        $raw = json_decode((string) file_get_contents($path), true);
+        if (!is_array($raw)) {
+            throw new ToolError(sprintf('Hop data file "%s" is not a JSON object.', $path));
+        }
+
+        return $raw;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     *
+     * @return list<string>
+     */
+    private static function chain(array $data, string $key): array
+    {
+        $value = $data[$key] ?? null;
+        if (!is_array($value) || $value === [] || array_diff_key($value, array_keys($value)) !== []) {
+            throw new ToolError(sprintf('Hop data key "%s" must be a non-empty list of version strings.', $key));
+        }
+        $chain = [];
+        foreach ($value as $version) {
+            if (!is_string($version) || $version === '') {
+                throw new ToolError(sprintf('Hop data key "%s" must contain only version strings.', $key));
+            }
+            $chain[] = $version;
+        }
+
+        return $chain;
+    }
+
+    /** @param array<string, mixed> $data */
+    private static function scalar(array $data, string $key): string
+    {
+        $value = $data[$key] ?? null;
+        if (!is_string($value) || $value === '') {
+            throw new ToolError(sprintf('Hop data key "%s" must be a non-empty string.', $key));
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     *
+     * @return array<string, string>
+     */
+    private static function stringTable(array $data, string $key): array
+    {
+        $value = $data[$key] ?? null;
+        if (!is_array($value)) {
+            throw new ToolError(sprintf('Hop data key "%s" must be a JSON object.', $key));
+        }
+        $table = [];
+        foreach ($value as $major => $floor) {
+            if (!is_string($floor) || $floor === '') {
+                throw new ToolError(sprintf('Hop data key "%s" must map majors to version strings.', $key));
+            }
+            $table[(string) $major] = $floor;
+        }
+
+        return $table;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     *
+     * @return array<string, array{0: string, 1: string}>
+     */
+    private static function rangeTable(array $data, string $key): array
+    {
+        $value = $data[$key] ?? null;
+        if (!is_array($value)) {
+            throw new ToolError(sprintf('Hop data key "%s" must be a JSON object.', $key));
+        }
+        $table = [];
+        foreach ($value as $major => $range) {
+            if (!is_array($range) || count($range) !== 2 || !is_string($range[0]) || !is_string($range[1])) {
+                throw new ToolError(sprintf('Hop data key "%s" must map majors to [lowest, highest] pairs.', $key));
+            }
+            $table[(string) $major] = [$range[0], $range[1]];
+        }
+
+        return $table;
+    }
+
+    /**
+     * @param list<string> $chain
+     */
+    private static function nextIn(array $chain, string $from): ?string
+    {
+        $i = array_search($from, $chain, true);
+
+        return $i === false ? null : ($chain[$i + 1] ?? null);
     }
 
     private function add(Hop $hop): void
@@ -171,8 +316,8 @@ final class HopRegistry
     {
         $setFor = static fn(string $v): string => 'Rector\Set\ValueObject\SetList::PHP_' . str_replace('.', '', $v);
 
-        foreach (self::PHP_CHAIN as $i => $from) {
-            $to = self::PHP_CHAIN[$i + 1] ?? null;
+        foreach ($this->phpChain as $i => $from) {
+            $to = $this->phpChain[$i + 1] ?? null;
             if ($to === null) {
                 break;
             }
@@ -219,8 +364,8 @@ final class HopRegistry
 
     private function addLaravelHops(): void
     {
-        foreach (self::LARAVEL_CHAIN as $i => $from) {
-            $to = self::LARAVEL_CHAIN[$i + 1] ?? null;
+        foreach ($this->laravelChain as $i => $from) {
+            $to = $this->laravelChain[$i + 1] ?? null;
             if ($to === null) {
                 break;
             }
@@ -243,8 +388,8 @@ final class HopRegistry
 
     private function addPhpunitHops(): void
     {
-        foreach (self::PHPUNIT_CHAIN as $i => $from) {
-            $to = self::PHPUNIT_CHAIN[$i + 1] ?? null;
+        foreach ($this->phpunitChain as $i => $from) {
+            $to = $this->phpunitChain[$i + 1] ?? null;
             if ($to === null) {
                 break;
             }
@@ -291,16 +436,18 @@ final class HopRegistry
 
     private function nodePinHop(): Hop
     {
+        $target = $this->nodePinTarget;
+
         return new Hop(
             id: self::NODE_PIN_ID,
             kind: HopKind::Node,
             from: 'any',
-            to: self::NODE_PIN_TARGET,
-            summary: 'Pin the app to Node 24: set engines.node in package.json and write .nvmrc.',
-            npmSet: ['engines.node' => '>=24'],
+            to: $target,
+            summary: sprintf('Pin the app to Node %s: set engines.node in package.json and write .nvmrc.', $target),
+            npmSet: ['engines.node' => '>=' . $target],
             notes: [
-                'The pin is a floor, not a ceiling: engines.node ">=24" still allows Node 26.',
-                'Later front-end hops run in the same node:24 container, so this hop comes before them.',
+                sprintf('The pin is a floor, not a ceiling: engines.node ">=%s" still allows newer Node majors.', $target),
+                sprintf('Later front-end hops run in the same node:%s container, so this hop comes before them.', $target),
             ],
             links: ['https://nodejs.org/en/about/previous-releases'],
         );

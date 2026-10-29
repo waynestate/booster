@@ -92,9 +92,10 @@ final class PlannerTest extends TestCase
     public function test_an_old_app_never_rests_on_a_pair_laravel_does_not_support(): void
     {
         $plan = $this->plan('laravel-blade', new PlanOptions(fromPhp: '8.1', fromLaravel: '9', toPhp: '8.3', toLaravel: '13'));
+        $registry = new HopRegistry();
 
         foreach ($plan->steps as $step) {
-            self::assertTrue(HopRegistry::laravelSupportsPhp((string) $step->laravelAfter, (string) $step->phpAfter), $step->hop->id);
+            self::assertTrue($registry->laravelSupportsPhp((string) $step->laravelAfter, (string) $step->phpAfter), $step->hop->id);
         }
         self::assertSame(
             ['laravel-9-to-10', 'php-81-to-82', 'laravel-10-to-11', 'phpunit-10-to-11', 'laravel-11-to-12', 'php-82-to-83', 'phpunit-11-to-12', 'laravel-12-to-13'],
@@ -202,7 +203,9 @@ final class PlannerTest extends TestCase
      */
     public static function nodeEngineFloorsAtOrAboveTheTarget(): array
     {
-        return ['plain floor' => ['>=24'], 'caret' => ['^24'], 'wildcard' => ['24.x'], 'higher floor' => ['>=26']];
+        $target = (new HopRegistry())->nodePinTarget();
+
+        return ['plain floor' => ['>=' . $target], 'caret' => ['^' . $target], 'wildcard' => [$target . '.x'], 'higher floor' => ['>=' . ((int) $target + 2)]];
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('nodeEngineFloorsAtOrAboveTheTarget')]

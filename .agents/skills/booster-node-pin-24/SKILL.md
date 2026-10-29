@@ -15,7 +15,7 @@ Pin the app to Node 24: set engines.node in package.json and write .nvmrc.
 
 What Rector cannot do (check these by hand):
 
-- The pin is a floor, not a ceiling: engines.node ">=24" still allows Node 26.
+- The pin is a floor, not a ceiling: engines.node ">=24" still allows newer Node majors.
 - Later front-end hops run in the same node:24 container, so this hop comes before them.
 
 Official notes:

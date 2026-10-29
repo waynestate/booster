@@ -7,6 +7,7 @@ namespace Waynestate\Booster\Console;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Report\JsonWriter;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\ComposerEditor;
@@ -49,12 +50,14 @@ final class RunCommand extends BaseCommand
         }
 
         $plan = $this->buildPlan($input);
+        $registry = new HopRegistry();
         $executor = new HopExecutor(
             new RectorRunner($this->processes),
             new ComposerEditor(),
             new TargetImageRunner($this->processes),
             $this->processes,
-            new NodeRunner($this->processes),
+            new NodeRunner($this->processes, (int) $registry->nodePinTarget()),
+            $registry,
         );
         $report = $executor->execute($plan, new RunOptions(
             dryRun: (bool) $input->getOption('dry-run'),
