@@ -1,0 +1,28 @@
+{
+    "squire": "Written by SQUIRE. Commit this file: `vendor/bin/squire init --check` reads it to report drift.",
+    "version": "0.1.0",
+    "target": "raw",
+    "groups": [
+        "release",
+        "parity"
+    ],
+    "files": {
+        ".env.squire.example": "f920d86e274ba02f7c82f5f4fb9cc1bda0937eabdea6002c3839ab0fc66b1de3",
+        ".squire/Dockerfile": "460ceb25f47481b9a209ec28db709565022c601a3ee3a603d3ff8dbc45ff47fa",
+        ".squire/Dockerfile.dockerignore": "6ccbb5a302475dd6322dc9f46057f98d0a5db59e5cfcc334d956df862d5da6fe",
+        ".squire/base-fallback.Dockerfile": "8f02eb4146deb0b66ed13ba57e6d98ebd64bdc97867f993abab25a1ea7b16109",
+        ".squire/fallback/citadel-apache-entrypoint": "c91ed1bbdc3982769f3c3364e9e4f32baef13f25d42e8c34bb261f3d157a9305",
+        ".squire/fallback/citadel-deploy": "4203eb9458ab6910156622735da2ca026e2ac50420598c64e98cf3ef66603b90",
+        ".squire/haproxy.cfg": "bcbc3ea3a8fb19c991900a1275e0d6954b41a6a3c6ccaef1934eeebf9f6ab901",
+        ".squire/php.ini": "2d8a40ce470b17ecd815e76afdfe591dfbe09a390f49aa99cde47997c13849ce",
+        ".squire/vhost.conf": "0197be7c59f4caf10ade0ae223f5ddc75b9b0c962fec76d8e9dabd27408f35ff",
+        "build.sh": "4024aa5ab57964aac6c01d7616ead33f333654421882bf4b81f66cbc3c8fc6a3",
+        "deployments/001-first-release.sh": "1cd81fcd10e75589f1b6da2eda83501397dd61a3762554c3965267092ad7460d",
+        "docker-compose.squire.yml": "1d8e7b74ca7b19fec643c23c15453cf9182ab5064e64a03260bf38cb670e36bd",
+        "health.php": "344cf3e893a56fe04d17cd44de26b98fe5d02017643fc71a4415fb7ce8d125a6",
+        "public/up.php": "6321ff4ce74bbbe0a74d1db307e1f15280207cd1ac447c6b90cc0baa5ad23e87",
+        "scripts/parity.ps1": "b72c0d155801b1dadf8d84d6b3647bd1a4e699936fffb68814cfd3341ff308e2",
+        "scripts/parity.sh": "f0fb6a963277bde29b77e8b7869a1775acd517ea8d4f2774567469bf77235eae",
+        "scripts/release.sh": "1e0b50d956ce682e8a2e49ad47a3e203821522c444376f6e42589a16ed9c9923"
+    }
+}

@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Local copy of the deployments runner: each executable file in $CITADEL_DEPLOYMENTS runs once per file name.
+# Mirrors the platform's deployments runner (run as the `citadel` user from /citadel/src).
+set -u
+
+pushd /citadel/src > /dev/null || exit 1
+
+if [ -d "${CITADEL_DEPLOYMENTS:-}" ]; then
+    for script in "$CITADEL_DEPLOYMENTS"*; do
+        if [ -x "$script" ]; then
+            name="$(basename "$script")"
+            if [ -f "/citadel/logs/deployments/$name.log" ]; then
+                continue
+            fi
+            touch "/citadel/logs/deployments/$name.log"
+            echo "[$(date)] Starting deployment script $name" >> "/citadel/logs/deployments/$name.log"
+            "$script" >> "/citadel/logs/deployments/$name.log" 2>&1
+            status=$?
+            echo "[$(date)] finished deployment script $name" >> "/citadel/logs/deployments/$name.log"
+            if [ "$status" -ne 0 ]; then
+                echo "deployment script $script finished with non-zero status" >&2
+                mv "/citadel/logs/deployments/$name.log" "/citadel/logs/deployments/$name.failed.log"
+                exit "$status"
+            fi
+        fi
+    done
+fi
+
+popd > /dev/null || exit 1
+exit 0

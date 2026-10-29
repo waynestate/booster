@@ -1,0 +1,4 @@
+# The image build needs only build.sh and the files in .squire/; keep vendor/ and node_modules/ out of the context.
+*
+!build.sh
+!.squire
