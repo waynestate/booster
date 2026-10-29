@@ -21,6 +21,29 @@ abstract class TestCase extends PhpUnitTestCase
     /** A frozen copy of the bundled policy, named for the date it was copied from. */
     protected const POLICY_FIXTURE = __DIR__ . '/fixtures/policy/policy-2026-10-28.json';
 
+    /** A real PROCTOR 0.2.7 JSON report with no failing findings. */
+    protected const PROCTOR_PASS_FIXTURE = __DIR__ . '/fixtures/proctor/pass-report.json';
+
+    /** A real PROCTOR 0.2.7 JSON report with failing findings (php-floor, lock-committed). */
+    protected const PROCTOR_FAIL_FIXTURE = __DIR__ . '/fixtures/proctor/fail-report.json';
+
+    /** The raw contents of one of the PROCTOR fixture reports. */
+    protected static function proctorFixture(string $name): string
+    {
+        $contents = file_get_contents(__DIR__ . '/fixtures/proctor/' . $name);
+        if ($contents === false) {
+            throw new \RuntimeException('Missing PROCTOR fixture ' . $name);
+        }
+
+        return $contents;
+    }
+
+    /** Whether $command is Booster's PROCTOR gate call (php <proctor bin> check ...). */
+    protected static function isProctorCommand(array $command): bool
+    {
+        return ($command[2] ?? '') === 'check' && str_ends_with((string) ($command[1] ?? ''), 'proctor');
+    }
+
     /** @var list<string> */
     private array $tempDirs = [];
 

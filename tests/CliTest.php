@@ -360,6 +360,9 @@ final class CliTest extends TestCase
             if ($command[0] === 'docker') {
                 return new ProcessResult(0, '', '');
             }
+            if (self::isProctorCommand($command)) {
+                return new ProcessResult(0, self::proctorFixture('pass-report.json'), '');
+            }
 
             return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
         });
@@ -374,6 +377,38 @@ final class CliTest extends TestCase
         self::assertSame('passed', $data['baseline']['status']);
         self::assertSame('7.4', $data['baseline']['php']);
         self::assertSame(0, $data['baseline']['exit_code']);
+    }
+
+    public function test_a_failing_proctor_gate_exits_1_and_advisory_keeps_it_zero(): void
+    {
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            if (self::isProctorCommand($command)) {
+                return new ProcessResult(1, self::proctorFixture('fail-report.json'), '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84',
+        ], $fake);
+        self::assertSame(1, $exit);
+        self::assertStringContainsString('PROCTOR: FAIL', $out);
+        self::assertStringContainsString('[php-floor]', $out);
+        self::assertStringContainsString('RESULT: FAIL', $out);
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84', '--proctor-advisory' => true,
+        ], $fake);
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Advisory only', $out);
+        self::assertStringContainsString('RESULT: PASS', $out);
     }
 
     public function test_run_exits_1_when_the_baseline_fails(): void
