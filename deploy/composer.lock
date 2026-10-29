@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b1a00b2544838b922769b6254aab8b91",
+    "content-hash": "66b921fc0ad41564719ead6fce8141e4",
     "packages": [
         {
             "name": "composer/semver",
@@ -1843,16 +1843,16 @@
         },
         {
             "name": "waynestate/helmet",
-            "version": "dev-main",
+            "version": "0.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/helmet.git",
-                "reference": "87c83d2e069440a2e6be9142626b8923125aa61f"
+                "reference": "0ac46793af9e93551c9f932de8019abcee23260f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/helmet/zipball/87c83d2e069440a2e6be9142626b8923125aa61f",
-                "reference": "87c83d2e069440a2e6be9142626b8923125aa61f",
+                "url": "https://api.github.com/repos/waynestate/helmet/zipball/0ac46793af9e93551c9f932de8019abcee23260f",
+                "reference": "0ac46793af9e93551c9f932de8019abcee23260f",
                 "shasum": ""
             },
             "require": {
@@ -1870,12 +1870,12 @@
                 "nyholm/psr7": "^1.8",
                 "orchestra/testbench": "^10.0 || ^11.0",
                 "phpstan/phpstan": "^2.1",
-                "phpunit/phpunit": "^11.5"
+                "phpunit/phpunit": "^11.5",
+                "waynestate/pinstripe": "^0.1"
             },
             "suggest": {
                 "laravel/framework": "For the Laravel adapter (step 2)"
             },
-            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
@@ -1908,7 +1908,7 @@
                 "issues": "https://github.com/waynestate/helmet/issues",
                 "source": "https://github.com/waynestate/helmet"
             },
-            "time": "2026-10-29T00:27:27+00:00"
+            "time": "2026-10-29T04:28:19+00:00"
         },
         {
             "name": "waynestate/proctor",
@@ -1967,9 +1967,7 @@
     "packages-dev": [],
     "aliases": [],
     "minimum-stability": "dev",
-    "stability-flags": {
-        "waynestate/helmet": 20
-    },
+    "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
