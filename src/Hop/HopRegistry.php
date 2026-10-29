@@ -8,7 +8,7 @@ use Waynestate\Booster\Packaging\PharFiles;
 use Waynestate\Booster\ToolError;
 
 /**
- * Every hop BOOSTER knows. The version data lives in data/versions.json, which
+ * Every hop Booster knows. The version data lives in data/versions.json, which
  * bin/refresh-hop-data.php regenerates from the public feeds and CREED's
  * version policy, so a new major shows up here without anyone editing this
  * class. The recipes themselves (Rector sets, notes, links) stay human work.
@@ -180,7 +180,7 @@ final class HopRegistry
         return $this->laravelPhp;
     }
 
-    /** The PHP version BOOSTER can move to from $from, or null at the end of the chain. */
+    /** The PHP version Booster can move to from $from, or null at the end of the chain. */
     public function nextPhp(string $from): ?string
     {
         return self::nextIn($this->phpChain, $from);

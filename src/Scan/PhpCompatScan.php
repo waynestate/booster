@@ -15,9 +15,9 @@ use Waynestate\Booster\Run\ProcessRunner;
  * for the human doing the upgrade, never a gate. It gives the plan a boost of
  * foreknowledge, the way a supercharger gives an engine more power up front.
  *
- * The scanner is optional. BOOSTER looks for a PHP_CodeSniffer that carries
+ * The scanner is optional. Booster looks for a PHP_CodeSniffer that carries
  * the PHPCompatibility standard, trying the app's own vendor/bin/phpcs, then
- * BOOSTER's vendor/bin/phpcs, then phpcs on the PATH. When none of them has
+ * Booster's vendor/bin/phpcs, then phpcs on the PATH. When none of them has
  * the standard, the scan reports a skip instead of failing the plan.
  */
 final class PhpCompatScan
@@ -114,7 +114,7 @@ final class PhpCompatScan
 
     /**
      * The candidate PHP_CodeSniffer launchers, in priority order: the scanned
-     * app's own vendor copy, BOOSTER's vendor copy, then phpcs on the PATH.
+     * app's own vendor copy, Booster's vendor copy, then phpcs on the PATH.
      *
      * @return list<list<string>>
      */

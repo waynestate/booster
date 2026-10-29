@@ -7,7 +7,7 @@ namespace Waynestate\Booster\Run;
 /**
  * The baseline: the app's own tests, run once on the PHP the app is on now,
  * before the first hop touches anything. A red baseline means the suite was
- * already broken, so a later red gate is not BOOSTER's doing.
+ * already broken, so a later red gate is not Booster's doing.
  */
 final readonly class BaselineResult
 {

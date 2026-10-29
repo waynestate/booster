@@ -10,7 +10,7 @@ use Waynestate\Booster\Creed\Policy as CreedPolicy;
 use Waynestate\Booster\Creed\State;
 
 /**
- * BOOSTER's view of a CREED policy: the generated CREED reader (src/Creed)
+ * Booster's view of a CREED policy: the generated CREED reader (src/Creed)
  * plus the label the report prints for where the policy came from.
  *
  * Every policy fact (states, supported versions, dates) comes from the

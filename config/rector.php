@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-// One Rector config for every hop. BOOSTER passes the app path, the sets to
+// One Rector config for every hop. Booster passes the app path, the sets to
 // apply and the class renames through the environment, so this file works the
 // same from the CLI, from a PHAR and from a container, and it never reads
 // anything from the app being upgraded.

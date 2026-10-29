@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /* ============================================================================
-   BOOSTER README art kit.
+   Booster README art kit.
 
    Cuts the README images from this repo's own static front page (site/), its
    brand files and its source, and writes them under docs/readme/. Nothing is
    drawn freehand: the hero and the two gallery cuts are screenshots of the
    real page, the cast is the marks resized (WayneUI composed on its green
    tile), the badges read their facts from composer.json and RunOptions, and
-   the immunization record is the site's own Form B-01, one row per hop BOOSTER
+   the immunization record is the site's own Form B-01, one row per hop Booster
    plans for the example Laravel app, read from the page's markup.
 
    Run from any folder (every path resolves from this file's own location):
@@ -38,7 +38,7 @@ const castDir = path.join(outDir, "cast");
 const MAX_BYTES = 300 * 1024; // every file in docs/readme/ stays at or under this
 const FORBIDDEN = /noug[a]t|snu[.]gs|citadel/i; // internal names never ship in art
 
-// BOOSTER's own palette, from site/assets/booster.css (:root).
+// Booster's own palette, from site/assets/booster.css (:root).
 const C = {
   green: "#0c5449",
   greenDeep: "#083d35",
@@ -104,7 +104,7 @@ const CAST = [
 ];
 
 function castSource(name) {
-  // BOOSTER's own mark is not in assets/marks/ (the site shows it from brand/).
+  // Booster's own mark is not in assets/marks/ (the site shows it from brand/).
   if (name === "booster") return path.join(siteDir, "brand", "booster-avatar-256.png");
   return path.join(siteDir, "assets", "marks", `${name}.png`);
 }
@@ -437,7 +437,7 @@ async function buildRecord(page) {
   console.log("record:");
   const rec = await readRecord(page);
   if (rec.doses.length < 3) fail("the record card has fewer than three dose rows");
-  // Every hop id must be a hop BOOSTER really plans: the ids are the page's
+  // Every hop id must be a hop Booster really plans: the ids are the page's
   // own words, and the registry must still build php- and laravel- hops.
   const reg = read("src/Hop/HopRegistry.php");
   for (const d of rec.doses) {

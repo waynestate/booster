@@ -11,7 +11,7 @@ use Waynestate\Booster\Packaging\PharFiles;
 use Waynestate\Booster\ToolError;
 
 /**
- * Runs rector/rector from BOOSTER's own vendor directory against an app, with
+ * Runs rector/rector from Booster's own vendor directory against an app, with
  * config/rector.php. Rector never comes from the app's composer.json, so an app
  * on PHP 7.4 can be rewritten by a Rector that runs on PHP 8.3 or newer.
  *

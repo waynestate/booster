@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Node;
 
 /**
- * What BOOSTER learned from a simple webpack.mix.js: the asset entries in
+ * What Booster learned from a simple webpack.mix.js: the asset entries in
  * file order and whether the front end compiles Vue components.
  */
 final readonly class MixBuild

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Project;
 
 /**
- * What BOOSTER learned about an app by reading its manifests.
+ * What Booster learned about an app by reading its manifests.
  *
  * Versions are "major.minor" strings for PHP ("7.4") and plain majors for
  * Laravel, Vue and Node ("10", "2", "24"). A null means the manifest does not

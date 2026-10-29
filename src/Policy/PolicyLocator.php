@@ -10,7 +10,7 @@ use Waynestate\Booster\Creed\Policy as CreedPolicy;
 
 /**
  * Finds policy.json: the --policy option, then BOOSTER_POLICY, then the copy
- * bundled with BOOSTER. The bundled copy is generated from CREED by
+ * bundled with Booster. The bundled copy is generated from CREED by
  * bin/export.php (composer creed-copy:check verifies it); it is never
  * edited by hand.
  */

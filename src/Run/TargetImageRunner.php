@@ -50,7 +50,7 @@ final class TargetImageRunner
     {
         $command = [$this->docker, 'run', '--rm', '-v', $appPath . ':/app', '-w', '/app', '-e', 'COMPOSER_HOME=/tmp/composer', '-e', 'HOME=/tmp'];
         if ($uid !== null && $gid !== null) {
-            // Keep files the container writes owned by the person running BOOSTER.
+            // Keep files the container writes owned by the person running Booster.
             array_push($command, '--user', $uid . ':' . $gid);
         }
         array_push($command, self::imageTag($php), 'sh', '-c', $script);

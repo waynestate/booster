@@ -88,7 +88,7 @@ final class PhpCompatScanTest extends TestCase
     public function test_a_missing_binary_is_reported_not_thrown(): void
     {
         // The real runner against a path that does not exist. phpcs runs under
-        // BOOSTER's own PHP, so a missing binary is PHP's "Could not open
+        // Booster's own PHP, so a missing binary is PHP's "Could not open
         // input file" (exit 1, no JSON): the scan turns that into a scan error
         // instead of an exception.
         $scan = (new PhpCompatScan(new SymfonyProcessRunner(), '/nonexistent/phpcs'))->scan('/srv/app', '8.0');

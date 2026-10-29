@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# Builds build/booster.phar, a single-file PHAR of BOOSTER, using Box.
+# Builds build/booster.phar, a single-file PHAR of Booster, using Box.
 #
-# The phar lets PREFLIGHT and apps without Composer access run BOOSTER as one
+# The phar lets Preflight and apps without Composer access run Booster as one
 # file. The script:
 #   1. installs the build tool (Box, pinned in tools/box) so the compiler exists,
 #   2. copies the runtime sources into a temp dir and installs only the no-dev
@@ -10,7 +10,7 @@
 #   3. runs Box against that temp copy, so the phar contains src/, config/,
 #      docker/, resources/ and the runtime vendor deps only (no dev deps),
 #   4. copies the built phar back into build/,
-#   5. verifies it runs by printing BOOSTER's version.
+#   5. verifies it runs by printing Booster's version.
 #
 # Everything runs through Docker, so no PHP or Composer is needed on the host.
 # Written for macOS's bash 3.2 and BSD userland, as well as Linux.

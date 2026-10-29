@@ -1,5 +1,5 @@
 # The target image: the PHP version an app is moving to, plus Composer.
-# BOOSTER builds it on demand as booster-target:<php> and runs the app's tests in it.
+# Booster builds it on demand as booster-target:<php> and runs the app's tests in it.
 ARG PHP_VERSION=8.4
 FROM composer:2.10.3 AS composer
 

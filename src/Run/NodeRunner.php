@@ -8,7 +8,7 @@ namespace Waynestate\Booster\Run;
  * Runs Node commands against the app inside a node:<major>-bookworm-slim
  * container with the app mounted at /app, so front-end hops work identically
  * on Windows, macOS and Linux without Node on the host. The image major is a
- * constructor argument (BOOSTER pins Node 24 today) and the command is always
+ * constructor argument (Booster pins Node 24 today) and the command is always
  * an argument array, never a shell string.
  */
 final class NodeRunner

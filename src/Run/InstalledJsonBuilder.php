@@ -11,7 +11,7 @@ use Throwable;
  * Builds the vendor/composer/installed.json that Rector reads to decide which
  * version-bound rules apply (rector-laravel binds many rules to
  * laravel/framework constraints). The app may have no vendor directory, or one
- * built for the version it is leaving, so BOOSTER writes a throwaway one from
+ * built for the version it is leaving, so Booster writes a throwaway one from
  * composer.lock (or the composer.json lower bounds) and pins
  * laravel/framework to the version the hop moves to.
  */

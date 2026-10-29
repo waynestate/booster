@@ -12,7 +12,7 @@ use Throwable;
 use Waynestate\Booster\ToolError;
 
 /**
- * Real filesystem paths for the files bundled with BOOSTER.
+ * Real filesystem paths for the files bundled with Booster.
  *
  * From a checkout every path is the path in the tree. From the phar, the whole
  * phar is unpacked into a temp directory once per run, because child processes
@@ -24,7 +24,7 @@ final class PharFiles
     private static ?string $root = null;
 
     /**
-     * Whether this process is running from the BOOSTER phar.
+     * Whether this process is running from the Booster phar.
      */
     public static function running(): bool
     {
@@ -32,7 +32,7 @@ final class PharFiles
     }
 
     /**
-     * A real path for a file or directory bundled with BOOSTER, relative to the
+     * A real path for a file or directory bundled with Booster, relative to the
      * project root (for example `config/rector.php` or `docker`).
      */
     public static function path(string $relative): string

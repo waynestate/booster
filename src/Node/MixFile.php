@@ -15,7 +15,7 @@ use Waynestate\Booster\ToolError;
  */
 final class MixFile
 {
-    /** The only calls BOOSTER converts. */
+    /** The only calls Booster converts. */
     private const ALLOWED = ['js', 'vue', 'sass', 'postCss', 'version'];
 
     private const GUIDE = 'https://laravel.com/docs/9.x/upgrade#vite';

@@ -8,7 +8,7 @@ use App\Models\Post;
 use PHPUnit\Framework\TestCase;
 
 /**
- * A legacy PHPUnit 10 test. Each method carries one pattern that a BOOSTER
+ * A legacy PHPUnit 10 test. Each method carries one pattern that a Booster
  * PHPUnit hop rewrites, so the contract can prove the hop actually changes
  * the file: createMock() on a property that is never mocked (10 to 11),
  * isType() (11 to 12) and the any() matcher (12 to 13).

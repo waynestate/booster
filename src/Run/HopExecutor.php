@@ -49,7 +49,7 @@ final class HopExecutor
 
         $baseline = $this->runBaseline($plan, $path, $options);
         if ($baseline->failed() && !$options->allowFailingBaseline) {
-            // The suite is red before BOOSTER touches anything, so a later red gate would be
+            // The suite is red before Booster touches anything, so a later red gate would be
             // unprovable. Stop before the first hop and say so plainly.
             $results = [];
             foreach ($plan->steps as $step) {
@@ -495,7 +495,7 @@ final class HopExecutor
     }
 
     /**
-     * Manual notes about Blade files BOOSTER will not touch: references with no
+     * Manual notes about Blade files Booster will not touch: references with no
      * matching Mix entry, or mix() calls that are not plain script or link tags.
      *
      * @return list<string>
@@ -524,7 +524,7 @@ final class HopExecutor
 
     /**
      * Files that still call withoutMix(); the helper becomes withoutVite() and
-     * BOOSTER does not rename it on your behalf.
+     * Booster does not rename it on your behalf.
      *
      * @return list<string>
      */
