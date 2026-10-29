@@ -4,6 +4,12 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed: stale capability claims in the site and README.
+
+### Changed
+
 - Changed: the proof page moves to a private site that needs a Wayne State sign-in.
 - Changed: project names written as words except acronyms.
 
