@@ -50,3 +50,9 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
   `booster scan --path=... --php=X.Y [--format=json]` command runs it on demand. Findings never change exit codes; a
   scan that cannot run is reported as "could not run" without failing the plan. The scan ignores `vendor/`,
   `node_modules/` and `storage/`; `plan --no-scan` skips it.
+
+### Changed
+
+- The PHPCompatibility packages (`phpcompatibility/php-compatibility`, `squizlabs/php_codesniffer`) moved from `require`
+  to `require-dev` and `suggest`: the advisory scan is now optional, and BOOSTER reports a skip when no installed
+  PHP_CodeSniffer carries the PHPCompatibility standard.

@@ -33,7 +33,7 @@ final class PhpCompatScanTest extends TestCase
                 ],
             ],
         ]);
-        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
 
         $scan = (new PhpCompatScan($fake))->scan($app, '8.0');
 
@@ -52,11 +52,15 @@ final class PhpCompatScanTest extends TestCase
     {
         $app = $this->tempDir();
         $json = $this->phpcsJson([]);
-        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, (string) json_encode($json), ''));
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(0, (string) json_encode($json), ''));
 
         (new PhpCompatScan($fake))->scan($app, '8.4');
 
-        $command = $fake->calls[0]['command'];
+        // The first process call is the `phpcs -i` discovery check; the scan
+        // itself is the one that carries --standard=PHPCompatibility.
+        $scanCommands = $fake->commandsContaining('--standard=PHPCompatibility');
+        self::assertCount(1, $scanCommands);
+        $command = $scanCommands[0];
         self::assertContains('--standard=PHPCompatibility', $command);
         $i = array_search('--runtime-set', $command, true);
         self::assertFalse($i === false);
@@ -71,7 +75,7 @@ final class PhpCompatScanTest extends TestCase
     {
         $app = $this->tempDir();
         $json = $this->phpcsJson([]);
-        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, (string) json_encode($json), ''));
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(0, (string) json_encode($json), ''));
 
         $scan = (new PhpCompatScan($fake))->scan($app, '8.5');
 
@@ -114,7 +118,7 @@ final class PhpCompatScanTest extends TestCase
                 'messages' => [['message' => 'm', 'source' => 's', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 3, 'column' => 1]],
             ],
         ]);
-        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
 
         $array = (new PhpCompatScan($fake))->scan($app, '8.1')->toArray();
 

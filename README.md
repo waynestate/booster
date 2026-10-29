@@ -210,6 +210,14 @@ break on the PHP version the first PHP hop lands on. The findings are hints for 
 gate: they do not change the exit code, and a scan that cannot run (missing tooling, a crash) is reported as "could
 not run" while the plan still prints in full. `--no-scan` skips it.
 
+The scan is optional. BOOSTER looks for a PHP_CodeSniffer that carries the PHPCompatibility standard, trying the app's
+own `vendor/bin/phpcs`, then BOOSTER's `vendor/bin/phpcs`, then `phpcs` on the PATH. When none of them has the
+standard, the scan reports a skip and the plan goes on. To turn it on, install the packages into the app:
+
+```
+composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"
+```
+
 The scan ignores `vendor/`, `node_modules/` and `storage/`, because those hold third-party code and generated files,
 not the app's. It reads the app only and changes nothing. `booster scan --path=../my-app --php=8.0` runs the same scan
 on its own, for any PHP version BOOSTER knows, and exits 0 even when it finds a wall of removed functions.

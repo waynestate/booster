@@ -25,10 +25,10 @@ final class CliTest extends TestCase
         return [$exit, $tester->getDisplay() . $tester->getErrorOutput()];
     }
 
-    /** A FakeProcessRunner that answers every call with a clean phpcs report. */
+    /** A FakeProcessRunner whose discovery finds PHPCompatibility and whose scan reports a clean app. */
     private function cleanPhpcsFake(): FakeProcessRunner
     {
-        return new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''));
+        return $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''));
     }
 
     public function test_plan_prints_the_hops_in_order(): void
@@ -92,7 +92,7 @@ final class CliTest extends TestCase
                 ],
             ],
         ];
-        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
 
         [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $app, '--today' => self::TODAY, '--goal' => 'php-74-to-84'], $fake);
 
@@ -114,7 +114,9 @@ final class CliTest extends TestCase
 
     public function test_plan_survives_a_broken_scan(): void
     {
-        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(3, '', 'ERROR: the standard does not exist'));
+        // Discovery succeeds (the standard is present) but the scan itself
+        // fails; the plan must survive that.
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(3, '', 'ERROR: the standard does not exist'));
 
         [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84'], $fake);
 
@@ -122,6 +124,23 @@ final class CliTest extends TestCase
         self::assertStringContainsString('1. php-74-to-80', $out);
         self::assertStringContainsString('PHPCompatibility scan: could not run', $out);
         self::assertStringContainsString('the standard does not exist', $out);
+    }
+
+    public function test_plan_survives_a_missing_standard(): void
+    {
+        // No candidate phpcs carries PHPCompatibility, so discovery gives up
+        // before any scan runs. The plan must still print and exit as if the
+        // scan had never happened.
+        $fake = new FakeProcessRunner(static fn(array $command): ProcessResult => in_array('-i', $command, true)
+            ? new ProcessResult(0, "The installed standards are PEAR, PSR1, PSR2, PSR12, Squiz, Zend\n", '')
+            : new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''));
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84'], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('1. php-74-to-80', $out);
+        self::assertStringContainsString('PHPCompatibility scan: could not run', $out);
+        self::assertStringContainsString('PHP compatibility scan skipped: PHPCompatibility is not installed. Enable it with: composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"', $out);
     }
 
     public function test_scan_prints_the_findings_and_exits_0(): void
@@ -140,7 +159,7 @@ final class CliTest extends TestCase
                 ],
             ],
         ];
-        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
 
         [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $app, '--php' => '8.0'], $fake);
 
@@ -163,7 +182,7 @@ final class CliTest extends TestCase
                 ],
             ],
         ];
-        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
 
         [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $app, '--php' => '8.1', '--format' => 'json'], $fake);
         $data = json_decode($out, true);
