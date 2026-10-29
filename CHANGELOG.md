@@ -4,6 +4,8 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-29
+
 ### Added
 
 - `data/versions.json`, the hop data file (shipped in the PHAR), and `bin/refresh-hop-data.php`, which rewrites it
