@@ -6,9 +6,9 @@ BOOSTER 0.1 is built and `composer ci` passes. What follows needs a person.
 
 | # | Question | Who can answer | Blocks | Default built |
 |---|---|---|---|---|
-| 1 | Where does BOOSTER read `policy.json` from once CREED is on Packagist? | CREED owner | Removing the bundled copy | `--policy`, then `BOOSTER_POLICY`, then the generated copy in `src/Creed/policy.json` (schema_version 1). The copy goes stale; refresh it from a CREED checkout with `bin/export.php`. |
+| 1 | Where does BOOSTER read `policy.json` from now that CREED is on Packagist (`waynestate/creed` 0.1.0)? | CREED owner | Removing the bundled copy | `--policy`, then `BOOSTER_POLICY`, then the generated copy in `src/Creed/policy.json` (schema_version 1). The copy goes stale; refresh it from a CREED checkout with `bin/export.php`. |
 | 2 | Should the bundled copy be refreshed by a script, or replaced by `require waynestate/creed`? | CREED owner, Pantry owner | The copy going stale | CREED's `bin/export.php` writes the copy; `composer creed-copy:check` verifies it. |
-| 3 | What Composer vendor name will the packages publish under (`waynestate/booster`)? | Pantry owner | `composer require` for users | `waynestate/booster` in `composer.json`; install from the VCS repository until then. |
+| 3 | What Composer vendor name will the packages publish under (`waynestate/booster`)? | Pantry owner | `composer require` for users | Answered: `waynestate/booster` is on Packagist (`dev-main`, no tag yet). The README still installs from a clone, since BOOSTER runs from its own folder. |
 | 4 | PHP test matrix: 8.3, 8.4, 8.5 or 8.3 and 8.5 only? | Stack lead | Nothing | 8.3, 8.4 and 8.5, as decided. |
 | 5 | Is PHPCompatibility wanted as an advisory signal? | Stack lead | A second scan for what Rector misses | Left out of 0.1. The design guide says advisory only. |
 | 6 | Larastan or plain PHPStan for Laravel apps, and for which Laravel versions? | Stack lead, Pinstripe owner | A "find what Rector cannot fix" gate | Neither is run by BOOSTER; `--proctor-command` can carry any extra check. |
@@ -41,7 +41,7 @@ BOOSTER holds no secrets and calls no API.
   directory so the child processes get real paths. There is no release step yet, so the phar is built from a checkout,
   not downloaded.
 - **`booster mcp`**, the read-only tool server. Waiting on the shared MCP conventions.
-- **PROCTOR as a built-in gate step.** PROCTOR is not on Packagist and needs `--policy`; `--proctor-command` runs it today.
+- **PROCTOR as a built-in gate step.** PROCTOR is on Packagist now (`waynestate/proctor` 0.1.0) but is not wired in, and needs `--policy`; `--proctor-command` runs it today.
 - **PHPCompatibility and PHPStan-on-the-target-version** as advisory scans.
 - **Real wayne-cas migration.** The recipe renames classes and swaps the requirement; it does not move
   `config/wayne-cas.php`, the user model trait methods or Duo settings, and it was not run against a real app.

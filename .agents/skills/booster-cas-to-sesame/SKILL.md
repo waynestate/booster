@@ -16,7 +16,7 @@ Swap the wayne-cas package for SESAME using its compatibility classes (stub reci
 What Rector cannot do (check these by hand):
 
 - This recipe renames classes and swaps the Composer requirement. It does not move config/wayne-cas.php to the SESAME config; do that by hand.
-- SESAME is not on Packagist yet: add its repository to composer.json before you run composer update.
+- SESAME is on Packagist: run composer require waynestate/sesame:^0.1 (no extra repository needed).
 - Log in through the pre-production host and check the session timeout, the Access ID attribute and Duo before you ship.
 
 Official notes:
