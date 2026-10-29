@@ -13,7 +13,7 @@ use Waynestate\Booster\Creed\State;
  * BOOSTER's view of a CREED policy: the generated CREED reader (src/Creed)
  * plus the label the report prints for where the policy came from.
  *
- * Every policy fact — states, supported versions, dates — comes from the
+ * Every policy fact (states, supported versions, dates) comes from the
  * CREED copy. This class only adds the origin label and turns the copy's
  * exceptions into PolicyException, so a policy that cannot answer a question
  * is a tool error (exit 2) like any other.
