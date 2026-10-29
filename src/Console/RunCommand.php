@@ -33,6 +33,7 @@ final class RunCommand extends BaseCommand
         $this
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Show the diffs Rector would make and change nothing.')
             ->addOption('max-changes', null, InputOption::VALUE_REQUIRED, 'Stop a hop that would change more than this many files.', '50')
+            ->addOption('memory-limit', null, InputOption::VALUE_REQUIRED, 'Memory limit for the Rector process (for example 2G), or -1 for no limit.', RectorRunner::DEFAULT_MEMORY_LIMIT)
             ->addOption('skip-gate', null, InputOption::VALUE_NONE, 'Do not run the tests in the target image after each hop.')
             ->addOption('allow-failing-baseline', null, InputOption::VALUE_NONE, 'Continue even when the baseline (the app\'s tests on its current PHP) fails; later gate failures are labelled as pre-existing.')
             ->addOption('allow-dirty', null, InputOption::VALUE_NONE, 'Run even when the working copy has uncommitted changes.')
@@ -48,6 +49,9 @@ final class RunCommand extends BaseCommand
         if (preg_match('/^\d+$/', $cap) !== 1) {
             throw new ToolError(sprintf('Invalid --max-changes value "%s". Expected a whole number.', $cap));
         }
+
+        $memoryLimit = $this->stringOption($input, 'memory-limit') ?? RectorRunner::DEFAULT_MEMORY_LIMIT;
+        RectorRunner::assertMemoryLimit($memoryLimit);
 
         $plan = $this->buildPlan($input);
         $registry = new HopRegistry();
@@ -67,6 +71,7 @@ final class RunCommand extends BaseCommand
             maxChanges: (int) $cap,
             testCommand: $this->stringOption($input, 'test-command'),
             proctorCommand: $this->stringOption($input, 'proctor-command'),
+            memoryLimit: $memoryLimit,
         ));
 
         $output->writeln(

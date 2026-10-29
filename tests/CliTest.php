@@ -351,6 +351,40 @@ final class CliTest extends TestCase
         self::assertSame(2, $exit);
     }
 
+    public function test_run_rejects_a_bad_memory_limit(): void
+    {
+        [$exit, $out] = $this->booster(['command' => 'run', '--path' => $this->example('raw-php'), '--memory-limit' => 'lots']);
+
+        self::assertSame(2, $exit);
+        self::assertStringContainsString('--memory-limit', $out);
+        self::assertStringContainsString('lots', $out);
+    }
+
+    public function test_run_passes_the_memory_limit_to_rector(): void
+    {
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [$exit] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--dry-run' => true, '--memory-limit' => '4G', '--goal' => 'php-74-to-84',
+        ], $fake);
+
+        self::assertSame(0, $exit);
+        $rectorCalls = array_values(array_filter($fake->calls, static fn(array $c): bool => in_array('process', $c['command'], true)));
+        self::assertNotEmpty($rectorCalls);
+        foreach ($rectorCalls as $call) {
+            self::assertContains('--memory-limit=4G', $call['command']);
+        }
+    }
+
     public function test_run_json_contains_the_baseline_object(): void
     {
         $fake = new FakeProcessRunner(static function (array $command): ProcessResult {

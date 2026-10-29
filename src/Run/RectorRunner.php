@@ -21,6 +21,9 @@ use Waynestate\Booster\ToolError;
  */
 final class RectorRunner
 {
+    /** The memory limit Rector runs with unless the user raises it. Big apps need more than the old hard-coded gigabyte. */
+    public const DEFAULT_MEMORY_LIMIT = '2G';
+
     public function __construct(
         private readonly ProcessRunner $processes,
         private readonly ?string $rectorBinary = null,
@@ -33,12 +36,28 @@ final class RectorRunner
     }
 
     /**
+     * Checks a --memory-limit value. Accepted: a whole number with an optional
+     * K, M or G suffix (for example 2G), or -1 for no limit.
+     */
+    public static function assertMemoryLimit(string $value): void
+    {
+        if (preg_match('/^(\d+[KMG]?|-1)$/', $value) !== 1) {
+            throw new ToolError(sprintf(
+                'Invalid --memory-limit value "%s". Accepted: a whole number with an optional K, M or G suffix (for example 2G), or -1 for no limit.',
+                $value,
+            ));
+        }
+    }
+
+    /**
      * @param string  $phpTarget     the PHP version the rules may assume (major.minor); Rector otherwise reads the old version from the app composer.json and skips the new rules
      * @param ?string $laravelTarget the Laravel major the version-bound rules should assume, or null for a non-Laravel app
      * @param ?string $phpunitTarget the PHPUnit major the version-bound rules should assume, or null for a non-PhpUnit hop
+     * @param string  $memoryLimit   Rector's --memory-limit (for example 2G), or -1 for no limit
      */
-    public function run(Hop $hop, string $appPath, bool $dryRun, string $phpTarget, ?string $laravelTarget = null, ?string $phpunitTarget = null): RectorResult
+    public function run(Hop $hop, string $appPath, bool $dryRun, string $phpTarget, ?string $laravelTarget = null, ?string $phpunitTarget = null, string $memoryLimit = self::DEFAULT_MEMORY_LIMIT): RectorResult
     {
+        self::assertMemoryLimit($memoryLimit);
         $appPath = rtrim($appPath, '/\\');
         $command = [
             $this->phpBinary ?? PHP_BINARY,
@@ -49,7 +68,7 @@ final class RectorRunner
             '--no-progress-bar',
             '--no-ansi',
             '--clear-cache',
-            '--memory-limit=1G',
+            '--memory-limit=' . $memoryLimit,
         ];
         if ($dryRun) {
             $command[] = '--dry-run';
