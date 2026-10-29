@@ -52,11 +52,12 @@
             "phpunit",
             "pint --test",
             "phpstan analyse --memory-limit=1G",
-            "@composer audit"
+            "@composer audit",
+            "@php bin/refresh-hop-data.php --check"
         ]
     },
     "scripts-descriptions": {
-        "ci": "Run every CI check: manifest, tests, style, static analysis, audit",
+        "ci": "Run every CI check: manifest, tests, style, static analysis, audit, hop data freshness",
         "creed-copy:check": "Verify src/Creed still matches a fresh export from the CREED checkout in $CREED_PATH"
     },
     "bin": [

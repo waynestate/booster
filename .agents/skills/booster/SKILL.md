@@ -35,7 +35,7 @@ Playbooks:
 - `booster-phpunit-11-to-12`: Move PHPUnit 11 tests to PHPUnit 12.
 - `booster-phpunit-12-to-13`: Move PHPUnit 12 tests to PHPUnit 13.
 - `booster-cas-to-sesame`: Swap the wayne-cas package for SESAME using its compatibility classes (stub recipe).
-- `booster-node-pin-24`: Pin the app to Node 24: set engines.node in package.json and write .nvmrc.
+- `booster-node-pin-24`: Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
 - `booster-mix-to-vite`: Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only).
 - `booster-vue-2-to-3`: Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue).
 

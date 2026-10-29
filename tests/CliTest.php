@@ -49,7 +49,7 @@ final class CliTest extends TestCase
 
         self::assertSame(0, $exit);
         self::assertSame('laravel-blade', $data['project']['app_type']);
-        self::assertSame('laravel-10-to-11', $data['steps'][0]['hop']['id']);
+        self::assertSame('phpunit-10-to-11', $data['steps'][0]['hop']['id']);
         self::assertSame('bundled snapshot', $data['policy']);
         self::assertSame('ok', $data['php_compat']['status']);
         self::assertSame('8.3', $data['php_compat']['test_version']);

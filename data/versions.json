@@ -1,5 +1,5 @@
 {
-    "generated_on": "2026-10-28",
+    "generated_on": "2026-10-29",
     "php": [
         "5.6",
         "7.0",
@@ -29,7 +29,7 @@
         "12",
         "13"
     ],
-    "node_pin_target": "24",
+    "node_pin_target": "26",
     "vite_version": "^8.3",
     "laravel_vite_plugin_version": "^3.2",
     "vue_plugin_version": "^6.0",
@@ -41,8 +41,8 @@
         "13": "8.4"
     },
     "laravel_phpunit": {
-        "10": "9",
-        "11": "10",
+        "10": "10",
+        "11": "11",
         "12": "11",
         "13": "12"
     },
