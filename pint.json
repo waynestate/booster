@@ -5,5 +5,8 @@
         "tests/fixtures",
         "examples",
         "src/Creed"
+    ],
+    "notPath": [
+        "bin/agent-ready.php"
     ]
 }

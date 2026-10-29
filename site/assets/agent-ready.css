@@ -87,19 +87,33 @@
 }
 .ar-prompt__text code { font: inherit; color: inherit; background: none; padding: 0; border-radius: 0; white-space: inherit; }
 
-/* The preview: the first lines, fading into the page, and a button for the rest. */
-.ar-prompt.is-collapsed .ar-prompt__text {
-  max-height: calc(var(--ar-preview-lines, 10) * 1.6em + 1rem);
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 4.5em), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 4.5em), transparent);
+/* The preview: the first lines, a fade, and a button for the rest. Only the text fades: the mask sits
+   on the code inside the panel, so the panel's own background, pattern, border and corners stay whole
+   on every site, whatever each one paints there. A mask on the panel would fade its edge too. */
+.ar-prompt.is-collapsed .ar-prompt__text { overflow: hidden; }
+.ar-prompt.is-collapsed .ar-prompt__text code,
+.ar-cmd.is-collapsed .ar-cmd__code code {
+  display: block; overflow: hidden;
+  max-height: calc(var(--ar-preview-lines, 10) * 1.6em);
+  max-height: calc(var(--ar-preview-lines, 10) * 1lh);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 5.5em), transparent calc(100% - .5em));
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 5.5em), transparent calc(100% - .5em));
 }
 .ar-prompt__more {
-  display: block; margin: .5rem 0 0; padding: .35rem 0;
+  display: inline-flex; align-items: center; gap: .55rem;
+  min-height: 2.75rem; margin: .15rem 0 -.5rem; padding: 0;
   background: none; border: 0; cursor: pointer;
   font: inherit; font-family: var(--_mono); font-size: .8rem; letter-spacing: .02em;
   color: var(--_accent); text-decoration: underline; text-underline-offset: .2em; text-decoration-thickness: 1px;
 }
+/* A chevron drawn with two borders: down while folded, up once open. */
+.ar-prompt__more::after {
+  content: ""; flex: none; width: .42em; height: .42em;
+  border: solid currentColor; border-width: 0 1.5px 1.5px 0;
+  transform: translateY(-.15em) rotate(45deg);
+}
+.ar-prompt__more[aria-expanded="true"]::after { transform: translateY(.1em) rotate(-135deg); }
+.ar-prompt__more[hidden] { display: none; }
 .ar-prompt__more:hover { text-decoration-thickness: 2px; }
 
 /* ------------------------------------------------------------ actions */
@@ -157,13 +171,14 @@
 .ar-seg__btn[aria-pressed="true"] { background: var(--_term-ink); color: var(--_term-bg); }
 .ar-cmd :focus-visible { outline-color: var(--_term-ink); }
 .ar-cmd__code {
-  margin: 0; padding: .85rem 1rem; max-height: 18rem; overflow: auto;
+  margin: 0; padding: .85rem 1rem; overflow: auto;
   background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .18);
   border-radius: calc(var(--_radius) * .4);
   font-family: var(--_mono); font-size: .8rem; line-height: 1.55;
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .ar-cmd__code code { font: inherit; color: inherit; background: none; padding: 0; }
+.ar-cmd .ar-prompt__more { color: var(--_term-ink); margin-bottom: 0; }
 .ar-cmd__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1rem; margin-top: .75rem; }
 .ar-cmd__note { margin: 0; font-size: .88rem; max-width: 52ch; }
 .ar-cmd__note a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: .18em; }
@@ -191,6 +206,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .ar-btn, .ar-chip, .ar-seg__btn { transition: background-color .15s, border-color .15s, box-shadow .15s, color .15s; }
+  .ar-prompt__more::after { transition: transform .2s cubic-bezier(.2, .8, .2, 1); }
   .ar-prompt.is-ready .ar-cmd:not([hidden]) { animation: ar-unfold .22s cubic-bezier(.2, .8, .2, 1); }
   @keyframes ar-unfold { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 }
@@ -198,5 +214,11 @@
 @media (forced-colors: active) {
   .ar-prompt, .ar-prompt__text, .ar-chip, .ar-btn, .ar-cmd, .ar-cmd__code { border: 1px solid CanvasText; }
   .ar-chip[aria-expanded="true"], .ar-seg__btn[aria-pressed="true"] { outline: 2px solid Highlight; }
-  .ar-prompt.is-collapsed .ar-prompt__text { -webkit-mask-image: none; mask-image: none; }
+  .ar-prompt.is-collapsed .ar-prompt__text code, .ar-cmd.is-collapsed .ar-cmd__code code { -webkit-mask-image: none; mask-image: none; }
+}
+
+/* Paper gets the whole prompt. Sites already lift the panel's max-height for print; the fold on the
+   text is the kit's, so the kit lifts it too. */
+@media print {
+  .ar-prompt.is-collapsed .ar-prompt__text code { max-height: none; -webkit-mask-image: none; mask-image: none; }
 }

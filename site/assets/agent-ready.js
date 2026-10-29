@@ -6,7 +6,7 @@
  * The page carries everything an agent or a no-JS reader needs: the prompt is plain text in the HTML and
  * the Markdown twin is a plain link. This script only adds the buttons:
  *
- *   [data-ar-prompt]  a prompt block. Adds the expand toggle for long prompts, Copy prompt, and
+ *   [data-ar-prompt]  a prompt block. Adds the expand toggle for long prompts and commands, Copy prompt, and
  *                     "Run it in": OpenCode, Claude Code and Codex CLI as ready commands (PowerShell and
  *                     bash or zsh), and ChatGPT as a link.
  *   [data-ar-page]    the page menu. Adds Copy page as Markdown and Open in ChatGPT beside the plain
@@ -134,6 +134,35 @@
     copyText(text).then(function () { say(done); }, function () { say(failed); });
   }
 
+  /* The "show the whole thing" toggle under a long panel. The holder carries is-collapsed and the
+     sheet does the clipping and the fade, so the full text stays in the DOM for Copy, find in page
+     and anyone reading the source. show(lines) arms it for that many lines; show(0) puts it away. */
+  function expander(holder, target, noun) {
+    var button = el("button", { type: "button", "class": "ar-prompt__more", "aria-expanded": "false", "aria-controls": target.id });
+    var lines = 0;
+    function label() {
+      var open = button.getAttribute("aria-expanded") === "true";
+      button.textContent = open ? "Show less" : "Show the whole " + noun + ", " + lines + " lines";
+    }
+    button.addEventListener("click", function () {
+      var open = button.getAttribute("aria-expanded") !== "true";
+      button.setAttribute("aria-expanded", open ? "true" : "false");
+      holder.classList.toggle("is-collapsed", !open);
+      label();
+      // Folding a long panel back up can leave the reader far below it; bring the toggle back to them.
+      if (!open && button.scrollIntoView) { button.scrollIntoView({ block: "nearest" }); }
+    });
+    return {
+      button: button,
+      show: function (count) {
+        lines = count;
+        button.hidden = count === 0;
+        holder.classList.toggle("is-collapsed", count > 0 && button.getAttribute("aria-expanded") !== "true");
+        label();
+      }
+    };
+  }
+
   /* ---------------------------------------------------------------- prompt blocks */
   var shell = defaultShell();
   var blocks = [];
@@ -150,17 +179,9 @@
     // Long prompts show a preview first; the rest is one button away.
     var lineCount = prompt.split("\n").length;
     if (lineCount > CONFIG.previewLines) {
-      block.classList.add("is-collapsed");
-      var more = el("button", { type: "button", "class": "ar-prompt__more", "aria-expanded": "false", "aria-controls": pre.id });
-      var moreLabel = "Show the whole prompt, " + lineCount + " lines";
-      more.textContent = moreLabel;
-      more.addEventListener("click", function () {
-        var open = more.getAttribute("aria-expanded") !== "true";
-        more.setAttribute("aria-expanded", open ? "true" : "false");
-        block.classList.toggle("is-collapsed", !open);
-        more.textContent = open ? "Show less" : moreLabel;
-      });
-      pre.parentNode.insertBefore(more, pre.nextSibling);
+      var more = expander(block, pre, "prompt");
+      more.show(lineCount);
+      pre.parentNode.insertBefore(more.button, pre.nextSibling);
     }
 
     var actions = el("div", { "class": "ar-prompt__actions" });
@@ -237,10 +258,12 @@
     });
     bar.appendChild(seg);
     panel.appendChild(bar);
-    var cmdPre = el("pre", { "class": "ar-cmd__code", tabindex: "0", role: "region" });
+    var cmdPre = el("pre", { "class": "ar-cmd__code", id: panelId + "-code", tabindex: "0", role: "region" });
     var cmdCode = el("code");
     cmdPre.appendChild(cmdCode);
     panel.appendChild(cmdPre);
+    var cmdMore = expander(panel, cmdPre, "command");
+    panel.appendChild(cmdMore.button);
     var foot = el("div", { "class": "ar-cmd__foot" });
     var note = el("p", { "class": "ar-cmd__note" });
     foot.appendChild(note);
@@ -270,6 +293,8 @@
       heading.appendChild(el("b", {}, current.name));
       heading.appendChild(document.createTextNode(" in " + shellName));
       cmdCode.textContent = shell === "pwsh" ? powershell(current, prompt) : posix(current, prompt);
+      var cmdLines = cmdCode.textContent.split("\n").length;
+      cmdMore.show(cmdLines > CONFIG.previewLines ? cmdLines : 0);
       cmdPre.setAttribute("aria-label", current.name + " command for " + shellName);
       note.textContent = "";
       note.appendChild(document.createTextNode("Paste it into a terminal at the root of your project. Needs "));

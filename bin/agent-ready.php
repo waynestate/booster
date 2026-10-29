@@ -5,7 +5,7 @@ declare(strict_types=1);
 /*
  * agent-ready.php: makes a static front page readable by agents (ADR-0019).
  *
- * Same bytes in every stack repo; copy it, don't fork it. SQUIRE owns it, and `--sync-to` (run from SQUIRE)
+ * Same bytes in every stack repo; copy it, don't fork it. Squire owns it, and `--sync-to` (run from Squire)
  * is how a site takes a new version, together with the kit's agent-ready.js and agent-ready.css.
  *
  * From the site folder and the README it writes, into the site folder:
@@ -20,8 +20,8 @@ declare(strict_types=1);
  * Usage:
  *   php bin/agent-ready.php [--root=.]                 write the files
  *   php bin/agent-ready.php [--root=.] --check         write nothing; exit 1 on drift or a finding
- *   php bin/agent-ready.php --sync-to=<repo>           from SQUIRE only: copy the kit and this file
- *   php bin/agent-ready.php --rehash                   from SQUIRE only: record the kit's hashes below
+ *   php bin/agent-ready.php --sync-to=<repo>           from Squire only: copy the kit and this file
+ *   php bin/agent-ready.php --rehash                   from Squire only: record the kit's hashes below
  *
  * Settings come from <root>/agent-ready.json, all optional: site (default "site"), readme ("README.md"),
  * base (composer.json homepage), source (composer.json support.source), exclude (page paths, relative to
@@ -36,7 +36,7 @@ final class AgentReadyError extends RuntimeException {}
 
 /**
  * The kit's files, by path inside the site folder, with the SHA-256 of their bytes (LF line endings).
- * SQUIRE's tests fail when these drift from kit/site/assets/.
+ * Squire's tests fail when these drift from kit/site/assets/.
  */
 final class AgentReadyKit
 {
@@ -46,8 +46,8 @@ final class AgentReadyKit
     public const LEGACY_GENERATOR = 'SQUIRE agent-ready';
 
     public const FILES = [
-        'assets/agent-ready.css' => 'a666ce64d82859bb658f51c33af145d374fcccaca615e699f51dc683ad7b1fc5',
-        'assets/agent-ready.js' => '581f22b237e10ded1fe6dad30d3c01b04cac31f5106faec31a64dde6a870d506',
+        'assets/agent-ready.css' => 'be9bf22d00b10ab07774db1abe7fb6c4c282b4b6a9a0fe91191ee0a49e83de71',
+        'assets/agent-ready.js' => '17b4c83f48264f96b846102f0e0183d9317b800644e6cf6f0c8219f9960f1cb5',
     ];
 
     /** The stack's agent entry points, listed in every llms.txt except their own. */
@@ -95,7 +95,7 @@ final class AgentReadyMarkdown
         $markdown = implode("\n\n", $this->blocks($root));
         $markdown = (string) preg_replace("/\n{3,}/", "\n\n", $markdown);
 
-        return trim($markdown) . "\n";
+        return trim($markdown)."\n";
     }
 
     /** @return list<string> */
@@ -107,6 +107,7 @@ final class AgentReadyMarkdown
         foreach ($node->childNodes as $child) {
             if ($child instanceof DOMElement && $this->skipped($child)) {
                 $afterElement = true;
+
                 continue;
             }
             if ($child instanceof DOMElement && $this->isBlock($child)) {
@@ -115,6 +116,7 @@ final class AgentReadyMarkdown
                     $out[] = $block;
                 }
                 $afterElement = false;
+
                 continue;
             }
             $inline = $this->append($inline, $this->inline($child), $afterElement && $child instanceof DOMElement);
@@ -149,7 +151,7 @@ final class AgentReadyMarkdown
             $label = $this->labelOf($el);
             $blocks = $this->blocks($el);
 
-            return $label === '' ? $blocks : array_merge(['**' . $label . '**'], $blocks);
+            return $label === '' ? $blocks : array_merge(['**'.$label.'**'], $blocks);
         }
 
         $tag = strtolower($el->tagName);
@@ -172,7 +174,7 @@ final class AgentReadyMarkdown
     {
         $text = $this->squash($this->inlineChildren($el));
 
-        return $text === '' ? [] : [str_repeat('#', $level) . ' ' . $text];
+        return $text === '' ? [] : [str_repeat('#', $level).' '.$text];
     }
 
     /** @return list<string> */
@@ -180,7 +182,7 @@ final class AgentReadyMarkdown
     {
         $hasBlock = false;
         foreach ($el->childNodes as $child) {
-            if ($child instanceof DOMElement && !$this->skipped($child) && $this->isBlock($child)) {
+            if ($child instanceof DOMElement && ! $this->skipped($child) && $this->isBlock($child)) {
                 $hasBlock = true;
                 break;
             }
@@ -193,7 +195,7 @@ final class AgentReadyMarkdown
             return [];
         }
 
-        return [$strong ? '**' . $text . '**' : $text];
+        return [$strong ? '**'.$text.'**' : $text];
     }
 
     /** @return list<string> */
@@ -203,7 +205,7 @@ final class AgentReadyMarkdown
         $title = $this->firstByClass($el, 'ar-prompt__title');
         if ($title !== null) {
             $level = preg_match('/^h([1-6])$/i', $title->tagName, $m) ? (int) $m[1] : 3;
-            $out[] = str_repeat('#', $level) . ' ' . $this->squash($this->inlineChildren($title));
+            $out[] = str_repeat('#', $level).' '.$this->squash($this->inlineChildren($title));
         }
         $desc = $this->firstByClass($el, 'ar-prompt__desc');
         if ($desc !== null) {
@@ -212,7 +214,7 @@ final class AgentReadyMarkdown
         $text = $this->firstByClass($el, 'ar-prompt__text');
         $prompt = $text === null ? '' : self::promptText($text);
         $this->prompts[] = $prompt;
-        if (!$this->withPrompts) {
+        if (! $this->withPrompts) {
             return [];
         }
         $out[] = 'A prompt for your coding agent. Copy it as it stands:';
@@ -236,10 +238,10 @@ final class AgentReadyMarkdown
         $n = $ordered && $el->hasAttribute('start') ? (int) $el->getAttribute('start') : 1;
         $lines = [];
         foreach ($el->childNodes as $li) {
-            if (!$li instanceof DOMElement || strtolower($li->tagName) !== 'li' || $this->skipped($li)) {
+            if (! $li instanceof DOMElement || strtolower($li->tagName) !== 'li' || $this->skipped($li)) {
                 continue;
             }
-            $marker = $ordered ? ($n++) . '. ' : '- ';
+            $marker = $ordered ? ($n++).'. ' : '- ';
             $pad = str_repeat(' ', strlen($marker));
             $parts = [];
             $inline = '';
@@ -250,6 +252,7 @@ final class AgentReadyMarkdown
                 if ($child instanceof DOMElement && in_array(strtolower($child->tagName), ['ul', 'ol'], true)) {
                     $this->flush($parts, $inline);
                     $parts[] = $this->list($child, $depth + 1);
+
                     continue;
                 }
                 if ($child instanceof DOMElement && $this->isBlock($child)) {
@@ -257,6 +260,7 @@ final class AgentReadyMarkdown
                     foreach ($this->block($child) as $block) {
                         $parts[] = $block;
                     }
+
                     continue;
                 }
                 $inline .= $this->inline($child);
@@ -266,8 +270,8 @@ final class AgentReadyMarkdown
                 continue;
             }
             $item = implode("\n", $parts);
-            $item = str_replace("\n", "\n" . $pad, $item);
-            $lines[] = $marker . $item;
+            $item = str_replace("\n", "\n".$pad, $item);
+            $lines[] = $marker.$item;
         }
 
         return implode("\n", $lines);
@@ -281,6 +285,7 @@ final class AgentReadyMarkdown
         foreach ($this->descendants($el, ['caption', 'tr']) as $node) {
             if (strtolower($node->tagName) === 'caption') {
                 $caption = $this->squash($this->inlineChildren($node));
+
                 continue;
             }
             $cells = [];
@@ -301,14 +306,14 @@ final class AgentReadyMarkdown
         $lines = [];
         foreach ($rows as $i => $cells) {
             $cells = array_pad($cells, $width, '');
-            $lines[] = '| ' . implode(' | ', $cells) . ' |';
+            $lines[] = '| '.implode(' | ', $cells).' |';
             if ($i === 0) {
-                $lines[] = '|' . str_repeat(' --- |', $width);
+                $lines[] = '|'.str_repeat(' --- |', $width);
             }
         }
         $out = [];
         if ($caption !== '') {
-            $out[] = '**' . $caption . '**';
+            $out[] = '**'.$caption.'**';
         }
         $out[] = implode("\n", $lines);
 
@@ -323,16 +328,17 @@ final class AgentReadyMarkdown
             $text = $this->squash($this->inlineChildren($node));
             if (strtolower($node->tagName) === 'dt') {
                 if ($term !== null) {
-                    $lines[] = '- **' . $term . '**';
+                    $lines[] = '- **'.$term.'**';
                 }
                 $term = $text;
+
                 continue;
             }
-            $lines[] = $term === null ? '- ' . $text : '- **' . $term . '**: ' . $text;
+            $lines[] = $term === null ? '- '.$text : '- **'.$term.'**: '.$text;
             $term = null;
         }
         if ($term !== null) {
-            $lines[] = '- **' . $term . '**';
+            $lines[] = '- **'.$term.'**';
         }
 
         return implode("\n", $lines);
@@ -343,7 +349,7 @@ final class AgentReadyMarkdown
     {
         $text = implode("\n\n", $blocks);
 
-        return '> ' . str_replace("\n", "\n> ", $text);
+        return '> '.str_replace("\n", "\n> ", $text);
     }
 
     private function fence(string $text, string $language): string
@@ -355,7 +361,7 @@ final class AgentReadyMarkdown
         }
         $fence = str_repeat('`', max(3, $longest + 1));
 
-        return $fence . $language . "\n" . $text . "\n" . $fence;
+        return $fence.$language."\n".$text."\n".$fence;
     }
 
     private function preText(DOMElement $el): string
@@ -381,6 +387,7 @@ final class AgentReadyMarkdown
         foreach ($node->childNodes as $child) {
             if ($child instanceof DOMElement && $this->skipped($child)) {
                 $afterElement = true;
+
                 continue;
             }
             $out = $this->append($out, $this->inline($child), $afterElement && $child instanceof DOMElement);
@@ -398,13 +405,13 @@ final class AgentReadyMarkdown
     private function append(string $text, string $next, bool $gap): string
     {
         if ($gap && $text !== '' && $next !== ''
-            && !ctype_space($text[strlen($text) - 1])
-            && !preg_match('/^[\s.,;:!?)\]]/', $next)
+            && ! ctype_space($text[strlen($text) - 1])
+            && ! preg_match('/^[\s.,;:!?)\]]/', $next)
         ) {
-            return $text . ' ' . $next;
+            return $text.' '.$next;
         }
 
-        return $text . $next;
+        return $text.$next;
     }
 
     private function inline(DOMNode $node): string
@@ -412,7 +419,7 @@ final class AgentReadyMarkdown
         if ($node instanceof DOMText) {
             return $this->escape((string) preg_replace('/\s+/', ' ', $node->data));
         }
-        if (!$node instanceof DOMElement || $this->skipped($node)) {
+        if (! $node instanceof DOMElement || $this->skipped($node)) {
             return '';
         }
         $tag = strtolower($node->tagName);
@@ -436,7 +443,7 @@ final class AgentReadyMarkdown
             case 'img':
                 $alt = trim($node->getAttribute('alt'));
 
-                return $alt === '' ? '' : '![' . $this->escape($alt) . '](' . $this->resolve($node->getAttribute('src')) . ')';
+                return $alt === '' ? '' : '!['.$this->escape($alt).']('.$this->resolve($node->getAttribute('src')).')';
             case 'a':
                 $text = $this->squash($this->inlineChildren($node));
                 $href = $node->getAttribute('href');
@@ -444,11 +451,11 @@ final class AgentReadyMarkdown
                     return $text;
                 }
 
-                return '[' . $text . '](' . $this->resolve($href) . ')';
+                return '['.$text.']('.$this->resolve($href).')';
         }
         $text = $this->inlineChildren($node);
 
-        return $this->isBlock($node) ? ' ' . $text . ' ' : $text;
+        return $this->isBlock($node) ? ' '.$text.' ' : $text;
     }
 
     private function wrap(string $mark, string $text): string
@@ -460,7 +467,7 @@ final class AgentReadyMarkdown
         $lead = ctype_space($text[0]) ? ' ' : '';
         $tail = ctype_space($text[strlen($text) - 1]) ? ' ' : '';
 
-        return $lead . $mark . $inner . $mark . $tail;
+        return $lead.$mark.$inner.$mark.$tail;
     }
 
     private function code(string $text): string
@@ -476,7 +483,7 @@ final class AgentReadyMarkdown
         $tick = str_repeat('`', $longest + 1);
         $pad = $longest > 0 ? ' ' : '';
 
-        return $tick . $pad . $text . $pad . $tick;
+        return $tick.$pad.$text.$pad.$tick;
     }
 
     private function escape(string $text): string
@@ -501,12 +508,12 @@ final class AgentReadyMarkdown
             return $href;
         }
         $parts = parse_url($this->pageUrl);
-        $origin = ($parts['scheme'] ?? 'https') . '://' . ($parts['host'] ?? '');
+        $origin = ($parts['scheme'] ?? 'https').'://'.($parts['host'] ?? '');
         if (str_starts_with($href, '//')) {
-            return ($parts['scheme'] ?? 'https') . ':' . $href;
+            return ($parts['scheme'] ?? 'https').':'.$href;
         }
         if (str_starts_with($href, '#') || str_starts_with($href, '?')) {
-            return (string) preg_replace('/[?#].*$/', '', $this->pageUrl) . $href;
+            return (string) preg_replace('/[?#].*$/', '', $this->pageUrl).$href;
         }
         $suffix = '';
         if (preg_match('/^([^?#]*)([?#].*)$/', $href, $m)) {
@@ -515,7 +522,7 @@ final class AgentReadyMarkdown
         }
         $dir = str_starts_with($href, '/') ? '' : (string) preg_replace('#[^/]*$#', '', $parts['path'] ?? '/');
         $segments = [];
-        foreach (explode('/', $dir . $href) as $segment) {
+        foreach (explode('/', $dir.$href) as $segment) {
             if ($segment === '..') {
                 array_pop($segments);
             } elseif ($segment !== '.') {
@@ -523,11 +530,11 @@ final class AgentReadyMarkdown
             }
         }
         $path = implode('/', $segments);
-        if (!str_starts_with($path, '/')) {
-            $path = '/' . $path;
+        if (! str_starts_with($path, '/')) {
+            $path = '/'.$path;
         }
 
-        return $origin . $path . $suffix;
+        return $origin.$path.$suffix;
     }
 
     private function labelOf(DOMElement $el): string
@@ -580,8 +587,7 @@ final class AgentReadyMarkdown
     }
 
     /**
-     * @param list<string> $tags
-     *
+     * @param  list<string>  $tags
      * @return list<DOMElement>
      */
     private function descendants(DOMElement $el, array $tags): array
@@ -615,26 +621,26 @@ final class AgentReady
 
     public function __construct(private readonly string $root)
     {
-        if (!is_dir($root)) {
+        if (! is_dir($root)) {
             throw new AgentReadyError("The folder {$root} does not exist.");
         }
-        $config = $this->json($root . '/agent-ready.json', false);
-        $composer = $this->json($root . '/composer.json', false);
+        $config = $this->json($root.'/agent-ready.json', false);
+        $composer = $this->json($root.'/composer.json', false);
         $site = is_string($config['site'] ?? null) ? $config['site'] : 'site';
-        $this->site = rtrim($root . '/' . $site, '/');
-        if (!is_dir($this->site)) {
+        $this->site = rtrim($root.'/'.$site, '/');
+        if (! is_dir($this->site)) {
             throw new AgentReadyError("The site folder {$this->site} does not exist.");
         }
-        $this->readme = $root . '/' . (is_string($config['readme'] ?? null) ? $config['readme'] : 'README.md');
-        if (!is_file($this->readme)) {
+        $this->readme = $root.'/'.(is_string($config['readme'] ?? null) ? $config['readme'] : 'README.md');
+        if (! is_file($this->readme)) {
             throw new AgentReadyError("The README {$this->readme} does not exist.");
         }
         $support = is_array($composer['support'] ?? null) ? $composer['support'] : [];
         $base = $config['base'] ?? $composer['homepage'] ?? null;
-        if (!is_string($base) || !preg_match('#^https://[^/]+/?$#', $base)) {
+        if (! is_string($base) || ! preg_match('#^https://[^/]+/?$#', $base)) {
             throw new AgentReadyError('No base URL: set "base" in agent-ready.json or "homepage" in composer.json to https://<host>/.');
         }
-        $this->base = rtrim($base, '/') . '/';
+        $this->base = rtrim($base, '/').'/';
         $source = $config['source'] ?? $support['source'] ?? '';
         $this->source = is_string($source) ? rtrim($source, '/') : '';
         $exclude = is_array($config['exclude'] ?? null) ? $config['exclude'] : [];
@@ -666,12 +672,12 @@ final class AgentReady
             $body = $this->body($page->dom);
             $md = new AgentReadyMarkdown($page->url);
             $twin = $md->convert($body);
-            if (!preg_match('/^# /m', $twin)) {
-                $twin = '# ' . $page->title . "\n\n" . $twin;
+            if (! preg_match('/^# /m', $twin)) {
+                $twin = '# '.$page->title."\n\n".$twin;
             }
-            $files[$page->twinPath] = $this->frontMatter($page) . $twin;
+            $files[$page->twinPath] = $this->frontMatter($page).$twin;
             $plain = new AgentReadyMarkdown($page->url, false);
-            $reference .= "\n" . $plain->convert($body);
+            $reference .= "\n".$plain->convert($body);
             foreach ($md->prompts as $prompt) {
                 $prompts[] = [$page, $prompt];
             }
@@ -693,8 +699,7 @@ final class AgentReady
     /**
      * Twins this tool wrote earlier whose page has gone.
      *
-     * @param array<string, string> $files
-     *
+     * @param  array<string, string>  $files
      * @return list<string>
      */
     public function leftovers(array $files): array
@@ -704,9 +709,9 @@ final class AgentReady
             if (isset($files[$relative])) {
                 continue;
             }
-            $head = (string) file_get_contents($this->site . '/' . $relative, false, null, 0, 600);
-            if (str_contains($head, 'generator: ' . AgentReadyKit::GENERATOR)
-                || str_contains($head, 'generator: ' . AgentReadyKit::LEGACY_GENERATOR)
+            $head = (string) file_get_contents($this->site.'/'.$relative, false, null, 0, 600);
+            if (str_contains($head, 'generator: '.AgentReadyKit::GENERATOR)
+                || str_contains($head, 'generator: '.AgentReadyKit::LEGACY_GENERATOR)
             ) {
                 $out[] = $relative;
             }
@@ -718,16 +723,16 @@ final class AgentReady
     /** True when a file on disk was not written by this tool, so it must not be overwritten. */
     public function foreign(string $relative): bool
     {
-        $path = $this->site . '/' . $relative;
-        if (!is_file($path)) {
+        $path = $this->site.'/'.$relative;
+        if (! is_file($path)) {
             return false;
         }
         $content = (string) file_get_contents($path);
 
-        return !str_contains($content, AgentReadyKit::GENERATOR)
-            && !str_contains($content, AgentReadyKit::LEGACY_GENERATOR)
-            && !str_contains($content, "Squire's agent-ready kit")
-            && !str_contains($content, "SQUIRE's agent-ready kit");
+        return ! str_contains($content, AgentReadyKit::GENERATOR)
+            && ! str_contains($content, AgentReadyKit::LEGACY_GENERATOR)
+            && ! str_contains($content, "Squire's agent-ready kit")
+            && ! str_contains($content, "SQUIRE's agent-ready kit");
     }
 
     /** @return list<AgentReadyPage> */
@@ -738,29 +743,29 @@ final class AgentReady
             if (in_array($relative, $this->exclude, true)) {
                 continue;
             }
-            $html = $this->normalise((string) file_get_contents($this->site . '/' . $relative));
-            $dom = new DOMDocument();
+            $html = $this->normalise((string) file_get_contents($this->site.'/'.$relative));
+            $dom = new DOMDocument;
             $previous = libxml_use_internal_errors(true);
-            $dom->loadHTML('<?xml encoding="utf-8" ?>' . $html, LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NONET);
+            $dom->loadHTML('<?xml encoding="utf-8" ?>'.$html, LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NONET);
             libxml_clear_errors();
             libxml_use_internal_errors($previous);
             if ($this->noindex($dom)) {
                 continue;
             }
             $path = $relative === 'index.html' ? '' : (string) preg_replace('#(^|/)index\.html$#', '$1', $relative);
-            $twinPath = substr($relative, 0, -5) . '.md';
+            $twinPath = substr($relative, 0, -5).'.md';
             $pages[] = new AgentReadyPage(
                 $relative,
-                $this->base . $path,
+                $this->base.$path,
                 $twinPath,
-                $this->base . $twinPath,
+                $this->base.$twinPath,
                 $this->text($dom, 'title'),
                 $this->meta($dom, 'description'),
                 $dom,
             );
         }
         // The front page first, then the rest in path order, so every list reads the same on every OS.
-        usort($pages, static fn(AgentReadyPage $a, AgentReadyPage $b): int => [$a->path !== 'index.html', $a->path] <=> [$b->path !== 'index.html', $b->path]);
+        usort($pages, static fn (AgentReadyPage $a, AgentReadyPage $b): int => [$a->path !== 'index.html', $a->path] <=> [$b->path !== 'index.html', $b->path]);
 
         return $pages;
     }
@@ -779,7 +784,7 @@ final class AgentReady
                         return false;
                     }
                     if ($iterator->hasChildren()) {
-                        return !in_array($relative, $skip, true);
+                        return ! in_array($relative, $skip, true);
                     }
 
                     return true;
@@ -808,15 +813,15 @@ final class AgentReady
 
     private function frontMatter(AgentReadyPage $page): string
     {
-        $q = static fn(string $v): string => '"' . addcslashes($v, "\"\\") . '"';
+        $q = static fn (string $v): string => '"'.addcslashes($v, '"\\').'"';
 
         return "---\n"
-            . 'title: ' . $q($page->title) . "\n"
-            . ($page->description !== '' ? 'description: ' . $q($page->description) . "\n" : '')
-            . 'url: ' . $page->url . "\n"
-            . 'llms: ' . $this->base . "llms.txt\n"
-            . 'generator: ' . AgentReadyKit::GENERATOR . "\n"
-            . "---\n\n";
+            .'title: '.$q($page->title)."\n"
+            .($page->description !== '' ? 'description: '.$q($page->description)."\n" : '')
+            .'url: '.$page->url."\n"
+            .'llms: '.$this->base."llms.txt\n"
+            .'generator: '.AgentReadyKit::GENERATOR."\n"
+            ."---\n\n";
     }
 
     /** @param list<string> $prompts */
@@ -834,7 +839,7 @@ final class AgentReady
                 }
             }
         }
-        if (!$found) {
+        if (! $found) {
             $this->findings[] = "{$page->path}: add <link rel=\"alternate\" type=\"text/markdown\" href=\"{$want}\"> to the head.";
         }
         if ($page->path === 'index.html') {
@@ -842,7 +847,7 @@ final class AgentReady
             foreach ($page->dom->getElementsByTagName('*') as $node) {
                 if ($node->hasAttribute('data-ar-prompt')) {
                     foreach ($node->getElementsByTagName('*') as $inner) {
-                        if (str_contains(' ' . $inner->getAttribute('class') . ' ', ' ar-prompt__title ')
+                        if (str_contains(' '.$inner->getAttribute('class').' ', ' ar-prompt__title ')
                             && str_starts_with(trim($inner->textContent), 'Get started with ')
                         ) {
                             $started = true;
@@ -850,7 +855,7 @@ final class AgentReady
                     }
                 }
             }
-            if (!$started) {
+            if (! $started) {
                 $this->findings[] = 'index.html: the front page needs a "Get started with <NAME>" prompt block (ADR-0019).';
             }
         }
@@ -866,15 +871,15 @@ final class AgentReady
         $script = false;
         $sheet = false;
         foreach ($page->dom->getElementsByTagName('script') as $node) {
-            $script = $script || $node->getAttribute('src') === $prefix . 'assets/agent-ready.js';
+            $script = $script || $node->getAttribute('src') === $prefix.'assets/agent-ready.js';
         }
         foreach ($page->dom->getElementsByTagName('link') as $node) {
-            $sheet = $sheet || $node->getAttribute('href') === $prefix . 'assets/agent-ready.css';
+            $sheet = $sheet || $node->getAttribute('href') === $prefix.'assets/agent-ready.css';
         }
-        if (!$script) {
+        if (! $script) {
             $this->findings[] = "{$page->path}: has a prompt block but does not load {$prefix}assets/agent-ready.js.";
         }
-        if (!$sheet) {
+        if (! $sheet) {
             $this->findings[] = "{$page->path}: has a prompt block but does not load {$prefix}assets/agent-ready.css.";
         }
     }
@@ -883,7 +888,7 @@ final class AgentReady
     {
         $first = strtok($prompt, "\n");
         $first = $first === false ? '' : $first;
-        $name = $page->path . ': prompt "' . (strlen($first) > 48 ? substr($first, 0, 45) . '...' : $first) . '"';
+        $name = $page->path.': prompt "'.(strlen($first) > 48 ? substr($first, 0, 45).'...' : $first).'"';
         if ($prompt === '') {
             $this->findings[] = "{$name} is empty.";
 
@@ -897,15 +902,15 @@ final class AgentReady
         if (str_contains($prompt, "\t")) {
             $this->findings[] = "{$name} contains a tab; indent with spaces so a paste into bash does not trigger completion.";
         }
-        if (!str_contains($prompt, $this->base . 'llms.txt')) {
+        if (! str_contains($prompt, $this->base.'llms.txt')) {
             $this->findings[] = "{$name} does not point at {$this->base}llms.txt.";
         }
-        if (!str_contains($prompt, 'ADVISOR')) {
+        if (! str_contains($prompt, 'ADVISOR')) {
             $this->findings[] = "{$name} does not point at ADVISOR.";
         }
         preg_match_all('/`([^`\n]+)`/', $prompt, $spans);
         foreach ($spans[1] as $span) {
-            if (preg_match(AgentReadyKit::COMMAND, $span) && !str_contains($reference, $span)) {
+            if (preg_match(AgentReadyKit::COMMAND, $span) && ! str_contains($reference, $span)) {
                 $this->findings[] = "{$name} runs `{$span}`, which is not in the README or on a page. Prompts must match the docs.";
             }
         }
@@ -914,13 +919,14 @@ final class AgentReady
     private function checkKit(): void
     {
         foreach (AgentReadyKit::FILES as $relative => $hash) {
-            $path = $this->site . '/' . $relative;
-            if (!is_file($path)) {
-                $this->findings[] = "{$relative} is missing. Copy the kit with SQUIRE: php bin/agent-ready.php --sync-to=<this repo>.";
+            $path = $this->site.'/'.$relative;
+            if (! is_file($path)) {
+                $this->findings[] = "{$relative} is missing. Copy the kit with Squire: php bin/agent-ready.php --sync-to=<this repo>.";
+
                 continue;
             }
             if (hash('sha256', $this->normalise((string) file_get_contents($path))) !== $hash) {
-                $this->findings[] = "{$relative} differs from SQUIRE's kit. Never edit it here; change the kit in SQUIRE and sync.";
+                $this->findings[] = "{$relative} differs from Squire's kit. Never edit it here; change the kit in Squire and sync.";
             }
         }
     }
@@ -930,31 +936,31 @@ final class AgentReady
     {
         $readme = $this->readmeParts();
         $front = $pages[0];
-        $out = '# ' . $readme['name'] . "\n\n";
+        $out = '# '.$readme['name']."\n\n";
         if ($front->description !== '') {
-            $out .= '> ' . $front->description . "\n\n";
+            $out .= '> '.$front->description."\n\n";
         }
         if ($readme['intro'] !== '') {
-            $out .= $readme['intro'] . "\n\n";
+            $out .= $readme['intro']."\n\n";
         }
         $out .= 'Every page below is Markdown. The HTML pages send the same Markdown to a client that asks for '
-            . "`text/markdown`. Written by Squire's agent-ready kit from the README and the pages; do not edit.\n\n";
+            ."`text/markdown`. Written by Squire's agent-ready kit from the README and the pages; do not edit.\n\n";
 
         $out .= "## Pages\n\n";
         foreach ($pages as $page) {
-            $out .= '- [' . $page->title . '](' . $page->twinUrl . ')' . ($page->description !== '' ? ': ' . $page->description : '') . "\n";
+            $out .= '- ['.$page->title.']('.$page->twinUrl.')'.($page->description !== '' ? ': '.$page->description : '')."\n";
         }
 
         $promptLines = '';
         foreach ($pages as $page) {
             foreach ($page->dom->getElementsByTagName('*') as $node) {
-                if (!$node->hasAttribute('data-ar-prompt')) {
+                if (! $node->hasAttribute('data-ar-prompt')) {
                     continue;
                 }
                 $title = '';
                 $desc = '';
                 foreach ($node->getElementsByTagName('*') as $inner) {
-                    $class = ' ' . $inner->getAttribute('class') . ' ';
+                    $class = ' '.$inner->getAttribute('class').' ';
                     if ($title === '' && str_contains($class, ' ar-prompt__title ')) {
                         $title = trim((string) preg_replace('/\s+/', ' ', $inner->textContent));
                     }
@@ -963,56 +969,56 @@ final class AgentReady
                     }
                 }
                 $anchor = $node->getAttribute('id');
-                $promptLines .= '- [' . $title . '](' . $page->url . ($anchor !== '' ? '#' . $anchor : '') . ')'
-                    . ($desc !== '' ? ': ' . $desc : '') . ' The prompt itself is in ' . $page->twinUrl . ".\n";
+                $promptLines .= '- ['.$title.']('.$page->url.($anchor !== '' ? '#'.$anchor : '').')'
+                    .($desc !== '' ? ': '.$desc : '').' The prompt itself is in '.$page->twinUrl.".\n";
             }
         }
         if ($promptLines !== '') {
-            $out .= "\n## Prompts\n\n" . $promptLines;
+            $out .= "\n## Prompts\n\n".$promptLines;
         }
 
         $out .= "\n## Source\n\n";
         if ($this->source !== '') {
-            $out .= '- [README](' . $this->source . '/blob/HEAD/' . basename($this->readme) . '): the project\'s README, with install, commands and checks' . "\n";
+            $out .= '- [README]('.$this->source.'/blob/HEAD/'.basename($this->readme).'): the project\'s README, with install, commands and checks'."\n";
         }
-        $out .= '- [Everything in one file](' . $this->base . 'llms-full.txt): the README and every page above, as one Markdown file' . "\n";
+        $out .= '- [Everything in one file]('.$this->base.'llms-full.txt): the README and every page above, as one Markdown file'."\n";
 
         $self = (string) preg_replace('#^https://([^.]+)\..*$#', '$1', $this->base);
         $optional = '';
         foreach (AgentReadyKit::STACK as $key => [$title, $url, $note]) {
             if ($key !== $self) {
-                $optional .= '- [' . $title . '](' . $url . '): ' . $note . "\n";
+                $optional .= '- ['.$title.']('.$url.'): '.$note."\n";
             }
         }
         if ($optional !== '') {
-            $out .= "\n## Optional\n\n" . $optional;
+            $out .= "\n## Optional\n\n".$optional;
         }
 
         return $out;
     }
 
     /**
-     * @param list<AgentReadyPage> $pages
-     * @param array<string, string> $files
+     * @param  list<AgentReadyPage>  $pages
+     * @param  array<string, string>  $files
      */
     private function llmsFull(array $pages, array $files): string
     {
         $readme = $this->readmeParts();
-        $out = '# ' . $readme['name'] . ": everything in one file\n\n";
+        $out = '# '.$readme['name'].": everything in one file\n\n";
         if ($pages[0]->description !== '') {
-            $out .= '> ' . $pages[0]->description . "\n\n";
+            $out .= '> '.$pages[0]->description."\n\n";
         }
-        $out .= 'The README and the Markdown twin of every page, joined. The index is ' . $this->base . 'llms.txt. '
-            . "Written by Squire's agent-ready kit; do not edit.\n";
+        $out .= 'The README and the Markdown twin of every page, joined. The index is '.$this->base.'llms.txt. '
+            ."Written by Squire's agent-ready kit; do not edit.\n";
         $out .= "\n---\n\n## README\n\n";
         if ($this->source !== '') {
-            $out .= 'Source: ' . $this->source . '/blob/HEAD/' . basename($this->readme) . "\n\n";
+            $out .= 'Source: '.$this->source.'/blob/HEAD/'.basename($this->readme)."\n\n";
         }
-        $out .= $this->demote($readme['body']) . "\n";
+        $out .= $this->demote($readme['body'])."\n";
         foreach ($pages as $page) {
             $twin = $files[$page->twinPath] ?? '';
             $twin = (string) preg_replace('/\A---\n.*?\n---\n\n/s', '', $twin);
-            $out .= "\n---\n\nSource: " . $page->url . "\n\n" . $this->demote(trim($twin)) . "\n";
+            $out .= "\n---\n\nSource: ".$page->url."\n\n".$this->demote(trim($twin))."\n";
         }
 
         return $out;
@@ -1020,26 +1026,26 @@ final class AgentReady
 
     private function robots(): string
     {
-        return '# robots.txt for ' . $this->base . ", written by Squire's agent-ready kit (ADR-0019); do not edit.\n"
-            . "# Content Signals (contentsignals.org): find it and answer from it, yes; train on it, no.\n"
-            . "User-agent: *\n"
-            . "Content-Signal: search=yes, ai-input=yes, ai-train=no\n"
-            . "Allow: /\n"
-            . "\n"
-            . 'Sitemap: ' . $this->base . "sitemap.xml\n";
+        return '# robots.txt for '.$this->base.", written by Squire's agent-ready kit (ADR-0019); do not edit.\n"
+            ."# Content Signals (contentsignals.org): find it and answer from it, yes; train on it, no.\n"
+            ."User-agent: *\n"
+            ."Content-Signal: search=yes, ai-input=yes, ai-train=no\n"
+            ."Allow: /\n"
+            ."\n"
+            .'Sitemap: '.$this->base."sitemap.xml\n";
     }
 
     /** @param list<AgentReadyPage> $pages */
     private function sitemap(array $pages): string
     {
         $out = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-            . "<!-- Written by Squire's agent-ready kit from the pages in the site folder; do not edit. -->\n"
-            . "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n";
+            ."<!-- Written by Squire's agent-ready kit from the pages in the site folder; do not edit. -->\n"
+            ."<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n";
         foreach ($pages as $page) {
-            $out .= '  <url><loc>' . htmlspecialchars($page->url, ENT_XML1) . "</loc></url>\n";
+            $out .= '  <url><loc>'.htmlspecialchars($page->url, ENT_XML1)."</loc></url>\n";
         }
 
-        return $out . "</urlset>\n";
+        return $out."</urlset>\n";
     }
 
     /** @return array{name: string, intro: string, body: string} */
@@ -1065,22 +1071,25 @@ final class AgentReady
         $depth = 0;
         foreach ($lines as $line) {
             if (preg_match('/^\s*(```|~~~)/', $line)) {
-                $fence = !$fence;
+                $fence = ! $fence;
             }
             if ($fence || preg_match('/^\s*(```|~~~)/', $line)) {
                 if ($depth === 0) {
                     $out[] = $line;
                 }
+
                 continue;
             }
             if (preg_match('/^\s*<(div|details|picture|p)\b/i', $line)) {
                 $depth += preg_match_all('/<(div|details|picture|p)\b/i', $line) - preg_match_all('/<\/(div|details|picture|p)>/i', $line);
                 $depth = max(0, $depth);
+
                 continue;
             }
             if ($depth > 0) {
                 $depth += preg_match_all('/<(div|details|picture|p)\b/i', $line) - preg_match_all('/<\/(div|details|picture|p)>/i', $line);
                 $depth = max(0, $depth);
+
                 continue;
             }
             $line = (string) preg_replace('/<!--.*?-->/', '', $line);
@@ -1090,7 +1099,7 @@ final class AgentReady
                 $source = $this->source;
                 $line = (string) preg_replace_callback(
                     '/\]\((?![a-z][a-z0-9+.-]*:|#|\/)([^)\s]+)\)/i',
-                    static fn(array $m): string => '](' . $source . '/blob/HEAD/' . ltrim($m[1], './') . ')',
+                    static fn (array $m): string => ']('.$source.'/blob/HEAD/'.ltrim($m[1], './').')',
                     $line,
                 );
             }
@@ -1109,11 +1118,12 @@ final class AgentReady
         $lines = explode("\n", $markdown);
         foreach ($lines as $i => $line) {
             if (preg_match('/^\s*(```|~~~)/', $line)) {
-                $fence = !$fence;
+                $fence = ! $fence;
+
                 continue;
             }
-            if (!$fence && preg_match('/^(#{1,5}) /', $line)) {
-                $lines[$i] = '#' . $line;
+            if (! $fence && preg_match('/^(#{1,5}) /', $line)) {
+                $lines[$i] = '#'.$line;
             }
         }
 
@@ -1151,7 +1161,7 @@ final class AgentReady
     /** @return array<string, mixed> */
     private function json(string $path, bool $required): array
     {
-        if (!is_file($path)) {
+        if (! is_file($path)) {
             if ($required) {
                 throw new AgentReadyError("{$path} is missing.");
             }
@@ -1159,7 +1169,7 @@ final class AgentReady
             return [];
         }
         $data = json_decode((string) file_get_contents($path), true);
-        if (!is_array($data)) {
+        if (! is_array($data)) {
             throw new AgentReadyError("{$path} is not valid JSON.");
         }
 
@@ -1172,7 +1182,7 @@ final class AgentReady
 function agent_ready_main(array $argv): int
 {
     $usage = "Usage: php bin/agent-ready.php [--root=.] [--check]\n"
-        . "       php bin/agent-ready.php --sync-to=<repo>   (from SQUIRE: copy the kit and this file)\n";
+        ."       php bin/agent-ready.php --sync-to=<repo>   (from Squire: copy the kit and this file)\n";
     $root = '.';
     $check = false;
     $syncTo = null;
@@ -1210,9 +1220,10 @@ function agent_ready_main(array $argv): int
         $site = $tool->siteDir();
         $drift = [];
         foreach ($files as $relative => $content) {
-            $path = $site . '/' . $relative;
+            $path = $site.'/'.$relative;
             if ($tool->foreign($relative)) {
                 $tool->findings[] = "{$relative} exists and was not written by this tool; move it aside or merge it by hand.";
+
                 continue;
             }
             $onDisk = is_file($path) ? str_replace("\r\n", "\n", (string) file_get_contents($path)) : null;
@@ -1220,11 +1231,12 @@ function agent_ready_main(array $argv): int
                 continue;
             }
             if ($check) {
-                $drift[] = $relative . ($onDisk === null ? ' (missing)' : ' (out of date)');
+                $drift[] = $relative.($onDisk === null ? ' (missing)' : ' (out of date)');
+
                 continue;
             }
             $dir = dirname($path);
-            if (!is_dir($dir) && !mkdir($dir, 0o775, true) && !is_dir($dir)) {
+            if (! is_dir($dir) && ! mkdir($dir, 0o775, true) && ! is_dir($dir)) {
                 throw new AgentReadyError("Cannot create {$dir}.");
             }
             if (file_put_contents($path, $content) === false) {
@@ -1234,9 +1246,9 @@ function agent_ready_main(array $argv): int
         }
         foreach ($leftovers as $relative) {
             if ($check) {
-                $drift[] = $relative . ' (no longer generated)';
+                $drift[] = $relative.' (no longer generated)';
             } else {
-                unlink($site . '/' . $relative);
+                unlink($site.'/'.$relative);
                 fwrite(STDOUT, "removed {$relative}\n");
             }
         }
@@ -1252,52 +1264,52 @@ function agent_ready_main(array $argv): int
         if ($drift !== [] || $tool->findings !== []) {
             return 1;
         }
-        fwrite(STDOUT, ($check ? 'Agent-ready files are current: ' : 'Agent-ready files written: ') . count($files) . " file(s).\n");
+        fwrite(STDOUT, ($check ? 'Agent-ready files are current: ' : 'Agent-ready files written: ').count($files)." file(s).\n");
 
         return 0;
     } catch (AgentReadyError $e) {
-        fwrite(STDERR, 'agent-ready: ' . $e->getMessage() . "\n");
+        fwrite(STDERR, 'agent-ready: '.$e->getMessage()."\n");
 
         return 2;
     }
 }
 
-/** Records the SHA-256 of each kit file in AgentReadyKit::FILES, in this file. SQUIRE's maintainers run it. */
+/** Records the SHA-256 of each kit file in AgentReadyKit::FILES, in this file. Squire's maintainers run it. */
 function agent_ready_rehash(): int
 {
-    $kit = dirname(__DIR__) . '/kit/site';
-    if (!is_dir($kit)) {
-        throw new AgentReadyError('--rehash runs from SQUIRE, where the kit lives (kit/site/).');
+    $kit = dirname(__DIR__).'/kit/site';
+    if (! is_dir($kit)) {
+        throw new AgentReadyError('--rehash runs from Squire, where the kit lives (kit/site/).');
     }
     $source = str_replace("\r\n", "\n", (string) file_get_contents(__FILE__));
     foreach (array_keys(AgentReadyKit::FILES) as $relative) {
-        $hash = hash('sha256', str_replace("\r\n", "\n", (string) file_get_contents($kit . '/' . $relative)));
+        $hash = hash('sha256', str_replace("\r\n", "\n", (string) file_get_contents($kit.'/'.$relative)));
         $source = (string) preg_replace(
-            "/('" . preg_quote($relative, '/') . "' => ')[^']*(')/",
-            '${1}' . $hash . '${2}',
+            "/('".preg_quote($relative, '/')."' => ')[^']*(')/",
+            '${1}'.$hash.'${2}',
             $source,
             1,
         );
     }
     if (file_put_contents(__FILE__, $source) === false) {
-        throw new AgentReadyError('Cannot write ' . __FILE__ . '.');
+        throw new AgentReadyError('Cannot write '.__FILE__.'.');
     }
     fwrite(STDOUT, "Kit hashes recorded.\n");
 
     return 0;
 }
 
-/** Copies the kit and this file into a repo. Only SQUIRE has the kit, so only SQUIRE can sync. */
+/** Copies the kit and this file into a repo. Only Squire has the kit, so only Squire can sync. */
 function agent_ready_sync(string $repo): int
 {
-    $kit = dirname(__DIR__) . '/kit/site';
-    if (!is_dir($kit)) {
-        throw new AgentReadyError('--sync-to runs from SQUIRE, where the kit lives (kit/site/). This copy has no kit.');
+    $kit = dirname(__DIR__).'/kit/site';
+    if (! is_dir($kit)) {
+        throw new AgentReadyError('--sync-to runs from Squire, where the kit lives (kit/site/). This copy has no kit.');
     }
     $tool = new AgentReady(rtrim($repo, '/\\'));
-    $copies = [__FILE__ => rtrim($repo, '/\\') . '/bin/agent-ready.php'];
+    $copies = [__FILE__ => rtrim($repo, '/\\').'/bin/agent-ready.php'];
     foreach (array_keys(AgentReadyKit::FILES) as $relative) {
-        $copies[$kit . '/' . $relative] = $tool->siteDir() . '/' . $relative;
+        $copies[$kit.'/'.$relative] = $tool->siteDir().'/'.$relative;
     }
     foreach ($copies as $from => $to) {
         $content = str_replace("\r\n", "\n", (string) file_get_contents($from));
@@ -1305,8 +1317,8 @@ function agent_ready_sync(string $repo): int
         if ($old === $content) {
             continue;
         }
-        if (!is_dir(dirname($to)) && !mkdir(dirname($to), 0o775, true) && !is_dir(dirname($to))) {
-            throw new AgentReadyError('Cannot create ' . dirname($to) . '.');
+        if (! is_dir(dirname($to)) && ! mkdir(dirname($to), 0o775, true) && ! is_dir(dirname($to))) {
+            throw new AgentReadyError('Cannot create '.dirname($to).'.');
         }
         if (file_put_contents($to, $content) === false) {
             throw new AgentReadyError("Cannot write {$to}.");
