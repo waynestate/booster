@@ -6,3 +6,5 @@
 *.sh text eol=lf
 /docs/readme export-ignore
 /scripts/readme-art export-ignore
+/bin/agent-ready.php export-ignore
+/site export-ignore
