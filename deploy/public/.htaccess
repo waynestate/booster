@@ -1,0 +1,8 @@
+# Everything that is not a real file in this folder goes to the front
+# controller, so every response, assets and 404s included, carries
+# HELMET's headers (ADR-0017).
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [L]
+DirectoryIndex index.php
+Options -Indexes

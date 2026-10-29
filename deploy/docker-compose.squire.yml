@@ -1,0 +1,122 @@
+# docker-compose.squire.yml: local parity with Citadel (SQUIRE S35 to S37, S67, S70, S71).
+#
+#   app    the Citadel PHP image (Apache + mod_php) plus the vhost, php.ini, YOUR build.sh and deployments/
+#   proxy  HA-Proxy in front, adding X-Forwarded-For and X-Forwarded-Proto the way Citadel's does
+#   mysql  MySQL 5.6.51, the version of Citadel's shared database server (it has no JSON columns, indexed strings
+#          stop at 191 characters)
+#
+# Start it with scripts/parity.sh (Linux, macOS) or scripts/parity.ps1 (Windows), which pass --env-file .env.squire.
+# Every SQUIRE_* variable is documented in .env.squire.example. Secrets are required, not defaulted: compose stops
+# with a message if a password is missing (fail closed).
+
+name: ${SQUIRE_PROJECT:-squire-app}
+
+x-app-build: &app-build
+  context: .
+  dockerfile: .squire/Dockerfile
+  args:
+    BASE_IMAGE: ${SQUIRE_BASE_IMAGE:-citadel/php-apache:8.4r5}
+    CITADEL_PUBLIC_DIR: ${SQUIRE_PUBLIC_DIR:-src/public}
+    CITADEL_TIME_ZONE: ${SQUIRE_TZ:-America/Detroit}
+    CITADEL_SERVER_NAME: ${SQUIRE_SERVER_NAME:-app.apps.wayne.test}
+    CITADEL_ENVIRONMENT: ${SQUIRE_ENVIRONMENT:-local}
+    CITADEL_DEPLOYMENTS: ${SQUIRE_DEPLOYMENTS:-./deployments/}
+
+services:
+  # Citadel creates /citadel/logs/deployments on the host; a fresh named volume does not have it. This one-shot
+  # container makes it, owned by the `citadel` user, before the app starts.
+  logs-init:
+    build: *app-build
+    image: squire-local/app:${SQUIRE_PROJECT:-squire-app}
+    user: root
+    entrypoint: ["sh", "-c", "mkdir -p /citadel/logs/deployments /citadel/logs/apache && chown citadel:citadel /citadel/logs/deployments && chown -R prisoner:prisoner /citadel/logs/apache 2>/dev/null || true"]
+    volumes:
+      - logs:/citadel/logs
+    restart: "no"
+
+  app:
+    build: *app-build
+    image: squire-local/app:${SQUIRE_PROJECT:-squire-app}
+    depends_on:
+      logs-init:
+        condition: service_completed_successfully
+      mysql:
+        condition: service_healthy
+    hostname: app
+    volumes:
+      # The app source, as Citadel mounts it.
+      - ./:/citadel/src/
+      # Container logs, kept apart from the source.
+      - logs:/citadel/logs
+    environment:
+      CITADEL_ENVIRONMENT: ${SQUIRE_ENVIRONMENT:-local}
+    # Same timing as Citadel's check (5 minutes, 15 seconds). The start_* settings are local-only: they make the
+    # first result arrive in seconds instead of after 5 minutes.
+    healthcheck:
+      test: ["CMD", "php", "health.php"]
+      interval: 5m
+      timeout: 15s
+      start_period: 60s
+      start_interval: 5s
+    # S70: least privilege. Apache starts as root and then drops to `prisoner`; the entrypoint runs the deployments
+    # as `citadel`. Those are the only capabilities that needs.
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID, NET_BIND_SERVICE, KILL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: ${SQUIRE_APP_MEMORY:-512m}
+    pids_limit: 256
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "2"
+
+  proxy:
+    image: ${SQUIRE_PROXY_IMAGE:-haproxy:3.0-alpine@sha256:f06f6cc1c25c7071e62d955d8e67a33d6935066ced8fac496cdd0ad9ffdd17f3}
+    depends_on:
+      - app
+    ports:
+      - "127.0.0.1:${SQUIRE_HTTP_PORT:-8080}:8080"
+    volumes:
+      - ./.squire/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    pids_limit: 64
+    logging: *logging
+
+  mysql:
+    image: ${SQUIRE_MYSQL_IMAGE:-mysql:5.6.51@sha256:20575ecebe6216036d25dab5903808211f1e9ba63dc7825ac20cb975e34cfcae}
+    # MySQL 5.6 has no arm64 build; on Apple Silicon this runs under emulation.
+    platform: linux/amd64
+    command: ["--skip-host-cache", "--skip-name-resolve"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${SQUIRE_DB_ROOT_PASSWORD:?set SQUIRE_DB_ROOT_PASSWORD in .env.squire}
+      MYSQL_DATABASE: ${SQUIRE_DB_NAME:-app}
+      MYSQL_USER: ${SQUIRE_DB_USER:-app}
+      MYSQL_PASSWORD: ${SQUIRE_DB_PASSWORD:?set SQUIRE_DB_PASSWORD in .env.squire}
+    ports:
+      - "127.0.0.1:${SQUIRE_DB_PORT:-3307}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: ${SQUIRE_DB_MEMORY:-512m}
+    pids_limit: 512
+    logging: *logging
+
+volumes:
+  logs:
+  mysql-data:

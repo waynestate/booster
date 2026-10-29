@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Local copy of the Citadel entrypoint: run the deployments as `citadel`, then replace the shell with the command.
+# Mirrors the platform's entrypoint without the Composer download.
+set -u
+
+if [ -d "${CITADEL_DEPLOYMENTS:-}" ]; then
+    echo "Running deployments in $(pwd)"
+    su -l citadel -c "TZ=$TZ CITADEL_DEPLOYMENTS=$CITADEL_DEPLOYMENTS CITADEL_SERVER_NAME=${CITADEL_SERVER_NAME:-} citadel-deploy"
+    status=$?
+    if [ "$status" -ne 0 ]; then
+        echo "Deployments failed" >&2
+        exit "$status"
+    fi
+fi
+
+if [ "$#" -ne 0 ]; then
+    echo "replacing shell with command $*" >&2
+    exec "$@"
+fi
