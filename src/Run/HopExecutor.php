@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Run;
 
+use Waynestate\Booster\Hop\Hop;
 use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanStep;
@@ -21,6 +22,7 @@ final class HopExecutor
         private readonly ComposerEditor $composer,
         private readonly TargetImageRunner $gate,
         private readonly ProcessRunner $processes,
+        private readonly ?NodeRunner $node = null,
     ) {}
 
     public function execute(Plan $plan, RunOptions $options): RunReport
@@ -131,6 +133,10 @@ final class HopExecutor
         }
 
         try {
+            if ($hop->kind === HopKind::Node) {
+                return $this->runNodeHop($step, $path, $options, $baseline);
+            }
+
             $phpunitTarget = $hop->kind === HopKind::Phpunit ? $hop->to : null;
             $preview = $this->rector->run($hop, $path, true, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget);
             if ($preview->errors !== []) {
@@ -209,6 +215,167 @@ final class HopExecutor
         }
 
         return $messages;
+    }
+
+    /**
+     * A Node hop edits package.json and .nvmrc instead of running Rector. The
+     * build gate (when the hop asks for one) runs npm ci and npm run build in
+     * a node container; otherwise the usual test gate applies.
+     */
+    private function runNodeHop(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): StepResult
+    {
+        $hop = $step->hop;
+        if ($options->dryRun) {
+            return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [], [
+                sprintf('Dry run: would set %s in package.json and write .nvmrc with %s.', implode(', ', self::npmSetPhrases($hop->npmSet)), $hop->to),
+                ...$hop->notes,
+            ]);
+        }
+
+        [$changes, $files] = $this->applyNodeChanges($hop, $path);
+        if ($changes === []) {
+            return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
+                'Nothing to do: package.json already sets ' . implode(' and ', self::npmSetPhrases($hop->npmSet)) . ' and .nvmrc already pins ' . $hop->to . ', so the gate was skipped.',
+                ...$hop->notes,
+            ]);
+        }
+
+        if ($hop->buildGate) {
+            $failure = $this->runBuildGate($path);
+            if ($failure !== null) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$failure]);
+            }
+            $changes[] = 'Build gate passed: npm ci and npm run build are green in the Node container.';
+        } elseif (!$options->skipGate) {
+            $gate = $this->runGate($step, $path, $options, $baseline);
+            if ($gate !== null) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate]);
+            }
+            $changes[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
+        } else {
+            $changes[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
+        }
+
+        return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$changes, ...$hop->notes]);
+    }
+
+    /**
+     * Applies the hop's package.json values and .nvmrc pin.
+     *
+     * @return array{0: list<string>, 1: list<array{file: string, diff: string}>} what changed and which files
+     */
+    private function applyNodeChanges(Hop $hop, string $path): array
+    {
+        $changes = [];
+        $files = [];
+        $packageFile = $path . '/package.json';
+
+        if (is_file($packageFile)) {
+            $package = json_decode((string) file_get_contents($packageFile), true);
+            if (!is_array($package)) {
+                throw new ToolError(sprintf('package.json is not valid JSON: %s', $packageFile));
+            }
+            $edited = false;
+            foreach ($hop->npmSet as $key => $value) {
+                if (self::getNested($package, $key) !== $value) {
+                    $package = self::setNested($package, $key, $value);
+                    $changes[] = 'package.json: ' . $key . ' to ' . $value;
+                    $files[] = ['file' => 'package.json', 'diff' => $key . ' to ' . $value];
+                    $edited = true;
+                }
+            }
+            if ($edited) {
+                file_put_contents($packageFile, json_encode($package, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+            }
+        }
+
+        $nvmrc = $path . '/.nvmrc';
+        if (!is_file($nvmrc) || trim((string) file_get_contents($nvmrc)) !== $hop->to) {
+            file_put_contents($nvmrc, $hop->to . "\n");
+            $changes[] = '.nvmrc: ' . $hop->to;
+            $files[] = ['file' => '.nvmrc', 'diff' => 'pins ' . $hop->to];
+        }
+
+        return [$changes, $files];
+    }
+
+    /**
+     * @return list<string>|null failure messages, or null when the build passed
+     */
+    private function runBuildGate(string $path): ?array
+    {
+        if ($this->node === null) {
+            return ['The build gate needs a Node runner, but this BOOSTER has none configured.'];
+        }
+        foreach ([['npm', 'ci'], ['npm', 'run', 'build']] as $argv) {
+            $result = $this->node->run($path, $argv);
+            if (!$result->successful()) {
+                return [
+                    sprintf('Build gate failed: "%s" exited %d in the Node container. The working copy keeps the changes so you can read them.', implode(' ', $argv), $result->exitCode),
+                    trim($result->stdout . "\n" . $result->stderr),
+                    'Undo with: git checkout . (inside the app).',
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, string> $npmSet
+     *
+     * @return list<string>
+     */
+    private static function npmSetPhrases(array $npmSet): array
+    {
+        $phrases = [];
+        foreach ($npmSet as $key => $value) {
+            $phrases[] = $key . ' to ' . $value;
+        }
+
+        return $phrases;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     *
+     * @return mixed
+     */
+    private static function getNested(array $data, string $dotPath): mixed
+    {
+        $current = $data;
+        foreach (explode('.', $dotPath) as $part) {
+            if (!is_array($current) || !array_key_exists($part, $current)) {
+                return null;
+            }
+            $current = $current[$part];
+        }
+
+        return $current;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param mixed                $value
+     *
+     * @return array<string, mixed>
+     */
+    private static function setNested(array $data, string $dotPath, mixed $value): array
+    {
+        $parts = explode('.', $dotPath);
+        $target = &$data;
+        foreach ($parts as $i => $part) {
+            if ($i === count($parts) - 1) {
+                $target[$part] = $value;
+                break;
+            }
+            if (!isset($target[$part]) || !is_array($target[$part])) {
+                $target[$part] = [];
+            }
+            $target = &$target[$part];
+        }
+
+        return $data;
     }
 
     private function defaultTestCommand(string $path): string

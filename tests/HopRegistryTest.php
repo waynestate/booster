@@ -54,6 +54,18 @@ final class HopRegistryTest extends PhpUnitTestCase
         self::assertSame(['laravel/framework' => '^13.0'], $hop->composerSet);
     }
 
+    public function test_the_node_pin_hop_pins_engines_node_and_is_not_manual(): void
+    {
+        $hop = (new HopRegistry())->get(HopRegistry::NODE_PIN_ID);
+
+        self::assertSame(HopKind::Node, $hop->kind);
+        self::assertSame('any', $hop->from);
+        self::assertSame(HopRegistry::NODE_PIN_TARGET, $hop->to);
+        self::assertSame(['engines.node' => '>=24'], $hop->npmSet);
+        self::assertFalse($hop->buildGate);
+        self::assertFalse($hop->isManual());
+    }
+
     public function test_the_php_80_hop_asks_for_extra_review(): void
     {
         self::assertTrue((new HopRegistry())->get('php-74-to-80')->extraReview);

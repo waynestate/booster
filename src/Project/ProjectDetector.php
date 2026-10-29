@@ -42,6 +42,10 @@ final class ProjectDetector
         $hasVue = array_key_exists('vue', $deps);
         $vue = is_string($vueConstraint) ? $this->lowerBound($vueConstraint, 1) : null;
 
+        $engines = $this->section($package, 'engines');
+        $nodeConstraint = $engines['node'] ?? null;
+        $node = is_string($nodeConstraint) ? $this->lowerBound($nodeConstraint, 1) : null;
+
         $isLaravel = array_key_exists('laravel/framework', $all);
         $inertia = array_key_exists('inertiajs/inertia-laravel', $all)
             || array_key_exists('@inertiajs/vue3', $deps)
@@ -68,6 +72,8 @@ final class ProjectDetector
             type: $type,
             usesWayneCas: array_key_exists(self::WAYNE_CAS_PACKAGE, $all),
             hasTestScript: array_key_exists('test', $scripts),
+            hasPackageJson: $package !== [],
+            nodeMajor: $node,
         );
     }
 

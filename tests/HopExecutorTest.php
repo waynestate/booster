@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Tests;
 
+use Waynestate\Booster\Hop\Hop;
+use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Hop\HopRegistry;
+use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanOptions;
+use Waynestate\Booster\Plan\PlanStep;
 use Waynestate\Booster\Plan\Planner;
 use Waynestate\Booster\Project\ProjectDetector;
 use Waynestate\Booster\Run\ComposerEditor;
 use Waynestate\Booster\Run\HopExecutor;
+use Waynestate\Booster\Run\NodeRunner;
 use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\Run\RectorRunner;
 use Waynestate\Booster\Run\RunOptions;
@@ -324,6 +329,124 @@ final class HopExecutorTest extends TestCase
 
         self::assertSame('manual', $this->statuses($report)[count($report->results) - 1]);
         self::assertFalse($report->failed());
+    }
+
+    public function test_a_node_hop_pins_package_json_and_writes_nvmrc(): void
+    {
+        $dir = $this->copyExample('vue-spa');
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.3', toPhp: '8.3'), $this->today());
+        $fake = $this->fake();
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake, new NodeRunner($fake)))
+            ->execute($plan, new RunOptions(skipGate: true));
+
+        self::assertSame(['applied', 'manual'], $this->statuses($report));
+        $package = json_decode((string) file_get_contents($dir . '/package.json'), true);
+        self::assertSame('>=24', $package['engines']['node']);
+        self::assertSame('example-vue-spa', $package['name']);
+        self::assertSame("24\n", (string) file_get_contents($dir . '/.nvmrc'));
+        self::assertStringContainsString('engines.node to >=24', implode(' ', $report->results[0]->messages));
+    }
+
+    public function test_a_node_hop_dry_run_changes_nothing(): void
+    {
+        $dir = $this->copyExample('vue-spa');
+        $before = file_get_contents($dir . '/package.json');
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.3', toPhp: '8.3'), $this->today());
+        $fake = $this->fake();
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake, new NodeRunner($fake)))
+            ->execute($plan, new RunOptions(dryRun: true));
+
+        self::assertSame(['previewed', 'manual'], $this->statuses($report));
+        self::assertSame($before, file_get_contents($dir . '/package.json'));
+        self::assertFileDoesNotExist($dir . '/.nvmrc');
+        self::assertStringContainsString('Dry run: would set engines.node to >=24 in package.json and write .nvmrc with 24.', implode(' ', $report->results[0]->messages));
+    }
+
+    public function test_a_node_hop_that_is_already_pinned_is_nothing_to_do(): void
+    {
+        // The planner would not offer the hop to an already-pinned app, so the step is built by hand.
+        $dir = $this->copyExample('vue-spa');
+        $file = $dir . '/package.json';
+        $data = json_decode((string) file_get_contents($file), true);
+        self::assertIsArray($data);
+        $data['engines']['node'] = '>=24';
+        file_put_contents($file, (string) json_encode($data));
+        file_put_contents($dir . '/.nvmrc', "24\n");
+        $step = new PlanStep(1, (new HopRegistry())->get(HopRegistry::NODE_PIN_ID), '8.3', '8.3', null, null, null, null, [Planner::GATE_TESTS]);
+        $plan = new Plan((new ProjectDetector())->detect($dir), '2026-10-28', 'test', '8.3', null, null, [$step], []);
+        $fake = $this->fake();
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake, new NodeRunner($fake)))
+            ->execute($plan, new RunOptions(skipGate: true));
+
+        self::assertSame('nothing-to-do', $this->statuses($report)[0]);
+        self::assertFalse($report->failed());
+    }
+
+    public function test_an_app_without_a_package_json_never_runs_node(): void
+    {
+        $fake = $this->fake();
+        $this->execute($fake, new RunOptions());
+
+        self::assertSame([], array_filter($fake->calls, static fn(array $c): bool => in_array('bookworm-slim', $c['command'], true)));
+    }
+
+    public function test_a_passing_build_gate_applies_the_pin(): void
+    {
+        $dir = $this->copyExample('vue-spa');
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(0, '', '');
+        });
+        $report = $this->runBuildGateHop($dir, $fake);
+
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        self::assertStringContainsString('Build gate passed', implode(' ', $report->results[0]->messages));
+        $package = json_decode((string) file_get_contents($dir . '/package.json'), true);
+        self::assertSame('>=24', $package['engines']['node']);
+    }
+
+    public function test_a_failing_build_gate_fails_the_node_hop(): void
+    {
+        $dir = $this->copyExample('vue-spa');
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return in_array('build', $command, true) ? new ProcessResult(1, '', 'vite build failed') : new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(0, '', '');
+        });
+        $report = $this->runBuildGateHop($dir, $fake);
+
+        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
+        self::assertTrue($report->failed());
+        self::assertStringContainsString('npm run build', implode(' ', $report->results[0]->messages));
+        self::assertStringContainsString('vite build failed', implode(' ', $report->results[0]->messages));
+    }
+
+    private function runBuildGateHop(string $dir, FakeProcessRunner $fake): RunReport
+    {
+        $hop = new Hop(
+            id: HopRegistry::NODE_PIN_ID,
+            kind: HopKind::Node,
+            from: 'any',
+            to: HopRegistry::NODE_PIN_TARGET,
+            summary: 'A pin hop that asks for a build gate.',
+            npmSet: ['engines.node' => '>=24'],
+            buildGate: true,
+        );
+        $step = new PlanStep(1, $hop, '8.3', '8.3', null, null, null, null, [Planner::GATE_TESTS]);
+        $plan = new Plan((new ProjectDetector())->detect($dir), '2026-10-28', 'test', '8.3', null, null, [$step], []);
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake, new NodeRunner($fake));
+
+        return $executor->execute($plan, new RunOptions());
     }
 
     public function test_the_default_test_command_follows_the_composer_scripts(): void

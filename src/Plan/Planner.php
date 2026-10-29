@@ -147,6 +147,10 @@ final class Planner
             break;
         }
 
+        if ($this->needsNodePin($project)) {
+            $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::NODE_PIN_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+        }
+
         if ($options->sesame) {
             if (!$project->usesWayneCas) {
                 $warnings[] = 'Asked for the SESAME swap, but composer.json does not require cit-web-infra/wayne-cas; skipped.';
@@ -259,6 +263,16 @@ final class Planner
         }
 
         return version_compare($phpunit, $floor, '>=');
+    }
+
+    /** The app has a package.json without an engines.node floor at or above the pin target. */
+    private function needsNodePin(Project $project): bool
+    {
+        if (!$project->hasPackageJson) {
+            return false;
+        }
+
+        return $project->nodeMajor === null || version_compare($project->nodeMajor, HopRegistry::NODE_PIN_TARGET, '<');
     }
 
     private function newestPhpunitForPhp(string $php): string

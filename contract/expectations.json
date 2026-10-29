@@ -18,7 +18,7 @@
             "php": "8.0",
             "laravel": null,
             "vue": "2",
-            "plan": ["php-80-to-81", "php-81-to-82", "php-82-to-83", "php-83-to-84", "php-84-to-85", "vue-2-to-3"],
+            "plan": ["php-80-to-81", "php-81-to-82", "php-82-to-83", "php-83-to-84", "php-84-to-85", "node-pin-24", "vue-2-to-3"],
             "rector": {}
         },
         "laravel-blade": {
@@ -42,7 +42,7 @@
             "php": "8.3",
             "laravel": "12",
             "vue": "3",
-            "plan": ["laravel-12-to-13", "php-83-to-84", "php-84-to-85"],
+            "plan": ["laravel-12-to-13", "php-83-to-84", "php-84-to-85", "node-pin-24"],
             "rector": {}
         },
         "laravel-inertia-vue": {
@@ -50,7 +50,7 @@
             "php": "8.3",
             "laravel": "12",
             "vue": "3",
-            "plan": ["laravel-12-to-13", "php-83-to-84", "php-84-to-85"],
+            "plan": ["laravel-12-to-13", "php-83-to-84", "php-84-to-85", "node-pin-24"],
             "rector": {}
         },
         "laravel-wayne-cas": {

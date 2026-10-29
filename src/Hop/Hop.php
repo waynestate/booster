@@ -18,6 +18,7 @@ final readonly class Hop
      * @param list<string>          $composerRemove packages to drop from require
      * @param list<string>          $notes         what Rector cannot do; the person reviewing the diff reads these
      * @param list<string>          $links         official migration notes
+     * @param array<string, string> $npmSet      package.json dot-path to value, for example "engines.node" to ">=24"
      */
     public function __construct(
         public string $id,
@@ -32,12 +33,14 @@ final readonly class Hop
         public array $notes = [],
         public array $links = [],
         public bool $extraReview = false,
+        public array $npmSet = [],
+        public bool $buildGate = false,
     ) {}
 
-    /** A hop with no Rector rules is a playbook a person follows. */
+    /** A hop with no Rector rules and no manifest edit is a playbook a person follows. */
     public function isManual(): bool
     {
-        return $this->rectorSets === [] && $this->classRenames === [];
+        return $this->rectorSets === [] && $this->classRenames === [] && $this->npmSet === [];
     }
 
     /**

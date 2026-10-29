@@ -179,6 +179,48 @@ final class PlannerTest extends TestCase
         self::assertSame(['manual-review'], $last->gates);
     }
 
+    public function test_apps_with_a_package_json_get_the_node_pin_and_others_do_not(): void
+    {
+        self::assertContains(HopRegistry::NODE_PIN_ID, $this->ids($this->plan('vue-spa')));
+        self::assertContains(HopRegistry::NODE_PIN_ID, $this->ids($this->plan('laravel-blade-vue')));
+        self::assertNotContains(HopRegistry::NODE_PIN_ID, $this->ids($this->plan('raw-php')));
+        self::assertNotContains(HopRegistry::NODE_PIN_ID, $this->ids($this->plan('laravel-blade')));
+    }
+
+    public function test_the_node_pin_comes_after_the_php_hops_and_before_the_vue_playbook(): void
+    {
+        $ids = $this->ids($this->plan('vue-spa'));
+        $pin = array_search(HopRegistry::NODE_PIN_ID, $ids, true);
+
+        self::assertIsInt($pin);
+        self::assertStringStartsWith('php-', $ids[$pin - 1]);
+        self::assertSame('vue-2-to-3', $ids[$pin + 1]);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function nodeEngineFloorsAtOrAboveTheTarget(): array
+    {
+        return ['plain floor' => ['>=24'], 'caret' => ['^24'], 'wildcard' => ['24.x'], 'higher floor' => ['>=26']];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('nodeEngineFloorsAtOrAboveTheTarget')]
+    public function test_an_app_already_pinned_to_the_target_or_newer_gets_no_node_pin(string $engine): void
+    {
+        $dir = $this->copyExample('vue-spa');
+        $file = $dir . '/package.json';
+        $data = json_decode((string) file_get_contents($file), true);
+        self::assertIsArray($data);
+        $data['engines']['node'] = $engine;
+        file_put_contents($file, (string) json_encode($data));
+
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(), $this->today());
+
+        self::assertNotContains(HopRegistry::NODE_PIN_ID, $this->ids($plan));
+    }
+
     public function test_sesame_swap_is_opt_in_and_goes_last(): void
     {
         $without = $this->plan('laravel-wayne-cas');
@@ -258,10 +300,17 @@ final class PlannerTest extends TestCase
 
     public function test_an_app_already_at_the_target_has_no_steps(): void
     {
-        $plan = $this->plan('laravel-inertia-vue', new PlanOptions(fromPhp: '8.5', toPhp: '8.5', fromLaravel: '13', toLaravel: '13'));
+        $plan = $this->plan('raw-php', new PlanOptions(fromPhp: '8.5', toPhp: '8.5'));
 
         self::assertSame([], $plan->steps);
         self::assertStringContainsString('Nothing to do', implode(' ', $plan->warnings));
+    }
+
+    public function test_an_app_already_at_the_php_target_still_gets_the_node_pin(): void
+    {
+        $plan = $this->plan('laravel-inertia-vue', new PlanOptions(fromPhp: '8.5', toPhp: '8.5', fromLaravel: '13', toLaravel: '13'));
+
+        self::assertSame([HopRegistry::NODE_PIN_ID], $this->ids($plan));
     }
 
     public function test_an_unknown_php_floor_asks_for_from_php(): void

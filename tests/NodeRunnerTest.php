@@ -29,7 +29,7 @@ final class NodeRunnerTest extends TestCase
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '', ''));
         $command = (new NodeRunner($fake, 26))->runCommand('/app', ['npm', 'ci']);
 
-        self::assertSame('node:26-bookworm-slim', $command[6]);
+        self::assertSame('node:26-bookworm-slim', $command[7]);
     }
 
     public function test_a_non_zero_exit_is_reported_not_thrown(): void

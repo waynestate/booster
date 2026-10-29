@@ -11,6 +11,7 @@ use Waynestate\Booster\Report\JsonWriter;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\ComposerEditor;
 use Waynestate\Booster\Run\HopExecutor;
+use Waynestate\Booster\Run\NodeRunner;
 use Waynestate\Booster\Run\ProcessRunner;
 use Waynestate\Booster\Run\RectorRunner;
 use Waynestate\Booster\Run\RunOptions;
@@ -53,6 +54,7 @@ final class RunCommand extends BaseCommand
             new ComposerEditor(),
             new TargetImageRunner($this->processes),
             $this->processes,
+            new NodeRunner($this->processes),
         );
         $report = $executor->execute($plan, new RunOptions(
             dryRun: (bool) $input->getOption('dry-run'),

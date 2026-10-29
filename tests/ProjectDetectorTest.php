@@ -35,6 +35,21 @@ final class ProjectDetectorTest extends TestCase
         self::assertSame($vue, $project->vueMajor);
     }
 
+    public function test_the_node_floor_comes_from_engines_node(): void
+    {
+        $spa = (new ProjectDetector())->detect($this->example('vue-spa'));
+        self::assertTrue($spa->hasPackageJson);
+        self::assertNull($spa->nodeMajor);
+
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/package.json', '{"engines":{"node":"^20"}}');
+        self::assertSame('20', (new ProjectDetector())->detect($dir)->nodeMajor);
+
+        $plain = (new ProjectDetector())->detect($this->example('raw-php'));
+        self::assertFalse($plain->hasPackageJson);
+        self::assertNull($plain->nodeMajor);
+    }
+
     public function test_wayne_cas_is_flagged(): void
     {
         $project = (new ProjectDetector())->detect($this->example('laravel-wayne-cas'));

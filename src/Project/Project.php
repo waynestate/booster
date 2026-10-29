@@ -8,7 +8,9 @@ namespace Waynestate\Booster\Project;
  * What BOOSTER learned about an app by reading its manifests.
  *
  * Versions are "major.minor" strings for PHP ("7.4") and plain majors for
- * Laravel and Vue ("10", "2"). A null means the manifest does not say.
+ * Laravel, Vue and Node ("10", "2", "24"). A null means the manifest does not
+ * say; nodeMajor is the lowest major engines.node allows, null when there is
+ * no package.json or no engines.node.
  */
 final readonly class Project
 {
@@ -22,6 +24,8 @@ final readonly class Project
         public AppType $type,
         public bool $usesWayneCas,
         public bool $hasTestScript,
+        public bool $hasPackageJson = false,
+        public ?string $nodeMajor = null,
     ) {}
 
     /**
@@ -37,6 +41,7 @@ final readonly class Project
             'laravel' => $this->laravelMajor,
             'phpunit' => $this->phpunitMajor,
             'vue' => $this->vueMajor,
+            'node' => $this->nodeMajor,
             'wayne_cas' => $this->usesWayneCas,
         ];
     }

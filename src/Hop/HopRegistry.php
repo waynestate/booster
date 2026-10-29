@@ -24,6 +24,11 @@ final class HopRegistry
     /** @var list<string> */
     public const PHPUNIT_CHAIN = ['9', '10', '11', '12', '13'];
 
+    /** The Node pin hop and the major it pins to (Node LTS today: 24 and 26). */
+    public const NODE_PIN_ID = 'node-pin-24';
+
+    public const NODE_PIN_TARGET = '24';
+
     /**
      * The lowest PHP version each PHPUnit major runs on
      * (sebastianbergmann/phpunit composer.json).
@@ -75,6 +80,7 @@ final class HopRegistry
         $this->addLaravelHops();
         $this->addPhpunitHops();
         $this->add($this->sesameHop());
+        $this->add($this->nodePinHop());
         $this->add($this->vueHop());
     }
 
@@ -267,6 +273,23 @@ final class HopRegistry
                 'Log in through the pre-production host and check the session timeout, the Access ID attribute and Duo before you ship.',
             ],
             links: [],
+        );
+    }
+
+    private function nodePinHop(): Hop
+    {
+        return new Hop(
+            id: self::NODE_PIN_ID,
+            kind: HopKind::Node,
+            from: 'any',
+            to: self::NODE_PIN_TARGET,
+            summary: 'Pin the app to Node 24: set engines.node in package.json and write .nvmrc.',
+            npmSet: ['engines.node' => '>=24'],
+            notes: [
+                'The pin is a floor, not a ceiling: engines.node ">=24" still allows Node 26.',
+                'Later front-end hops run in the same node:24 container, so this hop comes before them.',
+            ],
+            links: ['https://nodejs.org/en/about/previous-releases'],
         );
     }
 
