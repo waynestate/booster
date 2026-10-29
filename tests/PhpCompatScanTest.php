@@ -98,6 +98,33 @@ final class PhpCompatScanTest extends TestCase
         self::assertStringContainsString('/nonexistent/phpcs', (string) $scan->error);
     }
 
+    public function test_a_running_phpcs_without_the_standard_points_at_the_blocked_plugin(): void
+    {
+        $app = $this->tempDir();
+        // The app's own phpcs is present, as after a `composer require` whose
+        // installer plugin Composer blocked: it runs, but its standard list
+        // lacks PHPCompatibility.
+        mkdir($app . '/vendor/bin', 0775, true);
+        file_put_contents($app . '/vendor/bin/phpcs', '');
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, "The installed standards are PEAR, PSR1, PSR2, PSR12, Squiz, Zend\n", ''));
+
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.0');
+
+        self::assertFalse($scan->ok);
+        self::assertSame('PHPCompatibility is not registered. If composer blocked a plugin, run: composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true, then composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"', (string) $scan->error);
+    }
+
+    public function test_no_running_phpcs_keeps_the_install_hint_with_the_plugin_approval(): void
+    {
+        $app = $this->tempDir();
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(1, '', 'phpcs: command not found'));
+
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.0');
+
+        self::assertFalse($scan->ok);
+        self::assertSame('PHP compatibility scan skipped: PHPCompatibility is not installed. Enable it with: composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true, then composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"', (string) $scan->error);
+    }
+
     public function test_a_crash_without_json_is_a_scan_error(): void
     {
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(4, '', 'segfault'));

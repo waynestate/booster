@@ -18,7 +18,9 @@ use Waynestate\Booster\Run\ProcessRunner;
  * The scanner is optional. Booster looks for a PHP_CodeSniffer that carries
  * the PHPCompatibility standard, trying the app's own vendor/bin/phpcs, then
  * Booster's vendor/bin/phpcs, then phpcs on the PATH. When none of them has
- * the standard, the scan reports a skip instead of failing the plan.
+ * the standard, the scan reports a skip instead of failing the plan, and the
+ * skip says how to fix it: approve the installer plugin when a phpcs ran
+ * without the standard, install the packages when no phpcs ran at all.
  */
 final class PhpCompatScan
 {
@@ -30,10 +32,26 @@ final class PhpCompatScan
     private const IGNORE_PATTERN = '(?:^|/)(?:vendor|node_modules|storage)(?:/|\z)';
 
     /**
+     * Shown when a PHP_CodeSniffer runs but does not offer the
+     * PHPCompatibility standard, which is what happens when Composer blocks
+     * the installer plugin that registers it.
+     */
+    private const STANDARD_NOT_REGISTERED = 'PHPCompatibility is not registered. If composer blocked a plugin, run: composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true, then composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"';
+
+    /**
      * Shown when no PHP_CodeSniffer carrying the PHPCompatibility standard can
      * be found. Plain and exact, so it can be copied straight into a terminal.
      */
-    private const MISSING_STANDARD = 'PHP compatibility scan skipped: PHPCompatibility is not installed. Enable it with: composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"';
+    private const MISSING_STANDARD = 'PHP compatibility scan skipped: PHPCompatibility is not installed. Enable it with: composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true, then composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"';
+
+    /** `phpcs -i` ran and named PHPCompatibility among the standards. */
+    private const STANDARD_OFFERED = 'offered';
+
+    /** `phpcs -i` ran but named other standards only. */
+    private const STANDARD_MISSING = 'missing';
+
+    /** The launcher could not run at all. */
+    private const NOT_RUNNING = 'not-running';
 
     public function __construct(
         private readonly ProcessRunner $processes,
@@ -48,10 +66,16 @@ final class PhpCompatScan
      */
     public function scan(string $appPath, string $testVersion): ScanResult
     {
-        $launch = $this->selectLauncher($appPath);
-        if ($launch === null) {
-            return ScanResult::error($testVersion, self::MISSING_STANDARD);
+        $selected = $this->selectLauncher($appPath);
+        if ($selected['launch'] === null) {
+            // A phpcs that ran but lacks the standard points at a blocked
+            // installer plugin; no phpcs running at all points at installing.
+            $reason = $selected['binaryFound'] ? self::STANDARD_NOT_REGISTERED : self::MISSING_STANDARD;
+
+            return ScanResult::error($testVersion, $reason);
         }
+
+        $launch = $selected['launch'];
 
         // Resolve to an absolute path so the reported file paths (always
         // absolute from phpcs) can be made relative to the app again. If the
@@ -91,25 +115,30 @@ final class PhpCompatScan
 
     /**
      * Pick the argument prefix that starts a PHP_CodeSniffer carrying the
-     * PHPCompatibility standard, or null when none of the candidates does.
+     * PHPCompatibility standard. Returns the launch prefix, or null when none
+     * of the candidates does, plus whether some phpcs ran at all, so the skip
+     * message can tell "installed but not registered" from "not installed".
      *
-     * @return list<string>|null
+     * @return array{launch: list<string>|null, binaryFound: bool}
      */
-    private function selectLauncher(string $appPath): ?array
+    private function selectLauncher(string $appPath): array
     {
         if ($this->phpcsBinary !== null) {
             // Test seam: trust the injected binary and skip discovery, so tests
             // can exercise the scan without a real PHP_CodeSniffer installed.
-            return $this->launcher($this->phpcsBinary);
+            return ['launch' => $this->launcher($this->phpcsBinary), 'binaryFound' => true];
         }
 
+        $binaryFound = false;
         foreach ($this->candidates($appPath) as $candidate) {
-            if ($this->hasStandard($candidate)) {
-                return $candidate;
+            $status = $this->standardStatus($candidate);
+            if ($status === self::STANDARD_OFFERED) {
+                return ['launch' => $candidate, 'binaryFound' => true];
             }
+            $binaryFound = $binaryFound || $status === self::STANDARD_MISSING;
         }
 
-        return null;
+        return ['launch' => null, 'binaryFound' => $binaryFound];
     }
 
     /**
@@ -149,22 +178,23 @@ final class PhpCompatScan
     }
 
     /**
-     * Whether a launcher offers the PHPCompatibility standard, asked with
-     * `phpcs -i`. A launcher that cannot run, or whose standard list does not
-     * name PHPCompatibility, counts as a miss.
+     * What `phpcs -i` says about a launcher: that it offers the
+     * PHPCompatibility standard, that it ran but names other standards only,
+     * or that it could not run at all. The last is how a missing phpcs shows
+     * up, and it is what lets the skip message say "not installed".
      *
      * @param list<string> $launch
      */
-    private function hasStandard(array $launch): bool
+    private function standardStatus(array $launch): string
     {
         try {
             $result = $this->processes->run(array_merge($launch, ['-i']), null, [], 60);
         } catch (Throwable) {
-            return false;
+            return self::NOT_RUNNING;
         }
 
         if (!$result->successful()) {
-            return false;
+            return self::NOT_RUNNING;
         }
 
         // `phpcs -i` lists the standards comma separated, and PHPCompatibility
@@ -172,7 +202,7 @@ final class PhpCompatScan
         // tokens rather than substring-matching.
         $standards = preg_split('/[\s,]+/', $result->stdout) ?: [];
 
-        return in_array('PHPCompatibility', $standards, true);
+        return in_array('PHPCompatibility', $standards, true) ? self::STANDARD_OFFERED : self::STANDARD_MISSING;
     }
 
     private function parse(ProcessResult $result, string $testVersion, string $prefix): ScanResult
