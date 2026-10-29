@@ -18,6 +18,9 @@ abstract class TestCase extends PhpUnitTestCase
     /** `phpcs -i` output that carries the PHPCompatibility standard. */
     protected const PHPCOMPAT_STANDARDS = "The installed standards are PEAR, PSR1, PSR2, PSR12, Squiz, Zend, PHPCompatibility\n";
 
+    /** A frozen copy of the bundled policy, named for the date it was copied from. */
+    protected const POLICY_FIXTURE = __DIR__ . '/fixtures/policy/policy-2026-10-28.json';
+
     /** @var list<string> */
     private array $tempDirs = [];
 
@@ -28,7 +31,10 @@ abstract class TestCase extends PhpUnitTestCase
 
     protected function policy(): Policy
     {
-        return PolicyLocator::locate(null, null);
+        // Tests run against a frozen copy of the bundled policy so they do not
+        // change when the bundled snapshot is refreshed. The bundled copy itself
+        // is smoke-tested in PolicyTest.
+        return PolicyLocator::locate(self::POLICY_FIXTURE, null);
     }
 
     protected function example(string $name): string

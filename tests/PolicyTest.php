@@ -81,6 +81,15 @@ final class PolicyTest extends TestCase
         self::assertSame($file, PolicyLocator::locate(null, $file)->origin());
     }
 
+    public function test_the_bundled_policy_still_loads_and_lists_supported_versions(): void
+    {
+        $p = PolicyLocator::locate(null, null);
+
+        self::assertSame('bundled snapshot', $p->origin());
+        self::assertNotSame([], $p->supported('php', $this->today()));
+        self::assertNotSame([], $p->supported('laravel', $this->today()));
+    }
+
     public function test_missing_file_fails_closed(): void
     {
         $this->expectException(PolicyException::class);
