@@ -122,8 +122,11 @@ final class Policy
      * A version is first resolved to its policy line: 8.3.12 is judged as
      * 8.3. A line marked current is Active on every date. A version that
      * resolves to no line and sorts above every listed line is Active too:
-     * current versions are never refused. A version that falls between
-     * listed lines is unknown and throws.
+     * current versions are never refused. A version that parses and sorts
+     * below every listed line is Eol: it is older than the oldest listed
+     * line, which is end of life by definition, and
+     * belowOldestLineReason() gives the reason. A version that falls
+     * between listed lines, or that does not parse, is unknown and throws.
      *
      * @throws InvalidArgumentException if the component is unknown, the
      *                                  version is unknown, or the version's
@@ -139,6 +142,9 @@ final class Policy
         if ($line === null) {
             if ($this->isAheadOfPolicy($component, $version)) {
                 return State::Active;
+            }
+            if ($this->belowOldestLineReason($component, $version) !== null) {
+                return State::Eol;
             }
             throw new InvalidArgumentException("Unknown version of {$component}: {$version}");
         }
@@ -213,6 +219,41 @@ final class Policy
         }
 
         return true;
+    }
+
+    /**
+     * The reason a version is Eol without a policy line of its own.
+     *
+     * A version that parses and sorts below every line the policy lists is
+     * end of life by definition: the policy knows the component, and nothing
+     * this old is still supported. The answer is the reason phrase "older
+     * than the oldest listed line (8.1)". Null when the version resolves to
+     * a line, sorts above or between lines, does not parse as a version, or
+     * the component lists no lines.
+     *
+     * @throws InvalidArgumentException if the component is unknown
+     */
+    public function belowOldestLineReason(string $component, string $version): ?string
+    {
+        $versions = $this->components[$component]['versions'] ?? null;
+        if ($versions === null) {
+            throw new InvalidArgumentException("Unknown component: {$component}");
+        }
+        if ($versions === [] || !preg_match('/^\d+(\.\d+)*$/', $version)) {
+            return null;
+        }
+        if ($this->resolveVersion($component, $version) !== null) {
+            return null;
+        }
+        $list = $this->versions($component);
+        if ($list === []) {
+            return null;
+        }
+        $oldest = $list[0];
+        if (version_compare($version, $oldest) >= 0) {
+            return null;
+        }
+        return 'older than the oldest listed line (' . $oldest . ')';
     }
 
     /**
