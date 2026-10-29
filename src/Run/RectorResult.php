@@ -17,12 +17,12 @@ final readonly class RectorResult
     public const REPAIRED_UTF8_NOTE = 'Rector output contained invalid UTF-8 and was repaired';
 
     /**
-     * @param list<array{file: string, diff: string}> $files
-     * @param list<string>                            $errors
+     * @param list<array{file: string, diff: string}> $files  files that changed, relative to the app
+     * @param list<string>                            $errors Rector's own errors (parse failures and the like)
      */
     public function __construct(
-        public array $files = [],
-        public array $errors = [],
+        public array $files,
+        public array $errors,
     ) {}
 
     public function changedCount(): int
