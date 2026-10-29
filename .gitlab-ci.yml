@@ -1,14 +1,19 @@
 # composer ci is the contract: the checks are defined there, and this pipeline only wraps them.
 # BOOSTER's pipeline, built from the PREFLIGHT components on this GitLab.
 # Pinned to PREFLIGHT 0.1.0. Never use ~latest.
-# The proctor component is not included yet: PROCTOR needs --policy until it
-# reads CREED's bundled policy.
 # BOOSTER requires PHP ^8.3, so the test matrix starts at 8.3.
 include:
   - component: $CI_SERVER_FQDN/enterprise-apps/preflight/php-test@0.1.0
     inputs:
       php_versions: ["8.3", "8.4", "8.5"]
   - component: $CI_SERVER_FQDN/enterprise-apps/preflight/composer-audit@0.1.0
+  # The front page deploy layer (ADR-0017): PROCTOR checks deploy/ against CREED's policy.
+  # allow_failure: current findings: unbounded dev-main constraints; CI files missing in deploy/.
+  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/proctor@0.1.0
+    inputs:
+      working_dir: deploy
+      proctor_command: vendor/bin/proctor check --policy=vendor/waynestate/creed/policy/policy.json --format=codequality
+      allow_failure: true
 
 composer-ci:
   image: composer:2.10.3
