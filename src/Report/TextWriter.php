@@ -119,6 +119,12 @@ final class TextWriter
                     $lines[] = '   changed ' . self::clean($file['file']);
                 }
             }
+            if ($r->prepass !== []) {
+                $lines[] = '   Pre-pass fixes:';
+                foreach ($r->prepass as $fix) {
+                    $lines[] = sprintf('      %s: %d %s', self::clean($fix['file']), $fix['rewrites'], $fix['rewrites'] === 1 ? 'rewrite' : 'rewrites');
+                }
+            }
         }
         $lines[] = '';
         if ($report->dryRun && $previewedFiles !== []) {

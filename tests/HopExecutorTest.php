@@ -12,6 +12,7 @@ use Waynestate\Booster\Plan\PlanOptions;
 use Waynestate\Booster\Plan\PlanStep;
 use Waynestate\Booster\Plan\Planner;
 use Waynestate\Booster\Project\ProjectDetector;
+use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\ComposerEditor;
 use Waynestate\Booster\Run\HopExecutor;
 use Waynestate\Booster\Run\NodeRunner;
@@ -548,5 +549,102 @@ final class HopExecutorTest extends TestCase
         self::assertFalse($report->failed());
         self::assertCount(1, $this->dockerRuns($fake));
         self::assertStringContainsString('Nothing to do', implode(' ', $report->results[0]->messages));
+    }
+
+    public function test_the_prepass_rewrites_new_by_reference_before_rector_runs(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        $legacy = $dir . '/src/Legacy.php';
+        $original = "<?php\n\nclass Legacy\n{\n    public function make()\n    {\n        \$a = &new Self();\n\n        return \$a;\n    }\n}\n";
+        file_put_contents($legacy, $original);
+        $seenDuringRector = [];
+        $fake = new FakeProcessRunner(static function (array $command, array $env) use ($dir, &$seenDuringRector): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            $seenDuringRector[] = (string) file_get_contents($dir . '/src/Legacy.php');
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $env['BOOSTER_APP_PATH'] . '/src/A.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions());
+
+        self::assertSame(['applied', 'applied'], $this->statuses($report));
+        self::assertNotEmpty($seenDuringRector);
+        foreach ($seenDuringRector as $seen) {
+            self::assertStringContainsString('$a = new Self();', $seen);
+            self::assertStringNotContainsString('&new', $seen);
+        }
+        self::assertStringContainsString('$a = new Self();', (string) file_get_contents($legacy));
+        self::assertSame([['file' => 'src/Legacy.php', 'rewrites' => 1]], $report->results[0]->prepass);
+        self::assertSame([], $report->results[1]->prepass);
+        self::assertSame([['file' => 'src/Legacy.php', 'rewrites' => 1]], $report->toArray()['results'][0]['prepass_fixes']);
+        self::assertArrayNotHasKey('prepass_fixes', $report->toArray()['results'][1]);
+    }
+
+    public function test_a_dry_run_restores_the_prepass_bytes_and_lists_the_fixes(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        $legacy = $dir . '/src/Legacy.php';
+        $original = "<?php\n\nclass Legacy\n{\n    public function make()\n    {\n        \$a = &new Self();\n\n        return \$a;\n    }\n}\n";
+        file_put_contents($legacy, $original);
+        $fake = $this->fake();
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions(dryRun: true));
+
+        self::assertSame(['previewed', 'previewed'], $this->statuses($report));
+        self::assertSame($original, (string) file_get_contents($legacy));
+        self::assertSame([['file' => 'src/Legacy.php', 'rewrites' => 1]], $report->results[0]->prepass);
+        $text = (new TextWriter())->run($report);
+        self::assertStringContainsString('Pre-pass fixes:', $text);
+        self::assertStringContainsString('src/Legacy.php: 1 rewrite', $text);
+    }
+
+    public function test_prepass_changes_count_toward_the_cap(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        $legacy = $dir . '/src/Legacy.php';
+        $original = "<?php\n\nclass Legacy\n{\n    public function make()\n    {\n        \$a = &new Self();\n\n        return \$a;\n    }\n}\n";
+        file_put_contents($legacy, $original);
+        $fake = $this->fake(changedPerHop: 1);
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions(maxChanges: 1));
+
+        self::assertSame(['capped', 'not-run'], $this->statuses($report));
+        self::assertStringContainsString('(1 from the pre-pass, 1 from Rector)', implode(' ', $report->results[0]->messages));
+        self::assertSame($original, (string) file_get_contents($legacy));
+    }
+
+    public function test_parse_errors_become_named_refusals(): void
+    {
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => [
+                ['file' => 'src/Broken.php', 'message' => "Syntax error, unexpected ';'"],
+                ['file' => 'src/Numeric.php', 'message' => 'Invalid numeric literal'],
+            ]]), '');
+        });
+        $report = $this->execute($fake, new RunOptions());
+
+        self::assertSame(['error', 'not-run'], $this->statuses($report));
+        $messages = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString("src/Broken.php: \"Syntax error, unexpected ';'\" cannot be repaired by tooling, so BOOSTER stops here and the file needs a person.", $messages);
+        self::assertStringContainsString('src/Numeric.php: "Invalid numeric literal" cannot be repaired by tooling, so BOOSTER stops here and the file needs a person.', $messages);
+        self::assertStringNotContainsString('src/Broken.php: Syntax error', $messages);
     }
 }

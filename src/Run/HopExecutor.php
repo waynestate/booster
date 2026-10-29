@@ -14,6 +14,8 @@ use Waynestate\Booster\Node\MixBuild;
 use Waynestate\Booster\Node\MixFile;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanStep;
+use Waynestate\Booster\Prepass\NewByReferenceFixer;
+use Waynestate\Booster\Prepass\PrepassResult;
 use Waynestate\Booster\ToolError;
 
 /**
@@ -35,6 +37,13 @@ final class HopExecutor
     private function registry(): HopRegistry
     {
         return $this->registry ?? new HopRegistry();
+    }
+
+    private ?NewByReferenceFixer $fixer = null;
+
+    private function fixer(): NewByReferenceFixer
+    {
+        return $this->fixer ??= new NewByReferenceFixer();
     }
 
     public function execute(Plan $plan, RunOptions $options): RunReport
@@ -151,60 +160,138 @@ final class HopExecutor
                     : $this->runNodeHop($step, $path, $options, $baseline);
             }
 
-            $phpunitTarget = $hop->kind === HopKind::Phpunit ? $hop->to : null;
-            $preview = $this->rector->run($hop, $path, true, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget);
-            if ($preview->errors !== []) {
-                return new StepResult($step->number, $hop->id, StepResult::ERROR, $preview->files, ['Rector reported errors; nothing was changed.', ...$preview->errors]);
-            }
-            if ($preview->changedCount() > $options->maxChanges) {
-                return new StepResult($step->number, $hop->id, StepResult::CAPPED, $preview->files, [sprintf(
-                    'Rector wants to change %d files and the cap is %d. Nothing was changed. Review with --dry-run, then raise --max-changes or use --skip to split the work.',
-                    $preview->changedCount(),
-                    $options->maxChanges,
-                )]);
-            }
-            if ($options->dryRun) {
-                // A Laravel hop previews through the app's own autoloader; without vendor/ Rector
-                // cannot see the app's classes, so the diff is a lower bound, not the whole change.
-                $incomplete = $hop->kind === HopKind::Laravel && !is_file($path . '/vendor/autoload.php');
-                if ($incomplete) {
-                    $messages = [sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$hop->notes];
-                } elseif ($preview->files === []) {
-                    $messages = ['Dry run: nothing was changed.', ...$hop->notes];
+            // PHP hops get the new-by-reference pre-pass first: modern PHP refuses to compile
+            // "$a = &new Foo();", so without the rewrite Rector never gets a parse tree and the
+            // hop stops with nothing changed. The rewrite lands on the working copy, and a dry
+            // run puts every original byte back.
+            $prepass = $hop->kind === HopKind::Php ? $this->fixer()->fixTree($path, true) : null;
+            $keepPrepass = false;
+            try {
+                $phpunitTarget = $hop->kind === HopKind::Phpunit ? $hop->to : null;
+                $preview = $this->rector->run($hop, $path, true, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget);
+                if ($preview->errors !== []) {
+                    return new StepResult($step->number, $hop->id, StepResult::ERROR, self::prepassFiles($prepass), ['Rector reported errors; nothing was changed.', ...self::refusals($preview->errors)], false, $prepass?->files() ?? []);
+                }
+                $wanted = $preview->changedCount() + ($prepass?->changedCount() ?? 0);
+                if ($wanted > $options->maxChanges) {
+                    return new StepResult($step->number, $hop->id, StepResult::CAPPED, [...self::prepassFiles($prepass), ...$preview->files], [sprintf(
+                        'This hop wants to change %d files (%d from the pre-pass, %d from Rector) and the cap is %d. Nothing was changed. Review with --dry-run, then raise --max-changes or use --skip to split the work.',
+                        $wanted,
+                        $prepass?->changedCount() ?? 0,
+                        $preview->changedCount(),
+                        $options->maxChanges,
+                    )], false, $prepass?->files() ?? []);
+                }
+                if ($options->dryRun) {
+                    // A Laravel hop previews through the app's own autoloader; without vendor/ Rector
+                    // cannot see the app's classes, so the diff is a lower bound, not the whole change.
+                    $incomplete = $hop->kind === HopKind::Laravel && !is_file($path . '/vendor/autoload.php');
+                    if ($incomplete) {
+                        $messages = [sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$hop->notes];
+                    } elseif ($preview->files === [] && ($prepass?->changedCount() ?? 0) === 0) {
+                        $messages = ['Dry run: nothing was changed.', ...$hop->notes];
+                    } else {
+                        $messages = $hop->notes;
+                    }
+
+                    return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [...self::prepassFiles($prepass), ...$preview->files], $messages, $incomplete, $prepass?->files() ?? []);
+                }
+
+                $keepPrepass = true;
+                $applied = $this->rector->run($hop, $path, false, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget);
+                $messages = $this->composer->apply($hop, $path);
+                if ($applied->errors !== []) {
+                    return new StepResult($step->number, $hop->id, StepResult::ERROR, [...self::prepassFiles($prepass), ...$applied->files], ['Rector reported errors while applying.', ...self::refusals($applied->errors)], false, $prepass?->files() ?? []);
+                }
+                if (($prepass?->changedCount() ?? 0) === 0 && $applied->changedCount() === 0 && $messages === []) {
+                    // Nothing changed, so there is nothing for the gate to prove; skip it.
+                    return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
+                        'Nothing to do: Rector changed no files and composer.json already allows the target, so the gate was skipped.',
+                        ...$hop->notes,
+                    ]);
+                }
+
+                if (!$options->skipGate) {
+                    $gate = $this->runGate($step, $path, $options, $baseline);
+                    if ($gate !== null) {
+                        return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, [...self::prepassFiles($prepass), ...$applied->files], [...$messages, ...$gate], false, $prepass?->files() ?? []);
+                    }
+                    $messages[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
                 } else {
-                    $messages = $hop->notes;
+                    $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
                 }
 
-                return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $preview->files, $messages, $incomplete);
-            }
-
-            $applied = $this->rector->run($hop, $path, false, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget);
-            $messages = $this->composer->apply($hop, $path);
-            if ($applied->errors !== []) {
-                return new StepResult($step->number, $hop->id, StepResult::ERROR, $applied->files, ['Rector reported errors while applying.', ...$applied->errors]);
-            }
-            if ($applied->changedCount() === 0 && $messages === []) {
-                // Nothing changed, so there is nothing for the gate to prove; skip it.
-                return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
-                    'Nothing to do: Rector changed no files and composer.json already allows the target, so the gate was skipped.',
-                    ...$hop->notes,
-                ]);
-            }
-
-            if (!$options->skipGate) {
-                $gate = $this->runGate($step, $path, $options, $baseline);
-                if ($gate !== null) {
-                    return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $applied->files, [...$messages, ...$gate]);
+                return new StepResult($step->number, $hop->id, StepResult::APPLIED, [...self::prepassFiles($prepass), ...$applied->files], [...$messages, ...$hop->notes], false, $prepass?->files() ?? []);
+            } finally {
+                if ($prepass !== null && !$keepPrepass) {
+                    $prepass->restore();
                 }
-                $messages[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
-            } else {
-                $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
             }
-
-            return new StepResult($step->number, $hop->id, StepResult::APPLIED, $applied->files, [...$messages, ...$hop->notes]);
         } catch (ToolError $e) {
             return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [$e->getMessage()]);
         }
+    }
+
+    /**
+     * Pre-pass fixes as StepResult file entries, so they show in the per-step
+     * file list and count as changed files.
+     *
+     * @return list<array{file: string, diff: string}>
+     */
+    private static function prepassFiles(?PrepassResult $prepass): array
+    {
+        if ($prepass === null) {
+            return [];
+        }
+
+        return array_map(static fn(array $fix): array => [
+            'file' => $fix['file'],
+            'diff' => sprintf('pre-pass: %d new-by-reference rewrite%s', $fix['rewrites'], $fix['rewrites'] === 1 ? '' : 's'),
+        ], $prepass->files());
+    }
+
+    /**
+     * Turns Rector parse errors into named refusals: the file (and the line,
+     * when the message carries one) is named, and the reader is told that a
+     * person is needed. Every other error passes through untouched.
+     *
+     * @param list<string> $errors
+     *
+     * @return list<string>
+     */
+    private static function refusals(array $errors): array
+    {
+        $out = [];
+        foreach ($errors as $error) {
+            $out[] = self::refusal($error) ?? $error;
+        }
+
+        return $out;
+    }
+
+    /**
+     * One refusal for a parse error Rector reports as "Syntax error ..." or
+     * "Invalid numeric literal": BOOSTER cannot repair those by tooling, so
+     * the file needs a person.
+     */
+    private static function refusal(string $error): ?string
+    {
+        foreach (['Syntax error', 'Invalid numeric literal'] as $phrase) {
+            $at = strpos($error, $phrase);
+            if ($at === false) {
+                continue;
+            }
+            $message = substr($error, $at);
+            $file = $at >= 2 && substr($error, $at - 2, 2) === ': ' ? substr($error, 0, $at - 2) : null;
+            $where = '';
+            if ($file !== null) {
+                $where = preg_match('/line (\d+)/i', $message, $m) === 1 ? $file . ' line ' . $m[1] : $file;
+            }
+
+            return ($where !== '' ? $where . ': ' : '') . '"' . $message . '" cannot be repaired by tooling, so BOOSTER stops here and the file needs a person.';
+        }
+
+        return null;
     }
 
     /**
