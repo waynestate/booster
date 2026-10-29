@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * up.php: a dependency-free health endpoint for apps with no framework (SQUIRE S55).
+ * up.php: a dependency-free health endpoint for apps with no framework (Squire S55).
  *
  * If HELMET is installed, its /up handler answers and exits; otherwise this file answers 200 and nothing else:
  * no session, no database, no includes. Set SQUIRE_HEALTH_PATH=/up.php and SQUIRE_SMOKE_URL to match. A squire

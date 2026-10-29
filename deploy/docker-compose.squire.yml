@@ -1,4 +1,4 @@
-# docker-compose.squire.yml: local parity with Citadel (SQUIRE S35 to S37, S67, S70, S71).
+# docker-compose.squire.yml: local parity with Citadel (Squire S35 to S37, S67, S70, S71).
 #
 #   app    the Citadel PHP image (Apache + mod_php) plus the vhost, php.ini, YOUR build.sh and deployments/
 #   proxy  HA-Proxy in front, adding X-Forwarded-For and X-Forwarded-Proto the way Citadel's does

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * health.php: the Citadel health check, with no framework boot and no artisan (SQUIRE S55).
+ * health.php: the Citadel health check, with no framework boot and no artisan (Squire S55).
  *
  * Citadel runs the Health Check script every 5 minutes with a 15 second timeout, as root, from the app directory.
  * In the dashboard wizard set it to:   ["php", "health.php"]

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deployments/001-first-release.sh: the one-time hook (SQUIRE S9).
+# deployments/001-first-release.sh: the one-time hook (Squire S9).
 #
 # Citadel runs each file in deployments/ once per file name for the life of the app, as the `citadel` user, when the
 # container starts, before Apache. A failing hook is retried up to three times and then marks the deployment

@@ -1,5 +1,5 @@
 #!/bin/sh
-# build.sh: image-level tooling only (SQUIRE S1).
+# build.sh: image-level tooling only (Squire S1).
 #
 # Citadel runs this file at image build time, as root, with `/bin/sh` (dash on Debian, so no bashisms), in a
 # directory that holds this one file. The rest of the app is NOT here yet. So: system packages and tools go in this
