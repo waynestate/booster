@@ -342,28 +342,6 @@ docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install
 `contract/expectations.json` says what BOOSTER must detect, plan and change for each example app in `examples/`;
 `tests/ContractTest.php` enforces it with the real Rector, so a Rector release that changes a hop shows up in CI.
 
-## Proof
-
-**82 Wayne State applications run through BOOSTER on 2026-10-28: 59 passed, 20 flagged, 3 tool errors.**
-
-Each app was copied into a throwaway git repository with `.git`, `auth.json` and every `.env` removed, then taken
-through `booster detect`, `plan` and `run --skip-gate` inside `php:8.4-cli` with Wayne State's servers out of reach.
-BOOSTER (commit `be134f5`) applied 207 upgrade hops toward PHP 8.5, and all 277 PHP files it changed pass `php -l` on
-PHP 8.5. The apps are counted, never named.
-
-| Outcome | Apps | Why |
-|---|---:|---|
-| Passed | 59 | 43 upgraded, 16 had nothing to change |
-| Flagged | 8 | PHP 5 era code Rector cannot parse; nothing was changed |
-| Flagged | 5 | a Laravel hop needs `vendor/`, and a private package could not install in the sandbox |
-| Flagged | 3 | Laravel 5, 6 or 7, older than the Laravel 8 BOOSTER plans from |
-| Flagged | 2 | a hop larger than `--max-changes`; nothing was changed |
-| Flagged | 2 | a `webpack.mix.js` shape it does not convert, and a `>=5.5` PHP floor below 5.6 |
-| Tool error | 3 | Rector out of memory, a non-UTF-8 source file, one run past the 40 minute budget |
-
-The full flight log, what it does not prove and the command to repeat it on your own app are on the
-[proof page](site/proof.html). 207 boosters given, zero files broken. Side effects may include passing tests.
-
 ## Status
 
 Version 0.1. See [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) for what a person must answer and what is not built yet, and
