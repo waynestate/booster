@@ -219,6 +219,18 @@ standard, the scan reports a skip and the plan goes on. To turn it on, install t
 composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"
 ```
 
+Before the require line, approve the installer plugin once:
+
+```
+composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+```
+
+Composer asks for approval of `dealerdirect/phpcodesniffer-composer-installer`, the plugin that registers the
+PHPCompatibility standard with PHP_CodeSniffer. Without the approval, Composer blocks the plugin, the standard never
+registers, and the scan skips with a message that names this fix. The command writes `allow-plugins` into the app's
+own `composer.json`. That is an app-side change the person who wants the scan chooses to make; Booster never edits
+the app's `composer.json`.
+
 The scan ignores `vendor/`, `node_modules/` and `storage/`, because those hold third-party code and generated files,
 not the app's. It reads the app only and changes nothing. `booster scan --path=../my-app --php=8.0` runs the same scan
 on its own, for any PHP version Booster knows, and exits 0 even when it finds a wall of removed functions.
