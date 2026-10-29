@@ -111,7 +111,7 @@ final class RectorRunner
             @rmdir($work);
         }
 
-        return $this->parse($result, $appPath, $work);
+        return $this->parse($result, $appPath, $work, $memoryLimit);
     }
 
     private function binary(): string
@@ -163,15 +163,27 @@ final class RectorRunner
         return implode('/', $parts);
     }
 
-    private function parse(ProcessResult $result, string $appPath, string $work): RectorResult
+    private function parse(ProcessResult $result, string $appPath, string $work, string $memoryLimit): RectorResult
     {
         // Rector exits 2 when a dry run finds changes, so the exit code alone says nothing.
+        if (trim($result->stdout) === '') {
+            // An empty report means Rector died before writing it, most often of
+            // memory on a big app.
+            throw new ToolError(sprintf(
+                "Rector produced no JSON report (exit %d). It ran with --memory-limit=%s; an exit code of 255 or a stderr line mentioning memory usually means Rector ran out of memory, and --memory-limit can raise the limit.\nstderr: %s",
+                $result->exitCode,
+                $memoryLimit,
+                substr(trim($result->stderr), 0, 500),
+            ));
+        }
+
         $data = json_decode($result->stdout, true);
         if (!is_array($data)) {
             throw new ToolError(sprintf(
-                "Rector produced no JSON report (exit %d).\n%s",
+                "Rector output was not valid JSON: %s (exit %d).\nstderr: %s",
+                json_last_error_msg(),
                 $result->exitCode,
-                trim($result->stderr . "\n" . $result->stdout),
+                substr(trim($result->stderr), 0, 500),
             ));
         }
 

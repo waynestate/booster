@@ -56,4 +56,47 @@ final class RectorRunnerTest extends TestCase
         $this->expectExceptionMessageMatches('/--memory-limit/');
         (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), '/srv/acme-app', true, '8.0', null, null, 'lots');
     }
+
+    public function test_empty_stdout_points_at_the_memory_limit(): void
+    {
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(255, '', 'Fatal error: Allowed memory size of 2147483648 bytes exhausted'));
+        try {
+            (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), '/srv/acme-app', true, '8.0');
+            self::fail('expected a ToolError');
+        } catch (ToolError $e) {
+            self::assertStringContainsString('Rector produced no JSON report (exit 255)', $e->getMessage());
+            self::assertStringContainsString('--memory-limit=2G', $e->getMessage());
+            self::assertStringContainsString('--memory-limit can raise the limit', $e->getMessage());
+            self::assertStringContainsString('Allowed memory size', $e->getMessage());
+        }
+    }
+
+    public function test_empty_stdout_names_a_custom_memory_limit(): void
+    {
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(255, '', ''));
+        try {
+            (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), '/srv/acme-app', true, '8.0', null, null, '4G');
+            self::fail('expected a ToolError');
+        } catch (ToolError $e) {
+            self::assertStringContainsString('--memory-limit=4G', $e->getMessage());
+        }
+    }
+
+    public function test_hopeless_stdout_throws_a_clear_tool_error(): void
+    {
+        $stderr = "first-line-of-stderr\n" . str_repeat('padding line\n', 100) . 'last-line-of-stderr';
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(255, 'this is not json at all', $stderr));
+        try {
+            (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), '/srv/acme-app', true, '8.0');
+            self::fail('expected a ToolError');
+        } catch (ToolError $e) {
+            $message = $e->getMessage();
+            self::assertStringContainsString('Rector output was not valid JSON', $message);
+            self::assertStringContainsString('Syntax error', $message);
+            self::assertStringContainsString('exit 255', $message);
+            self::assertStringContainsString('first-line-of-stderr', $message);
+            // The stderr excerpt is capped at 500 characters.
+            self::assertStringNotContainsString('last-line-of-stderr', $message);
+        }
+    }
 }
