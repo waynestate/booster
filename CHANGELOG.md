@@ -4,6 +4,8 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-29
+
 ### Added
 
 - `booster plan`, `run`, `hops`, `detect` and `init` commands (also `vendor/bin/booster`).
