@@ -6,6 +6,7 @@ namespace Waynestate\Booster\Tests;
 
 use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Run\ProcessResult;
+use Waynestate\Booster\Run\RectorResult;
 use Waynestate\Booster\Run\RectorRunner;
 use Waynestate\Booster\ToolError;
 
@@ -98,5 +99,33 @@ final class RectorRunnerTest extends TestCase
             // The stderr excerpt is capped at 500 characters.
             self::assertStringNotContainsString('last-line-of-stderr', $message);
         }
+    }
+
+    public function test_invalid_utf8_in_the_report_is_repaired_and_named(): void
+    {
+        // Lone 0xFF and 0xFE bytes are not valid UTF-8, so strict json_decode fails
+        // with JSON_ERROR_UTF8. chr() keeps the raw bytes out of this source file.
+        $stdout = '{"file_diffs": [{"file": "/srv/acme-app/src/Bad.php", "diff": "+@@@"}], "errors": []}';
+        $stdout = str_replace('@@@', chr(255) . chr(254), $stdout);
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, $stdout, ''));
+        $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), '/srv/acme-app', true, '8.0');
+
+        self::assertCount(1, $result->files);
+        self::assertSame('src/Bad.php', $result->files[0]['file']);
+        self::assertStringContainsString("\u{FFFD}", $result->files[0]['diff']);
+        self::assertSame([RectorResult::REPAIRED_UTF8_NOTE . ' (src/Bad.php)'], $result->errors);
+    }
+
+    public function test_repaired_utf8_outside_the_diffs_gets_a_bare_note(): void
+    {
+        $stdout = '{"file_diffs": [], "errors": ["bad @@@ byte"]}';
+        $stdout = str_replace('@@@', chr(255), $stdout);
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, $stdout, ''));
+        $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), '/srv/acme-app', true, '8.0');
+
+        self::assertSame([], $result->files);
+        self::assertSame(RectorResult::REPAIRED_UTF8_NOTE, $result->errors[0]);
+        self::assertCount(2, $result->errors);
+        self::assertStringContainsString("\u{FFFD}", $result->errors[1]);
     }
 }

@@ -153,26 +153,27 @@ final class HopExecutor
 
             $phpunitTarget = $hop->kind === HopKind::Phpunit ? $hop->to : null;
             $preview = $this->rector->run($hop, $path, true, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget, $options->memoryLimit);
-            if ($preview->errors !== []) {
-                return new StepResult($step->number, $hop->id, StepResult::ERROR, $preview->files, ['Rector reported errors; nothing was changed.', ...$preview->errors]);
+            [$stopErrors, $notes] = self::splitRepairedNotes($preview->errors);
+            if ($stopErrors !== []) {
+                return new StepResult($step->number, $hop->id, StepResult::ERROR, $preview->files, ['Rector reported errors; nothing was changed.', ...$stopErrors, ...$notes]);
             }
             if ($preview->changedCount() > $options->maxChanges) {
                 return new StepResult($step->number, $hop->id, StepResult::CAPPED, $preview->files, [sprintf(
                     'Rector wants to change %d files and the cap is %d. Nothing was changed. Review with --dry-run, then raise --max-changes or use --skip to split the work.',
                     $preview->changedCount(),
                     $options->maxChanges,
-                )]);
+                ), ...$notes]);
             }
             if ($options->dryRun) {
                 // A Laravel hop previews through the app's own autoloader; without vendor/ Rector
                 // cannot see the app's classes, so the diff is a lower bound, not the whole change.
                 $incomplete = $hop->kind === HopKind::Laravel && !is_file($path . '/vendor/autoload.php');
                 if ($incomplete) {
-                    $messages = [sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$hop->notes];
+                    $messages = [sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$hop->notes, ...$notes];
                 } elseif ($preview->files === []) {
-                    $messages = ['Dry run: nothing was changed.', ...$hop->notes];
+                    $messages = ['Dry run: nothing was changed.', ...$hop->notes, ...$notes];
                 } else {
-                    $messages = $hop->notes;
+                    $messages = [...$hop->notes, ...$notes];
                 }
 
                 return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $preview->files, $messages, $incomplete);
@@ -180,31 +181,62 @@ final class HopExecutor
 
             $applied = $this->rector->run($hop, $path, false, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget, $options->memoryLimit);
             $messages = $this->composer->apply($hop, $path);
-            if ($applied->errors !== []) {
-                return new StepResult($step->number, $hop->id, StepResult::ERROR, $applied->files, ['Rector reported errors while applying.', ...$applied->errors]);
+            [$appliedErrors, $appliedNotes] = self::splitRepairedNotes($applied->errors);
+            foreach ($appliedNotes as $note) {
+                if (!in_array($note, $notes, true)) {
+                    $notes[] = $note;
+                }
+            }
+            if ($appliedErrors !== []) {
+                return new StepResult($step->number, $hop->id, StepResult::ERROR, $applied->files, ['Rector reported errors while applying.', ...$appliedErrors, ...$notes]);
             }
             if ($applied->changedCount() === 0 && $messages === []) {
                 // Nothing changed, so there is nothing for the gate to prove; skip it.
                 return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
                     'Nothing to do: Rector changed no files and composer.json already allows the target, so the gate was skipped.',
                     ...$hop->notes,
+                    ...$notes,
                 ]);
             }
 
             if (!$options->skipGate) {
                 $gate = $this->runGate($step, $path, $options, $baseline);
                 if ($gate !== null) {
-                    return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $applied->files, [...$messages, ...$gate]);
+                    return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $applied->files, [...$messages, ...$gate, ...$notes]);
                 }
                 $messages[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
             } else {
                 $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
             }
 
-            return new StepResult($step->number, $hop->id, StepResult::APPLIED, $applied->files, [...$messages, ...$hop->notes]);
+            return new StepResult($step->number, $hop->id, StepResult::APPLIED, $applied->files, [...$messages, ...$hop->notes, ...$notes]);
         } catch (ToolError $e) {
             return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [$e->getMessage()]);
         }
+    }
+
+    /**
+     * Splits Rector errors into the ones that must stop the run and the
+     * informational notes (the UTF-8 repair note). A note never stops a run;
+     * it is shown in the step's messages wherever the step ends.
+     *
+     * @param list<string> $errors
+     *
+     * @return array{0: list<string>, 1: list<string>} stopping errors, then notes
+     */
+    private static function splitRepairedNotes(array $errors): array
+    {
+        $stopping = [];
+        $notes = [];
+        foreach ($errors as $error) {
+            if (str_starts_with($error, RectorResult::REPAIRED_UTF8_NOTE)) {
+                $notes[] = $error;
+            } else {
+                $stopping[] = $error;
+            }
+        }
+
+        return [$stopping, $notes];
     }
 
     /**

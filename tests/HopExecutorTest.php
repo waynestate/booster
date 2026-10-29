@@ -16,6 +16,7 @@ use Waynestate\Booster\Run\ComposerEditor;
 use Waynestate\Booster\Run\HopExecutor;
 use Waynestate\Booster\Run\NodeRunner;
 use Waynestate\Booster\Run\ProcessResult;
+use Waynestate\Booster\Run\RectorResult;
 use Waynestate\Booster\Run\RectorRunner;
 use Waynestate\Booster\Run\RunOptions;
 use Waynestate\Booster\Run\RunReport;
@@ -312,6 +313,40 @@ final class HopExecutorTest extends TestCase
                 self::assertContains('--dry-run', $call['command']);
             }
         }
+    }
+
+    public function test_a_repaired_utf8_note_does_not_stop_the_run(): void
+    {
+        $note = RectorResult::REPAIRED_UTF8_NOTE . ' (src/Bad.php)';
+        $report = $this->execute($this->fake(rectorErrors: [$note]), new RunOptions(dryRun: true));
+
+        self::assertSame(['previewed', 'previewed'], $this->statuses($report));
+        self::assertFalse($report->failed());
+        foreach ($report->results as $result) {
+            self::assertContains($note, $result->messages);
+        }
+    }
+
+    public function test_a_repaired_utf8_note_is_shown_once_on_an_applied_hop(): void
+    {
+        $note = RectorResult::REPAIRED_UTF8_NOTE . ' (src/Bad.php)';
+        $report = $this->execute($this->fake(rectorErrors: [$note]), new RunOptions());
+
+        self::assertSame(['applied', 'applied'], $this->statuses($report));
+        foreach ($report->results as $result) {
+            $notes = array_values(array_filter($result->messages, static fn(string $m): bool => str_starts_with($m, RectorResult::REPAIRED_UTF8_NOTE)));
+            self::assertSame([$note], $notes);
+        }
+    }
+
+    public function test_a_real_error_still_stops_the_run_next_to_a_note(): void
+    {
+        $note = RectorResult::REPAIRED_UTF8_NOTE . ' (src/Bad.php)';
+        $report = $this->execute($this->fake(rectorErrors: ['Parse error in x.php', $note]), new RunOptions());
+
+        self::assertSame(['error', 'not-run'], $this->statuses($report));
+        self::assertStringContainsString('Parse error in x.php', implode(' ', $report->results[0]->messages));
+        self::assertStringContainsString($note, implode(' ', $report->results[0]->messages));
     }
 
     public function test_skip_gate_says_so(): void

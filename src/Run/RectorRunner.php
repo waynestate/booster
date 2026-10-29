@@ -177,7 +177,15 @@ final class RectorRunner
             ));
         }
 
+        // Rector writes file contents into its JSON report. A byte sequence that is
+        // valid in the app's own encoding but not UTF-8 makes strict json_decode fail
+        // with JSON_ERROR_UTF8, so retry once with invalid bytes replaced by U+FFFD.
+        $repaired = false;
         $data = json_decode($result->stdout, true);
+        if ($data === null && json_last_error() === JSON_ERROR_UTF8) {
+            $data = json_decode($result->stdout, true, 512, JSON_INVALID_UTF8_SUBSTITUTE);
+            $repaired = true;
+        }
         if (!is_array($data)) {
             throw new ToolError(sprintf(
                 "Rector output was not valid JSON: %s (exit %d).\nstderr: %s",
@@ -212,6 +220,22 @@ final class RectorRunner
             } elseif (is_string($error)) {
                 $errors[] = $error;
             }
+        }
+
+        if ($repaired) {
+            // Name the files whose diff now carries U+FFFD replacement characters, so
+            // the developer knows where the repair touched content.
+            $damaged = [];
+            foreach ($files as $f) {
+                if (str_contains($f['diff'], "\u{FFFD}")) {
+                    $damaged[] = $f['file'];
+                }
+            }
+            $note = RectorResult::REPAIRED_UTF8_NOTE;
+            if ($damaged !== []) {
+                $note .= ' (' . implode(', ', $damaged) . ')';
+            }
+            array_unshift($errors, $note);
         }
 
         return new RectorResult($files, $errors);
