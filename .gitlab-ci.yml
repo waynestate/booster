@@ -31,3 +31,39 @@ refresh-hop-data:
   script:
     - composer install --no-interaction --no-progress --prefer-dist
     - php bin/refresh-hop-data.php
+
+# PHAR release: on a version tag, build the single-file phar and publish it as
+# a GitLab release asset. One build recipe for both CI systems:
+# scripts/build-phar.sh in no-Docker mode, because the runners may have no
+# Docker daemon (the composer image ships php and composer).
+phar:
+  image: composer:2.10.3
+  variables:
+    BOOSTER_PHAR_NO_DOCKER: '1'
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  script:
+    - bash scripts/build-phar.sh
+  artifacts:
+    paths:
+      - build/booster.phar
+    expire_in: never
+
+release:
+  image:
+    name: registry.gitlab.com/gitlab-org/release-cli:latest
+    entrypoint: ['']
+  needs:
+    - phar
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  script:
+    - echo "Publishing the GitLab release for $CI_COMMIT_TAG"
+  release:
+    tag_name: '$CI_COMMIT_TAG'
+    name: 'Booster $CI_COMMIT_TAG'
+    description: 'Booster $CI_COMMIT_TAG as a single-file PHAR.'
+    assets:
+      links:
+        - name: 'booster.phar'
+          url: '$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/raw/build/booster.phar?job=phar'
