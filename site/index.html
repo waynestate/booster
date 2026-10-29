@@ -7,13 +7,13 @@
      points them at a local stack server in dev; content: auto, production or dev. -->
 <meta name="stack-env" content="auto">
 <script src="assets/stack-env.js" defer></script>
-<title>BOOSTER: Boosts your versions.</title>
-<meta name="description" content="BOOSTER plans and runs PHP and Laravel upgrades one hop at a time on Rector, gates every hop with your tests on the target PHP, and never commits or pushes for you.">
+<title>Booster: Boosts your versions.</title>
+<meta name="description" content="Booster plans and runs PHP and Laravel upgrades one hop at a time on Rector, gates every hop with your tests on the target PHP, and never commits or pushes for you.">
 <meta name="theme-color" content="#0c5449">
 <link rel="icon" href="brand/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="brand/favicon-32.png">
 <link rel="apple-touch-icon" href="brand/booster-avatar-256.png">
-<meta property="og:title" content="BOOSTER: Boosts your versions.">
+<meta property="og:title" content="Booster: Boosts your versions.">
 <meta property="og:description" content="PHP and Laravel upgrades, one dose at a time.">
 <meta property="og:image" content="brand/booster-avatar-512.png">
 <!--
@@ -63,7 +63,7 @@
         <p class="label"><span class="label__dot" aria-hidden="true"></span>PHP and Laravel upgrades · WELD stack</p>
         <h1 class="hero__title" id="hero-title">BOOSTER</h1>
         <p class="hero__tagline">Boosts your versions.</p>
-        <p class="hero__blurb">A booster shot keeps your immunity current. This one keeps your PHP current, and it stings less. BOOSTER plans the hops from the version your app runs today to one the policy still supports, then gives them one dose at a time: <a href="https://getrector.com">Rector</a> rewrites the code, BOOSTER raises <code>composer.json</code>, and your tests must pass on the target PHP before the next hop starts.</p>
+        <p class="hero__blurb">A booster shot keeps your immunity current. This one keeps your PHP current, and it stings less. Booster plans the hops from the version your app runs today to one the policy still supports, then gives them one dose at a time: <a href="https://getrector.com">Rector</a> rewrites the code, Booster raises <code>composer.json</code>, and your tests must pass on the target PHP before the next hop starts.</p>
         <ul class="hero__facts">
           <li><strong>One hop</strong> per dose</li>
           <li><strong>50 files</strong> cap per hop</li>
@@ -88,7 +88,7 @@
           </ol>
           <span class="pad__marker" aria-hidden="true" data-pad-marker style="--lvl:6"></span>
           <div class="pad__craft" data-pad-craft>
-            <img class="pad__mark" src="brand/booster-avatar-512.png" width="512" height="512" alt="BOOSTER mark: a syringe that is also a rocket, gold flame below">
+            <img class="pad__mark" src="brand/booster-avatar-512.png" width="512" height="512" alt="Booster mark: a syringe that is also a rocket, gold flame below">
             <span class="pad__plume" aria-hidden="true"><span></span><span></span><span></span></span>
           </div>
           <span class="pad__ground" aria-hidden="true"></span>
@@ -106,7 +106,7 @@
   <!-- ========================================================= record card -->
   <!-- The magic: pick an app, press Run the plan, and watch the countdown,
        each dose stamped as its gate passes, and the version climb. The data is
-       real BOOSTER 0.1 output for the example apps in examples/. -->
+        real Booster 0.1 output for the example apps in examples/. -->
   <section class="section section--record" id="record" aria-labelledby="record-title">
     <div class="wsu-container">
       <div class="head head--split">
@@ -114,7 +114,7 @@
           <p class="label"><span class="label__dot" aria-hidden="true"></span>Dose by dose</p>
           <h2 id="record-title">Every hop a dose. Every gate a stamp.</h2>
         </div>
-        <p class="head__note">This is <code>booster plan</code> for the example apps that ship with BOOSTER, written up the way your doctor would. Pick a patient, then launch.</p>
+        <p class="head__note">This is <code>booster plan</code> for the example apps that ship with Booster, written up the way your doctor would. Pick a patient, then launch.</p>
       </div>
 
       <div class="record" data-record>
@@ -224,7 +224,7 @@
       <div class="pairs__copy">
         <p class="label"><span class="label__dot" aria-hidden="true"></span>The overlap</p>
         <h2 id="pairs-title">Never on a pair Laravel doesn't support.</h2>
-        <p>BOOSTER interleaves the PHP and Laravel hops so the app sits on a supported pair after every dose: Laravel 10 on PHP 8.1 to 8.3, 11 on 8.2 to 8.4, 12 on 8.2 to 8.5, 13 on 8.3 or newer. A target pair that cannot exist is refused before anything runs.</p>
+        <p>Booster interleaves the PHP and Laravel hops so the app sits on a supported pair after every dose: Laravel 10 on PHP 8.1 to 8.3, 11 on 8.2 to 8.4, 12 on 8.2 to 8.5, 13 on 8.3 or newer. A target pair that cannot exist is refused before anything runs.</p>
         <p>Targets must still be supported by CREED's policy. Passing through PHP 8.1 is fine; stopping there is not:</p>
         <pre class="snip"><span class="snip__p">$</span> bin/booster plan --path=examples/raw-php --to-php=8.1
 Php 8.1 is past security support; pick a version the policy still supports.
@@ -294,12 +294,12 @@ Php 8.1 is past security support; pick a version the policy still supports.
         <li class="seq">
           <span class="seq__t">T−3</span>
           <h3>Rector for real</h3>
-          <p>Only that hop's rules, from BOOSTER's own <code>vendor/</code>, with the hop's PHP target set on purpose. An app on PHP 7.4 is rewritten by a Rector running on 8.3 or newer.</p>
+          <p>Only that hop's rules, from Booster's own <code>vendor/</code>, with the hop's PHP target set on purpose. An app on PHP 7.4 is rewritten by a Rector running on 8.3 or newer.</p>
         </li>
         <li class="seq">
           <span class="seq__t">T−2</span>
           <h3>Raise the constraint</h3>
-          <p>The <code>php</code> or <code>laravel/framework</code> constraint in <code>composer.json</code> goes up, and <code>config.platform.php</code> moves with it. BOOSTER never runs <code>composer update</code>.</p>
+          <p>The <code>php</code> or <code>laravel/framework</code> constraint in <code>composer.json</code> goes up, and <code>config.platform.php</code> moves with it. Booster never runs <code>composer update</code>.</p>
         </li>
         <li class="seq">
           <span class="seq__t">T−1</span>
@@ -321,14 +321,14 @@ Php 8.1 is past security support; pick a version the policy still supports.
           <button class="cmd" role="tab" id="tab-detect" aria-controls="out-detect" aria-selected="true" tabindex="0"><span class="cmd__name">detect</span><span class="cmd__does">Which of the five stack shapes, and which versions</span></button>
           <button class="cmd" role="tab" id="tab-plan" aria-controls="out-plan" aria-selected="false" tabindex="-1"><span class="cmd__name">plan</span><span class="cmd__does">The ordered hops and the warnings. Changes nothing.</span></button>
           <button class="cmd" role="tab" id="tab-run" aria-controls="out-run" aria-selected="false" tabindex="-1"><span class="cmd__name">run</span><span class="cmd__does">Runs the plan; <code>--dry-run</code> previews every hop</span></button>
-          <button class="cmd" role="tab" id="tab-hops" aria-controls="out-hops" aria-selected="false" tabindex="-1"><span class="cmd__name">hops</span><span class="cmd__does">Every hop BOOSTER knows</span></button>
+          <button class="cmd" role="tab" id="tab-hops" aria-controls="out-hops" aria-selected="false" tabindex="-1"><span class="cmd__name">hops</span><span class="cmd__does">Every hop Booster knows</span></button>
           <button class="cmd" role="tab" id="tab-init" aria-controls="out-init" aria-selected="false" tabindex="-1"><span class="cmd__name">init</span><span class="cmd__does">Writes the coding-tab playbooks to <code>.agents/skills</code></span></button>
         </div>
         <p class="commands__exits">Exit codes: <strong>0</strong> pass · <strong>1</strong> a hop was capped, errored or failed its gate · <strong>2</strong> bad usage or a target the policy does not support.</p>
       </div>
 
       <!-- A greenbar printout, tractor-feed holes and all. Output is real
-           BOOSTER 0.1 output against the bundled example apps. -->
+            Booster 0.1 output against the bundled example apps. -->
       <div class="printout">
         <span class="printout__feed printout__feed--l" aria-hidden="true"></span>
         <span class="printout__feed printout__feed--r" aria-hidden="true"></span>
@@ -405,7 +405,7 @@ Wrote 19 playbooks, 19 changed.
           <p class="label"><span class="label__dot" aria-hidden="true"></span>Get the shot</p>
           <h2 id="install-title">Install, then plan.</h2>
         </div>
-        <p class="head__note">BOOSTER needs PHP 8.3 or newer. The app it upgrades does not: an app on PHP 7.4 is fine. The gate in <code>run</code> starts Docker itself, so the machine needs a Docker daemon.</p>
+        <p class="head__note">Booster needs PHP 8.3 or newer. The app it upgrades does not: an app on PHP 7.4 is fine. The gate in <code>run</code> starts Docker itself, so the machine needs a Docker daemon.</p>
       </div>
 
       <div class="install" data-install>
@@ -445,7 +445,7 @@ docker run --rm -v "${PWD}:/booster" -w /booster composer:2 composer install --n
 docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-cli php bin/booster plan --path=/app</pre>
             <button class="copy" type="button" data-copy="#code-docker">Copy</button>
           </div>
-          <p class="os__note">When BOOSTER itself runs in a container, pass <code>--skip-gate</code> to <code>run</code> and run the tests yourself.</p>
+          <p class="os__note">When Booster itself runs in a container, pass <code>--skip-gate</code> to <code>run</code> and run the tests yourself.</p>
         </div>
 
         <div class="install__side">
@@ -455,7 +455,7 @@ docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-
           </div>
           <div class="soon">
             <p class="soon__label"><span class="chip chip--soon">On Packagist</span></p>
-            <p>It's <code>waynestate/booster</code> on Packagist. BOOSTER runs on PHP 8.3 or newer even when the app does not, so give it its own folder: clone it as above, or <code>composer create-project waynestate/booster booster ^0.1</code>.</p>
+            <p>It's <code>waynestate/booster</code> on Packagist. Booster runs on PHP 8.3 or newer even when the app does not, so give it its own folder: clone it as above, or <code>composer create-project waynestate/booster booster ^0.1</code>.</p>
           </div>
         </div>
       </div>
@@ -467,13 +467,13 @@ docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-
     <div class="wsu-container">
       <div class="head">
         <p class="label label--on-green"><span class="label__dot" aria-hidden="true"></span>Contraindications</p>
-        <h2 id="never-title">What BOOSTER will not do.</h2>
+        <h2 id="never-title">What Booster will not do.</h2>
         <p class="head__sub">Side effects are limited to the diff in your working copy. Read it, then merge it yourself.</p>
       </div>
       <ul class="never">
         <li><span class="never__x" aria-hidden="true"></span><h3>Commit, push or open a merge request</h3><p>It edits the working copy and prints a report. A person reads the diff and merges it.</p></li>
         <li><span class="never__x" aria-hidden="true"></span><h3>Start on a dirty tree</h3><p><code>run</code> refuses a working copy that is not under git or has uncommitted changes, so the upgrade diff stands alone. <code>--allow-dirty</code> if you must.</p></li>
-        <li><span class="never__x" aria-hidden="true"></span><h3>Aim at an unsupported version</h3><p>An end-of-life target is refused; a security-only one comes with a warning. The dates come from CREED's <code>policy.json</code>, never from BOOSTER's code.</p></li>
+        <li><span class="never__x" aria-hidden="true"></span><h3>Aim at an unsupported version</h3><p>An end-of-life target is refused; a security-only one comes with a warning. The dates come from CREED's <code>policy.json</code>, never from Booster's code.</p></li>
         <li><span class="never__x" aria-hidden="true"></span><h3>Run <code>composer update</code></h3><p>It raises constraints. Resolving them is your call.</p></li>
         <li><span class="never__x" aria-hidden="true"></span><h3>Pass quietly</h3><p>An unreadable policy, broken JSON, missing Docker or a Rector error fails closed with exit 1 or 2.</p></li>
         <li><span class="never__x" aria-hidden="true"></span><h3>Trust your file names</h3><p>Subprocesses take argument arrays, and control characters are stripped from everything printed. It reads no secrets and makes no network calls of its own.</p></li>
@@ -487,25 +487,25 @@ docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-
       <div class="head head--split">
         <div>
           <p class="label"><span class="label__dot" aria-hidden="true"></span>The care team</p>
-          <h2 id="team-title">BOOSTER's place in WELD.</h2>
+          <h2 id="team-title">Booster's place in WELD.</h2>
         </div>
-        <p class="head__note">WELD is the Wayne State application stack. BOOSTER is its upgrade layer, and it works for all five shapes: raw PHP, raw PHP with a Vue SPA, Laravel with Blade, Blade with Vue islands, and Inertia with Vue.</p>
+        <p class="head__note">WELD is the Wayne State application stack. Booster is its upgrade layer, and it works for all five shapes: raw PHP, raw PHP with a Vue SPA, Laravel with Blade, Blade with Vue islands, and Inertia with Vue.</p>
       </div>
       <ul class="team">
         <li class="member"><span class="member__mark member__mark--tile"><img src="assets/marks/wayneui.svg" width="40" height="40" alt=""></span><span class="member__name"><a class="part-link" href="https://wayneui.apps.wayne.edu/">WayneUI</a></span><span class="member__role">The interface layer under everything, this page included.</span></li>
-        <li class="member"><span class="member__mark"><img src="assets/marks/creed.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://creed.apps.wayne.edu/">CREED</a></span><span class="member__role">Writes the version policy BOOSTER reads.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/creed.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://creed.apps.wayne.edu/">CREED</a></span><span class="member__role">Writes the version policy Booster reads.</span></li>
         <li class="member"><span class="member__mark"><img src="assets/marks/proctor.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://proctor.apps.wayne.edu/">PROCTOR</a></span><span class="member__role">Measures an app against that policy; can ride in the gate.</span></li>
-        <li class="member"><span class="member__mark"><img src="assets/marks/preflight.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://preflight.apps.wayne.edu/">PREFLIGHT</a></span><span class="member__role">The CI templates BOOSTER's own checks run on.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/preflight.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://preflight.apps.wayne.edu/">Preflight</a></span><span class="member__role">The CI templates Booster's own checks run on.</span></li>
         <li class="member"><span class="member__mark"><img src="assets/marks/sesame.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://sesame.apps.wayne.edu/">SESAME</a></span><span class="member__role">Sign-in; <code>--sesame</code> moves wayne-cas apps to it.</span></li>
         <li class="member"><span class="member__mark"><img src="assets/marks/helmet.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://helmet.apps.wayne.edu/">HELMET</a></span><span class="member__role">The baseline runtime and its headers.</span></li>
-        <li class="member"><span class="member__mark"><img src="assets/marks/pinstripe.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://pinstripe.apps.wayne.edu/">Pinstripe</a></span><span class="member__role">The coding standard BOOSTER is held to.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/pinstripe.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://pinstripe.apps.wayne.edu/">Pinstripe</a></span><span class="member__role">The coding standard Booster is held to.</span></li>
         <li class="member"><span class="member__mark"><img src="assets/marks/sourdough.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://sourdough.apps.wayne.edu/">Sourdough</a></span><span class="member__role">Starters that are born current.</span></li>
-        <li class="member"><span class="member__mark"><img src="assets/marks/weld.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://weld.apps.wayne.edu/">WELD</a></span><span class="member__role">The whole stack, joined. BOOSTER keeps it current.</span></li>
-        <li class="member member--self"><span class="member__mark"><img src="brand/booster-avatar-256.png" width="56" height="56" alt=""></span><span class="member__name">BOOSTER</span><span class="member__role">Moves apps forward, one dose at a time.</span><span class="member__here">You are here</span></li>
-        <li class="member"><span class="member__mark"><img src="assets/marks/squire.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://squire.apps.wayne.edu/">SQUIRE</a></span><span class="member__role">Carries the release out the door.</span></li>
-        <li class="member"><span class="member__mark"><img src="assets/marks/rollcall.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://rollcall.apps.wayne.edu/">ROLLCALL</a></span><span class="member__role">Every app answers “present”, with its PHP version.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/weld.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://weld.apps.wayne.edu/">WELD</a></span><span class="member__role">The whole stack, joined. Booster keeps it current.</span></li>
+        <li class="member member--self"><span class="member__mark"><img src="brand/booster-avatar-256.png" width="56" height="56" alt=""></span><span class="member__name">Booster</span><span class="member__role">Moves apps forward, one dose at a time.</span><span class="member__here">You are here</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/squire.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://squire.apps.wayne.edu/">Squire</a></span><span class="member__role">Carries the release out the door.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/rollcall.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://rollcall.apps.wayne.edu/">Rollcall</a></span><span class="member__role">Every app answers “present”, with its PHP version.</span></li>
         <li class="member"><span class="member__mark"><img src="assets/marks/advisor.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://advisor.apps.wayne.edu/">ADVISOR</a></span><span class="member__role">Ask what applies to your app, and what to do next.</span></li>
-        <li class="member"><span class="member__mark"><img src="assets/marks/drawbridge.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://drawbridge.apps.wayne.edu/">DRAWBRIDGE</a></span><span class="member__role">The sign-in gateway, lowered on request.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/drawbridge.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://drawbridge.apps.wayne.edu/">Drawbridge</a></span><span class="member__role">The sign-in gateway, lowered on request.</span></li>
       </ul>
     </div>
   </section>
@@ -519,7 +519,7 @@ docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-
         <p>The plumbing is proven on the example apps; the hit rate on real apps is not measured yet. What is still to come, from <a href="https://github.com/waynestate/booster/blob/main/OPEN_QUESTIONS.md">OPEN_QUESTIONS.md</a>:</p>
       </div>
       <ul class="schedule">
-        <li><span class="chip chip--soon">Coming soon</span> <span>A PHAR build, so BOOSTER is one file</span></li>
+        <li><span class="chip chip--soon">Coming soon</span> <span>A PHAR build, so Booster is one file</span></li>
         <li><span class="chip chip--soon">Coming soon</span> <span><code>booster mcp</code>, a read-only tool server</span></li>
         <li><span class="chip chip--soon">Coming soon</span> <span>A recorded green baseline before the first hop</span></li>
         <li><span class="chip chip--soon">Coming soon</span> <span>PHPCompatibility and target-version PHPStan as advisory scans</span></li>
