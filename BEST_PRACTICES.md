@@ -1,12 +1,12 @@
-# BOOSTER best practices
+# Booster best practices
 
 The short version of the stack's upgrade guide, with the
-tag for how BOOSTER holds each rule today.
+tag for how Booster holds each rule today.
 
 | Tag | Meaning |
 |---|---|
 | `Enforced` | Code makes the bad outcome impossible, or CI fails |
-| `Checked` | BOOSTER warns or stops |
+| `Checked` | Booster warns or stops |
 | `Documented` | Written down only |
 | `Not yet` | A gap |
 
@@ -18,7 +18,7 @@ tag for how BOOSTER holds each rule today.
   PHP 8.1 to 8.3, 11 on 8.2 to 8.4, 12 on 8.2 to 8.5, 13 on 8.3 or newer). `Enforced`: the planner interleaves the
   hops and refuses a target pair that cannot exist.
 - **Aim at a supported version.** `Enforced`: an EOL target is refused; a security-only target is allowed with a
-  warning. Dates come from CREED's `policy.json`, never from BOOSTER's code.
+  warning. Dates come from CREED's `policy.json`, never from Booster's code.
 - **Read the official notes for each hop.** `Checked`: every hop prints its notes and links the manual. The PHP 8.0 hop
   is flagged as the one that needs the most review time.
 
@@ -36,25 +36,25 @@ tag for how BOOSTER holds each rule today.
   writing.
 - **Cap the first change.** `Enforced`: a hop that would change more than `--max-changes` files stops before it
   writes.
-- **Set the PHP target on purpose.** `Enforced`: BOOSTER hands Rector the hop's PHP version, because Rector otherwise
+- **Set the PHP target on purpose.** `Enforced`: Booster hands Rector the hop's PHP version, because Rector otherwise
   reads the old constraint in `composer.json` and silently skips the new rules.
-- **Run Rector from its own toolchain.** `Enforced`: Rector and rector-laravel come from BOOSTER's `vendor/`, never
+- **Run Rector from its own toolchain.** `Enforced`: Rector and rector-laravel come from Booster's `vendor/`, never
   from the app, so an app on PHP 7.4 can be upgraded.
 - **Pin Rector and its rule packages** for a whole campaign. `Enforced`: `composer.lock` is committed; Rector is
   bounded `^2.8` and rector-laravel `^2.7`.
 - **Use maintained sets before writing rules.** `Enforced`: PHP and Laravel hops use the official per-version sets. The
-  only BOOSTER-owned rule set is the `wayne-cas` rename.
+  only Booster-owned rule set is the `wayne-cas` rename.
 
 ## Find what Rector cannot fix
 
 - **Static analysis against the target version** and **`composer audit` after dependency changes.** `Documented`:
-  hop notes name what Rector cannot do (for example `mysql_*` removal, implicit nullable parameters). `Not yet`: BOOSTER
-  does not run PHPStan or `composer audit` inside the app for you; pass them with `--proctor-command`.
+   hop notes name what Rector cannot do (for example `mysql_*` removal, implicit nullable parameters). `Not yet`: Booster
+   does not run PHPStan or `composer audit` inside the app for you; pass them with `--proctor-command`.
 - **PHPCompatibility is advisory only.** `Not yet`: not included in 0.1.
 
 ## Safe edits
 
-- **BOOSTER edits the working copy and nothing else.** `Enforced`: no commit, no branch, no push, no merge request.
+- **Booster edits the working copy and nothing else.** `Enforced`: no commit, no branch, no push, no merge request.
 - **Reversible.** `Enforced`: `run` refuses a dirty or non-git working copy unless `--allow-dirty` is passed.
 - **Fail closed.** `Enforced`: unreadable policy, malformed JSON, missing Docker for the gate, Rector errors and an
   unknown target are errors (exit 2) or failed hops (exit 1), never a quiet pass.

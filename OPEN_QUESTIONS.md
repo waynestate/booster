@@ -1,26 +1,26 @@
-# BOOSTER: open questions
+# Booster: open questions
 
-BOOSTER 0.1 is built and `composer ci` passes. What follows needs a person.
+Booster 0.1 is built and `composer ci` passes. What follows needs a person.
 
 ## Questions
 
 | # | Question | Who can answer | Blocks | Default built |
 |---|---|---|---|---|
-| 1 | Where does BOOSTER read `policy.json` from now that CREED is on Packagist (`waynestate/creed` 0.1.0)? | CREED owner | Removing the bundled copy | `--policy`, then `BOOSTER_POLICY`, then the generated copy in `src/Creed/policy.json` (schema_version 1). The copy goes stale; refresh it from a CREED checkout with `bin/export.php`. |
+| 1 | Where does Booster read `policy.json` from now that CREED is on Packagist (`waynestate/creed` 0.1.0)? | CREED owner | Removing the bundled copy | `--policy`, then `BOOSTER_POLICY`, then the generated copy in `src/Creed/policy.json` (schema_version 1). The copy goes stale; refresh it from a CREED checkout with `bin/export.php`. |
 | 2 | Should the bundled copy be refreshed by a script, or replaced by `require waynestate/creed`? | CREED owner | The copy going stale | CREED's `bin/export.php` writes the copy; `composer creed-copy:check` verifies it. |
-| 3 | What Composer vendor name will the packages publish under (`waynestate/booster`)? | Stack lead | `composer require` for users | Answered: `waynestate/booster` is on Packagist (`0.1.0`). The README still installs from a clone, since BOOSTER runs from its own folder. |
+| 3 | What Composer vendor name will the packages publish under (`waynestate/booster`)? | Stack lead | `composer require` for users | Answered: `waynestate/booster` is on Packagist (`0.1.0`). The README still installs from a clone, since Booster runs from its own folder. |
 | 4 | PHP test matrix: 8.3, 8.4, 8.5 or 8.3 and 8.5 only? | Stack lead | Nothing | 8.3, 8.4 and 8.5, as decided. |
 | 5 | Is PHPCompatibility wanted as an advisory signal? | Stack lead | A second scan for what Rector misses | Left out of 0.1. The design guide says advisory only. |
-| 6 | Larastan or plain PHPStan for Laravel apps, and for which Laravel versions? | Stack lead, Pinstripe owner | A "find what Rector cannot fix" gate | Neither is run by BOOSTER; `--proctor-command` can carry any extra check. |
+| 6 | Larastan or plain PHPStan for Laravel apps, and for which Laravel versions? | Stack lead, Pinstripe owner | A "find what Rector cannot fix" gate | Neither is run by Booster; `--proctor-command` can carry any extra check. |
 | 7 | Is the Vue 2 to 3 hop needed in 0.1, and how many Vue 2 apps still run? | App owners, fleet owner | An automated Vue hop | A playbook hop only (`vue-2-to-3`), planned automatically for Vue 2 apps. |
-| 8 | Which PHP and Laravel pairs does the shared MySQL server (5.6 per the stack notes) allow? Laravel's current database floor is above 5.6. | Citadel platform owner | Safe Laravel hops on Citadel | Hop notes tell the reviewer to check the database floor. BOOSTER does not look at the database. |
-| 9 | May BOOSTER ever open merge requests, and under what bot-branch, label and opt-out rules? | Stack lead, app owners | MR automation | BOOSTER never commits, pushes or opens merge requests. |
+| 8 | Which PHP and Laravel pairs does the shared MySQL server (5.6 per the stack notes) allow? Laravel's current database floor is above 5.6. | Citadel platform owner | Safe Laravel hops on Citadel | Hop notes tell the reviewer to check the database floor. Booster does not look at the database. |
+| 9 | May Booster ever open merge requests, and under what bot-branch, label and opt-out rules? | Stack lead, app owners | MR automation | Booster never commits, pushes or opens merge requests. |
 | 10 | Is `cas-to-sesame` wanted as an automatic step? It changes how people sign in. | SESAME owner, security | Planning it by default | Opt-in with `--sesame`. A warning prints when `wayne-cas` is detected. |
 | 11 | Which package names identify the old CAS client (only `cit-web-infra/wayne-cas` is detected now)? | SESAME owner | Detecting forks and renamed copies | `cit-web-infra/wayne-cas`, classes under `WSU\WayneCas\`. |
 | 12 | Which Composer release introduced the `config.policy` key the design guide mentions for `composer audit`? | CREED owner | Policy-driven audit settings | Not used. |
 | 13 | A first measured Rector pilot on a few real apps: what file cap and what time budget are right? | Stack lead | Tuning `--max-changes` | 50 files per hop. |
 | 14 | `composer audit` reports `symplify/rule-doc-generator-contracts` (a Rector dependency) as abandoned. Accept it? | Stack lead | `composer ci` | `config.audit.abandoned` is `report`: advisories still fail the build, an abandoned transitive does not. Revisit when Rector drops it. |
-| 15 | Where does the GitHub PREFLIGHT reusable workflow get its release tag? | PREFLIGHT owner | Replacing the commit pin | Pinned to the same commit SHA as the siblings, with the same comment. |
+| 15 | Where does the GitHub Preflight reusable workflow get its release tag? | Preflight owner | Replacing the commit pin | Pinned to the same commit SHA as the siblings, with the same comment. |
 
 ## Missing configuration
 
@@ -29,10 +29,10 @@ BOOSTER 0.1 is built and `composer ci` passes. What follows needs a person.
 | `BOOSTER_POLICY` (optional) | CREED's released `policy.json` | Empty in `.env.example`; the bundled snapshot is used |
 | Docker daemon on the machine that runs `booster run` | Developer machine or runner | None; without it the gate fails closed and `--skip-gate` is the way out |
 | Network access to Docker Hub for `php:<version>-cli` and `composer:2.10.3` | Developer machine or runner | None; a mirror would need the `FROM` lines in `docker/Dockerfile` changed |
-| PREFLIGHT components `@0.1.0` on GitLab, and the pinned PREFLIGHT workflow on GitHub | PREFLIGHT | As in the sibling projects |
+| Preflight components `@0.1.0` on GitLab, and the pinned Preflight workflow on GitHub | Preflight | As in the sibling projects |
 | The app's `vendor/` for Laravel hops | `composer install` in the app | None |
 
-BOOSTER holds no secrets and calls no API.
+Booster holds no secrets and calls no API.
 
 ## Not built yet
 

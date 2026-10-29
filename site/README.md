@@ -1,4 +1,4 @@
-# BOOSTER front page
+# Booster front page
 
 A static page: plain HTML, CSS and a little vanilla JS, no build step. Serve `site/` from anywhere (any static host,
 `python -m http.server`, or open `index.html` directly).
@@ -11,7 +11,7 @@ A static page: plain HTML, CSS and a little vanilla JS, no build step. Serve `si
   passes while the version climbs. "A capped hop" shows a dose held at the file cap. The plans are real
   `booster plan` output for the apps in `examples/`
 - reduced motion: no countdowns or lift-offs; the page loads with every dose already stamped
-- marks: `brand/` is BOOSTER's ChatGPT mark (never redrawn); `assets/marks/` holds the other stack parts' marks and
+- marks: `brand/` is Booster's ChatGPT mark (never redrawn); `assets/marks/` holds the other stack parts' marks and
   WayneUI's own mark
 
 Screenshots are in `screenshots/`.

@@ -1,8 +1,8 @@
 <div align="center">
-  <a href="site/index.html"><img src="docs/readme/hero.jpg" width="100%" alt="BOOSTER's front page: the headline 'Boosts your versions.' beside a launch pad where the syringe-rocket mark sits above a PHP altimeter reading 8.5, stage 6 of 6, gate: target-image tests."></a>
+  <a href="site/index.html"><img src="docs/readme/hero.jpg" width="100%" alt="Booster's front page: the headline 'Boosts your versions.' beside a launch pad where the syringe-rocket mark sits above a PHP altimeter reading 8.5, stage 6 of 6, gate: target-image tests."></a>
 </div>
 
-# BOOSTER
+# Booster
 
 <p>
   <img src="docs/readme/badges/php.svg" alt="php ^8.3">
@@ -20,39 +20,39 @@ Development happens on Wayne State's GitLab; this repository is a release mirror
 > A booster shot keeps your immunity current. This one keeps your PHP current, and it stings less.
 
 Front page: [`site/index.html`](site/index.html), a static page you can open in a browser or serve from `site/`.
-On Citadel it is served by the raw-PHP deploy layer in [`deploy/`](deploy/): a SQUIRE kit whose front controller serves `site/` behind HELMET's security headers. For local development, keep serving `site/` directly.
+On Citadel it is served by the raw-PHP deploy layer in [`deploy/`](deploy/): a Squire kit whose front controller serves `site/` behind HELMET's security headers. For local development, keep serving `site/` directly.
 
-BOOSTER is WELD's upgrade tool. It plans the hops that take a WSU PHP app from the PHP or Laravel version it runs now
+Booster is WELD's upgrade tool. It plans the hops that take a WSU PHP app from the PHP or Laravel version it runs now
 to one the version policy still supports, and it runs them one at a time: [Rector](https://getrector.com) rewrites the
-code, BOOSTER raises the constraints in `composer.json`, and the app's own tests must pass on the target PHP before the
+code, Booster raises the constraints in `composer.json`, and the app's own tests must pass on the target PHP before the
 next hop starts. It stands on `rector/rector` and `driftingly/rector-laravel` and adds only the ordering, the cap, the
 gate and a few WSU recipes.
 
-BOOSTER edits your working copy and prints a report. It never commits, pushes or opens a merge request: a person reads
+Booster edits your working copy and prints a report. It never commits, pushes or opens a merge request: a person reads
 the diff and merges it.
 
 ## Where it fits in WELD
 
-WELD is the Wayne State application stack. BOOSTER is its upgrade layer.
+WELD is the Wayne State application stack. Booster is its upgrade layer.
 
 | Part | Job |
 |---|---|
 | WayneUI (project 0) | The interface layer every other part builds on |
-| CREED | The version policy (`policy.json`) BOOSTER reads |
-| PROCTOR | Measures an app against that policy; BOOSTER can run it as part of the gate |
-| PREFLIGHT | The CI templates |
-| SESAME | Auth; BOOSTER can swap `wayne-cas` for it |
+| CREED | The version policy (`policy.json`) Booster reads |
+| PROCTOR | Measures an app against that policy; Booster can run it as part of the gate |
+| Preflight | The CI templates |
+| SESAME | Auth; Booster can swap `wayne-cas` for it |
 | HELMET | The baseline runtime |
 | Pinstripe | The coding standard |
 | Sourdough | The starters |
-| BOOSTER | This project: moves apps forward |
+| Booster | This project: moves apps forward |
 
 It works for all five permutations of the stack: raw PHP, raw PHP with a Vue SPA, Laravel with Blade, Laravel with
 Blade and Vue islands, and Laravel with Inertia and Vue.
 
 ## Install
 
-BOOSTER needs PHP 8.3 or newer, but the app it upgrades does not: Rector runs from BOOSTER's own `vendor/`, so an app
+Booster needs PHP 8.3 or newer, but the app it upgrades does not: Rector runs from Booster's own `vendor/`, so an app
 on PHP 7.4 is rewritten by a Rector that runs on 8.3 or newer.
 
 Linux and macOS:
@@ -78,13 +78,13 @@ docker run --rm -v "${PWD}:/booster" -w /booster composer:2 composer install --n
 docker run --rm -v "${PWD}:/booster" -v "C:\path\to\app:/app" -w /booster php:8.4-cli php bin/booster plan --path=/app
 ```
 
-The `run` command's test gate starts Docker itself, so it needs a Docker daemon on the machine that runs BOOSTER.
-When BOOSTER itself runs in a container, use `--skip-gate` and run the tests yourself. Node hops run `npm` in a
+The `run` command's test gate starts Docker itself, so it needs a Docker daemon on the machine that runs Booster.
+When Booster itself runs in a container, use `--skip-gate` and run the tests yourself. Node hops run `npm` in a
 `node:24` container, so they need the same daemon but no Node installed on the machine.
 
 ## Single-file download
 
-BOOSTER can also be built as a single-file PHAR, so PREFLIGHT and apps without Composer access can run it as one
+Booster can also be built as a single-file PHAR, so Preflight and apps without Composer access can run it as one
 file. Build it with the script for your OS (both need Docker, and no PHP or Composer on the host):
 
 Windows (PowerShell):
@@ -99,7 +99,7 @@ Linux / macOS:
 scripts/build-phar.sh
 ```
 
-Each script writes `build/booster.phar` and verifies it by printing BOOSTER's version. The phar is not published
+Each script writes `build/booster.phar` and verifies it by printing Booster's version. The phar is not published
 yet (there is no release step), so build it from a checkout rather than downloading it.
 
 Every command works from the phar. `detect`, `plan`, `hops` and `init` read only what is bundled inside it. `run`
@@ -136,7 +136,7 @@ supports at every step):
 ```
 
 <div align="center">
-  <img src="docs/readme/record.svg" width="100%" alt="BOOSTER's immunization record for the Laravel 10 example app: after a short countdown, a Gate passed stamp lands on each hop in turn, laravel-10-to-11, laravel-11-to-12, php-82-to-83, laravel-12-to-13, php-83-to-84 and php-84-to-85, ending in RESULT: PASS.">
+  <img src="docs/readme/record.svg" width="100%" alt="Booster's immunization record for the Laravel 10 example app: after a short countdown, a Gate passed stamp lands on each hop in turn, laravel-10-to-11, laravel-11-to-12, php-82-to-83, laravel-12-to-13, php-83-to-84 and php-84-to-85, ending in RESULT: PASS.">
   <br><sub>The plan above, written up the way your doctor would: one stamp per hop, one hop at a time.</sub>
 </div>
 
@@ -158,7 +158,7 @@ supports at every step):
 | `booster plan` | Prints the ordered hops, the warnings and an advisory PHPCompatibility scan of the first PHP hop's target. Changes nothing. |
 | `booster scan` | Advisory PHPCompatibility scan: what will break on `--php`. Exits 0 even with findings |
 | `booster run` | Runs the plan. `--dry-run` previews every hop |
-| `booster hops` | Lists every hop BOOSTER knows |
+| `booster hops` | Lists every hop Booster knows |
 | `booster init` | Writes the coding-tab playbooks to `.agents/skills`; `--check` exits 1 when they are stale |
 
 Options shared by `plan` and `run`:
@@ -186,7 +186,7 @@ Options for `scan`:
 | Option | Meaning |
 |---|---|
 | `--path` | The app (default `.`) |
-| `--php` | Required. The PHP version to ask about (`major.minor`, one BOOSTER knows) |
+| `--php` | Required. The PHP version to ask about (`major.minor`, one Booster knows) |
 | `--format` | `text` (default) or `json` |
 
 Options for `run`:
@@ -211,8 +211,8 @@ break on the PHP version the first PHP hop lands on. The findings are hints for 
 gate: they do not change the exit code, and a scan that cannot run (missing tooling, a crash) is reported as "could
 not run" while the plan still prints in full. `--no-scan` skips it.
 
-The scan is optional. BOOSTER looks for a PHP_CodeSniffer that carries the PHPCompatibility standard, trying the app's
-own `vendor/bin/phpcs`, then BOOSTER's `vendor/bin/phpcs`, then `phpcs` on the PATH. When none of them has the
+The scan is optional. Booster looks for a PHP_CodeSniffer that carries the PHPCompatibility standard, trying the app's
+own `vendor/bin/phpcs`, then Booster's `vendor/bin/phpcs`, then `phpcs` on the PATH. When none of them has the
 standard, the scan reports a skip and the plan goes on. To turn it on, install the packages into the app:
 
 ```
@@ -221,12 +221,12 @@ composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"
 
 The scan ignores `vendor/`, `node_modules/` and `storage/`, because those hold third-party code and generated files,
 not the app's. It reads the app only and changes nothing. `booster scan --path=../my-app --php=8.0` runs the same scan
-on its own, for any PHP version BOOSTER knows, and exits 0 even when it finds a wall of removed functions.
+on its own, for any PHP version Booster knows, and exits 0 even when it finds a wall of removed functions.
 
 ### The baseline
 
 Before the first hop, `run` runs the app's own tests on the PHP the app is on now, in the same `booster-target:<php>`
-image the gate uses. The point is to tell "BOOSTER broke it" from "it was already broken": a red baseline means the
+image the gate uses. The point is to tell "Booster broke it" from "it was already broken": a red baseline means the
 suite was red before any change, so a later red gate is not proof of a bad hop. The baseline is recorded in the report
 (`passed`, `failed` or `skipped`, with the exit code and the last 20 lines of output).
 
@@ -240,7 +240,7 @@ suite was red before any change, so a later red gate is not proof of a bad hop. 
    before anything is written.
 2. Rector runs for real, with only that hop's rules.
 3. `composer.json` is edited: the `php` or `laravel/framework` constraint is raised, and `config.platform.php` moves
-   with it. BOOSTER never runs `composer update`.
+    with it. Booster never runs `composer update`.
 4. The gate runs the app's tests inside `booster-target:<php>`, a container built from `docker/Dockerfile` on the PHP
    the hop moves to. A red gate stops the run and leaves the changes in place so you can read them
    (`git checkout .` undoes them).
@@ -253,13 +253,13 @@ with the number of unique files and a reminder that nothing was applied. A Larav
 cannot see the framework's classes, so its preview is marked incomplete and the report says to run `composer install`
 first.
 
-Some hops are playbooks only (`vue-2-to-3`): Rector does not read Vue, so BOOSTER lists the steps and the official
+Some hops are playbooks only (`vue-2-to-3`): Rector does not read Vue, so Booster lists the steps and the official
 guide, and a person does the work. Two hops edit manifests instead of code. `node-pin-24` sets `engines.node` in
 `package.json` and writes `.nvmrc`, then the app's usual gate applies. `mix-to-vite` converts a simple
 `webpack.mix.js` to Vite (below) and asks for a build gate, which runs `npm ci` and `npm run build` in the `node:26`
 container before the app's tests.
 
-### Hops BOOSTER knows
+### Hops Booster knows
 
 PHP one minor at a time from 5.6 to 8.5, Laravel one major at a time from 8 to 13 and PHPUnit one major at a time from
 9 to 13, each list read from `data/versions.json` and trimmed to the majors whose Rector ruleset is installed
@@ -275,7 +275,7 @@ every referenced asset maps to a Mix entry, and deletes `webpack.mix.js`; the si
 first, and `withoutMix()` calls are listed for a manual rename to `withoutVite()`); and `vue-2-to-3` (playbook).
 `booster hops` prints them all.
 
-BOOSTER plans only what the policy supports as a target. Moving to PHP 8.1 is refused because 8.1 is past security
+Booster plans only what the policy supports as a target. Moving to PHP 8.1 is refused because 8.1 is past security
 support; passing through it on the way to a newer version is fine.
 
 ## Configuration
@@ -288,23 +288,23 @@ The copy in `src/Creed/` (reader, `policy.json` and manifest) is generated from 
 written by hand: point `CREED_PATH` at a CREED checkout and run `composer creed-copy:check` to verify the copy has
 not drifted (it exits non-zero on a hand edit or a newer CREED).
 
-`.env.example` holds the placeholder. BOOSTER reads no secrets, makes no network calls of its own and talks to no
+`.env.example` holds the placeholder. Booster reads no secrets, makes no network calls of its own and talks to no
 Citadel host. Everything it prints from an app (file names, diffs) has control characters stripped.
 
-When Rector runs, BOOSTER passes it a few `BOOSTER_*` variables of its own (the app path, the sets, the PHP target).
+When Rector runs, Booster passes it a few `BOOSTER_*` variables of its own (the app path, the sets, the PHP target).
 They are internal; do not set them.
 
 ## Laravel hops and `vendor/`
 
-rector-laravel needs Laravel's classes to recognise a model or a controller. For a Laravel hop BOOSTER loads the app's
+rector-laravel needs Laravel's classes to recognise a model or a controller. For a Laravel hop Booster loads the app's
 own `vendor/autoload.php` when it exists, so run `composer install` in the app first. PHP hops never load the app's
 autoloader. An app with no `vendor/` still gets a plan and the hops that do not need Laravel's classes.
 
 ## Hop data
 
-`data/versions.json` holds the version facts BOOSTER plans against: the PHP, Laravel and PHPUnit chains, the PHP range
+`data/versions.json` holds the version facts Booster plans against: the PHP, Laravel and PHPUnit chains, the PHP range
 each Laravel major supports, the PHPUnit floor each Laravel major ships, and the Node floor the `node-pin-24` hop
-writes. The file ships inside the PHAR. A new major appears in the file as soon as its feed says so; BOOSTER offers a
+writes. The file ships inside the PHAR. A new major appears in the file as soon as its feed says so; Booster offers a
 hop for it only once Rector ships a ruleset for it, and a plan toward a major without one stops there with a warning
 instead of failing.
 
@@ -339,7 +339,7 @@ is on Packagist now, so it can become a dev requirement) and `composer audit`. N
 docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install --no-interaction && composer ci"
 ```
 
-`contract/expectations.json` says what BOOSTER must detect, plan and change for each example app in `examples/`;
+`contract/expectations.json` says what Booster must detect, plan and change for each example app in `examples/`;
 `tests/ContractTest.php` enforces it with the real Rector, so a Rector release that changes a hop shows up in CI.
 
 ## Proof
@@ -349,7 +349,7 @@ Proof runs against real Wayne State applications are on a private site, [proof.a
 ## Status
 
 Version 0.1. See [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) for what a person must answer and what is not built yet, and
-[BEST_PRACTICES.md](BEST_PRACTICES.md) for the rules BOOSTER follows.
+[BEST_PRACTICES.md](BEST_PRACTICES.md) for the rules Booster follows.
 
 ## Licence
 
@@ -358,7 +358,7 @@ MIT, Wayne State University, Enterprise Applications.
 <details>
 <summary><b>The brand board</b>: the syringe that is also a rocket, lockups, palette and type</summary>
 <br>
-<div align="center"><img src="docs/readme/board.jpg" width="100%" alt="BOOSTER's brand board: the syringe-rocket mark on a green tile, lockups, the palette of Wayne State green, gold and cream, Barlow Condensed type, and favicon sizes."></div>
+<div align="center"><img src="docs/readme/board.jpg" width="100%" alt="Booster's brand board: the syringe-rocket mark on a green tile, lockups, the palette of Wayne State green, gold and cream, Barlow Condensed type, and favicon sizes."></div>
 </details>
 
 <div align="center"><b>The whole course</b><br><sub>WayneUI and the stack. Each one is on its own schedule; this one keeps the schedule.</sub></div>
@@ -370,12 +370,12 @@ MIT, Wayne State University, Enterprise Applications.
   <a href="https://github.com/waynestate/sesame" title="SESAME"><img src="docs/readme/cast/sesame.png" width="40" alt="SESAME"></a>
   <a href="https://github.com/waynestate/helmet" title="HELMET"><img src="docs/readme/cast/helmet.png" width="40" alt="HELMET"></a>
   <a href="https://github.com/waynestate/sourdough" title="Sourdough"><img src="docs/readme/cast/sourdough.png" width="40" alt="Sourdough"></a>
-  <a href="https://github.com/waynestate/squire" title="SQUIRE"><img src="docs/readme/cast/squire.png" width="40" alt="SQUIRE"></a>
-  <a href="https://github.com/waynestate/preflight" title="PREFLIGHT"><img src="docs/readme/cast/preflight.png" width="40" alt="PREFLIGHT"></a>
+  <a href="https://github.com/waynestate/squire" title="Squire"><img src="docs/readme/cast/squire.png" width="40" alt="Squire"></a>
+  <a href="https://github.com/waynestate/preflight" title="Preflight"><img src="docs/readme/cast/preflight.png" width="40" alt="Preflight"></a>
   <a href="https://github.com/waynestate/pinstripe" title="Pinstripe"><img src="docs/readme/cast/pinstripe.png" width="40" alt="Pinstripe"></a>
-  <a href="https://github.com/waynestate/booster" title="BOOSTER"><img src="docs/readme/cast/booster.png" width="40" alt="BOOSTER"></a>
-  <a href="https://github.com/waynestate/rollcall" title="ROLLCALL"><img src="docs/readme/cast/rollcall.png" width="40" alt="ROLLCALL"></a>
-  <a href="https://github.com/waynestate/drawbridge" title="DRAWBRIDGE"><img src="docs/readme/cast/drawbridge.png" width="40" alt="DRAWBRIDGE"></a>
+  <a href="https://github.com/waynestate/booster" title="Booster"><img src="docs/readme/cast/booster.png" width="40" alt="Booster"></a>
+  <a href="https://github.com/waynestate/rollcall" title="Rollcall"><img src="docs/readme/cast/rollcall.png" width="40" alt="Rollcall"></a>
+  <a href="https://github.com/waynestate/drawbridge" title="Drawbridge"><img src="docs/readme/cast/drawbridge.png" width="40" alt="Drawbridge"></a>
   <a href="https://github.com/waynestate/advisor" title="ADVISOR"><img src="docs/readme/cast/advisor.png" width="40" alt="ADVISOR"></a>
   <a href="https://github.com/waynestate/weld" title="WELD"><img src="docs/readme/cast/weld.png" width="40" alt="WELD"></a>
 </div>

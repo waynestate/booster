@@ -1,6 +1,6 @@
-# BOOSTER contract
+# Booster contract
 
-`expectations.json` is what BOOSTER promises for each of the five stack permutations, using the apps in `examples/`:
+`expectations.json` is what Booster promises for each of the five stack permutations, using the apps in `examples/`:
 
 - the app type, PHP, Laravel and Vue versions it detects;
 - the ordered hops it plans on the fixed date `today`;

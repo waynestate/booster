@@ -1,4 +1,4 @@
-# BOOSTER README art kit
+# Booster README art kit
 
 Cuts the README images under `docs/readme/` from this repo's own front page
 (`site/`), brand files and source. Nothing is drawn freehand: the hero and the

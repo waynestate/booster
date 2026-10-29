@@ -1,10 +1,10 @@
 # MAINTAINING: refuelling the rocket
 
-How to build, test, release and keep BOOSTER current. BOOSTER plans and runs upgrade hops (PHP and Laravel versions,
+How to build, test, release and keep Booster current. Booster plans and runs upgrade hops (PHP and Laravel versions,
 PHPUnit, Node pins, Mix to Vite, old CAS clients to SESAME) on top of Rector, using CREED's policy to know where an app
 must land. Rockets need fuel, and this one runs on fresh version data and working recipes.
 
-## What BOOSTER is and what it depends on
+## What Booster is and what it depends on
 
 - `waynestate/booster` on Packagist, with the CLI `bin/booster`. An optional single-file phar (`build/booster.phar`)
   is built locally and not published yet.
@@ -12,7 +12,7 @@ must land. Rockets need fuel, and this one runs on fresh version data and workin
   `composer/semver`. No other stack package at runtime. Box (for the phar) lives in `tools/box/`, outside the main
   lock file.
 - **Its policy comes from CREED.** `src/Creed/` is a generated copy of CREED's reader and `policy.json`. Never
-  hand-edit it. `BOOSTER_POLICY` points BOOSTER at another `policy.json` at runtime.
+  hand-edit it. `BOOSTER_POLICY` points Booster at another `policy.json` at runtime.
 - Some hops run tools in Docker (for example Node in `node:<lts>`), so the upgrade gate needs a Docker daemon.
 
 ## Where it lives
@@ -42,8 +42,8 @@ with `--no-dev`, and finish with `php build/booster.phar --version`.
 
 ## CI
 
-- **GitLab:** PREFLIGHT's `php-test` (PHP 8.3, 8.4, 8.5) and `composer-audit` components, plus a `composer-ci` job.
-- **GitHub:** `.github/workflows/ci.yml` calls PREFLIGHT's reusable workflow with `composer ci`.
+- **GitLab:** Preflight's `php-test` (PHP 8.3, 8.4, 8.5) and `composer-audit` components, plus a `composer-ci` job.
+- **GitHub:** `.github/workflows/ci.yml` calls Preflight's reusable workflow with `composer ci`.
 - Green means `composer ci` passed on all three PHP versions on both.
 
 ## Refreshing the CREED copy
@@ -55,7 +55,7 @@ php ../creed/bin/export.php --namespace='Waynestate\Booster\Creed' --to=src/Cree
 ```
 
 Then the copy check and `composer ci`, and commit with the CREED commit in the message. When a new Laravel or PHP
-line appears in CREED, check whether BOOSTER needs a new hop for it.
+line appears in CREED, check whether Booster needs a new hop for it.
 
 ## Adding a hop
 
@@ -77,7 +77,7 @@ line appears in CREED, check whether BOOSTER needs a new hop for it.
 ## The front page
 
 `site/` is the static front page, for `https://booster.apps.wayne.edu/` on Citadel, served through a small raw-PHP
-`deploy/` layer generated with SQUIRE.
+`deploy/` layer generated with Squire.
 
 ## Who maintains it
 
