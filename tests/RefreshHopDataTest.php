@@ -6,6 +6,7 @@ namespace Waynestate\Booster\Tests;
 
 use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Component\Process\Process;
 use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Policy\Policy;
 use Waynestate\Booster\Policy\PolicyLocator;
@@ -267,5 +268,156 @@ final class RefreshHopDataTest extends TestCase
         $result = (new HopDataRefresher($this->policy()))->refresh($this->oldData(), $feeds, new DateTimeImmutable('2026-10-29'));
 
         self::assertSame('8.4', $result['phpunit_php']['13']);
+    }
+
+    /** The committed hop data file, decoded. */
+    private function committedData(): array
+    {
+        $data = json_decode((string) file_get_contents(dirname(__DIR__) . '/data/versions.json'), true);
+        self::assertIsArray($data);
+
+        return $data;
+    }
+
+    /**
+     * Runs bin/refresh-hop-data.php in a subprocess with remote URL fetching
+     * disabled (allow_url_fopen=0), so any attempt to reach a feed fails the
+     * run. Returns the exit code, stdout and stderr.
+     *
+     * @param list<string> $args
+     *
+     * @return array{0: int, 1: string, 2: string}
+     */
+    private function runScript(array $args): array
+    {
+        $cmd = [PHP_BINARY, '-d', 'allow_url_fopen=0', dirname(__DIR__) . '/bin/refresh-hop-data.php'];
+        foreach ($args as $arg) {
+            $cmd[] = $arg;
+        }
+
+        $process = new Process($cmd, dirname(__DIR__));
+        $process->run();
+
+        return [$process->getExitCode(), $process->getOutput(), $process->getErrorOutput()];
+    }
+
+    public function test_check_passes_offline_and_makes_no_network_call(): void
+    {
+        // Remote fetching is disabled for the child process: any attempt to
+        // reach a feed would fail the run, so exit 0 proves the check stayed
+        // local.
+        [$code, $out, $err] = $this->runScript(['--check']);
+
+        self::assertSame(0, $code);
+        self::assertStringContainsString('is current', $out);
+        self::assertStringNotContainsString('Could not fetch', $err);
+    }
+
+    public function test_online_mode_reaches_for_the_live_feeds(): void
+    {
+        // With remote fetching disabled, --online must try the live feeds and
+        // fail on the very first one.
+        [$code, , $err] = $this->runScript(['--online']);
+
+        self::assertSame(1, $code);
+        self::assertStringContainsString('Could not fetch', $err);
+    }
+
+    public function test_check_fails_when_the_file_drifts_from_the_fixtures(): void
+    {
+        $dataPath = dirname(__DIR__) . '/data/versions.json';
+        $original = (string) file_get_contents($dataPath);
+        try {
+            $data = $this->committedData();
+            $data['vite_version'] = '^9.0';
+            file_put_contents($dataPath, (string) json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+
+            [$code, $out] = $this->runScript(['--check']);
+
+            self::assertSame(3, $code);
+            self::assertStringContainsString('vite_version', $out);
+        } finally {
+            file_put_contents($dataPath, $original);
+        }
+    }
+
+    public function test_check_reports_shape_problems(): void
+    {
+        $dataPath = dirname(__DIR__) . '/data/versions.json';
+        $original = (string) file_get_contents($dataPath);
+        try {
+            $data = $this->committedData();
+            unset($data['laravel_php']['13']);
+            file_put_contents($dataPath, (string) json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+
+            [$code, , $err] = $this->runScript(['--check']);
+
+            self::assertSame(1, $code);
+            self::assertStringContainsString('laravel_php', $err);
+        } finally {
+            file_put_contents($dataPath, $original);
+        }
+    }
+
+    public function test_check_refuses_to_combine_with_offline_today_or_online(): void
+    {
+        $combos = [
+            ['--offline', 'tests/fixtures/hop-feeds'],
+            ['--today', '2026-10-29'],
+            ['--online'],
+        ];
+        foreach ($combos as $args) {
+            [$code, , $err] = $this->runScript(array_merge(['--check'], $args));
+
+            self::assertSame(1, $code, 'arguments: ' . implode(' ', $args));
+            self::assertStringContainsString('--check is offline', $err);
+        }
+    }
+
+    public function test_online_refuses_to_combine_with_offline(): void
+    {
+        [$code, , $err] = $this->runScript(['--online', '--offline', 'tests/fixtures/hop-feeds']);
+
+        self::assertSame(1, $code);
+        self::assertStringContainsString('--online fetches the live feeds', $err);
+    }
+
+    public function test_shape_problems_accept_the_committed_file(): void
+    {
+        self::assertSame([], (new HopDataRefresher($this->policy()))->shapeProblems($this->committedData(), new DateTimeImmutable('2026-10-29')));
+    }
+
+    public function test_shape_problems_do_not_require_majors_below_a_tables_floor(): void
+    {
+        // The committed laravel_phpunit table starts at 10 while the laravel
+        // chain starts at 8: the majors below the floor are not problems.
+        $data = $this->committedData();
+        self::assertArrayHasKey('10', $data['laravel_phpunit']);
+        self::assertArrayNotHasKey('8', $data['laravel_phpunit']);
+
+        self::assertSame([], (new HopDataRefresher($this->policy()))->shapeProblems($data, new DateTimeImmutable('2026-10-29')));
+    }
+
+    public function test_shape_problems_flag_a_policy_version_missing_from_a_chain(): void
+    {
+        $data = $this->committedData();
+        $data['php'] = array_values(array_diff($data['php'], ['8.5']));
+
+        $problems = (new HopDataRefresher($this->policy()))->shapeProblems($data, new DateTimeImmutable('2026-10-29'));
+
+        self::assertCount(1, $problems);
+        self::assertStringContainsString('PHP 8.5', $problems[0]);
+    }
+
+    public function test_shape_problems_flag_a_gap_in_a_table(): void
+    {
+        $data = $this->committedData();
+        unset($data['phpunit_php']['11']);
+
+        $problems = (new HopDataRefresher($this->policy()))->shapeProblems($data, new DateTimeImmutable('2026-10-29'));
+
+        self::assertCount(1, $problems);
+        self::assertStringContainsString('phpunit_php', $problems[0]);
+        self::assertStringContainsString('11', $problems[0]);
     }
 }

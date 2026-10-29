@@ -96,6 +96,48 @@ final class HopDataRefresher
     }
 
     /**
+     * Offline shape problems in a hop data file judged against the policy as
+     * of $today: one line per problem, empty when the shape is sound. The PHP
+     * and Laravel chains must carry every version the policy supports, and
+     * each table must cover every major from its own floor to the top of its
+     * chain: no gaps, and the newest major included. Majors below a table's
+     * floor are allowed, because a refresh never back-fills majors the table
+     * never covered.
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return list<string>
+     */
+    public function shapeProblems(array $data, DateTimeImmutable $today): array
+    {
+        $problems = [];
+        $phpChain = $this->chainOr($data, 'php', $problems);
+        $laravelChain = $this->chainOr($data, 'laravel', $problems);
+        $phpunitChain = $this->chainOr($data, 'phpunit', $problems);
+
+        if ($phpChain !== null) {
+            foreach ($this->policy->supported('php', $today) as $version) {
+                if (!in_array($version, $phpChain, true)) {
+                    $problems[] = sprintf('The policy supports PHP %s as of %s, but the php chain does not list it.', $version, $today->format('Y-m-d'));
+                }
+            }
+        }
+        if ($laravelChain !== null) {
+            foreach ($this->policy->supported('laravel', $today) as $version) {
+                if (!in_array($version, $laravelChain, true)) {
+                    $problems[] = sprintf('The policy supports Laravel %s as of %s, but the laravel chain does not list it.', $version, $today->format('Y-m-d'));
+                }
+            }
+        }
+
+        $this->tableCoverage($problems, $data, 'laravel_php', $laravelChain);
+        $this->tableCoverage($problems, $data, 'laravel_phpunit', $laravelChain);
+        $this->tableCoverage($problems, $data, 'phpunit_php', $phpunitChain);
+
+        return $problems;
+    }
+
+    /**
      * The stable major versions a Packagist p2 feed still lists, lowest first.
      *
      * @param array<mixed> $feed
@@ -284,6 +326,71 @@ final class HopDataRefresher
         $chain = self::chainOf($existing, $key);
 
         return $chain[0];
+    }
+
+    /**
+     * A chain for shape checking: the chain when the key holds one, and a
+     * problem line instead of an exception when it does not.
+     *
+     * @param array<string, mixed> $data
+     * @param list<string> $problems
+     *
+     * @return list<string>|null
+     */
+    private function chainOr(array $data, string $key, array &$problems): ?array
+    {
+        try {
+            return self::chainOf($data, $key);
+        } catch (ToolError $e) {
+            $problems[] = $e->getMessage();
+
+            return null;
+        }
+    }
+
+    /**
+     * Table coverage for shape checking: every major from the table's own
+     * floor to the top of its chain must be a key, so a gap or a missing
+     * newest major is a problem.
+     *
+     * @param list<string> $problems
+     * @param array<string, mixed> $data
+     * @param list<string>|null $chain
+     */
+    private function tableCoverage(array &$problems, array $data, string $key, ?array $chain): void
+    {
+        $table = $data[$key] ?? null;
+        if (!is_array($table) || $table === []) {
+            $problems[] = sprintf('Hop data key "%s" must be a non-empty JSON object.', $key);
+
+            return;
+        }
+        $majors = [];
+        foreach (array_keys($table) as $major) {
+            $major = (string) $major;
+            if (!ctype_digit($major)) {
+                $problems[] = sprintf('Hop data key "%s" has a non-numeric major "%s".', $key, $major);
+                continue;
+            }
+            $majors[$major] = true;
+        }
+        if ($majors === [] || $chain === null || $chain === []) {
+            return;
+        }
+        $floor = null;
+        foreach (array_keys($majors) as $major) {
+            $major = (string) $major;
+            if ($floor === null || version_compare($major, $floor, '<')) {
+                $floor = $major;
+            }
+        }
+        $top = $chain[count($chain) - 1];
+        foreach ($chain as $major) {
+            if (version_compare($major, $floor, '<') || isset($majors[$major])) {
+                continue;
+            }
+            $problems[] = sprintf('Hop data key "%s" has no entry for major %s, but its chain runs from %s to %s.', $key, $major, $floor, $top);
+        }
     }
 
     /**

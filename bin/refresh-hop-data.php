@@ -40,18 +40,21 @@ Recomputes data/versions.json from the public feeds and CREED's version policy.
   --policy <path>   Use this policy.json instead of the bundled snapshot (BOOSTER_POLICY also works)
   --today <date>    Date to judge the policy against, YYYY-MM-DD (default: the real today)
   --dry-run         Print what would change; do not write the file
-  --check           Like --dry-run, for CI: exit 3 when the file is stale
+  --check           Offline CI check: validate the file's shape and compare it with the
+                    frozen feeds in tests/fixtures/hop-feeds, as of the file's generated_on
+  --online          Compare against the live feeds without writing the file
   -h, --help        Show this help
 
 Exit codes: 0 the file is current, 3 the file changed or would change, 1 something failed.
 
 TXT;
+    exit(0);
 }
 
-/** @return array{offline: ?string, policy: ?string, today: ?string, dry_run: bool, check: bool} */
+/** @return array{offline: ?string, policy: ?string, today: ?string, dry_run: bool, check: bool, online: bool} */
 function parseArgs(array $args): array
 {
-    $options = ['offline' => null, 'policy' => null, 'today' => null, 'dry_run' => false, 'check' => false];
+    $options = ['offline' => null, 'policy' => null, 'today' => null, 'dry_run' => false, 'check' => false, 'online' => false];
     for ($i = 0; $i < count($args); $i++) {
         $arg = $args[$i];
         if ($arg === '--dry-run') {
@@ -60,6 +63,10 @@ function parseArgs(array $args): array
         }
         if ($arg === '--check') {
             $options['check'] = true;
+            continue;
+        }
+        if ($arg === '--online') {
+            $options['online'] = true;
             continue;
         }
         if ($arg === '-h' || $arg === '--help') {
@@ -162,7 +169,62 @@ function describeChanges(array $old, array $new): array
     return $lines;
 }
 
+/**
+ * The offline --check: shape problems first (exit 1), then the frozen feed
+ * fixtures compared with the file (exit 3 when they disagree). No network.
+ *
+ * @param array<string, string> $files fixture file name per feed name
+ */
+function runCheck(HopDataRefresher $refresher, array $existing, array $files): never
+{
+    $generatedOn = $existing['generated_on'] ?? null;
+    if (!is_string($generatedOn) || preg_match('/^\d{4}-\d{2}-\d{2}$/', $generatedOn) !== 1) {
+        fail(sprintf('data/versions.json has no usable "generated_on" date (%s); the offline check judges the file as of that date.', is_string($generatedOn) ? $generatedOn : '(none)'));
+    }
+    $today = new DateTimeImmutable($generatedOn);
+
+    $fixtures = dirname(__DIR__) . '/tests/fixtures/hop-feeds';
+    if (!is_dir($fixtures)) {
+        fail(sprintf('The frozen feed fixtures in %s are missing; --check needs a full BOOSTER checkout.', $fixtures));
+    }
+    $feeds = [];
+    foreach ($files as $name => $file) {
+        $feeds[$name] = decodeJsonFile($fixtures . '/' . $file, "feed $name");
+    }
+
+    $problems = $refresher->shapeProblems($existing, $today);
+    if ($problems !== []) {
+        fwrite(STDERR, "data/versions.json has shape problems:\n");
+        foreach ($problems as $problem) {
+            fwrite(STDERR, '  ' . $problem . "\n");
+        }
+        exit(1);
+    }
+
+    try {
+        $refreshed = $refresher->refresh($existing, $feeds, $today);
+    } catch (ToolError $e) {
+        fail($e->getMessage());
+    }
+    if ($refreshed === $existing) {
+        echo sprintf("data/versions.json is current (checked against the frozen feeds in tests/fixtures/hop-feeds as of %s).\n", $generatedOn);
+        exit(0);
+    }
+    echo 'data/versions.json differs from the frozen feeds:' . "\n";
+    foreach (describeChanges($existing, $refreshed) as $line) {
+        echo '  ' . $line . "\n";
+    }
+    exit(3);
+}
+
 $options = parseArgs(array_slice($argv, 1));
+
+if ($options['check'] && ($options['offline'] !== null || $options['today'] !== null || $options['online'])) {
+    fail('--check is offline: it reads the frozen feeds in tests/fixtures/hop-feeds and judges the file as of its generated_on date. Drop --offline, --today and --online.');
+}
+if ($options['online'] && $options['offline'] !== null) {
+    fail('--online fetches the live feeds; drop --offline.');
+}
 
 $dataPath = dirname(__DIR__) . '/data/versions.json';
 $existing = decodeJsonFile($dataPath, 'hop data file');
@@ -173,12 +235,6 @@ try {
     fail($e->getMessage());
 }
 
-$todayString = $options['today'] ?? date('Y-m-d');
-if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $todayString) !== 1) {
-    fail(sprintf('Bad --today date "%s"; use YYYY-MM-DD.', $todayString));
-}
-$today = new DateTimeImmutable($todayString);
-
 $files = [
     HopDataRefresher::FEED_PHPUNIT => 'packagist-phpunit-phpunit.json',
     HopDataRefresher::FEED_LARAVEL_FRAMEWORK => 'packagist-laravel-framework.json',
@@ -188,6 +244,17 @@ $files = [
     HopDataRefresher::FEED_LARAVEL_VITE_PLUGIN => 'npm-laravel-vite-plugin-dist-tags.json',
     HopDataRefresher::FEED_VUE_PLUGIN => 'npm-vitejs-plugin-vue-dist-tags.json',
 ];
+
+if ($options['check']) {
+    runCheck(new HopDataRefresher($policy), $existing, $files);
+}
+
+$todayString = $options['today'] ?? date('Y-m-d');
+if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $todayString) !== 1) {
+    fail(sprintf('Bad --today date "%s"; use YYYY-MM-DD.', $todayString));
+}
+$today = new DateTimeImmutable($todayString);
+
 $urls = [
     HopDataRefresher::FEED_PHPUNIT => 'https://repo.packagist.org/p2/phpunit/phpunit.json',
     HopDataRefresher::FEED_LARAVEL_FRAMEWORK => 'https://repo.packagist.org/p2/laravel/framework.json',
@@ -234,7 +301,7 @@ if ($refreshed === $existing) {
 }
 
 $lines = describeChanges($existing, $refreshed);
-if ($options['dry_run'] || $options['check']) {
+if ($options['dry_run'] || $options['online']) {
     echo 'data/versions.json would change:' . "\n";
     foreach ($lines as $line) {
         echo '  ' . $line . "\n";
