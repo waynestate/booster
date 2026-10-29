@@ -2,8 +2,7 @@
 
 // A deliberately broken legacy app for the PHPCompatibility scan tests.
 // each() and create_function() were removed in PHP 8.0; the ${name} embed
-// was deprecated in PHP 8.2, so it only shows up when scanning at 8.2 or
-// newer.
+// was deprecated in PHP 8.2, so it shows up only when scanning at 8.2 or newer.
 
 function legacy_each(array $rows): array
 {
@@ -23,6 +22,6 @@ function legacy_create_function(): callable
 
 function legacy_string_embed(string $name): string
 {
-    // ${name} embedding was deprecated in PHP 8.2 and removed in PHP 9.0.
+    // ${name} embedding was deprecated in PHP 8.2.
     return "Hello ${name}!";
 }
