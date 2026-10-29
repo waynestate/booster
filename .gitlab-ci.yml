@@ -20,3 +20,14 @@ composer-ci:
   script:
     - composer install --no-interaction --no-progress --prefer-dist
     - composer ci
+
+# Hop data freshness: only in scheduled pipelines, recompute data/versions.json
+# from the live feeds and fail when the committed file would change, so a feed
+# that moved is visible until someone runs the refresh and commits the result.
+refresh-hop-data:
+  image: composer:2.10.3
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+  script:
+    - composer install --no-interaction --no-progress --prefer-dist
+    - php bin/refresh-hop-data.php
