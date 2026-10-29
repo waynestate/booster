@@ -29,6 +29,18 @@ final class HopRegistry
 
     public const NODE_PIN_TARGET = '24';
 
+    /** The Mix to Vite hop and the package versions it installs. */
+    public const MIX_TO_VITE_ID = 'mix-to-vite';
+
+    public const VITE_VERSION = '^8.3';
+
+    public const LARAVEL_VITE_PLUGIN_VERSION = '^3.2';
+
+    public const VUE_PLUGIN_VERSION = '^6.0';
+
+    /** The lowest Laravel major whose upgrade guide ships Vite as the front-end tool. */
+    public const VITE_LARAVEL_FLOOR = '9';
+
     /**
      * The lowest PHP version each PHPUnit major runs on
      * (sebastianbergmann/phpunit composer.json).
@@ -81,6 +93,7 @@ final class HopRegistry
         $this->addPhpunitHops();
         $this->add($this->sesameHop());
         $this->add($this->nodePinHop());
+        $this->add($this->mixToViteHop());
         $this->add($this->vueHop());
     }
 
@@ -290,6 +303,30 @@ final class HopRegistry
                 'Later front-end hops run in the same node:24 container, so this hop comes before them.',
             ],
             links: ['https://nodejs.org/en/about/previous-releases'],
+        );
+    }
+
+    /**
+     * The Mix to Vite hop. It converts the simple shape of webpack.mix.js and
+     * refuses anything else; the planner offers it only after node-pin-24 and
+     * only when the app will sit on Laravel 9 or newer, where Vite is the
+     * front-end tool.
+     */
+    private function mixToViteHop(): Hop
+    {
+        return new Hop(
+            id: self::MIX_TO_VITE_ID,
+            kind: HopKind::Node,
+            from: 'laravel-mix',
+            to: 'vite',
+            summary: 'Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only).',
+            buildGate: true,
+            notes: [
+                'BOOSTER converts the simple shape only: mix.js, .vue(), .sass(), .postCss() and .version(). Anything else is refused so you follow the manual Vite migration guide.',
+                'Blade mix() script and link tags become one @vite([...]) line per layout when every referenced asset maps to a Mix entry; unmapped references are listed as manual notes.',
+                'Replace withoutMix() with withoutVite() by hand; BOOSTER lists the files that call it.',
+            ],
+            links: ['https://laravel.com/docs/9.x/upgrade#vite'],
         );
     }
 

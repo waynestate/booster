@@ -74,6 +74,7 @@ final class ProjectDetector
             hasTestScript: array_key_exists('test', $scripts),
             hasPackageJson: $package !== [],
             nodeMajor: $node,
+            hasMixFile: is_file($path . '/webpack.mix.js'),
         );
     }
 
