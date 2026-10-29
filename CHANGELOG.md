@@ -45,3 +45,8 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
   runs `npm ci`, `npm run build` and a `public/build/manifest.json` check in the `node:24` container, then the app's
   tests.
 - `booster detect` now reports the Node floor from `engines.node`.
+- An advisory PHPCompatibility scan (`phpcompatibility/php-compatibility` 10.0.0-alpha2 on
+  `squizlabs/php_codesniffer` 3.13): `plan` shows "Will break on PHP X.Y" for the first PHP hop's target, and a new
+  `booster scan --path=... --php=X.Y [--format=json]` command runs it on demand. Findings never change exit codes; a
+  scan that cannot run is reported as "could not run" without failing the plan. The scan ignores `vendor/`,
+  `node_modules/` and `storage/`; `plan --no-scan` skips it.

@@ -111,6 +111,7 @@ command exits.
 ```
 booster detect --path=../my-app        # which of the five permutations, and which versions
 booster plan   --path=../my-app        # the ordered hops to a supported version
+booster scan   --path=../my-app --php=8.0   # what will break on that PHP; advisory, changes nothing
 booster run    --path=../my-app --dry-run   # the diffs Rector would make; changes nothing
 booster run    --path=../my-app        # apply the plan, one hop at a time, with a test gate
 ```
@@ -153,7 +154,8 @@ supports at every step):
 | Command | What it does |
 |---|---|
 | `booster detect` | Reads `composer.json` and `package.json`; prints the app type, PHP, Laravel, PHPUnit, Vue and Node versions |
-| `booster plan` | Prints the ordered hops and the warnings. Changes nothing. |
+| `booster plan` | Prints the ordered hops, the warnings and an advisory PHPCompatibility scan of the first PHP hop's target. Changes nothing. |
+| `booster scan` | Advisory PHPCompatibility scan: what will break on `--php`. Exits 0 even with findings |
 | `booster run` | Runs the plan. `--dry-run` previews every hop |
 | `booster hops` | Lists every hop BOOSTER knows |
 | `booster init` | Writes the coding-tab playbooks to `.agents/skills`; `--check` exits 1 when they are stale |
@@ -172,6 +174,20 @@ Options shared by `plan` and `run`:
 | `--sesame` | Include the `wayne-cas` to SESAME swap |
 | `--skip` | A hop id to leave out (repeat it) |
 
+Options for `plan`:
+
+| Option | Meaning |
+|---|---|
+| `--no-scan` | Skip the advisory PHPCompatibility scan |
+
+Options for `scan`:
+
+| Option | Meaning |
+|---|---|
+| `--path` | The app (default `.`) |
+| `--php` | Required. The PHP version to ask about (`major.minor`, one BOOSTER knows) |
+| `--format` | `text` (default) or `json` |
+
 Options for `run`:
 
 | Option | Meaning |
@@ -186,6 +202,17 @@ Options for `run`:
 
 Exit codes: `0` pass, `1` the baseline failed or a hop was capped, errored or failed its gate, `2` bad usage (bad
 option, unreadable policy, broken `composer.json`, a target the policy does not support).
+
+### The PHPCompatibility scan
+
+`plan` ends with an advisory scan: PHP_CodeSniffer runs the PHPCompatibility standard over the app and asks what will
+break on the PHP version the first PHP hop lands on. The findings are hints for the person doing the upgrade, never a
+gate: they do not change the exit code, and a scan that cannot run (missing tooling, a crash) is reported as "could
+not run" while the plan still prints in full. `--no-scan` skips it.
+
+The scan ignores `vendor/`, `node_modules/` and `storage/`, because those hold third-party code and generated files,
+not the app's. It reads the app only and changes nothing. `booster scan --path=../my-app --php=8.0` runs the same scan
+on its own, for any PHP version BOOSTER knows, and exits 0 even when it finds a wall of removed functions.
 
 ### The baseline
 

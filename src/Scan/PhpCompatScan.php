@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Scan;
 
 use Composer\InstalledVersions;
+use Throwable;
 use Waynestate\Booster\Packaging\PharFiles;
 use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\Run\ProcessRunner;
@@ -68,11 +69,16 @@ final class PhpCompatScan
             $absolute,
         ];
 
-        $result = $this->processes->run($command, null, [], 900);
+        try {
+            $result = $this->processes->run($command, null, [], 900);
+        } catch (Throwable $e) {
+            return ScanResult::error($testVersion, 'The PHPCompatibility scan crashed: ' . $e->getMessage());
+        }
 
         // phpcs exits 0 (clean), 1 (findings, none fixable) or 2 (findings,
-        // some fixable). Anything else (3 usage error, 124 timeout, 127
-        // missing binary) means there is no report to read.
+        // some fixable). Exit codes above 2 (3 usage error, 124 timeout) have
+        // no report to read; a missing binary leaves no JSON either, because
+        // PHP itself says "Could not open input file".
         if ($result->exitCode > 2) {
             return $this->noReport($result, $testVersion);
         }
