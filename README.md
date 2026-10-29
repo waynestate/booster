@@ -265,6 +265,8 @@ autoloader. An app with no `vendor/` still gets a plan and the hops that do not 
 
 ## Checks
 
+Maintainers: how to build, test and release this project, and where its data comes from, is in [MAINTAINING.md](MAINTAINING.md).
+
 ```
 composer ci
 ```
