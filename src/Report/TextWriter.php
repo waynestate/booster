@@ -7,6 +7,7 @@ namespace Waynestate\Booster\Report;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Run\BaselineResult;
 use Waynestate\Booster\Run\RunReport;
+use Waynestate\Booster\Scan\ScanResult;
 
 /**
  * Plain text for people. Everything printed from an app (paths, diffs) is
@@ -15,6 +16,9 @@ use Waynestate\Booster\Run\RunReport;
  */
 final class TextWriter
 {
+    /** How many findings the text report shows before it says "and more". */
+    private const MAX_FINDINGS = 20;
+
     public function plan(Plan $plan): string
     {
         $p = $plan->project;
@@ -45,6 +49,42 @@ final class TextWriter
         foreach ($plan->warnings as $warning) {
             $lines[] = '';
             $lines[] = 'Warning: ' . $warning;
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * The advisory PHPCompatibility section that follows a plan: what will
+     * break on the first PHP hop's target, or why the scan could not run.
+     */
+    public function phpCompat(ScanResult $scan): string
+    {
+        if (!$scan->ok) {
+            $lines = ['PHPCompatibility scan: could not run'];
+            foreach (explode("\n", self::clean((string) $scan->error)) as $line) {
+                $lines[] = '   ' . $line;
+            }
+
+            return implode("\n", $lines);
+        }
+
+        if ($scan->findings === []) {
+            return sprintf('Will break on PHP %s: no findings.', $scan->testVersion);
+        }
+
+        $lines = [sprintf(
+            'Will break on PHP %s: %d errors, %d warnings.',
+            $scan->testVersion,
+            $scan->errorCount(),
+            $scan->warningCount(),
+        )];
+        foreach (array_slice($scan->findings, 0, self::MAX_FINDINGS) as $finding) {
+            $lines[] = sprintf('   %s:%d [%s] %s', self::clean($finding->file), $finding->line, $finding->severity, self::clean($finding->message));
+        }
+        $hidden = count($scan->findings) - self::MAX_FINDINGS;
+        if ($hidden > 0) {
+            $lines[] = sprintf('   (%d more findings...)', $hidden);
         }
 
         return implode("\n", $lines);
