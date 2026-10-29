@@ -80,7 +80,7 @@ docker run --rm -v "${PWD}:/booster" -v "C:\path\to\app:/app" -w /booster php:8.
 
 The `run` command's test gate starts Docker itself, so it needs a Docker daemon on the machine that runs Booster.
 When Booster itself runs in a container, use `--skip-gate` and run the tests yourself. Node hops run `npm` in a
-`node:24` container, so they need the same daemon but no Node installed on the machine.
+`node:26` container, so they need the same daemon but no Node installed on the machine.
 
 ## Single-file download
 

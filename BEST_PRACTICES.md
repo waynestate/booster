@@ -50,7 +50,7 @@ tag for how Booster holds each rule today.
 - **Static analysis against the target version** and **`composer audit` after dependency changes.** `Documented`:
    hop notes name what Rector cannot do (for example `mysql_*` removal, implicit nullable parameters). `Not yet`: Booster
    does not run PHPStan or `composer audit` inside the app for you; pass them with `--proctor-command`.
-- **PHPCompatibility is advisory only.** `Not yet`: not included in 0.1.
+- **PHPCompatibility is advisory only.** `Enforced`: `plan` and `booster scan` run it as an advisory scan; it never changes the exit code and a scan that cannot run is reported, not failed.
 
 ## Safe edits
 

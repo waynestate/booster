@@ -10,7 +10,7 @@ Booster 0.1 is built and `composer ci` passes. What follows needs a person.
 | 2 | Should the bundled copy be refreshed by a script, or replaced by `require waynestate/creed`? | CREED owner | The copy going stale | CREED's `bin/export.php` writes the copy; `composer creed-copy:check` verifies it. |
 | 3 | What Composer vendor name will the packages publish under (`waynestate/booster`)? | Stack lead | `composer require` for users | Answered: `waynestate/booster` is on Packagist (`0.1.0`). The README still installs from a clone, since Booster runs from its own folder. |
 | 4 | PHP test matrix: 8.3, 8.4, 8.5 or 8.3 and 8.5 only? | Stack lead | Nothing | 8.3, 8.4 and 8.5, as decided. |
-| 5 | Is PHPCompatibility wanted as an advisory signal? | Stack lead | A second scan for what Rector misses | Left out of 0.1. The design guide says advisory only. |
+| 5 | Is PHPCompatibility wanted as an advisory signal? | Stack lead | A second scan for what Rector misses | Built as an advisory scan: `plan` ends with it and `booster scan` runs it alone. It never changes the exit code. |
 | 6 | Larastan or plain PHPStan for Laravel apps, and for which Laravel versions? | Stack lead, Pinstripe owner | A "find what Rector cannot fix" gate | Neither is run by Booster; `--proctor-command` can carry any extra check. |
 | 7 | Is the Vue 2 to 3 hop needed in 0.1, and how many Vue 2 apps still run? | App owners, fleet owner | An automated Vue hop | A playbook hop only (`vue-2-to-3`), planned automatically for Vue 2 apps. |
 | 8 | Which PHP and Laravel pairs does the shared MySQL server (5.6 per the stack notes) allow? Laravel's current database floor is above 5.6. | Citadel platform owner | Safe Laravel hops on Citadel | Hop notes tell the reviewer to check the database floor. Booster does not look at the database. |
@@ -41,8 +41,8 @@ Booster holds no secrets and calls no API.
   directory so the child processes get real paths. There is no release step yet, so the phar is built from a checkout,
   not downloaded.
 - **`booster mcp`**, the read-only tool server. Waiting on the shared MCP conventions.
-- **PROCTOR as a built-in gate step.** PROCTOR is on Packagist now (`waynestate/proctor` 0.1.0) but is not wired in, and needs `--policy`; `--proctor-command` runs it today.
-- **PHPCompatibility and PHPStan-on-the-target-version** as advisory scans.
+- **PROCTOR as a built-in gate step.** PROCTOR is on Packagist now (`waynestate/proctor`) but is not wired in; `--proctor-command` runs it today.
+- **PHPStan on the target version** as an advisory scan. The PHPCompatibility scan is built.
 - **Real wayne-cas migration.** The recipe renames classes and swaps the requirement; it does not move
   `config/wayne-cas.php`, the user model trait methods or Duo settings, and it was not run against a real app.
 - **Rector pilot numbers on real apps.** The examples prove the plumbing, not the hit rate.
@@ -51,6 +51,5 @@ Booster holds no secrets and calls no API.
 - **Custom WSU Rector rules** beyond the CAS rename (for example the legacy patterns in the oldest apps).
 - **Hops for Laravel older than 8 and PHP older than 5.6**, and PHP-hop checks of extension removals.
 - **Merge-request automation** (bot branch, label, opt-out): deliberately absent.
-- **The static site** (`site/`): an Opus agent builds it next; `site/brand/` is in place.
 - **A real Docker gate run on a real app.** The gate is tested with a fake process runner, and the Dockerfile builds
   and runs (`booster-target:8.4`), but no full gate loop ran end to end.
