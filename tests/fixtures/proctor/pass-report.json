@@ -1,0 +1,116 @@
+{
+    "tool": "proctor",
+    "version": "0.2.7",
+    "path": "/tmp/passapp",
+    "today": "2026-10-28",
+    "result": "pass",
+    "exit": 0,
+    "tools": {
+        "composer": "2.10.3"
+    },
+    "policy": {
+        "origin": "option",
+        "path": "/app/src/Creed/policy.json",
+        "refreshed_on": "2026-10-29",
+        "age_days": -1
+    },
+    "findings": [
+        {
+            "check_id": "php-floor",
+            "rule_id": "proctor/php-floor",
+            "status": "pass",
+            "message": "php floor 8.4 is active",
+            "path": "composer.json",
+            "line": 1
+        },
+        {
+            "check_id": "unpatched",
+            "rule_id": "proctor/unpatched",
+            "status": "warning",
+            "message": "php 8.4.0 is behind 8.4.27 (checked 2026-10-28); update to the latest patch.",
+            "path": null,
+            "line": 1
+        },
+        {
+            "check_id": "unbounded-constraints",
+            "rule_id": "proctor/unbounded-constraints",
+            "status": "pass",
+            "message": "all require constraints are bounded",
+            "path": "composer.json",
+            "line": 1
+        },
+        {
+            "check_id": "composer-config",
+            "rule_id": "proctor/composer-config",
+            "status": "pass",
+            "message": "no unsafe values in the composer config block",
+            "path": "composer.json",
+            "line": 1
+        },
+        {
+            "check_id": "lock-committed",
+            "rule_id": "proctor/lock-committed",
+            "status": "pass",
+            "message": "composer.lock is present",
+            "path": "composer.lock",
+            "line": 1
+        },
+        {
+            "check_id": "portability",
+            "rule_id": "proctor/portability",
+            "status": "pass",
+            "message": "no hard-coded platform facts found",
+            "path": null,
+            "line": 1
+        },
+        {
+            "check_id": "mysql56",
+            "rule_id": "proctor/mysql56",
+            "status": "pass",
+            "message": "no Laravel migrations found; skipped",
+            "path": null,
+            "line": 1
+        },
+        {
+            "check_id": "destructive-deploy",
+            "rule_id": "proctor/destructive-deploy",
+            "status": "pass",
+            "message": "no destructive deploy commands found",
+            "path": null,
+            "line": 1
+        },
+        {
+            "check_id": "ci-pipelines",
+            "rule_id": "proctor/ci-pipelines",
+            "status": "pass",
+            "message": "gitlab pipeline runs composer ci",
+            "path": null,
+            "line": 1
+        },
+        {
+            "check_id": "composer-audit",
+            "rule_id": "proctor/composer-audit/could-not-run",
+            "status": "warning",
+            "message": "composer audit could not run: Composer could not detect the root package (example/pass-app) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version",
+            "path": "composer.lock",
+            "line": 1
+        },
+        {
+            "check_id": "composer-version",
+            "rule_id": "proctor/composer-version",
+            "status": "pass",
+            "message": "composer 2.10.3 is at or above the 2.7.7 floor",
+            "path": null,
+            "line": 1
+        },
+        {
+            "check_id": "repo-url-credentials",
+            "rule_id": "proctor/repo-url-credentials",
+            "status": "pass",
+            "message": "no credentials found in repository URLs",
+            "path": null,
+            "line": 1
+        }
+    ],
+    "overrides": []
+}
