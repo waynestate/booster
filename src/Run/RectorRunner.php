@@ -21,6 +21,9 @@ use Waynestate\Booster\ToolError;
  */
 final class RectorRunner
 {
+    /** The memory limit Rector runs with unless the user raises it. Big apps need more than the old hard-coded gigabyte. */
+    public const DEFAULT_MEMORY_LIMIT = '2G';
+
     public function __construct(
         private readonly ProcessRunner $processes,
         private readonly ?string $rectorBinary = null,
@@ -33,12 +36,28 @@ final class RectorRunner
     }
 
     /**
+     * Checks a --memory-limit value. Accepted: a whole number with an optional
+     * K, M or G suffix (for example 2G), or -1 for no limit.
+     */
+    public static function assertMemoryLimit(string $value): void
+    {
+        if (preg_match('/^(\d+[KMG]?|-1)$/', $value) !== 1) {
+            throw new ToolError(sprintf(
+                'Invalid --memory-limit value "%s". Accepted: a whole number with an optional K, M or G suffix (for example 2G), or -1 for no limit.',
+                $value,
+            ));
+        }
+    }
+
+    /**
      * @param string  $phpTarget     the PHP version the rules may assume (major.minor); Rector otherwise reads the old version from the app composer.json and skips the new rules
      * @param ?string $laravelTarget the Laravel major the version-bound rules should assume, or null for a non-Laravel app
      * @param ?string $phpunitTarget the PHPUnit major the version-bound rules should assume, or null for a non-PhpUnit hop
+     * @param string  $memoryLimit   Rector's --memory-limit (for example 2G), or -1 for no limit
      */
-    public function run(Hop $hop, string $appPath, bool $dryRun, string $phpTarget, ?string $laravelTarget = null, ?string $phpunitTarget = null): RectorResult
+    public function run(Hop $hop, string $appPath, bool $dryRun, string $phpTarget, ?string $laravelTarget = null, ?string $phpunitTarget = null, string $memoryLimit = self::DEFAULT_MEMORY_LIMIT): RectorResult
     {
+        self::assertMemoryLimit($memoryLimit);
         $appPath = rtrim($appPath, '/\\');
         $command = [
             $this->phpBinary ?? PHP_BINARY,
@@ -49,7 +68,7 @@ final class RectorRunner
             '--no-progress-bar',
             '--no-ansi',
             '--clear-cache',
-            '--memory-limit=1G',
+            '--memory-limit=' . $memoryLimit,
         ];
         if ($dryRun) {
             $command[] = '--dry-run';
@@ -92,7 +111,7 @@ final class RectorRunner
             @rmdir($work);
         }
 
-        return $this->parse($result, $appPath, $work);
+        return $this->parse($result, $appPath, $work, $memoryLimit);
     }
 
     private function binary(): string
@@ -144,15 +163,35 @@ final class RectorRunner
         return implode('/', $parts);
     }
 
-    private function parse(ProcessResult $result, string $appPath, string $work): RectorResult
+    private function parse(ProcessResult $result, string $appPath, string $work, string $memoryLimit): RectorResult
     {
         // Rector exits 2 when a dry run finds changes, so the exit code alone says nothing.
+        if (trim($result->stdout) === '') {
+            // An empty report means Rector died before writing it, most often of
+            // memory on a big app.
+            throw new ToolError(sprintf(
+                "Rector produced no JSON report (exit %d). It ran with --memory-limit=%s; an exit code of 255 or a stderr line mentioning memory usually means Rector ran out of memory, and --memory-limit can raise the limit.\nstderr: %s",
+                $result->exitCode,
+                $memoryLimit,
+                substr(trim($result->stderr), 0, 500),
+            ));
+        }
+
+        // Rector writes file contents into its JSON report. A byte sequence that is
+        // valid in the app's own encoding but not UTF-8 makes strict json_decode fail
+        // with JSON_ERROR_UTF8, so retry once with invalid bytes replaced by U+FFFD.
+        $repaired = false;
         $data = json_decode($result->stdout, true);
+        if ($data === null && json_last_error() === JSON_ERROR_UTF8) {
+            $data = json_decode($result->stdout, true, 512, JSON_INVALID_UTF8_SUBSTITUTE);
+            $repaired = true;
+        }
         if (!is_array($data)) {
             throw new ToolError(sprintf(
-                "Rector produced no JSON report (exit %d).\n%s",
+                "Rector output was not valid JSON: %s (exit %d).\nstderr: %s",
+                json_last_error_msg(),
                 $result->exitCode,
-                trim($result->stderr . "\n" . $result->stdout),
+                substr(trim($result->stderr), 0, 500),
             ));
         }
 
@@ -181,6 +220,22 @@ final class RectorRunner
             } elseif (is_string($error)) {
                 $errors[] = $error;
             }
+        }
+
+        if ($repaired) {
+            // Name the files whose diff now carries U+FFFD replacement characters, so
+            // the developer knows where the repair touched content.
+            $damaged = [];
+            foreach ($files as $f) {
+                if (str_contains($f['diff'], "\u{FFFD}")) {
+                    $damaged[] = $f['file'];
+                }
+            }
+            $note = RectorResult::REPAIRED_UTF8_NOTE;
+            if ($damaged !== []) {
+                $note .= ' (' . implode(', ', $damaged) . ')';
+            }
+            array_unshift($errors, $note);
         }
 
         return new RectorResult($files, $errors);
