@@ -53,12 +53,17 @@
             "pint --test",
             "phpstan analyse --memory-limit=1G",
             "@composer audit",
-            "@php bin/refresh-hop-data.php --check"
-        ]
+            "@php bin/refresh-hop-data.php --check",
+            "@site:agent-ready-check"
+        ],
+        "site:agent-ready": "php bin/agent-ready.php",
+        "site:agent-ready-check": "php bin/agent-ready.php --check"
     },
     "scripts-descriptions": {
-        "ci": "Run every CI check: manifest, tests, style, static analysis, audit, hop data freshness",
-        "creed-copy:check": "Verify src/Creed still matches a fresh export from the CREED checkout in $CREED_PATH"
+        "ci": "Run every CI check: manifest, tests, style, static analysis, audit, hop data freshness, agent-ready files",
+        "creed-copy:check": "Verify src/Creed still matches a fresh export from the CREED checkout in $CREED_PATH",
+        "site:agent-ready": "Rewrite the Markdown twins, llms.txt, llms-full.txt, robots.txt and sitemap.xml in site/ (Squire's agent-ready kit).",
+        "site:agent-ready-check": "Fail when the agent-ready files are stale, a page lacks its Markdown link, a prompt drifts from the docs, or the kit was edited here."
     },
     "bin": [
         "bin/booster"

@@ -1,0 +1,48 @@
+# Booster
+
+> Booster plans and runs PHP and Laravel upgrades one hop at a time on Rector, gates every hop with your tests on the target PHP, and never commits or pushes for you.
+
+**Boosts your versions.** One dose at a time, and every dose gets a stamp.
+
+Checks: `composer ci` (the same command runs on GitLab and GitHub).
+
+Development happens on Wayne State's GitLab; this repository is a release mirror. Changes land there first.
+
+> A booster shot keeps your immunity current. This one keeps your PHP current, and it stings less.
+
+Front page: [`site/index.html`](https://github.com/waynestate/booster/blob/HEAD/site/index.html), a static page you can open in a browser or serve from `site/`.
+On Citadel it is served by the raw-PHP deploy layer in [`deploy/`](https://github.com/waynestate/booster/blob/HEAD/deploy/): a Squire kit whose front controller serves `site/` behind HELMET's security headers. For local development, keep serving `site/` directly.
+
+Booster is WELD's upgrade tool. It plans the hops that take a WSU PHP app from the PHP or Laravel version it runs now
+to one the version policy still supports, and it runs them one at a time: [Rector](https://getrector.com) rewrites the
+code, Booster raises the constraints in `composer.json`, and the app's own tests must pass on the target PHP before the
+next hop starts. It stands on `rector/rector` and `driftingly/rector-laravel` and adds only the ordering, the cap, the
+gate and a few WSU recipes.
+
+Booster edits your working copy and prints a report. It never commits, pushes or opens a merge request: a person reads
+the diff and merges it.
+
+Every page below is Markdown. The HTML pages send the same Markdown to a client that asks for `text/markdown`. Written by Squire's agent-ready kit from the README and the pages; do not edit.
+
+## Pages
+
+- [Booster: Boosts your versions.](https://booster.apps.wayne.edu/index.md): Booster plans and runs PHP and Laravel upgrades one hop at a time on Rector, gates every hop with your tests on the target PHP, and never commits or pushes for you.
+
+## Prompts
+
+- [Get started with Booster](https://booster.apps.wayne.edu/#prompt-get-started): Install Booster beside the app, read its shape and versions, and bring back the plan. Not a single file changes. The prompt itself is in https://booster.apps.wayne.edu/index.md.
+- [Upgrade a raw PHP app](https://booster.apps.wayne.edu/#prompt-raw-php): PHP one minor at a time, a scan of what will break, a dry run, then the real run with the gate. The prompt itself is in https://booster.apps.wayne.edu/index.md.
+- [Upgrade a raw PHP app with a Vue front end](https://booster.apps.wayne.edu/#prompt-raw-php-vue): The PHP hops, the Node pin, and the Vue 2 to 3 playbook a person works through. The prompt itself is in https://booster.apps.wayne.edu/index.md.
+- [Upgrade a Laravel app with Blade](https://booster.apps.wayne.edu/#prompt-laravel-blade): Laravel and PHP hops in the order that keeps a supported pair at every step, and SESAME if the app still signs in with wayne-cas. The prompt itself is in https://booster.apps.wayne.edu/index.md.
+- [Upgrade a Laravel app with Vue islands](https://booster.apps.wayne.edu/#prompt-laravel-blade-vue): The Laravel and PHP hops, the Node pin, and Mix to Vite when the plan lands on Laravel 9 or newer. The prompt itself is in https://booster.apps.wayne.edu/index.md.
+- [Upgrade a Laravel app with Inertia](https://booster.apps.wayne.edu/#prompt-laravel-inertia-vue): The Laravel and PHP hops and the Node pin, with the Inertia checks a person still does by hand. The prompt itself is in https://booster.apps.wayne.edu/index.md.
+
+## Source
+
+- [README](https://github.com/waynestate/booster/blob/HEAD/README.md): the project's README, with install, commands and checks
+- [Everything in one file](https://booster.apps.wayne.edu/llms-full.txt): the README and every page above, as one Markdown file
+
+## Optional
+
+- [ADVISOR](https://advisor.apps.wayne.edu/llms.txt): the stack's MCP server: read-only tools that answer from CREED's policy and the parts' docs instead of from memory
+- [WELD](https://weld.apps.wayne.edu/llms.txt): the Wayne State application stack: every part, and the reference app

@@ -333,7 +333,7 @@ composer ci
 ```
 
 runs `composer validate --strict`, PHPUnit, Pint, PHPStan (Pinstripe's raw preset, still inlined; `waynestate/pinstripe`
-is on Packagist now, so it can become a dev requirement) and `composer audit`. Nothing needs PHP on the host:
+is on Packagist now, so it can become a dev requirement), `composer audit`, the hop data check and the agent-ready check. Nothing needs PHP on the host:
 
 ```
 docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install --no-interaction && composer ci"

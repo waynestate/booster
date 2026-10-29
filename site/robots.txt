@@ -1,0 +1,7 @@
+# robots.txt for https://booster.apps.wayne.edu/, written by Squire's agent-ready kit (ADR-0019); do not edit.
+# Content Signals (contentsignals.org): find it and answer from it, yes; train on it, no.
+User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+Allow: /
+
+Sitemap: https://booster.apps.wayne.edu/sitemap.xml

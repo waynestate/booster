@@ -10,6 +10,10 @@
 <title>Booster: Boosts your versions.</title>
 <meta name="description" content="Booster plans and runs PHP and Laravel upgrades one hop at a time on Rector, gates every hop with your tests on the target PHP, and never commits or pushes for you.">
 <meta name="theme-color" content="#0c5449">
+<link rel="canonical" href="https://booster.apps.wayne.edu/">
+<!-- For agents (ADR-0019): this page as Markdown, written by bin/agent-ready.php from Squire's kit.
+     The front controller also sends the twin to any client that asks for text/markdown. -->
+<link rel="alternate" type="text/markdown" href="index.md">
 <link rel="icon" href="brand/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="brand/favicon-32.png">
 <link rel="apple-touch-icon" href="brand/booster-avatar-256.png">
@@ -24,6 +28,7 @@
 -->
 <link rel="preload" href="assets/fonts/barlow-condensed-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/wayne-ui/wayne-ui.css">
+<link rel="stylesheet" href="assets/agent-ready.css">
 <link rel="stylesheet" href="assets/booster.css">
 <script>
   /* Countdowns and lift-offs only for people who are happy with motion.
@@ -47,6 +52,7 @@
       <a href="#record">Record</a>
       <a href="#pairs">Pairs</a>
       <a href="#commands">Commands</a>
+      <a href="#agents">Agents</a>
       <a href="https://proof.apps.wayne.edu/booster/">Proof</a>
       <a class="masthead__install" href="#install">Install</a>
     </nav>
@@ -73,6 +79,16 @@
           <a class="wsu-btn btn-launch" href="#record"><span>Watch a plan launch</span><span class="btn-launch__arrow" aria-hidden="true">↑</span></a>
           <a class="btn-quiet" href="#install">Install</a>
         </p>
+        <!-- The patient's chart, for the agent: where it reads this page. The script adds Copy page
+             as Markdown and Open in ChatGPT; without it, the plain links still work. -->
+        <nav class="ar-page hero__agent" aria-labelledby="hero-agent-label" data-ar-page>
+          <p class="ar-page__label" id="hero-agent-label">For your agent</p>
+          <ul class="ar-page__list">
+            <li><a class="ar-page__link" href="#agents">Prompts</a></li>
+            <li><a class="ar-page__link" href="index.md" type="text/markdown">This page as Markdown</a></li>
+            <li><a class="ar-page__link" href="llms.txt">llms.txt</a></li>
+          </ul>
+        </nav>
       </div>
 
       <!-- The launch pad. With motion on: T-3, T-2, T-1, lift-off, and the
@@ -462,6 +478,210 @@ docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-
     </div>
   </section>
 
+  <!-- ======================================================= agent prompts -->
+  <!-- Standing orders for the reader's own coding agent: role, task, the stack's constraints,
+       the output wanted, and an order to ask before guessing. The text is plain HTML, so an
+       agent reading this page (or index.md) gets it without the script; agent-ready.js only
+       adds the buttons. Keep the commands in step with the README and the install panel above:
+       bin/agent-ready.php --check fails a prompt that runs a command the docs do not. One order
+       per stack shape Booster really detects and plans today: all five. Doctor's orders. -->
+  <section class="section section--agents" id="agents" aria-labelledby="agents-title">
+    <div class="wsu-container">
+      <div class="head head--split">
+        <div>
+          <p class="label"><span class="label__dot" aria-hidden="true"></span>For your coding agent</p>
+          <h2 id="agents-title">Standing orders.</h2>
+        </div>
+        <p class="head__note">Prompts for the coding agent you already use. Copy one, or run it straight in OpenCode, Claude Code, Codex or ChatGPT. Every order starts with a plan that changes nothing, and none of them lets the agent commit for you.</p>
+      </div>
+
+      <div class="orders">
+        <section class="ar-prompt ar-prompt--lead" id="prompt-get-started" aria-labelledby="prompt-get-started-title" data-ar-prompt>
+          <header class="ar-prompt__head">
+            <span class="ar-prompt__glyph" aria-hidden="true">&gt;_</span>
+            <div>
+              <p class="ar-prompt__kicker">Order B-1 · Any stack app</p>
+              <h3 class="ar-prompt__title" id="prompt-get-started-title">Get started with Booster</h3>
+              <p class="ar-prompt__desc">Install Booster beside the app, read its shape and versions, and bring back the plan. Not a single file changes.</p>
+            </div>
+          </header>
+          <pre class="ar-prompt__text"><code>You are a coding agent planning a PHP and Laravel upgrade with Booster, for the app in this folder, at Wayne State University. Booster is the upgrade tool of WELD, the Wayne State application stack: it plans the hops from the versions the app runs today to ones CREED's version policy still supports, and runs them one at a time on Rector, with the app's own tests as the gate on each hop.
+
+Read first:
+- https://booster.apps.wayne.edu/llms.txt, the index of Booster's pages, each one as Markdown; llms-full.txt beside it holds the README with every command and option. Fetch what you need; do not work from memory.
+- ADVISOR, the stack's MCP server, if it is connected: upgrade_path for this app, policy_lookup for PHP and Laravel, and read_project_docs for booster. If it is not connected, say so and work from the pages. How to add it: https://advisor.apps.wayne.edu/llms.txt
+- This app's composer.json, and package.json if there is one.
+
+Task:
+1. Clone Booster into its own folder beside the app with `git clone https://github.com/waynestate/booster.git`, then run `composer install` in it. Booster needs PHP 8.3 or newer; the app does not. No PHP on the machine: use the Docker lines from the README.
+2. Run bin/booster detect --path=../my-app (on Windows PowerShell, php bin\booster with ..\my-app) and say which of the five stack shapes the app is and which versions it runs.
+3. Run bin/booster plan --path=../my-app and give me the ordered hops, the warnings and the PHPCompatibility findings.
+4. Say which hops are Rector, which edit manifests and which are playbooks a person works through.
+
+Constraints:
+- Plan only. Do not run bin/booster run, not even with --dry-run, until I say so.
+- Booster never commits, pushes or opens a merge request, and neither do you: a person reads the diff and merges it.
+- Ask me before you guess: a version the manifest does not state, a target the policy refuses, or anything that touches CI or a deploy.
+
+Output: the shape and versions, the plan as a numbered list, the warnings and scan findings, then your questions.</code></pre>
+        </section>
+
+        <h3 class="orders__title">Or write the order for your app's shape</h3>
+
+        <section class="ar-prompt" id="prompt-raw-php" aria-labelledby="prompt-raw-php-title" data-ar-prompt>
+          <header class="ar-prompt__head">
+            <span class="ar-prompt__glyph" aria-hidden="true">&gt;_</span>
+            <div>
+              <p class="ar-prompt__kicker">Order B-2 · Raw PHP</p>
+              <h3 class="ar-prompt__title" id="prompt-raw-php-title">Upgrade a raw PHP app</h3>
+              <p class="ar-prompt__desc">PHP one minor at a time, a scan of what will break, a dry run, then the real run with the gate.</p>
+            </div>
+          </header>
+          <pre class="ar-prompt__text"><code>You are a coding agent upgrading a raw PHP app (no framework, no Vue) at Wayne State University with Booster, the upgrade tool of WELD, the Wayne State application stack.
+
+Read first:
+- https://booster.apps.wayne.edu/llms.txt, then the README in llms-full.txt beside it: Quick start, What a hop does and The baseline.
+- ADVISOR, the stack's MCP server, if it is connected: upgrade_path for this app, and list_stack_rules with permutation raw-php. If it is not connected, say so and work from the pages.
+
+Task:
+1. With Booster cloned beside the app, run bin/booster detect --path=../my-app and confirm the shape is raw-php.
+2. Run bin/booster plan --path=../my-app. Expect PHP hops only, one minor at a time.
+3. Run bin/booster scan --path=../my-app --php=X.Y for the first hop's target and list what will break.
+4. Run bin/booster run --path=../my-app --dry-run and summarise the diffs per hop.
+5. Only when I say so: bin/booster run --path=../my-app. It needs a clean git working copy and a Docker daemon for the gate, which runs `composer test` (or vendor/bin/phpunit) in the target PHP image.
+
+Constraints:
+- One hop at a time; a red gate stops the run and leaves the changes for me to read (`git checkout .` undoes them). Never commit or push.
+- Do not raise --max-changes past 50, or use --skip-gate, without asking me.
+- Ask me before you guess: a red baseline, a capped hop, or a target the policy refuses.
+
+Output: the plan, the scan findings, the dry-run summary per hop, then your questions.</code></pre>
+        </section>
+
+        <section class="ar-prompt" id="prompt-raw-php-vue" aria-labelledby="prompt-raw-php-vue-title" data-ar-prompt>
+          <header class="ar-prompt__head">
+            <span class="ar-prompt__glyph" aria-hidden="true">&gt;_</span>
+            <div>
+              <p class="ar-prompt__kicker">Order B-3 · Raw PHP with a Vue SPA</p>
+              <h3 class="ar-prompt__title" id="prompt-raw-php-vue-title">Upgrade a raw PHP app with a Vue front end</h3>
+              <p class="ar-prompt__desc">The PHP hops, the Node pin, and the Vue 2 to 3 playbook a person works through.</p>
+            </div>
+          </header>
+          <pre class="ar-prompt__text"><code>You are a coding agent upgrading a raw PHP app with a Vue single-page front end at Wayne State University with Booster, the upgrade tool of WELD, the Wayne State application stack.
+
+Read first:
+- https://booster.apps.wayne.edu/llms.txt, then the README in llms-full.txt beside it: Quick start and Hops Booster knows.
+- ADVISOR, the stack's MCP server, if it is connected: upgrade_path for this app, policy_lookup for Node and Vue, and list_stack_rules with permutation raw-php-vue. If it is not connected, say so and work from the pages.
+- package.json and its lock file.
+
+Task:
+1. With Booster cloned beside the app, run bin/booster detect --path=../my-app and confirm the shape is raw-php-vue, with the Vue and Node versions.
+2. Run bin/booster plan --path=../my-app and sort the hops: PHP hops (Rector), node-pin-24 (sets engines.node and writes .nvmrc), and vue-2-to-3 if the app is on Vue 2.
+3. Run bin/booster run --path=../my-app --dry-run and summarise the diffs.
+4. For vue-2-to-3, list the playbook steps for this app. Rector does not read Vue, so Booster changes nothing there: a person does that work.
+
+Constraints:
+- Plan and dry run only, until I say so. Never commit or push.
+- Node hops run npm in a node:26 container, so they need a Docker daemon but no Node on the machine.
+- Ask me before you guess: a front end you cannot place, or a lock file that is missing.
+
+Output: the plan sorted into PHP, Node and Vue, the dry-run summary, the Vue playbook steps, then your questions.</code></pre>
+        </section>
+
+        <section class="ar-prompt" id="prompt-laravel-blade" aria-labelledby="prompt-laravel-blade-title" data-ar-prompt>
+          <header class="ar-prompt__head">
+            <span class="ar-prompt__glyph" aria-hidden="true">&gt;_</span>
+            <div>
+              <p class="ar-prompt__kicker">Order B-4 · Laravel with Blade</p>
+              <h3 class="ar-prompt__title" id="prompt-laravel-blade-title">Upgrade a Laravel app with Blade</h3>
+              <p class="ar-prompt__desc">Laravel and PHP hops in the order that keeps a supported pair at every step, and SESAME if the app still signs in with wayne-cas.</p>
+            </div>
+          </header>
+          <pre class="ar-prompt__text"><code>You are a coding agent upgrading a Laravel app with Blade views at Wayne State University with Booster, the upgrade tool of WELD, the Wayne State application stack.
+
+Read first:
+- https://booster.apps.wayne.edu/llms.txt, then the README in llms-full.txt beside it: Quick start, Laravel hops and vendor, and The baseline.
+- ADVISOR, the stack's MCP server, if it is connected: upgrade_path for this app, policy_lookup for PHP and Laravel, and list_stack_rules with permutation laravel-blade. If it is not connected, say so and work from the pages.
+
+Task:
+1. Run `composer install` in the app first: rector-laravel needs Laravel's classes, and a Laravel hop without vendor is only a partial preview.
+2. With Booster cloned beside the app, run bin/booster plan --path=../my-app and explain the order: it keeps the app on a PHP and Laravel pair Laravel supports at every step.
+3. If composer.json requires wayne-cas, run the plan again with --sesame and say what the cas-to-sesame hop renames. It is a stub recipe today, so list what is left for a person.
+4. Run bin/booster run --path=../my-app --dry-run and summarise the diffs per hop.
+
+Constraints:
+- Plan and dry run only, until I say so. Never commit or push.
+- Booster never runs composer update; say which packages will need it after each hop.
+- Ask me before you guess: a red baseline, a capped hop, or a package that blocks a Laravel major.
+
+Output: the plan with the reason for its order, the SESAME notes if any, the dry-run summary, then your questions.</code></pre>
+        </section>
+
+        <section class="ar-prompt" id="prompt-laravel-blade-vue" aria-labelledby="prompt-laravel-blade-vue-title" data-ar-prompt>
+          <header class="ar-prompt__head">
+            <span class="ar-prompt__glyph" aria-hidden="true">&gt;_</span>
+            <div>
+              <p class="ar-prompt__kicker">Order B-5 · Laravel with Blade and Vue islands</p>
+              <h3 class="ar-prompt__title" id="prompt-laravel-blade-vue-title">Upgrade a Laravel app with Vue islands</h3>
+              <p class="ar-prompt__desc">The Laravel and PHP hops, the Node pin, and Mix to Vite when the plan lands on Laravel 9 or newer.</p>
+            </div>
+          </header>
+          <pre class="ar-prompt__text"><code>You are a coding agent upgrading a Laravel app with Blade views and Vue islands at Wayne State University with Booster, the upgrade tool of WELD, the Wayne State application stack.
+
+Read first:
+- https://booster.apps.wayne.edu/llms.txt, then the README in llms-full.txt beside it: Hops Booster knows (node-pin-24, mix-to-vite, vue-2-to-3) and Laravel hops and vendor.
+- ADVISOR, the stack's MCP server, if it is connected: upgrade_path for this app, policy_lookup for Laravel and Node, and list_stack_rules with permutation laravel-blade-vue. If it is not connected, say so and work from the pages.
+- package.json, its lock file, and webpack.mix.js if there is one.
+
+Task:
+1. Run `composer install` in the app, then, with Booster cloned beside it, bin/booster plan --path=../my-app.
+2. If the plan has mix-to-vite, say whether this webpack.mix.js is the simple shape Booster converts (mix.js, .vue(), .sass(), .postCss(), .version()) or which call it will refuse by name. A Vue 2 front end takes vue-2-to-3 first.
+3. Run bin/booster run --path=../my-app --dry-run and summarise the diffs, Blade layouts included.
+4. List any withoutMix() calls for me to rename to withoutVite() by hand.
+
+Constraints:
+- Plan and dry run only, until I say so. Never commit or push.
+- The mix-to-vite gate runs npm ci and npm run build in a node:26 container before the tests, so it needs a Docker daemon.
+- Ask me before you guess: a Mix config Booster refuses, or an asset no Mix entry covers.
+
+Output: the plan, the Mix to Vite verdict, the dry-run summary, the manual renames, then your questions.</code></pre>
+        </section>
+
+        <section class="ar-prompt" id="prompt-laravel-inertia-vue" aria-labelledby="prompt-laravel-inertia-vue-title" data-ar-prompt>
+          <header class="ar-prompt__head">
+            <span class="ar-prompt__glyph" aria-hidden="true">&gt;_</span>
+            <div>
+              <p class="ar-prompt__kicker">Order B-6 · Laravel with Inertia and Vue</p>
+              <h3 class="ar-prompt__title" id="prompt-laravel-inertia-vue-title">Upgrade a Laravel app with Inertia</h3>
+              <p class="ar-prompt__desc">The Laravel and PHP hops and the Node pin, with the Inertia checks a person still does by hand.</p>
+            </div>
+          </header>
+          <pre class="ar-prompt__text"><code>You are a coding agent upgrading a Laravel app with Inertia and Vue at Wayne State University with Booster, the upgrade tool of WELD, the Wayne State application stack.
+
+Read first:
+- https://booster.apps.wayne.edu/llms.txt, then the README in llms-full.txt beside it: Quick start, Laravel hops and vendor, and Hops Booster knows.
+- ADVISOR, the stack's MCP server, if it is connected: upgrade_path for this app, policy_lookup for Laravel, Node and Vue, and list_stack_rules with permutation laravel-inertia-vue. If it is not connected, say so and work from the pages.
+- composer.json, package.json and its lock file.
+
+Task:
+1. Run `composer install` in the app, then, with Booster cloned beside it, bin/booster detect --path=../my-app and bin/booster plan --path=../my-app.
+2. Sort the hops: Laravel and PHP (Rector), node-pin-24, and vue-2-to-3 if the app is on Vue 2 (a playbook, not a code change).
+3. For each Laravel hop, list what to check by hand on the Inertia side: Booster has no Inertia checks per Laravel hop yet.
+4. Run bin/booster run --path=../my-app --dry-run and summarise the diffs per hop.
+
+Constraints:
+- Plan and dry run only, until I say so. Never commit or push.
+- A Laravel hop without vendor is only a partial preview; say so if you see one marked incomplete.
+- Ask me before you guess: an inertiajs package that blocks a Laravel major, or a red baseline.
+
+Output: the plan sorted by kind, the Inertia checks per Laravel hop, the dry-run summary, then your questions.</code></pre>
+        </section>
+
+        <p class="orders__fine">The agent reads the same pages you do: <a href="llms.txt">llms.txt</a> lists them, <a href="llms-full.txt">llms-full.txt</a> holds them all in one file, and this page has a <a href="index.md" type="text/markdown">Markdown twin</a>. Nothing here phones home; the buttons only copy text or open the tool you picked. Take as directed.</p>
+      </div>
+    </div>
+  </section>
+
   <!-- ===================================================== contraindications -->
   <section class="section section--never" aria-labelledby="never-title">
     <div class="wsu-container">
@@ -537,6 +757,7 @@ docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-
   </div>
 </footer>
 
+<script src="assets/agent-ready.js" defer></script>
 <script src="assets/booster.js" defer></script>
 </body>
 </html>

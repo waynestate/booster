@@ -1,0 +1,202 @@
+/* agent-ready.css: the prompt block and the page menu (ADR-0019).
+ Same bytes on every stack front page; copy it, don't fork it. Squire owns it (kit/site/assets/).
+
+ The kit brings the layout and none of the look. Every colour, font and corner comes from a --ar-*
+ token, and each site maps those onto its own palette in its own sheet, the way proof.css maps
+ --pf-*. Unmapped, a token falls back to WayneUI's, so a site that maps nothing still looks like
+ WayneUI rather than like a docs platform.
+
+   --ar-bg        the card                 --ar-code-bg   the prompt's panel
+   --ar-ink       text on the card         --ar-code-ink  the prompt's text
+   --ar-muted     secondary text           --ar-term-bg   the command panel
+   --ar-rule      hairlines                --ar-term-ink  the command's text
+   --ar-accent    the primary button       --ar-on-accent its label
+   --ar-focus     the focus ring           --ar-radius    corners
+   --ar-display   the title's face         --ar-body      running text
+   --ar-mono      prompts and commands     --ar-shadow    the card's lift
+
+ Link it before the site's own sheet: the kit's class rules still beat the site's bare element rules
+ (code, button, a), and a site rule of the same weight wins by coming later. Motion only when the
+ reader is happy with it. */
+
+.ar-prompt {
+  --_bg: var(--ar-bg, var(--wsu-surface-raised, #fff));
+  --_ink: var(--ar-ink, var(--wsu-text, #1b1b1b));
+  --_muted: var(--ar-muted, var(--wsu-text-muted, #4a4a4a));
+  --_rule: var(--ar-rule, var(--wsu-border, #d4d4d4));
+  --_accent: var(--ar-accent, var(--wsu-brand, #0c5449));
+  --_on-accent: var(--ar-on-accent, var(--wsu-on-brand, #fff));
+  --_code-bg: var(--ar-code-bg, var(--wsu-surface-sunken, #f6f6f4));
+  --_code-ink: var(--ar-code-ink, var(--_ink));
+  --_term-bg: var(--ar-term-bg, var(--wsu-ink-950, #16201d));
+  --_term-ink: var(--ar-term-ink, #f4f1ea);
+  --_focus: var(--ar-focus, var(--_accent));
+  --_radius: var(--ar-radius, var(--wsu-radius-box, .75rem));
+  --_mono: var(--ar-mono, var(--wsu-font-family-mono, ui-monospace, monospace));
+
+  position: relative;
+  margin: 0;
+  padding: clamp(1.1rem, 2.5vw, 1.6rem);
+  background: var(--_bg);
+  color: var(--_ink);
+  border: 1px solid var(--_rule);
+  border-radius: var(--_radius);
+  box-shadow: var(--ar-shadow, none);
+  font-family: var(--ar-body, inherit);
+  min-width: 0;
+}
+
+.ar-prompt :focus-visible,
+.ar-page :focus-visible {
+  outline: 3px solid var(--_focus, var(--ar-focus, currentColor));
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------ head */
+.ar-prompt__head { display: flex; gap: .9rem; align-items: flex-start; margin: 0 0 1rem; }
+.ar-prompt__glyph {
+  flex: none; display: inline-grid; place-items: center;
+  width: 2.4rem; height: 2.4rem;
+  border: 1px solid var(--_rule); border-radius: calc(var(--_radius) * .6);
+  font-family: var(--_mono); font-weight: 600; font-size: .9rem; letter-spacing: -.04em;
+  color: var(--_accent); background: var(--_code-bg);
+}
+.ar-prompt__kicker {
+  margin: 0 0 .2rem;
+  font-family: var(--_mono); font-size: .72rem; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--_muted);
+}
+.ar-prompt__title {
+  margin: 0;
+  font-family: var(--ar-display, inherit); font-size: 1.3rem; line-height: 1.2; font-weight: 700;
+  color: var(--_ink); text-wrap: balance;
+}
+.ar-prompt__desc { margin: .3rem 0 0; color: var(--_muted); font-size: .98rem; line-height: 1.5; max-width: 60ch; }
+
+/* ------------------------------------------------------------ the prompt */
+.ar-prompt__text {
+  position: relative;
+  margin: 0;
+  padding: 1rem 1.1rem;
+  background: var(--_code-bg);
+  color: var(--_code-ink);
+  border: 1px solid var(--_rule);
+  border-radius: calc(var(--_radius) * .6);
+  font-family: var(--_mono); font-size: .84rem; line-height: 1.6;
+  white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2;
+}
+.ar-prompt__text code { font: inherit; color: inherit; background: none; padding: 0; border-radius: 0; white-space: inherit; }
+
+/* The preview: the first lines, fading into the page, and a button for the rest. */
+.ar-prompt.is-collapsed .ar-prompt__text {
+  max-height: calc(var(--ar-preview-lines, 10) * 1.6em + 1rem);
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 4.5em), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 4.5em), transparent);
+}
+.ar-prompt__more {
+  display: block; margin: .5rem 0 0; padding: .35rem 0;
+  background: none; border: 0; cursor: pointer;
+  font: inherit; font-family: var(--_mono); font-size: .8rem; letter-spacing: .02em;
+  color: var(--_accent); text-decoration: underline; text-underline-offset: .2em; text-decoration-thickness: 1px;
+}
+.ar-prompt__more:hover { text-decoration-thickness: 2px; }
+
+/* ------------------------------------------------------------ actions */
+.ar-prompt__actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem;
+  margin-top: 1rem;
+}
+.ar-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+  min-height: 2.75rem; padding: .5rem 1.05rem;
+  font: inherit; font-weight: 700; font-size: .95rem; line-height: 1.1;
+  color: var(--_ink); background: transparent;
+  border: 1px solid var(--_ink); border-radius: calc(var(--_radius) * .5);
+  cursor: pointer;
+}
+.ar-btn--primary { background: var(--_accent); border-color: var(--_accent); color: var(--_on-accent); }
+.ar-btn:hover { box-shadow: inset 0 0 0 1px currentColor; }
+.ar-btn--primary:hover { box-shadow: inset 0 0 0 2px var(--_on-accent); }
+
+.ar-run { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; min-width: 0; }
+.ar-run__label { font-family: var(--_mono); font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--_muted); }
+.ar-run__targets { display: flex; flex-wrap: wrap; gap: .4rem; }
+.ar-chip {
+  display: inline-flex; align-items: center; gap: .3rem;
+  min-height: 2.75rem; padding: .4rem .8rem;
+  font: inherit; font-size: .9rem; font-weight: 600; line-height: 1.1;
+  color: var(--_ink); background: var(--_bg);
+  border: 1px solid var(--_rule); border-radius: calc(var(--_radius) * .5);
+  text-decoration: none; cursor: pointer;
+}
+.ar-chip:hover { border-color: var(--_ink); }
+.ar-chip[aria-expanded="true"] { border-color: var(--_accent); box-shadow: inset 0 -3px 0 var(--_accent); }
+.ar-chip__out { font-size: .85em; opacity: .75; }
+
+.ar-status { flex-basis: 100%; margin: 0; min-height: 1.4em; font-size: .9rem; color: var(--_muted); }
+.ar-status:empty { min-height: 0; }
+
+/* ------------------------------------------------------------ the command */
+.ar-cmd {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--_term-bg); color: var(--_term-ink);
+  border-radius: calc(var(--_radius) * .6);
+}
+.ar-cmd[hidden] { display: none; }
+.ar-cmd__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem 1rem; margin-bottom: .75rem; }
+.ar-cmd__title { margin: 0; font-size: .95rem; }
+.ar-seg { display: inline-flex; border: 1px solid currentColor; border-radius: calc(var(--_radius) * .5); overflow: hidden; }
+.ar-seg__btn {
+  min-height: 2.5rem; padding: .35rem .8rem;
+  font: inherit; font-size: .85rem; font-weight: 600;
+  color: inherit; background: transparent; border: 0; cursor: pointer;
+}
+.ar-seg__btn + .ar-seg__btn { border-left: 1px solid currentColor; }
+.ar-seg__btn[aria-pressed="true"] { background: var(--_term-ink); color: var(--_term-bg); }
+.ar-cmd :focus-visible { outline-color: var(--_term-ink); }
+.ar-cmd__code {
+  margin: 0; padding: .85rem 1rem; max-height: 18rem; overflow: auto;
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: calc(var(--_radius) * .4);
+  font-family: var(--_mono); font-size: .8rem; line-height: 1.55;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.ar-cmd__code code { font: inherit; color: inherit; background: none; padding: 0; }
+.ar-cmd__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1rem; margin-top: .75rem; }
+.ar-cmd__note { margin: 0; font-size: .88rem; max-width: 52ch; }
+.ar-cmd__note a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: .18em; }
+.ar-cmd .ar-btn { color: var(--_term-ink); border-color: var(--_term-ink); }
+.ar-cmd .ar-status { color: inherit; margin-top: .5rem; }
+
+/* ------------------------------------------------------------ the page menu */
+.ar-page { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem 1rem; font-size: .88rem; }
+.ar-page__list { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem 1rem; margin: 0; padding: 0; list-style: none; }
+.ar-page__label { margin: 0; font-family: var(--ar-mono, inherit); font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ar-muted, inherit); }
+.ar-page__link,
+.ar-page__btn {
+  display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0;
+  font: inherit; color: var(--ar-accent, inherit); background: none; border: 0; cursor: pointer;
+  text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .2em;
+}
+.ar-page__link:hover, .ar-page__btn:hover { text-decoration-thickness: 2px; }
+.ar-page .ar-status { margin-top: .1rem; }
+
+/* ------------------------------------------------------------ helpers */
+.ar-sr, .ar-offscreen {
+  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ar-btn, .ar-chip, .ar-seg__btn { transition: background-color .15s, border-color .15s, box-shadow .15s, color .15s; }
+  .ar-prompt.is-ready .ar-cmd:not([hidden]) { animation: ar-unfold .22s cubic-bezier(.2, .8, .2, 1); }
+  @keyframes ar-unfold { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+}
+
+@media (forced-colors: active) {
+  .ar-prompt, .ar-prompt__text, .ar-chip, .ar-btn, .ar-cmd, .ar-cmd__code { border: 1px solid CanvasText; }
+  .ar-chip[aria-expanded="true"], .ar-seg__btn[aria-pressed="true"] { outline: 2px solid Highlight; }
+  .ar-prompt.is-collapsed .ar-prompt__text { -webkit-mask-image: none; mask-image: none; }
+}
