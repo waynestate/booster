@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 /*
  * index.php: the front controller for the static front page (ADR-0017).
@@ -127,7 +129,7 @@ if ($extension === 'html') {
             }
             return '<script nonce="' . $nonce . '"' . $match[1] . '>';
         },
-        $body
+        $body,
     );
     header('Content-Type: ' . $mime['html']);
     header('Cache-Control: no-cache');

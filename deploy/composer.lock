@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "58aa027b8306a8c5dfddcf41125772e6",
+    "content-hash": "b1a00b2544838b922769b6254aab8b91",
     "packages": [
         {
             "name": "composer/semver",
@@ -1912,16 +1912,16 @@
         },
         {
             "name": "waynestate/proctor",
-            "version": "dev-main",
+            "version": "0.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/proctor.git",
-                "reference": "8e5eb98b947776b501fa196a6029e61615f4a2a0"
+                "reference": "88ebd260fca62d46162f9c9f3eb04a771a0b3986"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/proctor/zipball/8e5eb98b947776b501fa196a6029e61615f4a2a0",
-                "reference": "8e5eb98b947776b501fa196a6029e61615f4a2a0",
+                "url": "https://api.github.com/repos/waynestate/proctor/zipball/88ebd260fca62d46162f9c9f3eb04a771a0b3986",
+                "reference": "88ebd260fca62d46162f9c9f3eb04a771a0b3986",
                 "shasum": ""
             },
             "require": {
@@ -1937,7 +1937,6 @@
                 "phpstan/phpstan": "^2.1",
                 "phpunit/phpunit": "^11.5"
             },
-            "default-branch": true,
             "bin": [
                 "bin/proctor"
             ],
@@ -1962,15 +1961,14 @@
                 "issues": "https://github.com/waynestate/proctor/issues",
                 "source": "https://github.com/waynestate/proctor"
             },
-            "time": "2026-10-29T03:09:14+00:00"
+            "time": "2026-10-29T03:46:10+00:00"
         }
     ],
     "packages-dev": [],
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
-        "waynestate/helmet": 20,
-        "waynestate/proctor": 20
+        "waynestate/helmet": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,

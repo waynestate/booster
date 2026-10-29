@@ -1,12 +1,11 @@
 {
-    "name": "waynestate/stack-site",
     "description": "The front page deploy layer: static site/ served behind HELMET (ADR-0017).",
     "license": "MIT",
     "type": "project",
     "require": {
         "php": "^8.3",
         "waynestate/helmet": "dev-main",
-        "waynestate/proctor": "dev-main",
+        "waynestate/proctor": "^0.2",
         "waynestate/creed": "^0.1"
     },
     "config": {
