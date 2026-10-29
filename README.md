@@ -218,17 +218,24 @@ cannot see the framework's classes, so its preview is marked incomplete and the 
 first.
 
 Some hops are playbooks only (`vue-2-to-3`): Rector does not read Vue, so BOOSTER lists the steps and the official
-guide, and a person does the work. One hop edits manifests instead of code: `node-pin-24` sets `engines.node` in
-`package.json` and writes `.nvmrc`, then the app's usual gate applies (a hop may also ask for a build gate, which runs
-`npm ci` and `npm run build` in the `node:24` container).
+guide, and a person does the work. Two hops edit manifests instead of code. `node-pin-24` sets `engines.node` in
+`package.json` and writes `.nvmrc`, then the app's usual gate applies. `mix-to-vite` converts a simple
+`webpack.mix.js` to Vite (below) and asks for a build gate, which runs `npm ci` and `npm run build` in the `node:24`
+container before the app's tests.
 
 ### Hops BOOSTER knows
 
 PHP one minor at a time from 5.6 to 8.5; Laravel one major at a time from 8 to 13; PHPUnit one major at a time from 9
 to 13; `cas-to-sesame` (a stub recipe that renames the `wayne-cas` classes to SESAME's compatibility classes and swaps
 the Composer requirement); `node-pin-24` (planned for any app with a `package.json` that does not already floor Node at
-24 or newer: sets `engines.node` to `>=24` and writes `.nvmrc`, ahead of the front-end hops); and `vue-2-to-3`
-(playbook). `booster hops` prints them all.
+24 or newer: sets `engines.node` to `>=24` and writes `.nvmrc`, ahead of the front-end hops); `mix-to-vite` (planned
+when the app has a `webpack.mix.js` and the plan lands on Laravel 9 or newer, after `node-pin-24`: writes
+`vite.config.js`, swaps `laravel-mix` for `vite` and `laravel-vite-plugin` in `package.json`, renames `MIX_` keys to
+`VITE_` in `.env.example`, rewrites Blade `mix()` script and link tags into one `@vite([...])` line per layout when
+every referenced asset maps to a Mix entry, and deletes `webpack.mix.js`; the simple shape only: `mix.js`, `.vue()`,
+`.sass()`, `.postCss()` and `.version()`, anything else is refused by name, a Vue 2 front end must take `vue-2-to-3`
+first, and `withoutMix()` calls are listed for a manual rename to `withoutVite()`); and `vue-2-to-3` (playbook).
+`booster hops` prints them all.
 
 BOOSTER plans only what the policy supports as a target. Moving to PHP 8.1 is refused because 8.1 is past security
 support; passing through it on the way to a newer version is fine.

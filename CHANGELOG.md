@@ -35,4 +35,13 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
   after the PHP hops and ahead of the front-end playbooks, and skips itself when the app already floors Node at 24 or
   newer. The npm work runs in a `node:24` container, so the machine needs Docker but no Node; a hop may also ask for a
   build gate (`npm ci` and `npm run build` in that container).
+- A `mix-to-vite` hop for apps with a `webpack.mix.js`, planned after `node-pin-24` when the plan lands on Laravel 9 or
+  newer: it writes `vite.config.js`, swaps `laravel-mix` for `vite` and `laravel-vite-plugin` in `package.json` (plus
+  `@vitejs/plugin-vue` when the Mix file compiled components), renames `MIX_` keys to `VITE_` in `.env.example`,
+  rewrites Blade `mix()` script and link tags into one `@vite([...])` line per layout when every referenced asset maps
+  to a Mix entry, and deletes `webpack.mix.js`. Only the simple shape converts: `mix.js`, `.vue()`, `.sass()`,
+  `.postCss()` and `.version()`; anything else is refused by name, as is a Vue 2 front end (run `vue-2-to-3` first).
+  Unmapped references, bare `mix()` calls and `withoutMix()` sites are left alone and listed as manual notes. The gate
+  runs `npm ci`, `npm run build` and a `public/build/manifest.json` check in the `node:24` container, then the app's
+  tests.
 - `booster detect` now reports the Node floor from `engines.node`.
