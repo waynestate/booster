@@ -78,7 +78,8 @@ docker run --rm -v "${PWD}:/booster" -v "C:\path\to\app:/app" -w /booster php:8.
 ```
 
 The `run` command's test gate starts Docker itself, so it needs a Docker daemon on the machine that runs BOOSTER.
-When BOOSTER itself runs in a container, use `--skip-gate` and run the tests yourself.
+When BOOSTER itself runs in a container, use `--skip-gate` and run the tests yourself. Node hops run `npm` in a
+`node:24` container, so they need the same daemon but no Node installed on the machine.
 
 ## Single-file download
 
@@ -151,7 +152,7 @@ supports at every step):
 
 | Command | What it does |
 |---|---|
-| `booster detect` | Reads `composer.json` and `package.json`; prints the app type, PHP, Laravel, PHPUnit and Vue versions |
+| `booster detect` | Reads `composer.json` and `package.json`; prints the app type, PHP, Laravel, PHPUnit, Vue and Node versions |
 | `booster plan` | Prints the ordered hops and the warnings. Changes nothing. |
 | `booster run` | Runs the plan. `--dry-run` previews every hop |
 | `booster hops` | Lists every hop BOOSTER knows |
@@ -217,13 +218,17 @@ cannot see the framework's classes, so its preview is marked incomplete and the 
 first.
 
 Some hops are playbooks only (`vue-2-to-3`): Rector does not read Vue, so BOOSTER lists the steps and the official
-guide, and a person does the work.
+guide, and a person does the work. One hop edits manifests instead of code: `node-pin-24` sets `engines.node` in
+`package.json` and writes `.nvmrc`, then the app's usual gate applies (a hop may also ask for a build gate, which runs
+`npm ci` and `npm run build` in the `node:24` container).
 
 ### Hops BOOSTER knows
 
 PHP one minor at a time from 5.6 to 8.5; Laravel one major at a time from 8 to 13; PHPUnit one major at a time from 9
 to 13; `cas-to-sesame` (a stub recipe that renames the `wayne-cas` classes to SESAME's compatibility classes and swaps
-the Composer requirement); and `vue-2-to-3` (playbook). `booster hops` prints them all.
+the Composer requirement); `node-pin-24` (planned for any app with a `package.json` that does not already floor Node at
+24 or newer: sets `engines.node` to `>=24` and writes `.nvmrc`, ahead of the front-end hops); and `vue-2-to-3`
+(playbook). `booster hops` prints them all.
 
 BOOSTER plans only what the policy supports as a target. Moving to PHP 8.1 is refused because 8.1 is past security
 support; passing through it on the way to a newer version is fine.

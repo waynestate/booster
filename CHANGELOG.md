@@ -31,3 +31,8 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
 - A `nothing-to-do` status for a hop that changes no files and skips the gate.
 - An incomplete-preview marker for a Laravel hop whose app has no `vendor/`, plus a unique-files summary and a
   closing line in the dry-run report.
+- A `node-pin-24` hop for apps with a `package.json`: it sets `engines.node` to `>=24` and writes `.nvmrc`, is planned
+  after the PHP hops and ahead of the front-end playbooks, and skips itself when the app already floors Node at 24 or
+  newer. The npm work runs in a `node:24` container, so the machine needs Docker but no Node; a hop may also ask for a
+  build gate (`npm ci` and `npm run build` in that container).
+- `booster detect` now reports the Node floor from `engines.node`.
