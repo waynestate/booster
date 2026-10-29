@@ -15,9 +15,9 @@ Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only).
 
 What Rector cannot do (check these by hand):
 
-- BOOSTER converts the simple shape only: mix.js, .vue(), .sass(), .postCss() and .version(). Anything else is refused so you follow the manual Vite migration guide.
+- Booster converts the simple shape only: mix.js, .vue(), .sass(), .postCss() and .version(). Anything else is refused so you follow the manual Vite migration guide.
 - Blade mix() script and link tags become one @vite([...]) line per layout when every referenced asset maps to a Mix entry; unmapped references are listed as manual notes.
-- Replace withoutMix() with withoutVite() by hand; BOOSTER lists the files that call it.
+- Replace withoutMix() with withoutVite() by hand; Booster lists the files that call it.
 
 Official notes:
 
