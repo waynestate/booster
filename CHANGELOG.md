@@ -4,6 +4,8 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-29
+
 ### Added
 
 - Added: agent-ready site (prompt blocks, Markdown twins, llms.txt), from Squire's kit.
