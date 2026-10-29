@@ -256,15 +256,17 @@ first.
 Some hops are playbooks only (`vue-2-to-3`): Rector does not read Vue, so BOOSTER lists the steps and the official
 guide, and a person does the work. Two hops edit manifests instead of code. `node-pin-24` sets `engines.node` in
 `package.json` and writes `.nvmrc`, then the app's usual gate applies. `mix-to-vite` converts a simple
-`webpack.mix.js` to Vite (below) and asks for a build gate, which runs `npm ci` and `npm run build` in the `node:24`
+`webpack.mix.js` to Vite (below) and asks for a build gate, which runs `npm ci` and `npm run build` in the `node:26`
 container before the app's tests.
 
 ### Hops BOOSTER knows
 
-PHP one minor at a time from 5.6 to 8.5; Laravel one major at a time from 8 to 13; PHPUnit one major at a time from 9
-to 13; `cas-to-sesame` (a stub recipe that renames the `wayne-cas` classes to SESAME's compatibility classes and swaps
-the Composer requirement); `node-pin-24` (planned for any app with a `package.json` that does not already floor Node at
-24 or newer: sets `engines.node` to `>=24` and writes `.nvmrc`, ahead of the front-end hops); `mix-to-vite` (planned
+PHP one minor at a time from 5.6 to 8.5, Laravel one major at a time from 8 to 13 and PHPUnit one major at a time from
+9 to 13, each list read from `data/versions.json` and trimmed to the majors whose Rector ruleset is installed
+([Hop data](#hop-data)); `cas-to-sesame` (a stub recipe that renames the `wayne-cas` classes to SESAME's compatibility
+classes and swaps the Composer requirement); `node-pin-24` (planned for any app with a `package.json` that does not
+already floor Node at the hop data's target, 26 today: sets `engines.node` to `>=26` and writes `.nvmrc`, ahead of the
+front-end hops); `mix-to-vite` (planned
 when the app has a `webpack.mix.js` and the plan lands on Laravel 9 or newer, after `node-pin-24`: writes
 `vite.config.js`, swaps `laravel-mix` for `vite` and `laravel-vite-plugin` in `package.json`, renames `MIX_` keys to
 `VITE_` in `.env.example`, rewrites Blade `mix()` script and link tags into one `@vite([...])` line per layout when
@@ -297,6 +299,27 @@ They are internal; do not set them.
 rector-laravel needs Laravel's classes to recognise a model or a controller. For a Laravel hop BOOSTER loads the app's
 own `vendor/autoload.php` when it exists, so run `composer install` in the app first. PHP hops never load the app's
 autoloader. An app with no `vendor/` still gets a plan and the hops that do not need Laravel's classes.
+
+## Hop data
+
+`data/versions.json` holds the version facts BOOSTER plans against: the PHP, Laravel and PHPUnit chains, the PHP range
+each Laravel major supports, the PHPUnit floor each Laravel major ships, and the Node floor the `node-pin-24` hop
+writes. The file ships inside the PHAR. A new major appears in the file as soon as its feed says so; BOOSTER offers a
+hop for it only once Rector ships a ruleset for it, and a plan toward a major without one stops there with a warning
+instead of failing.
+
+`bin/refresh-hop-data.php` rewrites the file from the public feeds (Packagist for PHPUnit and Laravel, endoflife.date
+for Laravel's supported PHP ranges, npm for the Vite packages) plus CREED's policy for what counts as supported:
+
+```
+php bin/refresh-hop-data.php             # fetch the feeds, rewrite the file, print what changed
+php bin/refresh-hop-data.php --check     # like --dry-run, for CI: exit 3 when the file is stale
+php bin/refresh-hop-data.php --offline tests/fixtures/hop-feeds --today 2026-10-29 --dry-run
+```
+
+The refresh is deterministic for a given set of feeds and date, and it never touches the recipes: writing a playbook
+for a new hop stays human work. `composer ci` ends with the online `--check`, so a feed that moved while the file
+slept fails every pipeline until someone runs the refresh and commits the result.
 
 ## Checks
 

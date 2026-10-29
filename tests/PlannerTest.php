@@ -8,6 +8,7 @@ use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanOptions;
 use Waynestate\Booster\Plan\Planner;
+use Waynestate\Booster\Policy\Policy;
 use Waynestate\Booster\Policy\PolicyLocator;
 use Waynestate\Booster\Project\ProjectDetector;
 use Waynestate\Booster\ToolError;
@@ -46,6 +47,20 @@ final class PlannerTest extends TestCase
         $project = (new ProjectDetector())->detect($dir);
 
         return (new Planner($this->policy(), new HopRegistry()))->plan($project, $options, $this->today());
+    }
+
+    /** A policy like the frozen fixture, plus one extra version per component. */
+    private function policyWith(array $extra): Policy
+    {
+        $json = json_decode((string) file_get_contents(self::POLICY_FIXTURE), true);
+        self::assertIsArray($json);
+        foreach ($extra as $component => $versions) {
+            $json['components'][$component]['versions'] = array_replace($json['components'][$component]['versions'], $versions);
+        }
+        $file = $this->tempDir() . '/policy.json';
+        file_put_contents($file, (string) json_encode($json));
+
+        return PolicyLocator::locate($file, null);
     }
 
     public function test_php_74_to_84_lists_each_minor_step_with_its_gate(): void
@@ -288,6 +303,31 @@ final class PlannerTest extends TestCase
         $this->expectException(ToolError::class);
         $this->expectExceptionMessage('does not run on PHP');
         $this->plan('laravel-blade', new PlanOptions(toPhp: '8.2', toLaravel: '13'));
+    }
+
+    public function test_planning_stops_with_a_warning_when_rector_has_no_ruleset_for_the_target(): void
+    {
+        // The data knows Laravel 14 the way a refreshed file would, but rector-laravel ships no
+        // LARAVEL_140 set, so the plan must stop at 13 with a warning instead of failing.
+        $data = json_decode((string) file_get_contents(__DIR__ . '/../data/versions.json'), true);
+        self::assertIsArray($data);
+        $data['laravel'][] = '14';
+        $data['laravel_php']['14'] = ['8.4', '8.6'];
+        $data['laravel_phpunit']['14'] = '13';
+        $dataFile = $this->tempDir() . '/versions.json';
+        file_put_contents($dataFile, (string) json_encode($data));
+
+        $policy = $this->policyWith([
+            'laravel' => ['14' => ['active_until' => '2028-09-01', 'security_until' => '2029-03-01']],
+        ]);
+        $project = (new ProjectDetector())->detect($this->example('laravel-blade'));
+        $plan = (new Planner($policy, new HopRegistry($dataFile)))->plan($project, new PlanOptions(toLaravel: '14'), $this->today());
+
+        self::assertSame(
+            ['phpunit-10-to-11', 'laravel-10-to-11', 'laravel-11-to-12', 'php-82-to-83', 'phpunit-11-to-12', 'laravel-12-to-13', 'php-83-to-84', 'phpunit-12-to-13', 'php-84-to-85'],
+            $this->ids($plan),
+        );
+        self::assertStringContainsString('no hop for Laravel 14', implode(' ', $plan->warnings));
     }
 
     public function test_going_backwards_is_refused(): void

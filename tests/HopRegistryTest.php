@@ -54,6 +54,25 @@ final class HopRegistryTest extends PhpUnitTestCase
         self::assertSame(['laravel/framework' => '^13.0'], $hop->composerSet);
     }
 
+    public function test_a_laravel_major_without_a_rector_ruleset_gets_no_hop(): void
+    {
+        $data = json_decode((string) file_get_contents(__DIR__ . '/../data/versions.json'), true);
+        self::assertIsArray($data);
+        $data['laravel'][] = '14';
+        $file = sys_get_temp_dir() . '/booster-hop-registry-test-' . getmypid() . '.json';
+        file_put_contents($file, (string) json_encode($data));
+
+        try {
+            $registry = new HopRegistry($file);
+
+            self::assertSame(['8', '9', '10', '11', '12', '13', '14'], $registry->laravelChain());
+            self::assertTrue($registry->has('laravel-12-to-13'));
+            self::assertFalse($registry->has('laravel-13-to-14'), 'rector-laravel ships no LARAVEL_140 set yet.');
+        } finally {
+            unlink($file);
+        }
+    }
+
     public function test_the_node_pin_hop_pins_engines_node_and_is_not_manual(): void
     {
         $registry = new HopRegistry();

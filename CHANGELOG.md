@@ -4,6 +4,20 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- `data/versions.json`, the hop data file (shipped in the PHAR), and `bin/refresh-hop-data.php`, which rewrites it
+  from the Packagist, endoflife.date and npm feeds plus CREED's policy. `composer ci` ends with the online `--check`.
+- A plan warning when the target major has no Rector ruleset yet: BOOSTER stops short of the target instead of
+  failing.
+
+### Changed
+
+- The PHP, Laravel and PHPUnit hop lists now come from `data/versions.json`; a major whose Rector ruleset is not
+  installed gets no hop.
+- The `node-pin-24` hop now floors Node at the hop data's target (26 today, following the policy's newest supported
+  major) and runs its npm work in the matching `node:` container.
+
 ## [0.1.0] - 2026-10-29
 
 ### Added

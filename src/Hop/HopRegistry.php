@@ -321,6 +321,10 @@ final class HopRegistry
             if ($to === null) {
                 break;
             }
+            if (!defined($setFor($to))) {
+                // Rector has no ruleset for this PHP version yet, so there is no hop to offer.
+                continue;
+            }
             $this->add(new Hop(
                 id: self::phpHopId($from, $to),
                 kind: HopKind::Php,
@@ -368,6 +372,10 @@ final class HopRegistry
             $to = $this->laravelChain[$i + 1] ?? null;
             if ($to === null) {
                 break;
+            }
+            if (!defined('RectorLaravel\Set\LaravelSetList::LARAVEL_' . $to . '0')) {
+                // rector-laravel has no ruleset for this major yet, so there is no hop to offer.
+                continue;
             }
             $this->add(new Hop(
                 id: self::laravelHopId($from, $to),

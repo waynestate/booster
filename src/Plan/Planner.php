@@ -119,25 +119,42 @@ final class Planner
             $nextPhpunit = $phpunit !== null && $toPhpunit !== null && $phpunit !== $toPhpunit ? $this->registry->nextPhpunit($phpunit) : null;
             $nextPhp = $php !== $toPhp ? $this->registry->nextPhp($php) : null;
 
-            if ($nextLaravel !== null && $this->registry->laravelSupportsPhp($nextLaravel, $php) && $this->phpunitMeetsLaravelFloor($phpunit, $nextLaravel)) {
+            if ($nextLaravel !== null && $this->registry->has(HopRegistry::laravelHopId((string) $laravel, $nextLaravel)) && $this->registry->laravelSupportsPhp($nextLaravel, $php) && $this->phpunitMeetsLaravelFloor($phpunit, $nextLaravel)) {
                 $hop = $this->registry->get(HopRegistry::laravelHopId((string) $laravel, $nextLaravel));
                 $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $nextLaravel, $phpunit, $phpunit);
                 $laravel = $nextLaravel;
                 continue;
             }
-            if ($nextPhpunit !== null && version_compare($php, $this->registry->phpunitPhp()[$nextPhpunit], '>=')) {
+            if ($nextPhpunit !== null && $this->registry->has(HopRegistry::phpunitHopId($phpunit, $nextPhpunit)) && version_compare($php, $this->registry->phpunitPhp()[$nextPhpunit], '>=')) {
                 $hop = $this->registry->get(HopRegistry::phpunitHopId($phpunit, $nextPhpunit));
                 $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $laravel, $phpunit, $nextPhpunit);
                 $phpunit = $nextPhpunit;
                 continue;
             }
-            if ($nextPhp !== null && ($laravel === null || $this->registry->laravelSupportsPhp($laravel, $nextPhp))) {
+            if ($nextPhp !== null && $this->registry->has(HopRegistry::phpHopId($php, $nextPhp)) && ($laravel === null || $this->registry->laravelSupportsPhp($laravel, $nextPhp))) {
                 $hop = $this->registry->get(HopRegistry::phpHopId($php, $nextPhp));
                 $steps[] = $this->step(++$n, $hop, $php, $nextPhp, $laravel, $laravel, $phpunit, $phpunit);
                 $php = $nextPhp;
                 continue;
             }
             if ($nextLaravel !== null || $nextPhpunit !== null || $nextPhp !== null) {
+                $missing = [];
+                if ($nextLaravel !== null && !$this->registry->has(HopRegistry::laravelHopId((string) $laravel, $nextLaravel))) {
+                    $missing[] = 'Laravel ' . $nextLaravel;
+                }
+                if ($nextPhpunit !== null && !$this->registry->has(HopRegistry::phpunitHopId($phpunit, $nextPhpunit))) {
+                    $missing[] = 'PHPUnit ' . $nextPhpunit;
+                }
+                if ($nextPhp !== null && !$this->registry->has(HopRegistry::phpHopId($php, $nextPhp))) {
+                    $missing[] = 'PHP ' . $nextPhp;
+                }
+                if ($missing !== []) {
+                    $warnings[] = sprintf(
+                        'BOOSTER stops short of the target: it has no hop for %s yet because Rector ships no ruleset for it. The plan below is as far as BOOSTER can take you today.',
+                        implode(', ', $missing),
+                    );
+                    break;
+                }
                 throw new ToolError(sprintf(
                     'No safe next step from PHP %s, Laravel %s and PHPUnit %s toward PHP %s, Laravel %s and PHPUnit %s.',
                     $php,
