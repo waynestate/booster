@@ -11,4 +11,5 @@ enum HopKind: string
     case Phpunit = 'phpunit';
     case Sesame = 'sesame';
     case Vue = 'vue';
+    case Node = 'node';
 }
