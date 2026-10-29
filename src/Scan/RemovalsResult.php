@@ -23,6 +23,9 @@ final readonly class RemovalsResult
         public int $filesSkipped,
     ) {}
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [

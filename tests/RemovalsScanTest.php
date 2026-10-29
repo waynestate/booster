@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Tests;
 
+use Symfony\Component\Console\Tester\ApplicationTester;
+use Waynestate\Booster\Console\BoosterApplication;
+use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\Scan\RemovalsScan;
 use Waynestate\Booster\ToolError;
 
@@ -15,6 +18,27 @@ final class RemovalsScanTest extends TestCase
         file_put_contents($dir . '/' . $name, $content);
 
         return $dir;
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     *
+     * @return array{int, string}
+     */
+    private function booster(array $input, ?FakeProcessRunner $fake = null): array
+    {
+        $app = new BoosterApplication($fake);
+        $app->setAutoExit(false);
+        $tester = new ApplicationTester($app);
+        $exit = $tester->run($input, ['capture_stderr_separately' => true]);
+
+        return [$exit, $tester->getDisplay() . $tester->getErrorOutput()];
+    }
+
+    /** A FakeProcessRunner whose discovery finds PHPCompatibility and whose scan reports a clean app. */
+    private function cleanPhpcsFake(): FakeProcessRunner
+    {
+        return $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''));
     }
 
     public function test_a_removed_function_call_is_found_with_file_and_line(): void
@@ -162,5 +186,45 @@ final class RemovalsScanTest extends TestCase
 
         $this->expectException(ToolError::class);
         new RemovalsScan($data);
+    }
+
+    public function test_plan_lists_removals_under_each_php_step(): void
+    {
+        $app = $this->copyExample('raw-php');
+        file_put_contents($app . '/src/legacy.php', "<?php\nmysql_query('SELECT 1');\neach([]);\n");
+
+        // The goal must end on a policy-supported version (8.4 today), so the
+        // plan walks every hop in between and each gets its own removals line.
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $app, '--today' => self::TODAY, '--goal' => 'php-56-to-84', '--no-scan' => true]);
+
+        self::assertSame(0, $exit, $out);
+        self::assertStringContainsString('1. php-56-to-70', $out);
+        self::assertStringContainsString('Removed between PHP 5.6 and PHP 7.0: 1 hit (advisory).', $out);
+        self::assertStringContainsString('src/legacy.php:2 mysql_* functions (the mysql extension) -> mysqli or PDO', $out);
+        self::assertStringContainsString('Removed between PHP 7.4 and PHP 8.0: 1 hit (advisory).', $out);
+        self::assertStringContainsString('src/legacy.php:3 each() function -> foreach', $out);
+        // Hops with no seeded removals still say so, so the silence is deliberate.
+        self::assertStringContainsString('Removed between PHP 7.0 and PHP 7.1: none found.', $out);
+    }
+
+    public function test_plan_json_has_a_removals_key_per_php_step(): void
+    {
+        $app = $this->copyExample('raw-php');
+        file_put_contents($app . '/src/legacy.php', "<?php\nmysql_query('SELECT 1');\n");
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $app, '--today' => self::TODAY, '--goal' => 'php-56-to-84', '--format' => 'json'], $this->cleanPhpcsFake());
+        $data = json_decode($out, true);
+
+        self::assertSame(0, $exit, $out);
+        // One entry per PHP step of the plan, in step order.
+        self::assertCount(10, $data['removals']);
+        self::assertSame(1, $data['removals'][0]['step']);
+        self::assertSame('php-56-to-70', $data['removals'][0]['hop']);
+        self::assertSame('5.6', $data['removals'][0]['from']);
+        self::assertSame('7.0', $data['removals'][0]['to']);
+        self::assertSame(1, $data['removals'][0]['total']);
+        self::assertSame('mysql-functions', $data['removals'][0]['findings'][0]['id']);
+        self::assertSame('php-83-to-84', $data['removals'][9]['hop']);
+        self::assertSame(0, $data['removals'][9]['total']);
     }
 }

@@ -19,6 +19,9 @@ final readonly class RemovalFinding
         public string $replacement,
     ) {}
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [
