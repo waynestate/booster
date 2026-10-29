@@ -8,6 +8,16 @@ declare(strict_types=1);
  * Same bytes in every stack repo: boot HELMET, resolve the requested path
  * into the site folder, and serve it. Every response, including the 404s,
  * carries HELMET's headers. The only solo is the nonce.
+ *
+ * Agent-ready (ADR-0019): a page with a Markdown twin beside it (index.md
+ * for index.html, written by Squire's bin/agent-ready.php) is sent as that
+ * twin to a client that asks for text/markdown, and every HTML answer
+ * points at its twin with a Link header. A twin can also be fetched by its
+ * own name. Any other .md in the site folder (a README) stays private.
+ *
+ * The site folder comes from SQUIRE_STATIC_ROOT when that variable is set and non-empty: a path relative to
+ * the app directory, the parent of public/. Otherwise it is ../../site, because the app lives in deploy/
+ * beside site/.
  */
 
 require __DIR__ . '/../vendor/autoload.php';
@@ -31,7 +41,10 @@ $notFound = static function (): never {
     exit;
 };
 
-$siteRoot = realpath(__DIR__ . '/../../site');
+$staticRoot = getenv('SQUIRE_STATIC_ROOT');
+$siteRoot = $staticRoot === false || $staticRoot === ''
+    ? realpath(__DIR__ . '/../../site')
+    : realpath(__DIR__ . '/' . $staticRoot);
 if ($siteRoot === false) {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
@@ -53,7 +66,7 @@ foreach (explode('/', $path) as $segment) {
     }
 }
 $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-if (in_array($extension, ['md', 'php', 'phar'], true)) {
+if (in_array($extension, ['php', 'phar'], true)) {
     $notFound();
 }
 
@@ -65,6 +78,13 @@ if ($resolved !== false && is_dir($resolved)) {
 if ($resolved === false
     || !str_starts_with($resolved, $siteRoot . DIRECTORY_SEPARATOR)
     || !is_file($resolved)
+) {
+    $notFound();
+}
+
+// A .md is served only when it is a page's twin: the .html of the same name sits beside it.
+if (strtolower(pathinfo($resolved, PATHINFO_EXTENSION)) === 'md'
+    && !is_file(substr($resolved, 0, -3) . '.html')
 ) {
     $notFound();
 }
@@ -97,6 +117,7 @@ $mime = [
     'woff' => 'font/woff',
     'ttf' => 'font/ttf',
     'txt' => 'text/plain; charset=utf-8',
+    'md' => 'text/markdown; charset=utf-8',
     'xml' => 'application/xml; charset=utf-8',
     'webmanifest' => 'application/manifest+json; charset=utf-8',
     'pdf' => 'application/pdf',
@@ -108,6 +129,60 @@ $mime = [
 $extension = strtolower(pathinfo($resolved, PATHINFO_EXTENSION));
 if (!isset($mime[$extension])) {
     $notFound();
+}
+
+// The twin of an HTML page, and whether the client would rather have it.
+// Only an explicit text/markdown counts: a browser's */* never turns a page
+// into Markdown. Asked for at least as strongly as text/html, it wins.
+$twin = null;
+$twinUrl = null;
+if ($extension === 'html') {
+    $candidate = substr($resolved, 0, -5) . '.md';
+    if (is_file($candidate)) {
+        $twin = $candidate;
+        $relative = str_replace(DIRECTORY_SEPARATOR, '/', substr($candidate, strlen($siteRoot)));
+        $twinUrl = implode('/', array_map('rawurlencode', explode('/', $relative)));
+    }
+}
+$prefersMarkdown = static function (string $accept): bool {
+    $quality = ['text/markdown' => null, 'text/html' => null];
+    foreach (explode(',', $accept) as $range) {
+        $parts = array_map('trim', explode(';', $range));
+        $type = strtolower(array_shift($parts));
+        if (!array_key_exists($type, $quality)) {
+            continue;
+        }
+        $q = 1.0;
+        foreach ($parts as $parameter) {
+            if (preg_match('/^q\s*=\s*([01](?:\.\d{0,3})?)$/i', $parameter, $match)) {
+                $q = (float) $match[1];
+            }
+        }
+        $quality[$type] = $q;
+    }
+
+    return $quality['text/markdown'] !== null
+        && $quality['text/markdown'] > 0
+        && $quality['text/markdown'] >= ($quality['text/html'] ?? 0.0);
+};
+
+if ($twin !== null && $prefersMarkdown($_SERVER['HTTP_ACCEPT'] ?? '')) {
+    $body = file_get_contents($twin);
+    if ($body === false) {
+        http_response_code(500);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo 'The page could not be read.';
+        exit;
+    }
+    header('Content-Type: ' . $mime['md']);
+    header('Content-Location: ' . $twinUrl);
+    header('Vary: Accept');
+    header('Cache-Control: no-cache');
+    header('Content-Length: ' . strlen($body));
+    if ($method === 'GET') {
+        echo $body;
+    }
+    exit;
 }
 
 // HTML: the CSP nonce changes per request, so the page is rewritten on the
@@ -132,6 +207,10 @@ if ($extension === 'html') {
         $body,
     );
     header('Content-Type: ' . $mime['html']);
+    if ($twinUrl !== null) {
+        header('Link: <' . $twinUrl . '>; rel="alternate"; type="text/markdown"');
+        header('Vary: Accept');
+    }
     header('Cache-Control: no-cache');
     header('Content-Length: ' . strlen($body));
     if ($method === 'GET') {
