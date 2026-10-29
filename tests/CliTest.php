@@ -25,25 +25,34 @@ final class CliTest extends TestCase
         return [$exit, $tester->getDisplay() . $tester->getErrorOutput()];
     }
 
+    /** A FakeProcessRunner whose discovery finds PHPCompatibility and whose scan reports a clean app. */
+    private function cleanPhpcsFake(): FakeProcessRunner
+    {
+        return $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''));
+    }
+
     public function test_plan_prints_the_hops_in_order(): void
     {
-        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84']);
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84'], $this->cleanPhpcsFake());
 
         self::assertSame(0, $exit);
         self::assertStringContainsString('1. php-74-to-80', $out);
         self::assertStringContainsString('5. php-83-to-84', $out);
         self::assertStringNotContainsString('php-84-to-85', $out);
+        self::assertStringContainsString('Will break on PHP 8.0: no findings.', $out);
     }
 
     public function test_plan_json_is_machine_readable(): void
     {
-        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('laravel-blade'), '--today' => self::TODAY, '--format' => 'json']);
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('laravel-blade'), '--today' => self::TODAY, '--format' => 'json'], $this->cleanPhpcsFake());
         $data = json_decode($out, true);
 
         self::assertSame(0, $exit);
         self::assertSame('laravel-blade', $data['project']['app_type']);
         self::assertSame('laravel-10-to-11', $data['steps'][0]['hop']['id']);
         self::assertSame('bundled snapshot', $data['policy']);
+        self::assertSame('ok', $data['php_compat']['status']);
+        self::assertSame('8.3', $data['php_compat']['test_version']);
     }
 
     public function test_the_policy_option_replaces_the_bundled_copy(): void
@@ -54,7 +63,7 @@ final class CliTest extends TestCase
         $json['components']['php']['versions']['8.5']['active_until'] = '2020-01-01';
         file_put_contents($policy, json_encode($json));
 
-        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--policy' => $policy, '--format' => 'json']);
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--policy' => $policy, '--format' => 'json'], $this->cleanPhpcsFake());
         $data = json_decode($out, true);
 
         self::assertSame(0, $exit);
@@ -68,6 +77,163 @@ final class CliTest extends TestCase
 
         self::assertSame(2, $exit);
         self::assertStringContainsString('does not exist', $out);
+    }
+
+    public function test_plan_shows_the_phpcompat_findings(): void
+    {
+        $app = $this->example('raw-php');
+        $json = [
+            'totals' => ['errors' => 1, 'warnings' => 0, 'fixable' => 0],
+            'files' => [
+                $app . '/src/Legacy.php' => [
+                    'errors' => 1,
+                    'warnings' => 0,
+                    'messages' => [['message' => 'Function each() is deprecated since PHP 7.2 and removed since PHP 8.0; Use a foreach loop or ArrayIterator instead', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.eachDeprecatedRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 12, 'column' => 9]],
+                ],
+            ],
+        ];
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $app, '--today' => self::TODAY, '--goal' => 'php-74-to-84'], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Will break on PHP 8.0: 1 errors, 0 warnings.', $out);
+        self::assertStringContainsString('src/Legacy.php:12 [error] Function each()', $out);
+    }
+
+    public function test_plan_no_scan_skips_the_scan(): void
+    {
+        $fake = $this->cleanPhpcsFake();
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--no-scan' => true], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringNotContainsString('Will break on PHP', $out);
+        self::assertSame([], $fake->calls);
+    }
+
+    public function test_plan_survives_a_broken_scan(): void
+    {
+        // Discovery succeeds (the standard is present) but the scan itself
+        // fails; the plan must survive that.
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(3, '', 'ERROR: the standard does not exist'));
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84'], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('1. php-74-to-80', $out);
+        self::assertStringContainsString('PHPCompatibility scan: could not run', $out);
+        self::assertStringContainsString('the standard does not exist', $out);
+    }
+
+    public function test_plan_survives_a_missing_standard(): void
+    {
+        // No candidate phpcs carries PHPCompatibility, so discovery gives up
+        // before any scan runs. The plan must still print and exit as if the
+        // scan had never happened.
+        $fake = new FakeProcessRunner(static fn(array $command): ProcessResult => in_array('-i', $command, true)
+            ? new ProcessResult(0, "The installed standards are PEAR, PSR1, PSR2, PSR12, Squiz, Zend\n", '')
+            : new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''));
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84'], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('1. php-74-to-80', $out);
+        self::assertStringContainsString('PHPCompatibility scan: could not run', $out);
+        self::assertStringContainsString('PHP compatibility scan skipped: PHPCompatibility is not installed. Enable it with: composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"', $out);
+    }
+
+    public function test_scan_prints_the_findings_and_exits_0(): void
+    {
+        $app = $this->example('raw-php');
+        $json = [
+            'totals' => ['errors' => 1, 'warnings' => 1, 'fixable' => 0],
+            'files' => [
+                $app . '/src/Legacy.php' => [
+                    'errors' => 1,
+                    'warnings' => 1,
+                    'messages' => [
+                        ['message' => 'Function create_function() is deprecated since PHP 7.2 and removed since PHP 8.0; Use an anonymous function instead', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.create_functionDeprecatedRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 20, 'column' => 12],
+                        ['message' => 'Using ${var} in strings is deprecated since PHP 8.2, use {$var} instead. Found: ${name}', 'source' => 'PHPCompatibility.TextStrings.RemovedDollarBraceStringEmbeds.DeprecatedVariableSyntax', 'severity' => 5, 'fixable' => false, 'type' => 'WARNING', 'line' => 26, 'column' => 9],
+                    ],
+                ],
+            ],
+        ];
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+
+        [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $app, '--php' => '8.0'], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Will break on PHP 8.0: 1 errors, 1 warnings.', $out);
+        self::assertStringContainsString('src/Legacy.php:20 [error] Function create_function()', $out);
+        self::assertStringContainsString('src/Legacy.php:26 [warning] Using ${var}', $out);
+    }
+
+    public function test_scan_json_reports_the_full_result(): void
+    {
+        $app = $this->example('raw-php');
+        $json = [
+            'totals' => ['errors' => 1, 'warnings' => 0, 'fixable' => 0],
+            'files' => [
+                $app . '/src/Legacy.php' => [
+                    'errors' => 1,
+                    'warnings' => 0,
+                    'messages' => [['message' => 'm', 'source' => 's', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 3, 'column' => 1]],
+                ],
+            ],
+        ];
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+
+        [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $app, '--php' => '8.1', '--format' => 'json'], $fake);
+        $data = json_decode($out, true);
+
+        self::assertSame(0, $exit);
+        self::assertSame('ok', $data['status']);
+        self::assertSame('8.1', $data['test_version']);
+        self::assertSame(1, $data['errors']);
+        self::assertSame('src/Legacy.php', $data['findings'][0]['file']);
+    }
+
+    public function test_scan_requires_a_known_php_version(): void
+    {
+        [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $this->example('raw-php'), '--php' => 'banana']);
+        self::assertSame(2, $exit);
+        self::assertStringContainsString('not a PHP version BOOSTER knows', $out);
+
+        [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $this->example('raw-php')]);
+        self::assertSame(2, $exit);
+        self::assertStringContainsString('--php', $out);
+    }
+
+    public function test_scan_against_the_broken_fixture_finds_removed_and_deprecated_uses(): void
+    {
+        // End-to-end against the real phpcs: proves the wiring, the ignore
+        // pattern and the JSON parsing. At 8.3 the removed functions are still
+        // reported and the ${var} string syntax shows its 8.2 deprecation.
+        [$exit, $out] = $this->booster([
+            'command' => 'scan',
+            '--path' => dirname(__DIR__) . '/tests/fixtures/phpcompat/broken',
+            '--php' => '8.3',
+        ]);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Will break on PHP 8.3: 2 errors, 1 warnings.', $out);
+        self::assertStringContainsString('broken.php:10 [error] Function each()', $out);
+        self::assertStringContainsString('broken.php:20 [error] Function create_function()', $out);
+        self::assertStringContainsString('broken.php:26 [warning] Using ${var}', $out);
+        self::assertStringNotContainsString('junk.php', $out);
+    }
+
+    public function test_scan_against_the_clean_fixture_has_no_findings(): void
+    {
+        [$exit, $out] = $this->booster([
+            'command' => 'scan',
+            '--path' => dirname(__DIR__) . '/tests/fixtures/phpcompat/clean',
+            '--php' => '8.5',
+        ]);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Will break on PHP 8.5: no findings.', $out);
     }
 
     public function test_bad_options_are_exit_2(): void

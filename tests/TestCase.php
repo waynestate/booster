@@ -8,11 +8,15 @@ use DateTimeImmutable;
 use PHPUnit\Framework\TestCase as PhpUnitTestCase;
 use Waynestate\Booster\Policy\Policy;
 use Waynestate\Booster\Policy\PolicyLocator;
+use Waynestate\Booster\Run\ProcessResult;
 
 abstract class TestCase extends PhpUnitTestCase
 {
     /** The fixed date every test runs with, so results do not change with the calendar. */
     protected const TODAY = '2026-10-28';
+
+    /** `phpcs -i` output that carries the PHPCompatibility standard. */
+    protected const PHPCOMPAT_STANDARDS = "The installed standards are PEAR, PSR1, PSR2, PSR12, Squiz, Zend, PHPCompatibility\n";
 
     /** @var list<string> */
     private array $tempDirs = [];
@@ -48,6 +52,22 @@ abstract class TestCase extends PhpUnitTestCase
         $this->tempDirs[] = $dir;
 
         return $dir;
+    }
+
+    /**
+     * A FakeProcessRunner that answers `phpcs -i` with a standard list carrying
+     * PHPCompatibility and every other call with $scan, so the scan's discovery
+     * step finds the standard and then runs the real scan command.
+     */
+    protected function phpcsFake(callable $scan): FakeProcessRunner
+    {
+        return new FakeProcessRunner(static function (array $command) use ($scan): ProcessResult {
+            if (in_array('-i', $command, true)) {
+                return new ProcessResult(0, self::PHPCOMPAT_STANDARDS, '');
+            }
+
+            return $scan();
+        });
     }
 
     protected function tearDown(): void

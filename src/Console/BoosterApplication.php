@@ -24,11 +24,12 @@ final class BoosterApplication extends Application
         parent::__construct('booster', self::VERSION);
         $processes ??= new SymfonyProcessRunner();
 
-        $this->add(new PlanCommand());
+        $this->add(new PlanCommand($processes));
         $this->add(new RunCommand($processes));
         $this->add(new HopsCommand());
         $this->add(new DetectCommand());
         $this->add(new InitCommand());
+        $this->add(new ScanCommand($processes));
     }
 
     public function doRun(InputInterface $input, OutputInterface $output): int
