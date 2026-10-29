@@ -256,4 +256,21 @@ final class RemovalsScanTest extends TestCase
         self::assertFalse($data['removals']['truncated']);
         self::assertSame('mysql-functions', $data['removals']['findings'][0]['id']);
     }
+
+    public function test_run_prints_the_removals_before_the_step_outcome(): void
+    {
+        $app = $this->copyExample('raw-php');
+        file_put_contents($app . '/src/legacy.php', "<?php\neach([]);\n");
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), ''));
+
+        [$exit, $out] = $this->booster(['command' => 'run', '--path' => $app, '--today' => self::TODAY, '--dry-run' => true, '--goal' => 'php-74-to-84'], $fake);
+
+        self::assertSame(0, $exit, $out);
+        self::assertStringContainsString('Removed between PHP 7.4 and PHP 8.0: 1 hit (advisory).', $out);
+        self::assertStringContainsString('src/legacy.php:2 each() function -> foreach', $out);
+        self::assertLessThan(
+            (int) strpos($out, 'Dry run: nothing was changed.'),
+            (int) strpos($out, 'Removed between PHP 7.4 and PHP 8.0'),
+        );
+    }
 }
