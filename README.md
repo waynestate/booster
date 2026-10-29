@@ -327,7 +327,7 @@ PHP 8.5. The apps are counted, never named.
 
 | Outcome | Apps | Why |
 |---|---:|---|
-| Passed | 59 | 50 upgraded, 9 already on the target |
+| Passed | 59 | 43 upgraded, 16 had nothing to change |
 | Flagged | 8 | PHP 5 era code Rector cannot parse; nothing was changed |
 | Flagged | 5 | a Laravel hop needs `vendor/`, and a private package could not install in the sandbox |
 | Flagged | 3 | Laravel 5, 6 or 7, older than the Laravel 8 BOOSTER plans from |
