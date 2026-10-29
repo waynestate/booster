@@ -3,3 +3,5 @@
 /tools/box/vendor/
 /.phpunit.result.cache
 /.phpunit.cache/
+/.env
+/.env.backup
