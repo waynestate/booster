@@ -128,9 +128,10 @@ final class CliTest extends TestCase
 
     public function test_plan_survives_a_missing_standard(): void
     {
-        // No candidate phpcs carries PHPCompatibility, so discovery gives up
-        // before any scan runs. The plan must still print and exit as if the
-        // scan had never happened.
+        // No candidate phpcs carries PHPCompatibility (they run, but the
+        // installer plugin never registered the standard), so discovery gives
+        // up before any scan runs. The plan must still print and exit as if
+        // the scan had never happened.
         $fake = new FakeProcessRunner(static fn(array $command): ProcessResult => in_array('-i', $command, true)
             ? new ProcessResult(0, "The installed standards are PEAR, PSR1, PSR2, PSR12, Squiz, Zend\n", '')
             : new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''));
@@ -140,7 +141,7 @@ final class CliTest extends TestCase
         self::assertSame(0, $exit);
         self::assertStringContainsString('1. php-74-to-80', $out);
         self::assertStringContainsString('PHPCompatibility scan: could not run', $out);
-        self::assertStringContainsString('PHP compatibility scan skipped: PHPCompatibility is not installed. Enable it with: composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"', $out);
+        self::assertStringContainsString('PHPCompatibility is not registered. If composer blocked a plugin, run: composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true, then composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"', $out);
     }
 
     public function test_scan_prints_the_findings_and_exits_0(): void
