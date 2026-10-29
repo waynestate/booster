@@ -42,12 +42,13 @@ final class ScanCommand extends BaseCommand
         if ($php === null) {
             throw new ToolError('Missing required option --php (the PHP version to ask about, major.minor).');
         }
-        if (preg_match('/^\d+\.\d+$/', $php) !== 1 || !in_array($php, HopRegistry::PHP_CHAIN, true)) {
+        $chain = (new HopRegistry())->phpChain();
+        if (preg_match('/^\d+\.\d+$/', $php) !== 1 || !in_array($php, $chain, true)) {
             throw new ToolError(sprintf(
                 '--php "%s" is not a PHP version BOOSTER knows (use major.minor, from %s to %s).',
                 $php,
-                HopRegistry::PHP_CHAIN[0],
-                HopRegistry::PHP_CHAIN[count(HopRegistry::PHP_CHAIN) - 1],
+                $chain[0],
+                $chain[count($chain) - 1],
             ));
         }
 

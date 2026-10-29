@@ -7,7 +7,11 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
 ### Added
 
 - `data/versions.json`, the hop data file (shipped in the PHAR), and `bin/refresh-hop-data.php`, which rewrites it
-  from the Packagist, endoflife.date and npm feeds plus CREED's policy. `composer ci` ends with the online `--check`.
+  from the Packagist, endoflife.date and npm feeds plus CREED's policy. `composer ci` ends with the offline `--check`
+  (shape validation against the bundled policy, then a recompute from the frozen feeds in `tests/fixtures/hop-feeds`
+  as of the file's `generated_on` date); `--online` compares against the live feeds without writing the file.
+- A scheduled GitLab pipeline job that runs the refresh against the live feeds and fails when `data/versions.json`
+  would change, so a feed that moved while the file slept is visible until someone commits the refreshed file.
 - A plan warning when the target major has no Rector ruleset yet: BOOSTER stops short of the target instead of
   failing.
 

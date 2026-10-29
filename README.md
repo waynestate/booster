@@ -313,13 +313,16 @@ for Laravel's supported PHP ranges, npm for the Vite packages) plus CREED's poli
 
 ```
 php bin/refresh-hop-data.php             # fetch the feeds, rewrite the file, print what changed
-php bin/refresh-hop-data.php --check     # like --dry-run, for CI: exit 3 when the file is stale
+php bin/refresh-hop-data.php --check     # offline CI check: validate the shape, then compare the frozen feeds
+php bin/refresh-hop-data.php --online    # compare against the live feeds without writing the file
 php bin/refresh-hop-data.php --offline tests/fixtures/hop-feeds --today 2026-10-29 --dry-run
 ```
 
 The refresh is deterministic for a given set of feeds and date, and it never touches the recipes: writing a playbook
-for a new hop stays human work. `composer ci` ends with the online `--check`, so a feed that moved while the file
-slept fails every pipeline until someone runs the refresh and commits the result.
+for a new hop stays human work. `composer ci` ends with the offline `--check`: it validates the file's shape against
+the bundled policy, then recomputes it from the frozen feeds in `tests/fixtures/hop-feeds` as of the file's
+`generated_on` date, so the check itself needs no network. A scheduled pipeline runs the refresh against the live
+feeds and fails when a feed moved while the file slept; then someone runs the refresh and commits the result.
 
 ## Checks
 
