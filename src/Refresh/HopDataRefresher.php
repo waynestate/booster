@@ -89,6 +89,9 @@ final class HopDataRefresher
             'vite_version' => $this->distTagCaret($feeds[self::FEED_VITE], $existing, 'vite_version'),
             'laravel_vite_plugin_version' => $this->distTagCaret($feeds[self::FEED_LARAVEL_VITE_PLUGIN], $existing, 'laravel_vite_plugin_version'),
             'vue_plugin_version' => $this->distTagCaret($feeds[self::FEED_VUE_PLUGIN], $existing, 'vue_plugin_version'),
+            'vue_27' => $this->keptValue($existing, 'vue_27'),
+            'vue_compat' => $this->keptValue($existing, 'vue_compat'),
+            'vue_loader_compat' => $this->keptValue($existing, 'vue_loader_compat'),
             'phpunit_php' => $this->phpunitPhp($existing, $phpunitChain, $feeds[self::FEED_PHPUNIT]),
             'laravel_phpunit' => $this->laravelPhpunit($existing, $laravelChain, $feeds[self::FEED_LARAVEL_SKELETON]),
             'laravel_php' => $this->laravelPhp($existing, $laravelChain, $feeds[self::FEED_LARAVEL_FRAMEWORK], $feeds[self::FEED_ENDOFLIFE]),
@@ -495,6 +498,22 @@ final class HopDataRefresher
         }
 
         throw new ToolError(sprintf('No usable "latest" tag for %s and none on file.', $key));
+    }
+
+    /**
+     * A recipe pin no feed computes: carried through the refresh unchanged,
+     * so the committed file stays the single home of the value.
+     *
+     * @param array<string, mixed> $existing
+     */
+    private function keptValue(array $existing, string $key): string
+    {
+        $current = $existing[$key] ?? null;
+        if (is_string($current) && $current !== '') {
+            return $current;
+        }
+
+        throw new ToolError(sprintf('Hop data key "%s" must be a non-empty string.', $key));
     }
 
     /**

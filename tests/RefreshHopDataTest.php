@@ -45,6 +45,9 @@ final class RefreshHopDataTest extends TestCase
             'vite_version' => '^8.3',
             'laravel_vite_plugin_version' => '^3.2',
             'vue_plugin_version' => '^6.0',
+            'vue_27' => '^2.7',
+            'vue_compat' => '^3.5',
+            'vue_loader_compat' => '^17.4',
             'phpunit_php' => ['9' => '7.3', '10' => '8.1', '11' => '8.2', '12' => '8.3', '13' => '8.4'],
             'laravel_phpunit' => ['10' => '9', '11' => '10', '12' => '11', '13' => '12'],
             'laravel_php' => [
@@ -101,6 +104,10 @@ final class RefreshHopDataTest extends TestCase
         self::assertSame('^8.3', $result['vite_version']);
         self::assertSame('^3.2', $result['laravel_vite_plugin_version']);
         self::assertSame('^6.0', $result['vue_plugin_version']);
+        // The Vue recipe pins carry through untouched: no feed computes them.
+        self::assertSame('^2.7', $result['vue_27']);
+        self::assertSame('^3.5', $result['vue_compat']);
+        self::assertSame('^17.4', $result['vue_loader_compat']);
     }
 
     public function test_a_refresh_is_idempotent(): void
