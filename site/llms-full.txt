@@ -365,7 +365,7 @@ PHP and Laravel upgrades · WELD stack
 
 Boosts your versions.
 
-A booster shot keeps your immunity current. This one keeps your PHP current, and it stings less. Booster plans the hops from the version your app runs today to one the policy still supports, then gives them one dose at a time: [Rector](https://getrector.com) rewrites the code, Booster raises `composer.json`, and your tests must pass on the target PHP before the next hop starts.
+A booster shot keeps your immunity current. This one keeps your PHP current, and it stings less. Booster works out the hops from the PHP or Laravel version your app runs today to one CREED still supports, and runs them one at a time. [Rector](https://getrector.com) rewrites the code and Booster raises the constraints in `composer.json`. Your tests have to pass on the new PHP before the next hop starts.
 
 - **One hop** per dose
 - **50 files** cap per hop
@@ -373,9 +373,9 @@ A booster shot keeps your immunity current. This one keeps your PHP current, and
 
 [Watch a plan launch](https://booster.apps.wayne.edu/#record) [Install](https://booster.apps.wayne.edu/#install)
 
-**Works alongside [WELD](https://weld.apps.wayne.edu/).** WELD and [Sourdough](https://sourdough.apps.wayne.edu/) start new apps; Booster moves the ones you already have to a supported PHP or Laravel, one hop at a time.
+**Works alongside [WELD](https://weld.apps.wayne.edu/).** WELD and [Sourdough](https://sourdough.apps.wayne.edu/) start new apps. Booster is for the apps you already have.
 
-![Booster mark: a syringe that is also a rocket, gold flame below](https://booster.apps.wayne.edu/brand/booster-avatar-512.png)
+![Booster logo: a syringe that is also a rocket, gold flame below](https://booster.apps.wayne.edu/brand/booster-avatar-512.png)
 
 - **Altitude**: PHP 8.5
 - **Stage**: 6 of 6
@@ -383,9 +383,9 @@ A booster shot keeps your immunity current. This one keeps your PHP current, and
 
 Dose by dose
 
-### Every hop a dose. Every gate a stamp.
+### A stamp for each hop that passes.
 
-This is `booster plan` for the example apps that ship with Booster, written up the way your doctor would. Pick a patient, then launch.
+These are Booster's plans for the example apps in `examples/`, written up like a vaccination card. Pick an app and press Run the plan.
 
 Form B-01 · Version immunization record
 
@@ -409,9 +409,9 @@ The overlap
 
 ### Never on a pair Laravel doesn't support.
 
-Booster interleaves the PHP and Laravel hops so the app sits on a supported pair after every dose: Laravel 10 on PHP 8.1 to 8.3, 11 on 8.2 to 8.4, 12 on 8.2 to 8.5, 13 on 8.3 or newer. A target pair that cannot exist is refused before anything runs.
+Booster mixes the PHP and Laravel hops so the app is on a supported pair after every hop. Laravel 10 runs on PHP 8.1 to 8.3, 11 on 8.2 to 8.4, 12 on 8.2 to 8.5, 13 on 8.3 or newer. If you ask for a pair that can't exist, Booster refuses before anything runs.
 
-Targets must still be supported by CREED's policy. Passing through PHP 8.1 is fine; stopping there is not:
+The target also has to be one CREED's policy still supports. A plan can pass through PHP 8.1, but it can't stop there:
 
 ```
 $ bin/booster plan --path=examples/raw-php --to-php=8.1
@@ -425,28 +425,28 @@ Grid of Laravel versions 10 to 13 against PHP 8.1 to 8.5. The path starts at Lar
 
 Inside one dose
 
-### Four checks before the next stage fires.
+### Four steps before the next stage fires.
 
 1. T−4
    ### Dry run and cap
    Rector previews the hop. If it reports errors, or wants to change more files than `--max-changes` (50 by default), the run stops before anything is written.
 2. T−3
    ### Rector for real
-   Only that hop's rules, from Booster's own `vendor/`, with the hop's PHP target set on purpose. An app on PHP 7.4 is rewritten by a Rector running on 8.3 or newer.
+   Rector runs with only that hop's rules, from Booster's own `vendor/`. That's how an app on PHP 7.4 gets rewritten by a Rector running on 8.3 or newer.
 3. T−2
    ### Raise the constraint
    The `php` or `laravel/framework` constraint in `composer.json` goes up, and `config.platform.php` moves with it. Booster never runs `composer update`.
 4. T−1
    ### The gate
-   Your tests run inside `booster-target:<php>`, built from `docker/Dockerfile` on the PHP the hop moves to. Red stops the run and leaves the changes for you to read; `git checkout .` undoes them.
+   Your tests run inside `booster-target:<php>`, built from `docker/Dockerfile` on the PHP the hop moves to. A failure stops the run and leaves the changes for you to read. `git checkout .` undoes them.
 
-Some hops are playbooks, not code: Rector does not read Vue, so `vue-2-to-3` lists the steps and the official guide, and a person does the work. The PHP 7.4 to 8.0 hop is flagged as the one that needs the most review time.
+Not every hop is Rector. `node-pin-24` and `mix-to-vite` edit `package.json` and the build config. `vue-2-to-3` is a playbook: Rector doesn't read Vue, so Booster lists the steps and the official guide, and a person does the work. The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.
 
-Five commands
+The commands
 
 ### The whole kit.
 
-Exit codes: **0** pass · **1** a hop was capped, errored or failed its gate · **2** bad usage or a target the policy does not support.
+There's also `scan`, which reports what will break on a given PHP and always exits 0. Exit codes: **0** pass · **1** the baseline failed, or a hop was capped, errored or failed its gate · **2** bad usage or a target the policy does not support.
 
 **detectWhich of the five stack shapes, and which versions**
 
@@ -513,17 +513,17 @@ The one-shot form, for a forced image upgrade
 
 On Packagist
 
-It's `waynestate/booster` on Packagist. Booster runs on PHP 8.3 or newer even when the app does not, so give it its own folder: clone it as above, or `composer create-project waynestate/booster booster ^0.1`.
+It's `waynestate/booster` on Packagist. Give it its own folder, not your app's `vendor/`, because it needs PHP 8.3 even when your app doesn't. Clone it as above, or run `composer create-project waynestate/booster booster ^0.1`.
 
 For your coding agent
 
 ### Standing orders.
 
-Prompts for the coding agent you already use. Copy one, or run it straight in OpenCode, Claude Code, Codex or ChatGPT. Every order starts with a plan that changes nothing, and none of them lets the agent commit for you.
+Six prompts for whatever coding agent you use: one to get started, then one for each app shape. Copy one, or open it in OpenCode, Claude Code, Codex or ChatGPT. Each starts with a plan that changes nothing, and none of them lets the agent commit for you.
 
 #### Get started with Booster
 
-Install Booster beside the app, read its shape and versions, and bring back the plan. Not a single file changes.
+Clones Booster next to your app, runs `detect` and `plan`, and reports back. Nothing in your app changes.
 
 A prompt for your coding agent. Copy it as it stands:
 
@@ -553,7 +553,7 @@ Output: the shape and versions, the plan as a numbered list, the warnings and sc
 
 #### Upgrade a raw PHP app
 
-PHP one minor at a time, a scan of what will break, a dry run, then the real run with the gate.
+Plans the PHP hops, scans for what will break and does a dry run. The real run waits until you say so.
 
 A prompt for your coding agent. Copy it as it stands:
 
@@ -581,7 +581,7 @@ Output: the plan, the scan findings, the dry-run summary per hop, then your ques
 
 #### Upgrade a raw PHP app with a Vue front end
 
-The PHP hops, the Node pin, and the Vue 2 to 3 playbook a person works through.
+Plans the PHP hops and the Node pin, and lists the Vue 2 to 3 steps for a person to work through.
 
 A prompt for your coding agent. Copy it as it stands:
 
@@ -690,7 +690,7 @@ Constraints:
 Output: the plan sorted by kind, the Inertia checks per Laravel hop, the dry-run summary, then your questions.
 ```
 
-The agent reads the same pages you do: [llms.txt](https://booster.apps.wayne.edu/llms.txt) lists them, [llms-full.txt](https://booster.apps.wayne.edu/llms-full.txt) holds them all in one file, and this page has a [Markdown twin](https://booster.apps.wayne.edu/index.md). Nothing here phones home; the buttons only copy text or open the tool you picked. Take as directed.
+The agent reads the same pages you do: [llms.txt](https://booster.apps.wayne.edu/llms.txt) lists them, [llms-full.txt](https://booster.apps.wayne.edu/llms-full.txt) holds them all in one file, and this page has a [Markdown twin](https://booster.apps.wayne.edu/index.md). Nothing here phones home. The buttons only copy text or open the tool you picked.
 
 Contraindications
 
@@ -701,13 +701,13 @@ Side effects are limited to the diff in your working copy. Read it, then merge i
 - ### Commit, push or open a merge request
   It edits the working copy and prints a report. A person reads the diff and merges it.
 - ### Start on a dirty tree
-  `run` refuses a working copy that is not under git or has uncommitted changes, so the upgrade diff stands alone. `--allow-dirty` if you must.
+  `run` refuses a working copy that is not under git or has uncommitted changes, so the upgrade diff stands alone. Pass `--allow-dirty` if you must.
 - ### Aim at an unsupported version
   An end-of-life target is refused; a security-only one comes with a warning. The dates come from CREED's `policy.json`, never from Booster's code.
 - ### Run `composer update`
-  It raises constraints. Resolving them is your call.
+  It raises the constraints and stops there. You decide when to resolve them.
 - ### Pass quietly
-  An unreadable policy, broken JSON, missing Docker or a Rector error fails closed with exit 1 or 2.
+  An unreadable policy, broken JSON, missing Docker or a Rector error stops the run with exit 1 or 2.
 - ### Trust your file names
   Subprocesses take argument arrays, and control characters are stripped from everything printed. It reads no secrets and makes no network calls of its own.
 
@@ -719,24 +719,24 @@ WELD is the Wayne State application stack. Booster is its upgrade layer, and it 
 
 - [WayneUI](https://wayneui.apps.wayne.edu/)The interface layer under everything, this page included.
 - [CREED](https://creed.apps.wayne.edu/)Writes the version policy Booster reads.
-- [PROCTOR](https://proctor.apps.wayne.edu/)Measures an app against that policy; can ride in the gate.
+- [PROCTOR](https://proctor.apps.wayne.edu/)Checks an app against that policy. Booster can run it in the gate with `--proctor-command`.
 - [Preflight](https://preflight.apps.wayne.edu/)The CI templates Booster's own checks run on.
 - [SESAME](https://sesame.apps.wayne.edu/)Sign-in; `--sesame` moves wayne-cas apps to it.
-- [HELMET](https://helmet.apps.wayne.edu/)The baseline runtime and its headers.
-- [Pinstripe](https://pinstripe.apps.wayne.edu/)The coding standard Booster is held to.
-- [Sourdough](https://sourdough.apps.wayne.edu/)Starters that are born current.
-- [WELD](https://weld.apps.wayne.edu/)The whole stack, joined. Booster keeps it current.
+- [HELMET](https://helmet.apps.wayne.edu/)Security headers and session hardening.
+- [Pinstripe](https://pinstripe.apps.wayne.edu/)The code style. Booster's PHPStan config is a copy of its raw preset.
+- [Sourdough](https://sourdough.apps.wayne.edu/)Starts new raw PHP apps on current versions.
+- [WELD](https://weld.apps.wayne.edu/)The Laravel and Vue starter, with the stack already installed.
 - BoosterMoves apps forward, one dose at a time.You are here
 - [Squire](https://squire.apps.wayne.edu/)Carries the release out the door.
 - [Rollcall](https://rollcall.apps.wayne.edu/)Every app answers “present”, with its PHP version.
-- [ADVISOR](https://advisor.apps.wayne.edu/)Ask what applies to your app, and what to do next.
+- [ADVISOR](https://advisor.apps.wayne.edu/)An MCP server your agent can ask about the stack.
 - [Drawbridge](https://drawbridge.apps.wayne.edu/)The sign-in gateway, lowered on request.
 
 Version 0.1
 
 ### Not yet given.
 
-The plumbing is proven on the example apps; the hit rate on real apps is not measured yet. What is still to come, from [OPEN_QUESTIONS.md](https://github.com/waynestate/booster/blob/main/OPEN_QUESTIONS.md):
+The example apps prove the plumbing. We haven't measured how much Rector fixes on real apps yet, and the Docker gate hasn't run on a real app. Still to come, from [OPEN_QUESTIONS.md](https://github.com/waynestate/booster/blob/main/OPEN_QUESTIONS.md):
 
 - Coming soon A published PHAR, so Booster is one file you download (you can build it from a checkout today)
 - Coming soon `booster mcp`, a read-only tool server
