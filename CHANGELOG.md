@@ -4,6 +4,10 @@ All notable changes to BOOSTER are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- Changed: the scan skip message and the README say how to approve the PHPCompatibility installer plugin.
+
 ## [0.1.3] - 2026-10-29
 
 ### Added
