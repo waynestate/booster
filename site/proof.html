@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en" data-theme="wsu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="stack-env" content="auto">
+<script src="assets/stack-env.js" defer></script>
+<title>BOOSTER proof: 82 Wayne State apps on the launch pad</title>
+<meta name="description" content="BOOSTER's proof of work: 82 Wayne State application repositories taken through detect, plan and run on throwaway copies on 2026-10-28, every changed PHP file linted on PHP 8.5, and the command to repeat it.">
+<meta name="theme-color" content="#0c5449">
+<meta property="og:title" content="BOOSTER proof: 82 Wayne State apps on the launch pad">
+<meta property="og:image" content="brand/booster-avatar-512.png">
+<link rel="icon" href="brand/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="brand/favicon-32.png">
+<link rel="apple-touch-icon" href="brand/booster-avatar-256.png">
+<link rel="preload" href="assets/fonts/barlow-condensed-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/wayne-ui/wayne-ui.css">
+<link rel="stylesheet" href="assets/booster.css">
+<link rel="stylesheet" href="assets/proof.css">
+<script>
+  /* Motion only for people who are fine with it. Everyone else gets the
+     finished record: every square filled, every number already counted. */
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: no-preference)").matches) {
+    document.documentElement.classList.add("motion");
+  }
+</script>
+</head>
+<body>
+<a class="wsu-skip-link" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="wsu-container masthead__row">
+    <a class="masthead__brand" href="index.html">
+      <img src="brand/booster-avatar-256.png" width="36" height="36" alt="">
+      <span class="masthead__name">BOOSTER</span>
+      <span class="masthead__ver">0.1</span>
+    </a>
+    <nav class="masthead__nav" aria-label="On this page">
+      <a href="index.html">Front page</a>
+      <a href="#tally">Tally</a>
+      <a href="#telemetry">Telemetry</a>
+      <a href="#holds">Holds</a>
+      <a href="#run">Run it</a>
+      <a href="#limits">Limits</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="proof">
+
+  <section class="proof-hero" aria-labelledby="proof-title">
+    <div class="proof-wrap">
+      <p class="proof-kicker">Flight log · 2026-10-28 · 82 launches</p>
+      <h1 class="proof-hero__line" id="proof-title"><span class="n">82</span> Wayne State applications run through BOOSTER on 2026-10-28: <span class="n">59</span> passed, <span class="n">20</span> flagged, <span class="n">3</span> tool errors.</h1>
+      <p class="proof-hero__sub">Each app was copied into a throwaway git repository with its secrets stripped, then taken through <code>booster detect</code>, <code>plan</code> and <code>run</code> inside <code>php:8.4-cli</code> with Wayne State's servers out of reach. BOOSTER applied 207 upgrade hops toward PHP 8.5, and every PHP file it changed was linted on PHP 8.5: 277 files, none broken. Where it stopped, it said why.</p>
+      <ul class="proof-meta" aria-label="This run"><li>BOOSTER <b>0.1, untagged</b></li><li>commit <b>be134f5</b></li><li>target <b>PHP 8.5</b></li><li>lint <b>php:8.5-cli</b></li><li>median per app <b>3 min</b></li></ul>
+    </div>
+  </section>
+
+  <section class="proof-sec" id="tally" aria-labelledby="tally-title" data-arrive>
+    <div class="proof-wrap">
+      <p class="proof-kicker">T minus 3 · The tally</p>
+      <h2 class="proof-h2" id="tally-title">Eighty-two countdowns</h2>
+      <p class="proof-lede">An app passes when <code>detect</code> and <code>plan</code> succeed, <code>run</code> applies every planned hop, and every changed PHP file passes <code>php -l</code> on 8.5. It is flagged when BOOSTER stops on purpose with a named reason: a framework older than it plans, code too old for Rector to parse, a hop larger than <code>--max-changes</code>, or a Laravel hop that needs <code>vendor/</code>. A tool error is BOOSTER failing at its own job. A broken file after a hop would have been one; there were none.</p>
+      <ul class="proof-tally"><li class="proof-tile proof-tile--pass"><span class="proof-tile__n" data-count="59">59</span><span class="proof-tile__k">Passed</span><span class="proof-tile__d">50 upgraded, 9 already on the target</span></li><li class="proof-tile proof-tile--flag"><span class="proof-tile__n" data-count="20">20</span><span class="proof-tile__k">Flagged</span><span class="proof-tile__d">stopped on purpose, with a named reason</span></li><li class="proof-tile proof-tile--err"><span class="proof-tile__n" data-count="3">3</span><span class="proof-tile__k">Tool errors</span><span class="proof-tile__d">two Rector failures and one overrun; fixes queued</span></li><li class="proof-tile proof-tile--na"><span class="proof-tile__n" data-count="0">0</span><span class="proof-tile__k">Not applicable</span><span class="proof-tile__d">every app has PHP to move</span></li></ul>
+      <p class="sr-only proof-sr">82 applications, one square each: 59 passed, 20 flagged, 3 tool errors, 0 not applicable.</p><ol class="units" aria-hidden="true"><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--err"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--err"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--err"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--pass"></li><li class="units__u units__u--flag"></li><li class="units__u units__u--pass"></li></ol>
+      <ul class="legend" aria-hidden="true"><li class="l-pass">Passed</li><li class="l-flag">Flagged</li><li class="l-err">Tool error</li><li class="l-na">Not applicable</li></ul>
+      <p class="proof-note">One cell per application, in the order of its anonymous id. This repository is public, so the apps are counted and never named.</p>
+    </div>
+  </section>
+
+  <section class="proof-sec" id="telemetry" aria-labelledby="telemetry-title" data-arrive>
+    <div class="proof-wrap">
+      <p class="proof-kicker">T minus 2 · Telemetry</p>
+      <h2 class="proof-h2" id="telemetry-title">What BOOSTER changed</h2>
+      <p class="proof-lede">Counts across the 82 apps. Nothing was committed or pushed: every run worked on a throwaway copy, and the diff stays in the stack's internal record.</p>
+      <div class="proof-grid2"><div><h3 class="proof-h3">Hops applied, by kind</h3><ul class="bars" aria-label="Hops applied"><li><span class="bars__k">PHP, one minor at a time</span><span class="bars__track" aria-hidden="true"><span class="bars__fill" style="--w:82.6%"></span></span><span class="bars__n">171</span></li><li><span class="bars__k">PHPUnit, one major at a time</span><span class="bars__track" aria-hidden="true"><span class="bars__fill" style="--w:7.2%"></span></span><span class="bars__n">15</span></li><li><span class="bars__k">Laravel, one major at a time</span><span class="bars__track" aria-hidden="true"><span class="bars__fill" style="--w:6.8%"></span></span><span class="bars__n">14</span></li><li><span class="bars__k">Node floor pinned at 24</span><span class="bars__track" aria-hidden="true"><span class="bars__fill" style="--w:3.4%"></span></span><span class="bars__n">7</span></li></ul><p class="proof-note">441 hops were planned. 207 were applied, 78 had nothing to change, and 130 never ran because an earlier hop on the same app stopped the run, as it should.</p></div><div><h3 class="proof-h3">What it found</h3><ul class="bars" aria-label="App types"><li><span class="bars__k">plain PHP</span><span class="bars__track" aria-hidden="true"><span class="bars__fill" style="--w:78%"></span></span><span class="bars__n">64</span></li><li><span class="bars__k">Laravel with Blade</span><span class="bars__track" aria-hidden="true"><span class="bars__fill" style="--w:9.8%"></span></span><span class="bars__n">8</span></li><li><span class="bars__k">Laravel, Inertia and Vue</span><span class="bars__track" aria-hidden="true"><span class="bars__fill" style="--w:4.9%"></span></span><span class="bars__n">4</span></li><li><span class="bars__k">Laravel, Blade and Vue</span><span class="bars__track" aria-hidden="true"><span class="bars__fill" style="--w:2.4%"></span></span><span class="bars__n">2</span></li><li><span class="bars__k">not identified (refused before planning)</span><span class="bars__track" aria-hidden="true"><span class="bars__fill" style="--w:4.9%"></span></span><span class="bars__n">4</span></li></ul><p class="proof-note">277 PHP files were changed across the apps, and all 277 pass <code>php -l</code> on PHP 8.5. The gate that runs each app's own tests on the new PHP was skipped (<code>--skip-gate</code>): most of these apps have no tests, and the ones that do need a database the proof does not have.</p></div></div>
+    </div>
+  </section>
+
+  <section class="proof-sec" id="holds" aria-labelledby="holds-title" data-arrive>
+    <div class="proof-wrap">
+      <p class="proof-kicker">T minus 1 · Holds</p>
+      <h2 class="proof-h2" id="holds-title">Where the countdown held, and why</h2>
+      <p class="proof-lede">A hold is BOOSTER refusing to guess. Each one comes with the reason and, where there is one, the next step.</p>
+      <div class="proof-tablewrap"><table class="proof-table"><caption>The 20 flagged apps</caption><thead><tr><th scope="col">Reason BOOSTER gave</th><th scope="col" class="num">Apps</th></tr></thead><tbody><tr><th scope="row">Files Rector cannot parse (PHP 5 era code such as <code>=&amp; new</code>); the hop stopped before writing anything</th><td class="num">8</td></tr><tr><th scope="row">A Laravel hop needs <code>vendor/</code>, and a private package could not be installed inside the sandbox</th><td class="num">5</td></tr><tr><th scope="row">Laravel 5, 6 or 7: older than the Laravel 8 BOOSTER plans from</th><td class="num">3</td></tr><tr><th scope="row">A hop wanted to change more files than <code>--max-changes</code> (63 and 159 against 50); nothing changed</th><td class="num">2</td></tr><tr><th scope="row">A <code>webpack.mix.js</code> shape the Vite hop does not convert</th><td class="num">1</td></tr><tr><th scope="row">A PHP floor of <code>&gt;=5.5</code>, older than the 5.6 BOOSTER starts from</th><td class="num">1</td></tr></tbody></table></div><h3 class="proof-h3">The three tool errors</h3><p class="proof-note">On one large tree Rector ran out of its 1 GB memory limit. On another, Rector could not write its JSON report because a source file is not valid UTF-8. The third app was still running when the proof's 40 minute budget ran out, on a Docker host shared with other runs. In each case BOOSTER wrote nothing it could not account for. A memory option and a clean UTF-8 failure are queued; the overrun will be re-timed on a quiet host. The "older than 5.6" refusal above also names <code>--from-php</code> when the version came from <code>composer.json</code>; that message is queued for a fix too.</p>
+    </div>
+  </section>
+
+  <section class="proof-sec" id="run" aria-labelledby="run-title" data-arrive>
+    <div class="proof-wrap">
+      <p class="proof-kicker">Liftoff · Your turn</p>
+      <h2 class="proof-h2" id="run-title">Run it on your own app</h2>
+      <p class="proof-lede">Clone BOOSTER beside your app, read its plan, then let it run on a clean working tree. It never commits or pushes.</p>
+      <p class="proof-cmd__label">Install</p><div class="proof-cmd"><code>git clone https://github.com/waynestate/booster.git &amp;&amp; cd booster &amp;&amp; composer install</code><button class="proof-copy" type="button" data-copy="git clone https://github.com/waynestate/booster.git &amp;&amp; cd booster &amp;&amp; composer install"><span class="proof-copy__label">Copy</span></button></div><p class="proof-cmd__label">See the plan</p><div class="proof-cmd"><code>bin/booster plan --path=../my-app --today=2026-10-28</code><button class="proof-copy" type="button" data-copy="bin/booster plan --path=../my-app --today=2026-10-28"><span class="proof-copy__label">Copy</span></button></div><p class="proof-cmd__label">Run it, then read the diff</p><div class="proof-cmd"><code>bin/booster run --path=../my-app --today=2026-10-28 &amp;&amp; git -C ../my-app diff</code><button class="proof-copy" type="button" data-copy="bin/booster run --path=../my-app --today=2026-10-28 &amp;&amp; git -C ../my-app diff"><span class="proof-copy__label">Copy</span></button></div><p class="proof-note">The proof harness ran <code>detect</code>, <code>plan</code> and <code>run --skip-gate</code> inside <code>php:8.4-cli</code> on a throwaway git copy of each app, with <code>.git</code>, <code>auth.json</code> and every <code>.env</code> removed first, linted every changed PHP file in <code>php:8.5-cli</code>, and logged each app as one line (tool commit, unit id, command, exit code, duration, outcome) in the stack's internal record.</p>
+    </div>
+  </section>
+
+  <section class="proof-sec" id="limits" aria-labelledby="limits-title" data-arrive>
+    <div class="proof-wrap">
+      <p class="proof-kicker">Splashdown · Small print</p>
+      <h2 class="proof-h2" id="limits-title">What this does not prove</h2>
+      <ul class="proof-limits"><li>Lint proves the code parses on PHP 8.5, not that it behaves the same. The test gate was skipped; a behaviour change is found by the app's tests and by review, which BOOSTER's notes on each hop say plainly.</li><li>No upgraded app was deployed or served. That is the next proof, on a test site.</li><li><code>composer update</code> is never run by BOOSTER, so whether each app's dependencies resolve on 8.5 is not part of this run.</li><li>Nothing reached a database, a sign-in service or any Wayne State server.</li><li>Three tool errors stand until their fixes ship.</li></ul><p class="proof-joke">207 boosters given, zero files broken. Side effects may include passing tests.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="wsu-container foot__row">
+    <p class="foot__joke">Side effects may include passing tests.</p>
+    <p class="foot__org">Wayne State University · Enterprise Applications · MIT licence</p>
+  </div>
+</footer>
+
+<script src="assets/proof.js" defer></script>
+</body>
+</html>
