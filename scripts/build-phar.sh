@@ -8,7 +8,7 @@
 #   2. copies the runtime sources into a temp dir and installs only the no-dev
 #      (runtime) dependencies there,
 #   3. runs Box against that temp copy, so the phar contains src/, config/,
-#      docker/, resources/ and the runtime vendor deps only (no dev deps),
+#      data/, docker/, resources/ and the runtime vendor deps only (no dev deps),
 #   4. copies the built phar back into build/,
 #   5. verifies it runs by printing Booster's version,
 #   6. prints the phar's SHA-256 checksum.
@@ -54,6 +54,7 @@ echo '==> Copying runtime sources into a temp build dir...'
 cp -R "$ROOT/src" "$TMP/src"
 cp -R "$ROOT/bin" "$TMP/bin"
 cp -R "$ROOT/config" "$TMP/config"
+cp -R "$ROOT/data" "$TMP/data"
 cp -R "$ROOT/docker" "$TMP/docker"
 cp -R "$ROOT/resources" "$TMP/resources"
 cp "$ROOT/composer.json" "$TMP/composer.json"
