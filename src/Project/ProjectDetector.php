@@ -32,7 +32,7 @@ final class ProjectDetector
         $all = $require + $requireDev;
 
         $laravelConstraint = $all['laravel/framework'] ?? null;
-        $laravel = is_string($laravelConstraint) ? $this->lowerBound($laravelConstraint, 1) : null;
+        $laravel = is_string($laravelConstraint) ? $this->laravelMajor($laravelConstraint) : null;
 
         $phpunitConstraint = $requireDev['phpunit/phpunit'] ?? null;
         $phpunit = is_string($phpunitConstraint) ? $this->lowerBound($phpunitConstraint, 1) : null;
@@ -76,6 +76,23 @@ final class ProjectDetector
             nodeMajor: $node,
             hasMixFile: is_file($path . '/webpack.mix.js'),
         );
+    }
+
+    /**
+     * The Laravel major a constraint floors at, keeping the minor for 5.x
+     * ("^5.8" becomes "5.8") because BOOSTER plans the 5.8 to 6 hop, and whole
+     * majors otherwise ("^10.0" becomes "10"). Null when the constraint cannot
+     * be parsed.
+     */
+    private function laravelMajor(string $constraint): ?string
+    {
+        $bound = $this->lowerBound($constraint, 2);
+        if ($bound === null) {
+            return null;
+        }
+        $major = explode('.', $bound)[0];
+
+        return $major === '5' ? $bound : $major;
     }
 
     /**

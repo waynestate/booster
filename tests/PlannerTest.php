@@ -366,6 +366,19 @@ final class PlannerTest extends TestCase
         (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(), $this->today());
     }
 
+    public function test_an_unknown_composer_php_floor_blames_composer_json_not_the_flag(): void
+    {
+        try {
+            $this->planWithComposer('raw-php', ['require' => ['php' => '>=5.4']]);
+            self::fail('Planning a PHP 5.4 app was refused.');
+        } catch (ToolError $e) {
+            // The refusal names the source it read the version from, not a flag
+            // the developer never passed.
+            self::assertStringContainsString('composer.json "5.4"', $e->getMessage());
+            self::assertStringNotContainsString('--from-php', $e->getMessage());
+        }
+    }
+
     public function test_skip_removes_a_hop_and_renumbers(): void
     {
         $plan = $this->plan('raw-php', new PlanOptions(skip: ['php-80-to-81']));
