@@ -6,16 +6,19 @@ namespace Waynestate\Booster\Node;
 
 /**
  * What Booster learned from a simple webpack.mix.js: the asset entries in
- * file order and whether the front end compiles Vue components.
+ * file order, whether the front end compiles Vue components, and notes for
+ * the parts Booster dropped rather than converted.
  */
 final readonly class MixBuild
 {
     /**
      * @param list<MixEntry> $entries
+     * @param list<string> $notes
      */
     public function __construct(
         public array $entries,
         public bool $vue,
+        public array $notes = [],
     ) {}
 
     /**
