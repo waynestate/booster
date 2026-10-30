@@ -548,7 +548,7 @@ final class HopExecutor
         $messages = [
             sprintf('Gate failed: "%s" exited %d on PHP %s. The working copy keeps the changes so you can read them.', $test, $result->exitCode, $php),
             trim($result->stdout . "\n" . $result->stderr),
-            'Undo with: git checkout . (inside the app).',
+            $this->undoHint($path),
         ];
         if ($baseline->failed()) {
             $messages[] = 'The baseline was already failing, so this gate failure may predate the upgrade.';
@@ -716,7 +716,7 @@ final class HopExecutor
             return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [
                 sprintf('vue-upgrade-tool exited %d in the Node container. The working copy keeps any changes it made, so read them before continuing.', $result->exitCode),
                 trim($result->stdout . "\n" . $result->stderr),
-                'Undo with: git checkout . (inside the app).',
+                $this->undoHint($path),
                 ...$hop->notes,
             ]);
         }
@@ -835,7 +835,7 @@ final class HopExecutor
                 return [
                     sprintf('Build gate failed: "%s" exited %d in the Node container. The working copy keeps the changes so you can read them.', implode(' ', $argv), $result->exitCode),
                     trim($result->stdout . "\n" . $result->stderr),
-                    'Undo with: git checkout . (inside the app).',
+                    $this->undoHint($path),
                 ];
             }
         }
@@ -880,7 +880,7 @@ final class HopExecutor
             return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [
                 sprintf('The Tailwind upgrade tool failed: "npx -y %s" exited %d. The working copy keeps whatever it wrote, so you can read it.', $toolVersion, $tool->exitCode),
                 trim($tool->stdout . "\n" . $tool->stderr),
-                'Undo with: git checkout . (inside the app).',
+                $this->undoHint($path),
             ]);
         }
 
@@ -1504,7 +1504,7 @@ final class HopExecutor
                 return [
                     sprintf('Build gate failed: "%s" exited %d in the Node container. The working copy keeps the changes so you can read them.', implode(' ', $argv), $result->exitCode),
                     trim($result->stdout . "\n" . $result->stderr),
-                    'Undo with: git checkout . (inside the app).',
+                    $this->undoHint($path),
                 ];
             }
         }
@@ -1663,6 +1663,27 @@ final class HopExecutor
         $scripts = is_array($composer) && is_array($composer['scripts'] ?? null) ? $composer['scripts'] : [];
 
         return array_key_exists('test', $scripts) ? 'composer test' : 'vendor/bin/phpunit';
+    }
+
+    /**
+     * The undo line for a failed step. "git checkout ." restores changed
+     * tracked files; files this run created are untracked and survive that, so
+     * when the working tree holds any they are named for "git clean" too.
+     */
+    private function undoHint(string $path): string
+    {
+        $status = $this->processes->run(['git', '-C', $path, 'status', '--porcelain'], null, [], 60);
+        $created = [];
+        foreach (explode("\n", trim($status->stdout)) as $line) {
+            if (str_starts_with($line, '?? ') && strlen($line) > 3) {
+                $created[] = trim(substr($line, 3), '"');
+            }
+        }
+        if ($created === []) {
+            return 'Undo with: git checkout . (inside the app).';
+        }
+
+        return 'Undo with: git checkout . && git clean -fd -- ' . implode(' ', $created) . ' (inside the app).';
     }
 
     private function assertCleanGitTree(string $path): void

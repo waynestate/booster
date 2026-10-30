@@ -547,6 +547,23 @@ final class HopExecutorTest extends TestCase
         self::assertStringContainsString('FAILURES!', implode(' ', $report->results[0]->messages));
     }
 
+    public function test_the_undo_hint_names_files_the_run_created(): void
+    {
+        $report = $this->execute($this->fake(gitStatus: "?? src/NewThing.php\n?? generated/\n", gateExit: 1), new RunOptions(allowDirty: true));
+
+        self::assertSame(['gate-failed', 'not-run'], $this->statuses($report));
+        self::assertStringContainsString('Undo with: git checkout . && git clean -fd -- src/NewThing.php generated/ (inside the app).', implode(' ', $report->results[0]->messages));
+    }
+
+    public function test_the_undo_hint_stays_plain_when_nothing_was_created(): void
+    {
+        $report = $this->execute($this->fake(gateExit: 1), new RunOptions());
+        $messages = implode(' ', $report->results[0]->messages);
+
+        self::assertStringContainsString('Undo with: git checkout . (inside the app).', $messages);
+        self::assertStringNotContainsString('git clean', $messages);
+    }
+
     public function test_rector_errors_stop_the_run_without_applying(): void
     {
         $fake = $this->fake(rectorErrors: ['Parse error in x.php']);
