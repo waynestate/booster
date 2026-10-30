@@ -352,6 +352,39 @@ final class CliTest extends TestCase
         self::assertStringContainsString('Will break on PHP 8.5: no findings.', $out);
     }
 
+    public function test_scan_phpstan_against_the_broken_fixture_finds_removed_functions(): void
+    {
+        // End-to-end against the real PHPStan and the real Pinstripe preset:
+        // proves the binary discovery, the temporary configuration and the
+        // JSON parsing. At 8.3 the removed functions are gone, and the junk
+        // file under vendor/ stays out of the report.
+        [$exit, $out] = $this->booster([
+            'command' => 'scan',
+            '--path' => dirname(__DIR__) . '/tests/fixtures/phpcompat/broken',
+            '--php' => '8.3',
+            '--phpstan' => true,
+        ]);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('PHPStan on PHP 8.3:', $out);
+        self::assertStringContainsString('broken.php:10 [function.notFound]', $out);
+        self::assertStringContainsString('broken.php:20 [function.notFound]', $out);
+        self::assertStringNotContainsString('junk.php', $out);
+    }
+
+    public function test_scan_phpstan_against_the_clean_fixture_is_quiet(): void
+    {
+        [$exit, $out] = $this->booster([
+            'command' => 'scan',
+            '--path' => dirname(__DIR__) . '/tests/fixtures/phpcompat/clean',
+            '--php' => '8.5',
+            '--phpstan' => true,
+        ]);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('PHPStan on PHP 8.5: no findings.', $out);
+    }
+
     public function test_bad_options_are_exit_2(): void
     {
         foreach ([
