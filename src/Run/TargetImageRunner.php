@@ -26,9 +26,25 @@ final class TargetImageRunner
         private readonly string $docker = 'docker',
     ) {}
 
-    public static function imageTag(string $php): string
+    /**
+     * The image tag for a PHP version, stamped with the first 12 hex chars of
+     * the Dockerfile's sha256 so a changed recipe gets a new tag and an old,
+     * cached booster-target image is never reused by mistake.
+     */
+    public function imageTag(string $php): string
     {
-        return self::IMAGE_PREFIX . $php;
+        return self::IMAGE_PREFIX . $php . '-' . $this->recipeStamp();
+    }
+
+    private function recipeStamp(): string
+    {
+        $dir = $this->dockerDir ?? PharFiles::path('docker');
+        $contents = @file_get_contents($dir . '/Dockerfile');
+        if ($contents === false) {
+            throw new ToolError(sprintf('Could not read the target-image Dockerfile at %s/Dockerfile.', $dir));
+        }
+
+        return substr(hash('sha256', $contents), 0, 12);
     }
 
     /**
@@ -53,14 +69,14 @@ final class TargetImageRunner
             // Keep files the container writes owned by the person running Booster.
             array_push($command, '--user', $uid . ':' . $gid);
         }
-        array_push($command, self::imageTag($php), 'sh', '-c', $script);
+        array_push($command, $this->imageTag($php), 'sh', '-c', $script);
 
         return $command;
     }
 
     public function ensureImage(string $php): void
     {
-        $tag = self::imageTag($php);
+        $tag = $this->imageTag($php);
         if ($this->processes->run([$this->docker, 'image', 'inspect', $tag], null, [], 60)->successful()) {
             return;
         }

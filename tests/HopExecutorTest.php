@@ -160,9 +160,17 @@ final class HopExecutorTest extends TestCase
 
         $runs = $this->dockerRuns($fake);
         self::assertCount(3, $runs);
-        self::assertContains('booster-target:8.1', $runs[0]['command']);
-        self::assertContains('booster-target:8.2', $runs[1]['command']);
-        self::assertContains('booster-target:8.3', $runs[2]['command']);
+        self::assertContains($this->gateTag('8.1'), $runs[0]['command']);
+        self::assertContains($this->gateTag('8.2'), $runs[1]['command']);
+        self::assertContains($this->gateTag('8.3'), $runs[2]['command']);
+    }
+
+    /**
+     * The stamped image tag the gate builds for a PHP version.
+     */
+    private function gateTag(string $php): string
+    {
+        return 'booster-target:' . $php . '-' . substr(hash('sha256', file_get_contents(dirname(__DIR__) . '/docker/Dockerfile')), 0, 12);
     }
 
     public function test_the_baseline_runs_on_the_current_php_before_any_hop(): void
