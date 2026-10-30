@@ -63,6 +63,23 @@ final class HopRegistryTest extends PhpUnitTestCase
         self::assertSame(['laravel/framework' => '^13.0'], $hop->composerSet);
     }
 
+    public function test_the_laravel_9_hop_drops_fideloper_proxy(): void
+    {
+        $hop = (new HopRegistry())->get('laravel-8-to-9');
+
+        self::assertSame(['fideloper/proxy'], $hop->composerRemove);
+    }
+
+    public function test_other_laravel_hops_drop_nothing(): void
+    {
+        foreach ((new HopRegistry())->all() as $candidate) {
+            if ($candidate->kind !== HopKind::Laravel || $candidate->id === 'laravel-8-to-9') {
+                continue;
+            }
+            self::assertSame([], $candidate->composerRemove, $candidate->id);
+        }
+    }
+
     public function test_a_laravel_major_without_a_rector_ruleset_gets_no_hop(): void
     {
         $data = json_decode((string) file_get_contents(__DIR__ . '/../data/versions.json'), true);
