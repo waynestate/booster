@@ -22,5 +22,6 @@ final readonly class PlanOptions
         public bool $sesame = false,
         public bool $withNode = false,
         public array $skip = [],
+        public bool $noPackageCheck = false,
     ) {}
 }

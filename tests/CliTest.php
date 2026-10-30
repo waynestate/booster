@@ -114,9 +114,26 @@ final class CliTest extends TestCase
         self::assertSame(0, $exit);
         self::assertSame('laravel-blade', $data['project']['app_type']);
         self::assertSame('phpunit-10-to-11', $data['steps'][0]['hop']['id']);
+        // The example requires no third-party packages, so the check finds
+        // nothing to say, but the key must be present.
+        self::assertSame([], $data['package_checks']);
         self::assertSame(PolicyLocator::defaultOrigin(), $data['policy']);
         self::assertSame('ok', $data['php_compat']['status']);
         self::assertSame('8.3', $data['php_compat']['test_version']);
+    }
+
+    public function test_plan_no_package_check_skips_the_dependency_check(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', json_encode([
+            'require' => ['php' => '^8.3', 'laravel/framework' => '^12.0', 'acme/not-on-packagist' => '^1.0'],
+        ]));
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $dir, '--today' => self::TODAY, '--no-scan' => true, '--no-package-check' => true, '--format' => 'json']);
+        $data = json_decode($out, true);
+
+        self::assertSame(0, $exit);
+        self::assertSame([], $data['package_checks']);
     }
 
     public function test_the_policy_option_replaces_the_creed_package_policy(): void
@@ -502,7 +519,9 @@ final class CliTest extends TestCase
             'require-dev' => ['phpunit/phpunit' => '^11.0'],
         ]));
 
-        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $dir, '--today' => self::TODAY, '--no-scan' => true]);
+        // laravel/boost is a real package, so the dependency check would reach
+        // for it; these plans are about the boost report, not the wire.
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $dir, '--today' => self::TODAY, '--no-scan' => true, '--no-package-check' => true]);
         self::assertSame(0, $exit);
         self::assertStringContainsString('Laravel Boost found: the playbooks include Boost prompts.', $out);
 
@@ -510,7 +529,7 @@ final class CliTest extends TestCase
         self::assertSame(0, $exit);
         self::assertStringNotContainsString('Laravel Boost found', $out);
 
-        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $dir, '--today' => self::TODAY, '--no-scan' => true, '--format' => 'json']);
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $dir, '--today' => self::TODAY, '--no-scan' => true, '--no-package-check' => true, '--format' => 'json']);
         self::assertSame(0, $exit);
         self::assertTrue(json_decode($out, true)['project']['boost']);
 

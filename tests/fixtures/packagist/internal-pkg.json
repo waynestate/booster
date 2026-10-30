@@ -1,0 +1,17 @@
+{
+    "minified": "composer/2.0",
+    "packages": {
+        "internal/pkg": [
+            {
+                "1.2.0": {
+                    "name": "internal/pkg",
+                    "version": "1.2.0",
+                    "version_normalized": "1.2.0.0",
+                    "require": {
+                        "php": ">=8.1"
+                    }
+                }
+            }
+        ]
+    }
+}

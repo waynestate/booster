@@ -10,6 +10,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Waynestate\Booster\Hop\HopRegistry;
+use Waynestate\Booster\Plan\HttpPackageFetcher;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanOptions;
 use Waynestate\Booster\Plan\Planner;
@@ -60,7 +61,8 @@ abstract class BaseCommand extends Command
             ->addOption('to-phpunit', null, InputOption::VALUE_REQUIRED, 'Target PHPUnit major (default: the newest that runs on the target PHP).')
             ->addOption('with-node', null, InputOption::VALUE_NONE, 'Include the Node front-end hops (Node pin, Mix to Vite, Tailwind, Vue) even when you passed a target version')
             ->addOption('sesame', null, InputOption::VALUE_NONE, 'Include the wayne-cas to SESAME swap.')
-            ->addOption('skip', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hop id to leave out (repeatable).');
+            ->addOption('skip', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hop id to leave out (repeatable).')
+            ->addOption('no-package-check', null, InputOption::VALUE_NONE, 'Skip the Packagist dependency check (for offline use).');
     }
 
     protected function format(InputInterface $input): string
@@ -114,9 +116,10 @@ abstract class BaseCommand extends Command
             sesame: (bool) $input->getOption('sesame'),
             withNode: (bool) $input->getOption('with-node'),
             skip: is_array($skip) ? array_values(array_map('strval', $skip)) : [],
+            noPackageCheck: (bool) $input->getOption('no-package-check'),
         );
 
-        return (new Planner($policy, new HopRegistry()))->plan($project, $options, $this->today($input));
+        return (new Planner($policy, new HopRegistry(), new HttpPackageFetcher()))->plan($project, $options, $this->today($input));
     }
 
     protected function stringOption(InputInterface $input, string $name): ?string

@@ -1,0 +1,19 @@
+{
+    "minified": "composer/2.0",
+    "packages": {
+        "acme/illuminate-user": [
+            {
+                "3.1.0": {
+                    "name": "acme/illuminate-user",
+                    "version": "3.1.0",
+                    "version_normalized": "3.1.0.0",
+                    "require": {
+                        "php": ">=8.0 <8.4",
+                        "illuminate/auth": "^10.0",
+                        "illuminate/database": ">=10.0 <12.0"
+                    }
+                }
+            }
+        ]
+    }
+}
