@@ -315,6 +315,59 @@ suite was red before any change, so a later red gate is not proof of a bad hop. 
   the suite can be red before any hop. Build the assets before the baseline (the app's usual `npm ci && npm run
   build`), or pass `--allow-failing-baseline` knowing why.
 
+### A smoke test for WSU apps
+
+Laravel's stock tests do not fit a WSU app. `tests/Feature/ExampleTest.php` asks for `/` and expects 200, but on a
+real app the front page sits behind CAS, so an unauthenticated request is a redirect to the sign-in URL, never a
+200. The stock suite also assumes an `APP_URL` that points somewhere real and an `APP_KEY` that exists; a fresh
+checkout has neither, so the suite is red before any change, and even a green run of it proves nothing about the
+upgrade. When Booster sees only the two stock example tests, it says so next to the baseline:
+
+    The app's tests are only Laravel's stock examples, so the gate cannot prove anything. See "A smoke test for WSU apps" in the README.
+
+Write one small test that proves the app boots and its front door still works. It needs a few environment values in
+`phpunit.xml`, because the test environment starts empty:
+
+```xml
+<php>
+    <env name="APP_ENV" value="testing"/>
+    <env name="APP_KEY" value="base64:c21va2UtdGVzdC1rZXkwMDAwMDAwMDAwMDAwMDAwMDA="/>
+    <env name="APP_URL" value="http://localhost"/>
+</php>
+```
+
+`APP_KEY` can be any throwaway 32-byte key (`php artisan key:generate --show`); it never leaves the test
+environment. If the app touches the database while booting, point the tests at an in-memory SQLite database:
+
+```xml
+    <env name="DB_CONNECTION" value="sqlite"/>
+    <env name="DB_DATABASE" value=":memory:"/>
+```
+
+And the test itself, in `tests/Feature/SmokeTest.php`:
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+final class SmokeTest extends TestCase
+{
+    public function test_a_guest_is_sent_to_the_cas_login(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('/login', (string) $response->headers->get('Location'));
+    }
+}
+```
+
+That is the whole point: the app boots, encryption and sessions work, and the front door still sends guests to CAS.
+It passes on the old PHP and must still pass on the new one, which is what the gate is for.
+
 ### What a hop does
 
 On PHP hops a pre-pass runs first: PHP 4 era `$a = &new Foo();` becomes a plain assignment, because PHP 7 and newer

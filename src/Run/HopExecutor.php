@@ -169,8 +169,13 @@ final class HopExecutor
     private function runBaseline(Plan $plan, string $path, RunOptions $options): BaselineResult
     {
         $php = $this->startingPhp($plan);
+        // The scan is cheap and must happen even when the baseline itself is
+        // skipped, so a dry run still names a suite that proves nothing.
+        $warning = StockTests::onlyStockExamples($path)
+            ? "The app's tests are only Laravel's stock examples, so the gate cannot prove anything. See \"A smoke test for WSU apps\" in the README."
+            : null;
         if ($options->dryRun || $options->skipGate || $php === null) {
-            return new BaselineResult(BaselineResult::SKIPPED, $php, null);
+            return new BaselineResult(BaselineResult::SKIPPED, $php, null, [], $warning);
         }
 
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
@@ -182,6 +187,7 @@ final class HopExecutor
             $php,
             $result->exitCode,
             $output,
+            $warning,
         );
     }
 
@@ -353,6 +359,33 @@ final class HopExecutor
                 }
                 if ($appliedErrors !== []) {
                     return new StepResult($step->number, $hop->id, StepResult::ERROR, [...self::prepassFiles($prepass), ...$applied->files], ['Rector reported errors while applying.', ...self::refusals($appliedErrors), ...$notes], false, $prepass?->files() ?? []);
+                }
+                if ($hop->kind === HopKind::Laravel) {
+                    // Rector rewrites code but does not tidy imports, so a rename
+                    // leaves a dead `use` behind. Clean the files this hop changed.
+                    $importsRemoved = 0;
+                    $importFiles = 0;
+                    foreach ($applied->files as $entry) {
+                        $file = $entry['file'];
+                        if (!str_ends_with($file, '.php')) {
+                            continue;
+                        }
+                        $absolute = str_starts_with($file, '/') || preg_match('#^[A-Za-z]:/#', $file) === 1 ? $file : $path . '/' . $file;
+                        $removed = UnusedImports::cleanFile($absolute);
+                        if ($removed > 0) {
+                            $importsRemoved += $removed;
+                            $importFiles++;
+                        }
+                    }
+                    if ($importsRemoved > 0) {
+                        $messages[] = sprintf(
+                            'Removed %d unused import%s from %d file%s after the Rector pass.',
+                            $importsRemoved,
+                            $importsRemoved === 1 ? '' : 's',
+                            $importFiles,
+                            $importFiles === 1 ? '' : 's',
+                        );
+                    }
                 }
                 // The CAS config and model traits move only after Rector succeeded,
                 // because they assume the class renames are in place.

@@ -16,6 +16,7 @@ use Waynestate\Booster\Plan\PlanStep;
 use Waynestate\Booster\Plan\Planner;
 use Waynestate\Booster\Project\ProjectDetector;
 use Waynestate\Booster\Report\TextWriter;
+use Waynestate\Booster\Run\BaselineResult;
 use Waynestate\Booster\Run\ComposerEditor;
 use Waynestate\Booster\Run\HopExecutor;
 use Waynestate\Booster\Run\NodeRunner;
@@ -1406,5 +1407,162 @@ final class HopExecutorTest extends TestCase
         self::assertStringContainsString('PROCTOR baseline could not be taken: the baseline run tripped: PROCTOR could not read composer.json.', $text);
         self::assertStringContainsString('New:', $text);
         self::assertStringContainsString('RESULT: FAIL', $text);
+    }
+
+    /**
+     * Copies laravel-blade and gives it Laravel's two stock example tests. With
+     * $keepRealTest the app's own PostTest.php stays beside them.
+     */
+    private function stockExample(bool $keepRealTest = false): string
+    {
+        $dir = $this->copyExample('laravel-blade');
+        if (!$keepRealTest) {
+            unlink($dir . '/tests/PostTest.php');
+        }
+        $feature = $dir . '/tests/Feature';
+        $unit = $dir . '/tests/Unit';
+        if (!is_dir($feature)) {
+            mkdir($feature, 0775, true);
+        }
+        if (!is_dir($unit)) {
+            mkdir($unit, 0775, true);
+        }
+        file_put_contents(
+            $feature . '/ExampleTest.php',
+            <<<'PHP'
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_the_application_returns_a_successful_response(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertStatus(200);
+    }
+}
+PHP,
+        );
+        file_put_contents(
+            $unit . '/ExampleTest.php',
+            <<<'PHP'
+<?php
+
+namespace Tests\Unit;
+
+use PHPUnit\Framework\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_that_true_is_true(): void
+    {
+        $this->assertTrue(true);
+    }
+}
+PHP,
+        );
+
+        return $dir;
+    }
+
+    /** Like execute(), but for an app directory that is already prepared. */
+    private function executePrepared(string $dir, RunOptions $options): RunReport
+    {
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $fake = $this->fake();
+        $executor = new HopExecutor(
+            new RectorRunner($fake, '/fake/rector'),
+            new ComposerEditor(),
+            new TargetImageRunner($fake),
+            $fake,
+        );
+
+        return $executor->execute($plan, $options);
+    }
+
+    public function test_a_suite_of_only_stock_examples_is_named_next_to_the_baseline(): void
+    {
+        $report = $this->executePrepared($this->stockExample(), new RunOptions());
+
+        self::assertSame("The app's tests are only Laravel's stock examples, so the gate cannot prove anything. See \"A smoke test for WSU apps\" in the README.", $report->baseline->warning);
+        $text = (new TextWriter())->run($report);
+        self::assertStringContainsString("The app's tests are only Laravel's stock examples", $text);
+    }
+
+    public function test_the_stock_test_warning_shows_on_a_dry_run_too(): void
+    {
+        $report = $this->executePrepared($this->stockExample(), new RunOptions(dryRun: true));
+
+        self::assertSame(BaselineResult::SKIPPED, $report->baseline->status);
+        self::assertNotNull($report->baseline->warning);
+    }
+
+    public function test_a_real_test_beside_the_stock_examples_silences_the_warning(): void
+    {
+        $report = $this->executePrepared($this->stockExample(true), new RunOptions());
+
+        self::assertNull($report->baseline->warning);
+    }
+
+    public function test_a_laravel_hop_removes_the_imports_its_changes_left_unused(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        $controller = $dir . '/app/Http/Controllers/ThingController.php';
+        if (!is_dir(dirname($controller))) {
+            mkdir(dirname($controller), 0775, true);
+        }
+        // The post-Rector state of the file: Gone was renamed away, leaving its import dead.
+        file_put_contents($controller, implode("\n", [
+            '<?php',
+            '',
+            'namespace App\Http\Controllers;',
+            '',
+            'use App\Models\Gone;',
+            'use App\Models\Post;',
+            'use Illuminate\Routing\Controller;',
+            '',
+            'class ThingController extends Controller',
+            '{',
+            '    public function index(): Post',
+            '    {',
+            '        return Post::first();',
+            '    }',
+            '}',
+            '',
+        ]));
+
+        $fake = new FakeProcessRunner(static function (array $command, array $env, ?string $cwd) use ($dir): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Http/Controllers/ThingController.php', 'diff' => "--- a\n+++ b"]], 'errors' => []]), '');
+        });
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $executor = new HopExecutor(
+            new RectorRunner($fake, '/fake/rector'),
+            new ComposerEditor(),
+            new TargetImageRunner($fake),
+            $fake,
+        );
+        $report = $executor->execute($plan, new RunOptions());
+
+        $content = (string) file_get_contents($controller);
+        self::assertStringNotContainsString('use App\Models\Gone;', $content);
+        self::assertStringContainsString('use App\Models\Post;', $content);
+        self::assertStringContainsString('use Illuminate\Routing\Controller;', $content);
+
+        $laravelSteps = array_values(array_filter($report->results, static fn(StepResult $r): bool => $r->hopId === 'laravel-10-to-11'));
+        self::assertCount(1, $laravelSteps);
+        self::assertContains('Removed 1 unused import from 1 file after the Rector pass.', $laravelSteps[0]->messages);
     }
 }

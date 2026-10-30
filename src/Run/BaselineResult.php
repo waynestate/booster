@@ -18,13 +18,15 @@ final readonly class BaselineResult
     public const SKIPPED = 'skipped';
 
     /**
-     * @param list<string> $output the last lines of the run's output
+     * @param list<string> $output  the last lines of the run's output
+     * @param string|null  $warning an advisory about the suite itself (for example that it holds only Laravel's stock examples)
      */
     public function __construct(
         public string $status,
         public ?string $php,
         public ?int $exitCode,
         public array $output = [],
+        public ?string $warning = null,
     ) {}
 
     public function failed(): bool
@@ -42,6 +44,7 @@ final readonly class BaselineResult
             'php' => $this->php,
             'exit_code' => $this->exitCode,
             'output' => $this->output,
+            'warning' => $this->warning,
         ];
     }
 }
