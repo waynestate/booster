@@ -1131,9 +1131,9 @@ final class HopExecutorTest extends TestCase
 
             return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $env['BOOSTER_APP_PATH'] . '/src/Removed.php', 'diff' => 'd']], 'errors' => []]), '');
         });
-        // The planner would refuse 8.0 as a target (past security support),
-        // but the hop is exactly what a PHP 7.4 app needs, so the step is
-        // built by hand, like the manual-hop tests do.
+        // Planning to PHP 8.0 now only warns (past security support), but
+        // this test wants a single-step plan, so the step is built by hand,
+        // like the manual-hop tests do.
         $step = new PlanStep(1, (new HopRegistry())->get('php-74-to-80'), '7.4', '8.0', null, null, null, null, [Planner::GATE_TESTS]);
         $plan = new Plan((new ProjectDetector())->detect($dir), self::TODAY, 'test', '8.0', null, null, [$step], []);
         $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
@@ -1324,6 +1324,9 @@ final class HopExecutorTest extends TestCase
         $fake = $this->fake(proctorBaselineExit: 0, proctorExit: 1);
         $report = $this->executeWithProctor($fake, new RunOptions());
 
+        // The full plan reaches its final target, so nothing makes the gate advisory.
+        self::assertFalse($report->plan->stopsEarly);
+        self::assertFalse($report->proctorAdvisory);
         self::assertTrue($report->failed());
         self::assertNotNull($report->proctor);
         self::assertSame(ProctorResult::FAILED, $report->proctor->status);
@@ -1406,6 +1409,45 @@ final class HopExecutorTest extends TestCase
         self::assertFalse($report->failed());
         self::assertNotNull($report->proctor);
         self::assertSame(ProctorResult::TRIPPED, $report->proctor->status);
+    }
+
+    public function test_a_shortened_plan_makes_the_proctor_gate_advisory(): void
+    {
+        // The full plan runs two hops to PHP 8.3; --until cuts it after the
+        // first, so the run stops before the final target and the PROCTOR
+        // gate reports instead of blocking, even with new findings.
+        $fake = $this->fake(proctorBaselineExit: 0, proctorExit: 1);
+        $report = $this->executeWithProctor($fake, new RunOptions(), 'raw-php', new PlanOptions(fromPhp: '8.1', toPhp: '8.3', until: 'php-81-to-82'));
+
+        self::assertTrue($report->plan->stopsEarly);
+        self::assertTrue($report->proctorAdvisory);
+        self::assertFalse($report->failed());
+        self::assertNotNull($report->proctor);
+        self::assertSame(ProctorResult::FAILED, $report->proctor->status);
+        self::assertCount(2, $report->proctorComparison?->new ?? []);
+        self::assertTrue($report->proctorComparison?->blocking ?? false);
+        $text = (new TextWriter())->run($report);
+        self::assertStringContainsString('PROCTOR advisory: this run stops before the final target.', $text);
+    }
+
+    public function test_an_eol_target_makes_the_proctor_gate_advisory(): void
+    {
+        // PHP 8.1 is past security support in the frozen policy, so a plan to
+        // it stops early and the PROCTOR gate reports instead of blocking.
+        $fake = $this->fake(proctorBaselineExit: 0, proctorExit: 1);
+        $report = $this->executeWithProctor($fake, new RunOptions(), 'raw-php', new PlanOptions(toPhp: '8.1'));
+
+        self::assertTrue($report->plan->stopsEarly);
+        self::assertTrue($report->proctorAdvisory);
+        self::assertFalse($report->failed());
+        self::assertNotNull($report->proctor);
+        self::assertSame(ProctorResult::FAILED, $report->proctor->status);
+        self::assertContains(
+            'PHP 8.1 is past security support since 2025-12-31. Use it only as a stop on the way up.',
+            $report->plan->warnings,
+        );
+        $text = (new TextWriter())->run($report);
+        self::assertStringContainsString('PROCTOR advisory: this run stops before the final target.', $text);
     }
 
     public function test_the_proctor_gate_is_skipped_for_dry_runs_and_skip_gate(): void
@@ -1719,6 +1761,23 @@ PHP,
         self::assertSame(['laravel-12-to-13', 'php-83-to-84'], array_map(static fn(PlanStep $s): string => $s->hop->id, $plan->steps));
 
         return [$dir, $plan];
+    }
+
+    /** A copy of $plan with its stopsEarly flag set; Plan is readonly. */
+    private function planWithStopsEarly(Plan $plan, bool $stopsEarly): Plan
+    {
+        return new Plan(
+            $plan->project,
+            $plan->today,
+            $plan->policyOrigin,
+            $plan->targetPhp,
+            $plan->targetLaravel,
+            $plan->targetPhpunit,
+            $plan->steps,
+            $plan->warnings,
+            $plan->packageChecks,
+            $stopsEarly,
+        );
     }
 
     public function test_a_laravel_hop_updates_the_lock_in_the_gate(): void
@@ -2127,5 +2186,77 @@ PHP,
         self::assertStringContainsString('Gate passed: tests are green on PHP 8.3.', $first);
         $second = implode("\n", $report->results[1]->messages);
         self::assertStringContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.", $second);
+    }
+
+    public function test_a_stopped_early_plan_only_warns_about_a_remaining_unblock(): void
+    {
+        // An earlier run left its unblock behind; this run adds nothing new.
+        $dir = $this->copyExample('laravel-blade');
+        [$dir, $plan] = $this->laravelPlan($dir);
+        (new ComposerEditor())->advisoryUnblock($dir, 'laravel/framework', '^13.0', ['PKSA-2026-0001']);
+        // The plan stops before the real final target (--until, --only or an
+        // EOL target), so its last step is not the final target.
+        $plan = $this->planWithStopsEarly($plan, true);
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use ($dir, &$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $dockerRuns++;
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Models/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        // Baseline and the gate are green, and the leftover unblock is a
+        // warning, not a failure: the run never reaches the final target.
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        self::assertSame(2, $dockerRuns);
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore).", $all);
+        self::assertStringNotContainsString('Booster fails the final target while it is there.', $all);
+        self::assertStringContainsString('Gate passed: tests are green on PHP 8.3.', $all);
+        self::assertStringNotContainsString('Added a temporary advisory unblock to composer.json', $all);
+
+        // The same plan without the early stop climbs to the final target,
+        // and its last step fails while the unblock remains.
+        $dir = $this->copyExample('laravel-blade');
+        [$dir, $plan] = $this->laravelPlan($dir);
+        (new ComposerEditor())->advisoryUnblock($dir, 'laravel/framework', '^13.0', ['PKSA-2026-0001']);
+        self::assertFalse($plan->stopsEarly);
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use ($dir, &$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $dockerRuns++;
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Models/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
+        self::assertSame(2, $dockerRuns);
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.", $all);
+        self::assertStringContainsString('Gate passed: tests are green on PHP 8.3.', $all);
     }
 }

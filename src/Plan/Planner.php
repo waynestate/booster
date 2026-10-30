@@ -18,7 +18,8 @@ use Waynestate\Creed\State;
  * Orders the hops. The rules, all from the best-practices guide:
  *  - one PHP minor or one Laravel major per step;
  *  - the app only ever sits on a PHP and Laravel pair that Laravel supports;
- *  - the target must be a version the policy still supports today.
+ *  - the target must be a version the policy knows; a target past security
+ *    support is allowed as a stop on the way up, with a warning.
  */
 final class Planner
 {
@@ -63,12 +64,12 @@ final class Planner
 
         $supportedPhp = $this->policy->supported('php', $today);
         $toPhp = $options->toPhp !== null ? $this->normalisePhp($options->toPhp, '--to-php') : $this->highest($supportedPhp, 'php');
-        $this->assertTarget('php', $toPhp, $today, $warnings);
+        $eolTarget = $this->assertTarget('php', $toPhp, $today, $warnings);
 
         $toLaravel = null;
         if ($fromLaravel !== null) {
             $toLaravel = $options->toLaravel ?? $this->highest($this->policy->supported('laravel', $today), 'laravel');
-            $this->assertTarget('laravel', $toLaravel, $today, $warnings);
+            $eolTarget = $this->assertTarget('laravel', $toLaravel, $today, $warnings) || $eolTarget;
             if (version_compare($toLaravel, $fromLaravel, '<')) {
                 throw new ToolError(sprintf('Target Laravel %s is older than the current Laravel %s.', $toLaravel, $fromLaravel));
             }
@@ -254,7 +255,9 @@ final class Planner
 
         $steps = $this->withoutSkipped($steps, $options->skip);
         $selected = $options->until !== null || $options->only !== null;
+        $beforeSelection = count($steps);
         $steps = $this->applyStepSelection($steps, $project, $options, $fromPhp, $fromLaravel, $phpunitBeforeManual);
+        $stopsEarly = $eolTarget || ($selected && count($steps) < $beforeSelection);
         if ($selected) {
             // The cut plan ends where its last step lands, so the report and
             // the gates agree with the steps that remain.
@@ -275,7 +278,7 @@ final class Planner
             $packageChecks = $report->checks;
         }
 
-        return new Plan($project, $today->format('Y-m-d'), $this->policy->origin(), $toPhp, $toLaravel, $toPhpunit, $steps, $warnings, $packageChecks);
+        return new Plan($project, $today->format('Y-m-d'), $this->policy->origin(), $toPhp, $toLaravel, $toPhpunit, $steps, $warnings, $packageChecks, $stopsEarly);
     }
 
     /**
@@ -434,9 +437,17 @@ final class Planner
     }
 
     /**
+     * The target must be a version the policy knows. A target past security
+     * support is allowed as a stop on the way up, with a warning naming the
+     * date the security support ended; the plan then marks itself stopsEarly
+     * so the PROCTOR gate cannot block a run that never reaches the final
+     * target.
+     *
      * @param list<string> $warnings
+     *
+     * @return bool whether the target is past security support
      */
-    private function assertTarget(string $component, string $version, DateTimeImmutable $today, array &$warnings): void
+    private function assertTarget(string $component, string $version, DateTimeImmutable $today, array &$warnings): bool
     {
         try {
             $state = $this->policy->stateOf($component, $version, $today);
@@ -444,7 +455,11 @@ final class Planner
             throw new ToolError(sprintf('%s %s is not a version the policy supports. Pick one of: %s.', $this->componentName($component), $version, implode(', ', $this->policy->supported($component, $today))));
         }
         if ($state === State::Eol || $state === State::EolGraceExpired) {
-            throw new ToolError(sprintf('%s %s is past security support; pick a version the policy still supports.', $this->componentName($component), $version));
+            $until = $this->policy->securityUntil($component, $version);
+            $since = $until instanceof DateTimeImmutable ? ' since ' . $until->format('Y-m-d') : '';
+            $warnings[] = sprintf('%s %s is past security support%s. Use it only as a stop on the way up.', $this->componentName($component), $version, $since);
+
+            return true;
         }
         if ($state === State::Security) {
             $warnings[] = sprintf('%s %s only gets security fixes now; a newer version is a better place to stop.', $this->componentName($component), $version);
@@ -452,6 +467,8 @@ final class Planner
         if ($state === State::Active && $this->policy->isAheadOfPolicy($component, $version)) {
             $warnings[] = sprintf('%s %s is newer than CREED\'s policy; treated as current.', $this->componentName($component), $version);
         }
+
+        return false;
     }
 
     private function normalisePhp(string $version, string $option): string

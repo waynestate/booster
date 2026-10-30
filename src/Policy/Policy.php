@@ -58,6 +58,15 @@ final class Policy
     }
 
     /**
+     * The security_until date of a version of $component, or null when the
+     * policy has no line for the version or the line carries no date.
+     */
+    public function securityUntil(string $component, string $version): ?DateTimeImmutable
+    {
+        return $this->creed->securityUntil($component, $version);
+    }
+
+    /**
      * Whether $version sorts above every line the policy lists.
      *
      * Such a version is treated as current (stateOf() reports it Active), so a

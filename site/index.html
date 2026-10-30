@@ -263,10 +263,14 @@
         <p class="label"><span class="label__dot" aria-hidden="true"></span>The overlap</p>
         <h2 id="pairs-title">Never on a pair Laravel doesn't support.</h2>
         <p>Booster mixes the PHP and Laravel hops so the app is on a supported pair after every hop. Laravel 10 runs on PHP 8.1 to 8.3, 11 on 8.2 to 8.4, 12 on 8.2 to 8.5, 13 on 8.3 or newer. If you ask for a pair that can't exist, Booster refuses before anything runs.</p>
-        <p>The target also has to be one CREED's policy still supports. A plan can pass through PHP 8.1, but it can't stop there:</p>
+        <p>The target also has to be one CREED's policy knows. A plan can pass through PHP 8.1 and even stop there, with a warning that says so:</p>
         <pre class="snip"><span class="snip__p">$</span> bin/booster plan --path=examples/raw-php --to-php=8.1
-PHP 8.1 is past security support; pick a version the policy still supports.
-<span class="snip__p">exit 2</span></pre>
+BOOSTER plan for examples/raw-php
+  app type: raw-php
+  PHP: 7.4 -> 8.1
+...
+Warning: PHP 8.1 is past security support since 2025-12-31. Use it only as a stop on the way up.
+<span class="snip__p">exit 0</span></pre>
         <p class="pairs__legend">
           <span><span class="key key--ok" aria-hidden="true"></span>supported pair</span>
           <span><span class="key key--no" aria-hidden="true"></span>not a pair Laravel supports</span>
@@ -362,7 +366,7 @@ PHP 8.1 is past security support; pick a version the policy still supports.
           <button class="cmd" role="tab" id="tab-hops" aria-controls="out-hops" aria-selected="false" tabindex="-1"><span class="cmd__name">hops</span><span class="cmd__does">Every hop Booster knows</span></button>
           <button class="cmd" role="tab" id="tab-init" aria-controls="out-init" aria-selected="false" tabindex="-1"><span class="cmd__name">init</span><span class="cmd__does">Writes the coding-tab playbooks to <code>.agents/skills</code></span></button>
         </div>
-        <p class="commands__exits">There's also <code>scan</code>, which reports what will break on a given PHP (<code>--removals</code> for removed functions, <code>--phpstan</code> for static analysis) and always exits 0. Exit codes: <strong>0</strong> pass · <strong>1</strong> the baseline failed, or a hop was capped, errored or failed its gate · <strong>2</strong> bad usage or a target the policy does not support.</p>
+        <p class="commands__exits">There's also <code>scan</code>, which reports what will break on a given PHP (<code>--removals</code> for removed functions, <code>--phpstan</code> for static analysis) and always exits 0. Exit codes: <strong>0</strong> pass · <strong>1</strong> the baseline failed, or a hop was capped, errored or failed its gate · <strong>2</strong> bad usage or a target the policy does not know.</p>
       </div>
 
       <!-- A greenbar printout, tractor-feed holes and all. Output is real

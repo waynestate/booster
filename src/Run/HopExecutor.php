@@ -122,8 +122,12 @@ final class HopExecutor
 
         $proctor = $this->runProctorGate($plan, $path, $options, $results);
         $comparison = $proctor === null ? null : ProctorComparison::compare($proctorBaseline, $proctor);
+        // A run that stops before the final target (an EOL stop, --until or
+        // --only) cannot prove the app at that target, so the PROCTOR gate
+        // reports instead of blocking.
+        $advisory = $options->proctorAdvisory || $plan->stopsEarly;
 
-        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $options->proctorAdvisory, $comparison);
+        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison);
     }
 
     /**
@@ -413,13 +417,15 @@ final class HopExecutor
                     $unblocked = $this->composer->temporaryUnblocks($path);
                     if ($unblocked !== []) {
                         // The unblock is temporary by name: the final target
-                        // ships without it, so the last step fails until it is
-                        // out of composer.json. Earlier steps only warn.
+                        // ships without it, so the last step of the full plan
+                        // fails until it is out of composer.json. A plan that
+                        // stops early never reaches that target, so its last
+                        // step only warns.
                         $finding = sprintf(
                             'composer.json still has Booster\'s temporary advisory unblock for %s (config.policy.advisories.ignore).',
                             implode(', ', $unblocked),
                         );
-                        if ($step->number === count($plan->steps)) {
+                        if ($step->number === count($plan->steps) && !$plan->stopsEarly) {
                             return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, $finding . ' Remove it before release; Booster fails the final target while it is there.', ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$notes], false, $prepass?->files() ?? []);
                         }
                         $messages[] = $finding;
