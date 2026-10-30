@@ -512,7 +512,7 @@ The target also has to be one CREED's policy still supports. A plan can pass thr
 
 ```
 $ bin/booster plan --path=examples/raw-php --to-php=8.1
-Php 8.1 is past security support; pick a version the policy still supports.
+PHP 8.1 is past security support; pick a version the policy still supports.
 exit 2
 ```
 
@@ -551,7 +551,7 @@ $ bin/booster detect --path=examples/vue-spa path examples/vue-spa app_type raw-
 
 **planThe ordered hops, the warnings and the scans. Changes nothing.**
 
-$ bin/booster plan --path=examples/raw-php --today=2026-10-29 BOOSTER plan for examples/raw-php app type: raw-php PHP: 7.4 -> 8.5 policy: waynestate/creed 0.1.3 (today 2026-10-29) 1. php-74-to-80 \[target-image-tests\] Move PHP 7.4 code to PHP 8.0. Give this hop the most review time. Removed between PHP 7.4 and PHP 8.0: none found. 2. php-80-to-81 \[target-image-tests\] Move PHP 8.0 code to PHP 8.1. Removed between PHP 8.0 and PHP 8.1: none found. 3. php-81-to-82 \[target-image-tests\] Move PHP 8.1 code to PHP 8.2. Removed between PHP 8.1 and PHP 8.2: none found. 4. php-82-to-83 \[target-image-tests\] Move PHP 8.2 code to PHP 8.3. Removed between PHP 8.2 and PHP 8.3: none found. 5. php-83-to-84 \[target-image-tests\] Move PHP 8.3 code to PHP 8.4. Removed between PHP 8.3 and PHP 8.4: none found. 6. php-84-to-85 \[target-image-tests\] Move PHP 8.4 code to PHP 8.5. Removed between PHP 8.4 and PHP 8.5: none found. Will break on PHP 8.0: no findings. PHPStan on PHP 8.5: 3 findings. src/Legacy.php:20 \[missingType.parameter\] Method Example\Legacy::className() has parameter $object with no type specified. src/Legacy.php:22 \[return.type\] Method Example\Legacy::className() should return string but returns class-string|false. src/Legacy.php:25 \[parameter.implicitlyNullable\] Deprecated in PHP 8.4: Parameter #1 $label (string) is implicitly nullable via default value null.
+$ bin/booster plan --path=examples/raw-php --today=2026-10-29 BOOSTER plan for examples/raw-php app type: raw-php PHP: 7.4 -> 8.5 policy: waynestate/creed 0.1.3 (today 2026-10-29) 1. php-74-to-80 \[target-image-tests\] Move PHP 7.4 code to PHP 8.0. Give this hop the most review time. Removed between PHP 7.4 and PHP 8.0: none found. 2. php-80-to-81 \[target-image-tests\] Move PHP 8.0 code to PHP 8.1. Removed between PHP 8.0 and PHP 8.1: none found. 3. php-81-to-82 \[target-image-tests\] Move PHP 8.1 code to PHP 8.2. Removed between PHP 8.1 and PHP 8.2: none found. 4. php-82-to-83 \[target-image-tests\] Move PHP 8.2 code to PHP 8.3. Removed between PHP 8.2 and PHP 8.3: none found. 5. php-83-to-84 \[target-image-tests\] Move PHP 8.3 code to PHP 8.4. Removed between PHP 8.3 and PHP 8.4: none found. 6. php-84-to-85 \[target-image-tests\] Move PHP 8.4 code to PHP 8.5. Removed between PHP 8.4 and PHP 8.5: none found. Will break on PHP 8.0: no findings. PHPStan on PHP 8.5: 3 findings. src/Legacy.php:20 \[missingType.parameter\] Method Example\\Legacy::className() has parameter $object with no type specified. src/Legacy.php:22 \[return.type\] Method Example\\Legacy::className() should return string but returns class-string|false. src/Legacy.php:25 \[parameter.implicitlyNullable\] Deprecated in PHP 8.4: Parameter #1 $label (string) is implicitly nullable via default value null.
 
 **runRuns the plan; --dry-run previews every hop**
 
