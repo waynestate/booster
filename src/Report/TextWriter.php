@@ -6,6 +6,7 @@ namespace Waynestate\Booster\Report;
 
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Run\BaselineResult;
+use Waynestate\Booster\Run\ProctorResult;
 use Waynestate\Booster\Run\RunReport;
 use Waynestate\Booster\Scan\RemovalsResult;
 use Waynestate\Booster\Scan\ScanResult;
@@ -168,6 +169,9 @@ final class TextWriter
             $lines[] = sprintf('Unique files across hops: %d. Later hops were previewed against the original tree, so the same file can appear in several hops.', count($previewedFiles));
             $lines[] = '';
         }
+        foreach ($this->proctorLines($report) as $line) {
+            $lines[] = $line;
+        }
         $lines[] = 'RESULT: ' . ($report->failed() ? 'FAIL' : 'PASS');
         if ($report->dryRun && $previewedFiles !== []) {
             $lines[] = 'Dry run: these changes were previewed, none were applied.';
@@ -176,6 +180,48 @@ final class TextWriter
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * The PROCTOR gate section: what the policy check said about the upgraded
+     * app, or nothing when the gate did not run.
+     *
+     * @return list<string>
+     */
+    private function proctorLines(RunReport $report): array
+    {
+        $proctor = $report->proctor;
+        if ($proctor === null) {
+            return [];
+        }
+        $php = $proctor->php ?? '?';
+        $advisory = $report->proctorAdvisory ? ' Advisory only (--proctor-advisory), so this does not fail the run.' : '';
+        $lines = [];
+        switch ($proctor->status) {
+            case ProctorResult::PASSED:
+                $lines[] = sprintf('PROCTOR: PASS on PHP %s (the upgraded app meets the policy).', $php);
+                break;
+            case ProctorResult::FAILED:
+                $count = count($proctor->failures);
+                $lines[] = sprintf('PROCTOR: FAIL on PHP %s (%d finding%s).%s', $php, $count, $count === 1 ? '' : 's', $advisory);
+                foreach ($proctor->failures as $failure) {
+                    $where = $failure['path'] !== null ? ' (' . self::clean($failure['path']) . ':' . $failure['line'] . ')' : '';
+                    $lines[] = '   [' . $failure['check'] . '] ' . self::clean($failure['message']) . $where;
+                }
+                $lines[] = '   Fix the findings above, then run the upgrade again.';
+                break;
+            default:
+                $lines[] = sprintf('PROCTOR: TRIPPED on PHP %s (exit %d). The check could not finish.%s', $php, $proctor->exitCode, $advisory);
+                if ($proctor->error !== null && $proctor->error !== '') {
+                    foreach (explode("\n", self::clean($proctor->error)) as $line) {
+                        $lines[] = '   ' . $line;
+                    }
+                }
+                $lines[] = '   Fix the tool error above, then run the upgrade again.';
+                break;
+        }
+
+        return $lines;
     }
 
     /**

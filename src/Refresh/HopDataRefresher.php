@@ -51,6 +51,12 @@ final class HopDataRefresher
         self::FEED_VUE_PLUGIN,
     ];
 
+    /** The oldest PHP BOOSTER plans upgrades from, kept ahead of the policy. */
+    public const PHP_FLOOR_PREFIX = ['5.5'];
+
+    /** The oldest Laravel majors BOOSTER plans upgrades from, kept ahead of the policy. */
+    public const LARAVEL_FLOOR_PREFIX = ['5.8', '6', '7'];
+
     public function __construct(private readonly Policy $policy) {}
 
     /**
@@ -71,8 +77,8 @@ final class HopDataRefresher
             }
         }
 
-        $phpChain = $this->extendChain($existing, 'php', $this->policy->supported('php', $today));
-        $laravelChain = $this->extendChain($existing, 'laravel', $this->policy->supported('laravel', $today));
+        $phpChain = $this->extendChain($existing, 'php', array_merge(self::PHP_FLOOR_PREFIX, $this->policy->supported('php', $today)));
+        $laravelChain = $this->extendChain($existing, 'laravel', array_merge(self::LARAVEL_FLOOR_PREFIX, $this->policy->supported('laravel', $today)));
         $phpunitChain = $this->extendChain(
             $existing,
             'phpunit',
@@ -98,11 +104,11 @@ final class HopDataRefresher
     /**
      * Offline shape problems in a hop data file judged against the policy as
      * of $today: one line per problem, empty when the shape is sound. The PHP
-     * and Laravel chains must carry every version the policy supports, and
-     * each table must cover every major from its own floor to the top of its
-     * chain: no gaps, and the newest major included. Majors below a table's
-     * floor are allowed, because a refresh never back-fills majors the table
-     * never covered.
+     * and Laravel chains must carry every version the policy supports and the
+     * oldest version BOOSTER plans upgrades from, and each table must cover
+     * every major from its own floor to the top of its chain: no gaps, and
+     * the newest major included. Majors below a table's floor are allowed,
+     * because a refresh never back-fills majors the table never covered.
      *
      * @param array<string, mixed> $data
      *
@@ -126,6 +132,21 @@ final class HopDataRefresher
             foreach ($this->policy->supported('laravel', $today) as $version) {
                 if (!in_array($version, $laravelChain, true)) {
                     $problems[] = sprintf('The policy supports Laravel %s as of %s, but the laravel chain does not list it.', $version, $today->format('Y-m-d'));
+                }
+            }
+        }
+
+        if ($phpChain !== null) {
+            foreach (self::PHP_FLOOR_PREFIX as $floor) {
+                if (!in_array($floor, $phpChain, true)) {
+                    $problems[] = sprintf('BOOSTER plans PHP upgrades from %s, but the php chain does not list it.', $floor);
+                }
+            }
+        }
+        if ($laravelChain !== null) {
+            foreach (self::LARAVEL_FLOOR_PREFIX as $floor) {
+                if (!in_array($floor, $laravelChain, true)) {
+                    $problems[] = sprintf('BOOSTER plans Laravel upgrades from %s, but the laravel chain does not list it.', $floor);
                 }
             }
         }
@@ -368,8 +389,8 @@ final class HopDataRefresher
         $majors = [];
         foreach (array_keys($table) as $major) {
             $major = (string) $major;
-            if (!ctype_digit($major)) {
-                $problems[] = sprintf('Hop data key "%s" has a non-numeric major "%s".', $key, $major);
+            if (preg_match('/^\d+(\.\d+)?$/', $major) !== 1) {
+                $problems[] = sprintf('Hop data key "%s" has a malformed major "%s".', $key, $major);
                 continue;
             }
             $majors[$major] = true;

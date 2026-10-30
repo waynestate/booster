@@ -1,0 +1,34 @@
+name: Release PHAR
+
+# The mirror of the GitLab tag pipeline: on a version tag, build the same
+# single-file phar (one recipe: scripts/build-phar.sh, no-Docker mode) and
+# attach it to the GitHub release.
+on:
+  push:
+    tags: ['*.*.*', 'v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # pin by SHA at release time
+      - uses: actions/checkout@v4
+      # pin by SHA at release time
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer
+      - name: Build the phar
+        env:
+          BOOSTER_PHAR_NO_DOCKER: '1'
+        run: bash scripts/build-phar.sh
+      - name: Attach the phar to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" build/booster.phar --generate-notes \
+            || gh release upload --clobber "$GITHUB_REF_NAME" build/booster.phar
