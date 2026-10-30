@@ -65,6 +65,18 @@ final class MixToViteTest extends TestCase
         ], $this->ids($plan));
     }
 
+    public function test_mix_to_vite_never_appears_without_a_package_json(): void
+    {
+        // An app without a package.json has no front end to move, even if a
+        // webpack.mix.js file is lying around.
+        $dir = $this->tempDir();
+        $this->makeApp($dir);
+        unlink($dir . '/package.json');
+        $plan = $this->planner()->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '12'), $this->today());
+
+        self::assertSame([HopRegistry::laravelHopId('11', '12')], $this->ids($plan));
+    }
+
     public function test_a_simple_mix_file_is_converted_to_vite(): void
     {
         $dir = $this->tempDir();

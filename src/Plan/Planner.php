@@ -246,7 +246,7 @@ final class Planner
      */
     private function vueHopIds(Project $project): array
     {
-        if ($project->vueMajor !== '2') {
+        if (!$project->hasPackageJson || $project->vueMajor !== '2') {
             return [];
         }
         $ids = [HopRegistry::VUE_27_TO_COMPAT_ID, HopRegistry::VUE_COMPAT_CODEMOD_ID];
@@ -331,7 +331,7 @@ final class Planner
      */
     private function needsMixToVite(Project $project, ?string $laravel): bool
     {
-        if (!$project->hasMixFile || $laravel === null) {
+        if (!$project->hasPackageJson || !$project->hasMixFile || $laravel === null) {
             return false;
         }
 
