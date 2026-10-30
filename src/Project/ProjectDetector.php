@@ -21,6 +21,8 @@ final class ProjectDetector
 
     private const BOOST_PACKAGE = 'laravel/boost';
 
+    private const HELMET_PACKAGE = 'waynestate/helmet';
+
     public function detect(string $path): Project
     {
         if (!is_dir($path)) {
@@ -90,6 +92,7 @@ final class ProjectDetector
             hasMixFile: is_file($path . '/webpack.mix.js'),
             vueMinor: $vueMinor,
             hasBoost: array_key_exists(self::BOOST_PACKAGE, $all) || $this->lockHasBoost($path . '/composer.lock'),
+            hasHelmet: array_key_exists(self::HELMET_PACKAGE, $all),
             manifestPhp: $manifestPhp,
             lockPhpFloor: $lock['floor'],
             lockPhpCeiling: $lock['ceiling'],

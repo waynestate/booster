@@ -538,14 +538,30 @@ final class HopRegistry
                 summary: sprintf('Move a Laravel %s app to Laravel %s.', $from, $to),
                 rectorSets: ['RectorLaravel\Set\LaravelSetList::LARAVEL_' . self::laravelSetSuffix($to)],
                 composerSet: ['laravel/framework' => '^' . $to . '.0'],
+                composerRemove: $this->laravelComposerRemove($to),
                 notes: [
                     'Check the shared database server against the Laravel ' . $to . ' database floor before you apply this hop.',
                     'Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.',
                     ...$this->inertiaChanges($to)['notes'],
+                    ...($to === '9' ? ['Check app/Http/Middleware/TrustProxies.php after the hop: the stock file is rewritten to the framework middleware, and a customised one is left alone.'] : []),
                 ],
                 links: [sprintf('https://laravel.com/docs/%s.x/upgrade', $to)],
             ));
         }
+    }
+
+    /**
+     * Packages to drop when moving to $to. Laravel 9 ships its own
+     * TrustProxies middleware, so the fideloper/proxy stand-in goes with it.
+     *
+     * @return list<string>
+     */
+    private function laravelComposerRemove(string $to): array
+    {
+        return match ($to) {
+            '9' => ['fideloper/proxy'],
+            default => [],
+        };
     }
 
     /**

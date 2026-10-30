@@ -267,6 +267,16 @@ final class Planner
             $toPhpunit = $last->phpunitAfter;
         }
 
+        // The 8 to 9 hop drops fideloper/proxy, and HELMET takes over trusted
+        // proxies for WSU apps. Suggest it once, only while the plan still
+        // carries the hop and the app does not already require HELMET.
+        foreach ($steps as $step) {
+            if ($step->hop->id === HopRegistry::laravelHopId('8', '9') && !$project->hasHelmet) {
+                $warnings[] = 'HELMET sets trusted proxies, security headers and session defaults for WSU apps: composer require waynestate/helmet';
+                break;
+            }
+        }
+
         if ($steps === []) {
             $warnings[] = 'Nothing to do: the app is already at the target.';
         }

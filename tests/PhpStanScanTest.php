@@ -49,6 +49,42 @@ final class PhpStanScanTest extends TestCase
         return [$fake, $captured];
     }
 
+    /**
+     * A minimal app tree in a temp directory: composer.json with or without
+     * laravel/framework, Larastan in vendor, Pinstripe's presets, and the rule
+     * packages base.neon expects. The returned second element stands in for
+     * Booster's own vendor (empty), so nothing leaks in from the real
+     * environment.
+     *
+     * @param array{laravel: bool, larastan: bool, laravelNeon: bool} $shape
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function appWithPresets(array $shape): array
+    {
+        $app = $this->tempDir();
+        $composer = ['require' => ['php' => '^8.3']];
+        if ($shape['laravel']) {
+            $composer['require']['laravel/framework'] = '^11.0';
+        }
+        file_put_contents($app . '/composer.json', (string) json_encode($composer));
+        if ($shape['larastan']) {
+            mkdir($app . '/vendor/larastan/larastan', 0775, true);
+            file_put_contents($app . '/vendor/larastan/larastan/composer.json', '{"name": "larastan/larastan"}');
+        }
+        mkdir($app . '/vendor/waynestate/pinstripe/phpstan', 0775, true);
+        file_put_contents($app . '/vendor/waynestate/pinstripe/phpstan/base.neon', "parameters:\n    level: 8\n");
+        if ($shape['laravelNeon']) {
+            file_put_contents($app . '/vendor/waynestate/pinstripe/phpstan/laravel.neon', "includes:\n    - base.neon\n");
+        }
+        foreach (['phpstan/phpstan-strict-rules', 'phpstan/phpstan-deprecation-rules'] as $package) {
+            mkdir($app . '/vendor/' . $package, 0775, true);
+            file_put_contents($app . '/vendor/' . $package . '/rules.neon', "# rules\n");
+        }
+
+        return [$app, $this->tempDir()];
+    }
+
     public function test_a_finding_is_parsed_relative_to_the_app(): void
     {
         $app = $this->tempDir();
@@ -197,6 +233,10 @@ final class PhpStanScanTest extends TestCase
         self::assertStringContainsString('*/vendor/*', (string) $captured->neon);
         self::assertStringContainsString('*/node_modules/*', (string) $captured->neon);
         self::assertStringContainsString('*/storage/*', (string) $captured->neon);
+        // IDE-generated files carry fake signatures that level 8 reports as
+        // errors; Rector skips the same shapes in config/rector.php.
+        self::assertStringContainsString('*_ide_helper*.php', (string) $captured->neon);
+        self::assertStringContainsString('*.phpstorm.meta.php', (string) $captured->neon);
         // The preset sets level 8, so no fallback level is written.
         self::assertStringNotContainsString('level: 5', (string) $captured->neon);
     }
@@ -240,6 +280,124 @@ final class PhpStanScanTest extends TestCase
         self::assertFileDoesNotExist((string) $configPath);
     }
 
+    public function test_a_laravel_app_with_larastan_gets_the_laravel_preset(): void
+    {
+        [$app, $boosterVendor] = $this->appWithPresets(['laravel' => true, 'larastan' => true, 'laravelNeon' => true]);
+        $json = $this->phpstanJson([]);
+        [$fake, $captured] = $this->capturingFake(static fn(): ProcessResult => new ProcessResult(0, (string) json_encode($json), ''));
+
+        $scan = (new PhpStanScan($fake, null, null, $boosterVendor))->scan($app, '8.4');
+
+        self::assertTrue($scan->ok, (string) $scan->error);
+        self::assertSame([], $scan->hints);
+        self::assertNotNull($captured->neon);
+        self::assertStringContainsString('waynestate/pinstripe/phpstan/laravel.neon', (string) $captured->neon);
+        self::assertStringNotContainsString('base.neon', (string) $captured->neon);
+    }
+
+    public function test_a_laravel_app_without_larastan_gets_base_and_the_install_hint(): void
+    {
+        [$app, $boosterVendor] = $this->appWithPresets(['laravel' => true, 'larastan' => false, 'laravelNeon' => true]);
+        $json = $this->phpstanJson([]);
+        [$fake, $captured] = $this->capturingFake(static fn(): ProcessResult => new ProcessResult(0, (string) json_encode($json), ''));
+
+        $scan = (new PhpStanScan($fake, null, null, $boosterVendor))->scan($app, '8.4');
+
+        self::assertTrue($scan->ok, (string) $scan->error);
+        self::assertSame(['Laravel app without Larastan: Eloquent and facade calls show as errors. composer require --dev larastan/larastan for a cleaner scan.'], $scan->hints);
+        self::assertNotNull($captured->neon);
+        self::assertStringContainsString('waynestate/pinstripe/phpstan/base.neon', (string) $captured->neon);
+        self::assertStringNotContainsString('laravel.neon', (string) $captured->neon);
+    }
+
+    public function test_a_non_laravel_app_stays_on_base_without_hints(): void
+    {
+        // Larastan in a non-Laravel app changes nothing: the preset choice
+        // follows laravel/framework in composer.json.
+        [$app, $boosterVendor] = $this->appWithPresets(['laravel' => false, 'larastan' => true, 'laravelNeon' => true]);
+        $json = $this->phpstanJson([]);
+        [$fake, $captured] = $this->capturingFake(static fn(): ProcessResult => new ProcessResult(0, (string) json_encode($json), ''));
+
+        $scan = (new PhpStanScan($fake, null, null, $boosterVendor))->scan($app, '8.4');
+
+        self::assertTrue($scan->ok, (string) $scan->error);
+        self::assertSame([], $scan->hints);
+        self::assertNotNull($captured->neon);
+        self::assertStringContainsString('waynestate/pinstripe/phpstan/base.neon', (string) $captured->neon);
+        self::assertStringNotContainsString('laravel.neon', (string) $captured->neon);
+    }
+
+    public function test_a_laravel_app_with_larastan_but_no_laravel_neon_falls_back_to_base_with_a_hint(): void
+    {
+        [$app, $boosterVendor] = $this->appWithPresets(['laravel' => true, 'larastan' => true, 'laravelNeon' => false]);
+        $json = $this->phpstanJson([]);
+        [$fake, $captured] = $this->capturingFake(static fn(): ProcessResult => new ProcessResult(0, (string) json_encode($json), ''));
+
+        $scan = (new PhpStanScan($fake, null, null, $boosterVendor))->scan($app, '8.4');
+
+        self::assertTrue($scan->ok, (string) $scan->error);
+        self::assertSame(["Laravel app: Pinstripe's laravel.neon preset is missing, so the scan fell back to base.neon. Update Pinstripe with: composer update waynestate/pinstripe"], $scan->hints);
+        self::assertNotNull($captured->neon);
+        self::assertStringContainsString('waynestate/pinstripe/phpstan/base.neon', (string) $captured->neon);
+    }
+
+    public function test_booster_phpstan_includes_the_apps_larastan_explicitly(): void
+    {
+        // Pinstripe's laravel.neon only includes base.neon and leans on the
+        // app's extension-installer, which is not active while Booster's
+        // PHPStan runs, so the scan must load Larastan itself.
+        [$app, $boosterVendor] = $this->appWithPresets(['laravel' => true, 'larastan' => true, 'laravelNeon' => true]);
+        file_put_contents($app . '/vendor/larastan/larastan/extension.neon', "# larastan\n");
+        mkdir($boosterVendor . '/bin', 0775, true);
+        file_put_contents($boosterVendor . '/bin/phpstan', '<?php');
+        $json = $this->phpstanJson([]);
+        [$fake, $captured] = $this->capturingFake(static fn(): ProcessResult => new ProcessResult(0, (string) json_encode($json), ''));
+
+        $scan = (new PhpStanScan($fake, null, null, $boosterVendor))->scan($app, '8.4');
+
+        self::assertTrue($scan->ok, (string) $scan->error);
+        self::assertNotNull($captured->neon);
+        self::assertStringContainsString('vendor/larastan/larastan/extension.neon', (string) $captured->neon);
+    }
+
+    public function test_app_phpstan_with_installer_does_not_include_larastan_twice(): void
+    {
+        // The app's own PHPStan runs and its extension-installer already lists
+        // Larastan, so a second include would make PHPStan refuse to start.
+        [$app, $boosterVendor] = $this->appWithPresets(['laravel' => true, 'larastan' => true, 'laravelNeon' => true]);
+        file_put_contents($app . '/vendor/larastan/larastan/extension.neon', "# larastan\n");
+        mkdir($app . '/vendor/bin', 0775, true);
+        file_put_contents($app . '/vendor/bin/phpstan', '<?php');
+        mkdir($app . '/vendor/phpstan/extension-installer/src', 0775, true);
+        file_put_contents($app . '/vendor/phpstan/extension-installer/src/GeneratedConfig.php', "<?php\n\nnamespace PHPStan\\ExtensionInstaller;\n\nfinal class GeneratedConfig\n{\n\tconst EXTENSIONS = ['larastan/larastan'];\n}\n");
+        $json = $this->phpstanJson([]);
+        [$fake, $captured] = $this->capturingFake(static fn(): ProcessResult => new ProcessResult(0, (string) json_encode($json), ''));
+
+        $scan = (new PhpStanScan($fake, null, null, $boosterVendor))->scan($app, '8.4');
+
+        self::assertTrue($scan->ok, (string) $scan->error);
+        self::assertNotNull($captured->neon);
+        self::assertStringNotContainsString('vendor/larastan/larastan/extension.neon', (string) $captured->neon);
+    }
+
+    public function test_app_phpstan_without_installer_includes_larastan(): void
+    {
+        // The app's own PHPStan runs but has no extension-installer, so nothing
+        // else registers Larastan; the scan includes the neon.
+        [$app, $boosterVendor] = $this->appWithPresets(['laravel' => true, 'larastan' => true, 'laravelNeon' => true]);
+        file_put_contents($app . '/vendor/larastan/larastan/extension.neon', "# larastan\n");
+        mkdir($app . '/vendor/bin', 0775, true);
+        file_put_contents($app . '/vendor/bin/phpstan', '<?php');
+        $json = $this->phpstanJson([]);
+        [$fake, $captured] = $this->capturingFake(static fn(): ProcessResult => new ProcessResult(0, (string) json_encode($json), ''));
+
+        $scan = (new PhpStanScan($fake, null, null, $boosterVendor))->scan($app, '8.4');
+
+        self::assertTrue($scan->ok, (string) $scan->error);
+        self::assertNotNull($captured->neon);
+        self::assertStringContainsString('vendor/larastan/larastan/extension.neon', (string) $captured->neon);
+    }
+
     public function test_the_result_serialises_for_json_output(): void
     {
         $app = $this->tempDir();
@@ -261,5 +419,6 @@ final class PhpStanScanTest extends TestCase
         self::assertSame('a.php', $array['findings'][0]['file']);
         self::assertSame(3, $array['findings'][0]['line']);
         self::assertSame('argument.type', $array['findings'][0]['source']);
+        self::assertSame([], $array['hints']);
     }
 }

@@ -119,12 +119,10 @@ final class TextWriter
             return implode("\n", $lines);
         }
 
-        if ($scan->findings === []) {
-            return sprintf('PHPStan on PHP %s: no findings.', $scan->testVersion);
-        }
-
         $count = count($scan->findings);
-        $lines = [sprintf('PHPStan on PHP %s: %d %s.', $scan->testVersion, $count, $count === 1 ? 'finding' : 'findings')];
+        $lines = [$count === 0
+            ? sprintf('PHPStan on PHP %s: no findings.', $scan->testVersion)
+            : sprintf('PHPStan on PHP %s: %d %s.', $scan->testVersion, $count, $count === 1 ? 'finding' : 'findings')];
         foreach (array_slice($scan->findings, 0, self::MAX_FINDINGS) as $finding) {
             $tag = $finding->source !== '' ? $finding->source : $finding->severity;
             $lines[] = sprintf('   %s:%d [%s] %s', self::clean($finding->file), $finding->line, $tag, self::clean($finding->message));
@@ -132,6 +130,9 @@ final class TextWriter
         $hidden = count($scan->findings) - self::MAX_FINDINGS;
         if ($hidden > 0) {
             $lines[] = sprintf('   (%d more findings...)', $hidden);
+        }
+        foreach ($scan->hints as $hint) {
+            $lines[] = '   Hint: ' . self::clean($hint);
         }
 
         return implode("\n", $lines);
