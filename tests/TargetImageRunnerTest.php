@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Tests;
 
+use Waynestate\Booster\Run\GateImage;
 use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\Run\TargetImageRunner;
 use Waynestate\Booster\ToolError;
@@ -44,10 +45,29 @@ final class TargetImageRunnerTest extends TestCase
             '',
             '',
         ));
-        (new TargetImageRunner($fake, self::DOCKER_DIR))->ensureImage('8.5');
+        (new TargetImageRunner($fake, self::DOCKER_DIR))->ensureImage('8.4');
 
         $build = $fake->calls[1]['command'];
-        self::assertSame(['docker', 'build', '--build-arg', 'PHP_VERSION=8.5', '-t', 'booster-target:8.5-' . $this->stamp(), self::DOCKER_DIR], $build);
+        self::assertSame(
+            ['docker', 'build', '--build-arg', 'PHP_VERSION=8.4', '--build-arg', 'COMPOSER_VERSION=2.10.3', '-t', 'booster-target:8.4-' . $this->stamp(), self::DOCKER_DIR],
+            $build,
+        );
+    }
+
+    public function test_php_below_7_2_builds_with_composer_2_2(): void
+    {
+        $fake = new FakeProcessRunner(static fn(array $command): ProcessResult => new ProcessResult(
+            in_array('inspect', $command, true) ? 1 : 0,
+            '',
+            '',
+        ));
+        (new TargetImageRunner($fake, self::DOCKER_DIR))->ensureImage('7.1');
+
+        $build = $fake->calls[1]['command'];
+        self::assertSame(
+            ['docker', 'build', '--build-arg', 'PHP_VERSION=7.1', '--build-arg', 'COMPOSER_VERSION=2.2', '-t', 'booster-target:7.1-' . $this->stamp(), self::DOCKER_DIR],
+            $build,
+        );
     }
 
     public function test_the_tag_carries_the_recipe_stamp(): void
@@ -114,7 +134,7 @@ final class TargetImageRunnerTest extends TestCase
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '', ''));
         $runner = new TargetImageRunner($fake, self::DOCKER_DIR);
 
-        $result = $runner->run('/srv/my app', '8.4', 'composer test', null, 'myapp/gate:8.4');
+        $result = $runner->run('/srv/my app', '8.4', 'composer test', null, GateImage::fromOption('myapp/gate:8.4'));
 
         self::assertTrue($result->successful());
         $last = $fake->calls[count($fake->calls) - 1]['command'];
@@ -132,8 +152,8 @@ final class TargetImageRunnerTest extends TestCase
         ));
         $runner = new TargetImageRunner($fake, self::DOCKER_DIR);
 
-        $runner->run('/app', '8.4', 'composer test', null, 'myapp/gate:8.4');
-        $runner->run('/app', '8.5', 'composer test', null, 'myapp/gate:8.4');
+        $runner->run('/app', '8.4', 'composer test', null, GateImage::fromOption('myapp/gate:8.4'));
+        $runner->run('/app', '8.5', 'composer test', null, GateImage::fromOption('myapp/gate:8.4'));
 
         self::assertSame([['docker', 'pull', 'myapp/gate:8.4']], $fake->commandsContaining('pull'));
     }
@@ -148,6 +168,55 @@ final class TargetImageRunnerTest extends TestCase
 
         $this->expectException(ToolError::class);
         $this->expectExceptionMessage('The gate image myapp/gate:8.4 was not found locally and could not be pulled.');
-        (new TargetImageRunner($fake, self::DOCKER_DIR))->run('/app', '8.4', 'composer test', null, 'myapp/gate:8.4');
+        (new TargetImageRunner($fake, self::DOCKER_DIR))->run('/app', '8.4', 'composer test', null, GateImage::fromOption('myapp/gate:8.4'));
+    }
+
+    public function test_a_template_image_resolves_per_php_version(): void
+    {
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '', ''));
+        $runner = new TargetImageRunner($fake, self::DOCKER_DIR);
+
+        $runner->run('/app', '8.1', 'composer test', null, GateImage::fromOption('registry/php-apache:{php}'));
+
+        $last = $fake->calls[count($fake->calls) - 1]['command'];
+        self::assertContains('registry/php-apache:8.1', $last);
+    }
+
+    public function test_a_map_image_resolves_the_named_php_version(): void
+    {
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '', ''));
+        $runner = new TargetImageRunner($fake, self::DOCKER_DIR);
+
+        $runner->run('/app', '8.1', 'composer test', null, GateImage::fromOption('8.0=foo:1,8.1=bar:2'));
+
+        $last = $fake->calls[count($fake->calls) - 1]['command'];
+        self::assertContains('bar:2', $last);
+    }
+
+    public function test_a_map_without_the_php_version_is_a_tool_error(): void
+    {
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '', ''));
+
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('--image has no image for PHP 8.2; add 8.2=<image> or use a {php} template.');
+        (new TargetImageRunner($fake, self::DOCKER_DIR))->run('/app', '8.2', 'composer test', null, GateImage::fromOption('8.0=foo:1'));
+    }
+
+    public function test_each_distinct_resolved_image_is_pulled_once(): void
+    {
+        $fake = new FakeProcessRunner(static fn(array $command): ProcessResult => new ProcessResult(
+            in_array('inspect', $command, true) ? 1 : 0,
+            '',
+            '',
+        ));
+        $runner = new TargetImageRunner($fake, self::DOCKER_DIR);
+
+        $runner->run('/app', '8.4', 'composer test', null, GateImage::fromOption('reg/php:{php}'));
+        $runner->run('/app', '8.5', 'composer test', null, GateImage::fromOption('reg/php:{php}'));
+
+        self::assertSame(
+            [['docker', 'pull', 'reg/php:8.4'], ['docker', 'pull', 'reg/php:8.5']],
+            $fake->commandsContaining('pull'),
+        );
     }
 }
