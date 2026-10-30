@@ -191,6 +191,27 @@ final class PlannerTest extends TestCase
         );
     }
 
+    public function test_phpunit_below_9_gets_a_manual_step_before_the_first_php_8_hop(): void
+    {
+        $plan = $this->planWithComposer(
+            'laravel-blade',
+            [
+                'require' => ['php' => '>=7.3', 'laravel/framework' => '^6.0'],
+                'require-dev' => ['phpunit/phpunit' => '^7.5'],
+            ],
+            new PlanOptions(toPhp: '8.4'),
+        );
+
+        // PHPUnit 7 cannot run on PHP 8, so the plan carries the manual move to
+        // 9 just before the first hop that targets PHP 8.0; from there the
+        // normal PHPUnit hops take over.
+        self::assertSame(
+            ['laravel-6-to-7', 'laravel-7-to-8', 'php-73-to-74', 'phpunit-to-9-manual', 'php-74-to-80', 'laravel-8-to-9', 'php-80-to-81', 'phpunit-9-to-10', 'laravel-9-to-10', 'php-81-to-82', 'phpunit-10-to-11', 'laravel-10-to-11', 'laravel-11-to-12', 'php-82-to-83', 'phpunit-11-to-12', 'laravel-12-to-13', 'php-83-to-84', 'phpunit-12-to-13'],
+            $this->ids($plan),
+        );
+        self::assertCount(1, array_keys($this->ids($plan), 'phpunit-to-9-manual'));
+    }
+
     public function test_an_old_app_never_rests_on_a_pair_laravel_does_not_support(): void
     {
         $plan = $this->plan('laravel-blade', new PlanOptions(fromPhp: '8.1', fromLaravel: '9', toPhp: '8.3', toLaravel: '13'));
@@ -392,6 +413,45 @@ final class PlannerTest extends TestCase
 
         self::assertNotContains('cas-to-sesame', $this->ids($plan));
         self::assertStringContainsString('wayne-cas', implode(' ', $plan->warnings));
+    }
+
+    public function test_sesame_swap_goes_before_the_laravel_11_hop(): void
+    {
+        $plan = $this->planWithComposer(
+            'laravel-wayne-cas',
+            ['require' => ['php' => '^8.1', 'laravel/framework' => '^9.0']],
+            new PlanOptions(sesame: true, toPhp: '8.4', toLaravel: '12'),
+        );
+
+        // The swap needs PHP 8.3, so the PHP hops reach 8.3 first and the swap
+        // lands right before the hop from Laravel 10 to 11.
+        self::assertSame(
+            ['laravel-9-to-10', 'php-81-to-82', 'php-82-to-83', 'cas-to-sesame', 'laravel-10-to-11', 'laravel-11-to-12', 'php-83-to-84'],
+            $this->ids($plan),
+        );
+    }
+
+    public function test_sesame_swap_still_goes_last_when_the_plan_never_passes_laravel_10(): void
+    {
+        // In the frozen policy Laravel 10 is past security support, so this
+        // test extends its dates: the point is a plan whose Laravel hops stop
+        // at 10, which keeps the old end-of-plan placement for the swap.
+        $policy = $this->policyWith([
+            'laravel' => ['10' => ['active_until' => '2026-12-31', 'security_until' => '2027-12-31']],
+        ]);
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $file = $dir . '/composer.json';
+        $data = json_decode((string) file_get_contents($file), true);
+        self::assertIsArray($data);
+        $data = array_replace_recursive($data, ['require' => ['php' => '^8.3', 'laravel/framework' => '^10.0']]);
+        file_put_contents($file, (string) json_encode($data));
+
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($policy, new HopRegistry()))->plan($project, new PlanOptions(sesame: true, toPhp: '8.3', toLaravel: '10'), $this->today());
+
+        $ids = $this->ids($plan);
+        self::assertSame('cas-to-sesame', $ids[count($ids) - 1]);
+        self::assertCount(1, array_keys($ids, 'cas-to-sesame'));
     }
 
     public function test_an_eol_target_is_refused(): void

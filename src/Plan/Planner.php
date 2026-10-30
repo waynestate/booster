@@ -82,11 +82,15 @@ final class Planner
         $fromPhpunit = $project->phpunitMajor;
         $toPhpunit = null;
         $phpunitChain = $this->registry->phpunitChain();
+        $phpunitBeforeManual = $fromPhpunit;
+        $phpunitManualPending = false;
         if ($fromPhpunit !== null) {
             if (!in_array($fromPhpunit, $phpunitChain, true)) {
                 if (version_compare($fromPhpunit, $phpunitChain[0], '<')) {
-                    $warnings[] = sprintf('PHPUnit %s is below what BOOSTER can plan (%s to %s); PHPUnit hops are skipped.', $fromPhpunit, $phpunitChain[0], $phpunitChain[count($phpunitChain) - 1]);
-                    $fromPhpunit = null;
+                    // PHPUnit 7 and 8 do not run on PHP 8, so the plan carries a
+                    // manual move to 9 instead of skipping the PHPUnit hops.
+                    $phpunitManualPending = true;
+                    $fromPhpunit = $phpunitChain[0];
                 } else {
                     throw new ToolError(sprintf('PHPUnit %s is outside what BOOSTER can plan (%s to %s).', $fromPhpunit, $phpunitChain[0], $phpunitChain[count($phpunitChain) - 1]));
                 }
@@ -114,6 +118,7 @@ final class Planner
         $php = $fromPhp;
         $laravel = $fromLaravel;
         $phpunit = $fromPhpunit;
+        $sesamePlanned = false;
         $n = 0;
 
         for ($guard = 0; $guard < 64; $guard++) {
@@ -121,7 +126,32 @@ final class Planner
             $nextPhpunit = $phpunit !== null && $toPhpunit !== null && $phpunit !== $toPhpunit ? $this->registry->nextPhpunit($phpunit) : null;
             $nextPhp = $php !== $toPhp ? $this->registry->nextPhp($php) : null;
 
-            if ($nextLaravel !== null && $this->registry->has(HopRegistry::laravelHopId((string) $laravel, $nextLaravel)) && $this->registry->laravelSupportsPhp($nextLaravel, $php) && $this->phpunitMeetsLaravelFloor($phpunit, $nextLaravel)) {
+            // PHPUnit below 9 cannot run the gates on PHP 8, so the manual move
+            // to 9 lands before the first step that targets PHP 8.0 or newer.
+            if ($phpunitManualPending && (version_compare($php, '8.0', '>=') || ($nextPhp !== null && version_compare($nextPhp, '8.0', '>=')))) {
+                $hop = $this->registry->get(HopRegistry::PHPUNIT_TO_9_MANUAL_ID);
+                $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $laravel, $phpunitBeforeManual, $phpunit);
+                $phpunitManualPending = false;
+                continue;
+            }
+
+            // The SESAME swap needs PHP 8.3, so it goes in just before the hop
+            // from Laravel 10 to 11. While PHP is still below 8.3 that Laravel
+            // hop waits and the PHP hops go first.
+            $sesameCrossing = $options->sesame
+                && $project->usesWayneCas
+                && !$sesamePlanned
+                && $laravel === '10'
+                && $nextLaravel === '11'
+                && version_compare($toPhp, '8.3', '>=');
+            if ($sesameCrossing && version_compare($php, '8.3', '>=')) {
+                $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+                $sesamePlanned = true;
+                continue;
+            }
+            $holdLaravel = $sesameCrossing;
+
+            if (!$holdLaravel && $nextLaravel !== null && $this->registry->has(HopRegistry::laravelHopId((string) $laravel, $nextLaravel)) && $this->registry->laravelSupportsPhp($nextLaravel, $php) && $this->phpunitMeetsLaravelFloor($phpunit, $nextLaravel)) {
                 $hop = $this->registry->get(HopRegistry::laravelHopId((string) $laravel, $nextLaravel));
                 $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $nextLaravel, $phpunit, $phpunit);
                 $laravel = $nextLaravel;
@@ -205,14 +235,12 @@ final class Planner
             }
         }
 
-        if ($options->sesame) {
-            if (!$project->usesWayneCas) {
-                $warnings[] = 'Asked for the SESAME swap, but composer.json does not require cit-web-infra/wayne-cas; skipped.';
-            } elseif (version_compare($php, '8.3', '<')) {
-                $warnings[] = 'SESAME needs PHP 8.3 or newer; the swap was left out because the plan ends below that.';
-            } else {
-                $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
-            }
+        if ($options->sesame && !$project->usesWayneCas) {
+            $warnings[] = 'Asked for the SESAME swap, but composer.json does not require cit-web-infra/wayne-cas; skipped.';
+        } elseif ($options->sesame && !$sesamePlanned && version_compare($php, '8.3', '<')) {
+            $warnings[] = 'SESAME needs PHP 8.3 or newer; the swap was left out because the plan ends below that.';
+        } elseif ($options->sesame && !$sesamePlanned) {
+            $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
         } elseif ($project->usesWayneCas) {
             $warnings[] = 'The app uses wayne-cas. Add --sesame to plan the swap to SESAME.';
         }
