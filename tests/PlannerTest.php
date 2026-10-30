@@ -136,6 +136,27 @@ final class PlannerTest extends TestCase
         );
     }
 
+    public function test_phpunit_below_9_gets_a_manual_step_before_the_first_php_8_hop(): void
+    {
+        $plan = $this->planWithComposer(
+            'laravel-blade',
+            [
+                'require' => ['php' => '>=7.3', 'laravel/framework' => '^6.0'],
+                'require-dev' => ['phpunit/phpunit' => '^7.5'],
+            ],
+            new PlanOptions(toPhp: '8.4'),
+        );
+
+        // PHPUnit 7 cannot run on PHP 8, so the plan carries the manual move to
+        // 9 just before the first hop that targets PHP 8.0; from there the
+        // normal PHPUnit hops take over.
+        self::assertSame(
+            ['laravel-6-to-7', 'laravel-7-to-8', 'php-73-to-74', 'phpunit-to-9-manual', 'php-74-to-80', 'laravel-8-to-9', 'php-80-to-81', 'phpunit-9-to-10', 'laravel-9-to-10', 'php-81-to-82', 'phpunit-10-to-11', 'laravel-10-to-11', 'laravel-11-to-12', 'php-82-to-83', 'phpunit-11-to-12', 'laravel-12-to-13', 'php-83-to-84', 'phpunit-12-to-13'],
+            $this->ids($plan),
+        );
+        self::assertCount(1, array_keys($this->ids($plan), 'phpunit-to-9-manual'));
+    }
+
     public function test_an_old_app_never_rests_on_a_pair_laravel_does_not_support(): void
     {
         $plan = $this->plan('laravel-blade', new PlanOptions(fromPhp: '8.1', fromLaravel: '9', toPhp: '8.3', toLaravel: '13'));

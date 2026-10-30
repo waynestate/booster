@@ -81,11 +81,15 @@ final class Planner
         $fromPhpunit = $project->phpunitMajor;
         $toPhpunit = null;
         $phpunitChain = $this->registry->phpunitChain();
+        $phpunitBeforeManual = $fromPhpunit;
+        $phpunitManualPending = false;
         if ($fromPhpunit !== null) {
             if (!in_array($fromPhpunit, $phpunitChain, true)) {
                 if (version_compare($fromPhpunit, $phpunitChain[0], '<')) {
-                    $warnings[] = sprintf('PHPUnit %s is below what BOOSTER can plan (%s to %s); PHPUnit hops are skipped.', $fromPhpunit, $phpunitChain[0], $phpunitChain[count($phpunitChain) - 1]);
-                    $fromPhpunit = null;
+                    // PHPUnit 7 and 8 do not run on PHP 8, so the plan carries a
+                    // manual move to 9 instead of skipping the PHPUnit hops.
+                    $phpunitManualPending = true;
+                    $fromPhpunit = $phpunitChain[0];
                 } else {
                     throw new ToolError(sprintf('PHPUnit %s is outside what BOOSTER can plan (%s to %s).', $fromPhpunit, $phpunitChain[0], $phpunitChain[count($phpunitChain) - 1]));
                 }
@@ -120,6 +124,15 @@ final class Planner
             $nextLaravel = $laravel !== null && $toLaravel !== null && $laravel !== $toLaravel ? $this->registry->nextLaravel($laravel) : null;
             $nextPhpunit = $phpunit !== null && $toPhpunit !== null && $phpunit !== $toPhpunit ? $this->registry->nextPhpunit($phpunit) : null;
             $nextPhp = $php !== $toPhp ? $this->registry->nextPhp($php) : null;
+
+            // PHPUnit below 9 cannot run the gates on PHP 8, so the manual move
+            // to 9 lands before the first step that targets PHP 8.0 or newer.
+            if ($phpunitManualPending && (version_compare($php, '8.0', '>=') || ($nextPhp !== null && version_compare($nextPhp, '8.0', '>=')))) {
+                $hop = $this->registry->get(HopRegistry::PHPUNIT_TO_9_MANUAL_ID);
+                $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $laravel, $phpunitBeforeManual, $phpunit);
+                $phpunitManualPending = false;
+                continue;
+            }
 
             // The SESAME swap needs PHP 8.3, so it goes in just before the hop
             // from Laravel 10 to 11. While PHP is still below 8.3 that Laravel

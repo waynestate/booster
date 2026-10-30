@@ -36,6 +36,9 @@ final class HopRegistry
     /** The manual playbook that stands in for the three staged Vue hops. */
     public const VUE_2_TO_3_ID = 'vue-2-to-3';
 
+    /** The manual playbook that moves a PHPUnit below 9 onto PHPUnit 9. */
+    public const PHPUNIT_TO_9_MANUAL_ID = 'phpunit-to-9-manual';
+
     /** The lowest Laravel major whose upgrade guide ships Vite as the front-end tool. */
     public const VITE_LARAVEL_FLOOR = '9';
 
@@ -111,6 +114,7 @@ final class HopRegistry
         $this->addPhpHops();
         $this->addLaravelHops();
         $this->addPhpunitHops();
+        $this->add($this->phpunitTo9ManualHop());
         $this->add($this->sesameHop());
         $this->add($this->nodePinHop());
         $this->add($this->mixToViteHop());
@@ -577,6 +581,29 @@ final class HopRegistry
                 links: [sprintf('https://phpunit.de/articles/migrating-to-phpunit-%s.html', $to)],
             ));
         }
+    }
+
+    /**
+     * The manual step for apps whose PHPUnit is below 9. PHPUnit 7 and 8 do
+     * not run on PHP 8, so the planner puts this hop before the first step
+     * that targets PHP 8.0 and counts the app as PHPUnit 9 from there on.
+     */
+    private function phpunitTo9ManualHop(): Hop
+    {
+        return new Hop(
+            id: self::PHPUNIT_TO_9_MANUAL_ID,
+            kind: HopKind::Phpunit,
+            from: 'below-9',
+            to: '9',
+            summary: 'Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves.',
+            notes: [
+                'Raise phpunit/phpunit to ^9.5 in require-dev.',
+                'Replace setUp() and tearDown() without : void.',
+                'Replace assertInternalType and @expectedException.',
+                'Run the tests.',
+            ],
+            links: ['https://phpunit.de/articles/migrating-to-phpunit-9.html'],
+        );
     }
 
     private function sesameHop(): Hop
