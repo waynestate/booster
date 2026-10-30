@@ -299,6 +299,14 @@ final class TextWriter
                 }
             }
         }
+        if ($comparison === null && $proctor->status === ProctorResult::FAILED && $proctor->failures !== []) {
+            // No steps means no before/after to split, so the findings stand as-is.
+            $lines[] = '   Findings:';
+            foreach ($proctor->failures as $failure) {
+                $lines[] = $this->findingLine($failure);
+            }
+            $lines[] = '   Fix the findings above.';
+        }
 
         return $lines;
     }

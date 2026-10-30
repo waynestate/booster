@@ -127,7 +127,9 @@ final class HopExecutor
         }
 
         $proctor = $this->runProctorGate($plan, $path, $options, $results);
-        $comparison = $proctor === null ? null : ProctorComparison::compare($proctorBaseline, $proctor);
+        // With steps the final gate reads against the pre-upgrade baseline; with
+        // no steps there is nothing to compare, so the single result stands alone.
+        $comparison = $proctor === null || $plan->steps === [] ? null : ProctorComparison::compare($proctorBaseline, $proctor);
         // A run that stops before the final target (an EOL stop, --until or
         // --only) cannot prove the app at that target, so the PROCTOR gate
         // reports instead of blocking.
@@ -163,15 +165,16 @@ final class HopExecutor
 
     /**
      * The PROCTOR gate: once every step finished without failing, measure the
-     * upgraded app against the CREED policy on the final PHP. Skipped for dry
-     * runs, when the gate is skipped, when the plan has no steps, or when a
+     * app against the CREED policy on the final PHP. With no steps there is
+     * nothing to upgrade, so it runs once on the app's current PHP and stands
+     * on its own. Skipped for dry runs, when the gate is skipped, or when a
      * step left the run unfinished.
      *
      * @param list<StepResult> $results
      */
     private function runProctorGate(Plan $plan, string $path, RunOptions $options, array $results): ?ProctorResult
     {
-        if ($options->dryRun || $options->skipGate || $plan->steps === [] || $this->proctor === null) {
+        if ($options->dryRun || $options->skipGate || $this->proctor === null) {
             return null;
         }
         foreach ($results as $result) {
@@ -179,7 +182,9 @@ final class HopExecutor
                 return null;
             }
         }
-        $php = $plan->targetPhp ?? $this->startingPhp($plan);
+        // With no steps there is nothing to land on, so the single check runs
+        // on the app's current PHP; otherwise it lands where the last step did.
+        $php = $plan->steps === [] ? $this->startingPhp($plan) : ($plan->targetPhp ?? $this->startingPhp($plan));
         if ($php === null) {
             return null;
         }

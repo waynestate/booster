@@ -1476,6 +1476,88 @@ final class HopExecutorTest extends TestCase
         self::assertNull($report->proctorComparison);
     }
 
+    /**
+     * Builds a raw-php project and an already-up-to-date plan (no steps), then
+     * runs it through the executor with a PROCTOR gate wired in.
+     */
+    private function runEmptyPlan(FakeProcessRunner $fake, RunOptions $options): array
+    {
+        $dir = $this->copyExample('raw-php');
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.5', toPhp: '8.5'), $this->today());
+        self::assertSame([], $plan->steps);
+        $executor = new HopExecutor(
+            new RectorRunner($fake, '/fake/rector'),
+            new ComposerEditor(),
+            new TargetImageRunner($fake),
+            $fake,
+            null,
+            null,
+            new ProctorRunner($fake, '/fake/proctor', 'php'),
+        );
+
+        return [$executor->execute($plan, $options), $project];
+    }
+
+    public function test_an_empty_plan_runs_proctor_once_on_the_current_php(): void
+    {
+        $fake = $this->fake(proctorExit: 0);
+        [$report, $project] = $this->runEmptyPlan($fake, new RunOptions());
+
+        // Nothing to upgrade, but the gate still measures the app once, on the PHP it is on now.
+        self::assertCount(1, $this->proctorRuns($fake));
+        self::assertContains('--php-runtime=' . $project->phpVersion . '.0', $this->proctorRuns($fake)[0]);
+        self::assertNotNull($report->proctor);
+        self::assertSame(ProctorResult::PASSED, $report->proctor->status);
+        self::assertSame($project->phpVersion, $report->proctor->php);
+        self::assertNull($report->proctorComparison);
+        self::assertFalse($report->failed());
+    }
+
+    public function test_an_empty_plan_proctor_failure_blocks_the_run(): void
+    {
+        $fake = $this->fake(proctorExit: 1);
+        [$report] = $this->runEmptyPlan($fake, new RunOptions());
+
+        self::assertTrue($report->failed());
+        self::assertNotNull($report->proctor);
+        self::assertSame(ProctorResult::FAILED, $report->proctor->status);
+        self::assertCount(2, $report->proctor->failures);
+        $array = $report->toArray();
+        self::assertTrue($array['proctor']['blocking']);
+        // With no baseline there is nothing to call pre-existing, so nothing is "new" either.
+        self::assertSame([], $array['proctor']['new']);
+        self::assertFalse($array['proctor']['baseline']['taken']);
+    }
+
+    public function test_an_empty_plan_proctor_is_skipped_for_dry_runs_and_skip_gate(): void
+    {
+        $dry = $this->fake(proctorExit: 0);
+        [$report] = $this->runEmptyPlan($dry, new RunOptions(dryRun: true));
+        self::assertSame([], $this->proctorRuns($dry));
+        self::assertNull($report->proctor);
+
+        $skipped = $this->fake(proctorExit: 0);
+        [$report] = $this->runEmptyPlan($skipped, new RunOptions(skipGate: true));
+        self::assertSame([], $this->proctorRuns($skipped));
+        self::assertNull($report->proctor);
+    }
+
+    public function test_the_text_report_lists_findings_when_there_are_no_steps(): void
+    {
+        $fake = $this->fake(proctorExit: 1);
+        [$report, $project] = $this->runEmptyPlan($fake, new RunOptions());
+        $text = (new TextWriter())->run($report);
+
+        self::assertStringContainsString('PROCTOR: FAIL on PHP ' . $project->phpVersion . ' (2 findings).', $text);
+        self::assertStringContainsString('Findings:', $text);
+        self::assertStringContainsString('[php-floor]', $text);
+        self::assertStringContainsString('[lock-committed]', $text);
+        self::assertStringNotContainsString('New:', $text);
+        self::assertStringContainsString('Fix the findings above.', $text);
+        self::assertStringContainsString('RESULT: FAIL', $text);
+    }
+
     public function test_the_report_array_carries_the_proctor_section(): void
     {
         $array = $this->executeWithProctor($this->fake(proctorExit: 1), new RunOptions())->toArray();
