@@ -18,6 +18,8 @@ final class ProjectDetector
 {
     private const WAYNE_CAS_PACKAGE = 'cit-web-infra/wayne-cas';
 
+    private const BOOST_PACKAGE = 'laravel/boost';
+
     public function detect(string $path): Project
     {
         if (!is_dir($path)) {
@@ -32,7 +34,7 @@ final class ProjectDetector
         $all = $require + $requireDev;
 
         $laravelConstraint = $all['laravel/framework'] ?? null;
-        $laravel = is_string($laravelConstraint) ? $this->lowerBound($laravelConstraint, 1) : null;
+        $laravel = is_string($laravelConstraint) ? $this->laravelMajor($laravelConstraint) : null;
 
         $phpunitConstraint = $requireDev['phpunit/phpunit'] ?? null;
         $phpunit = is_string($phpunitConstraint) ? $this->lowerBound($phpunitConstraint, 1) : null;
@@ -77,7 +79,25 @@ final class ProjectDetector
             nodeMajor: $node,
             hasMixFile: is_file($path . '/webpack.mix.js'),
             vueMinor: $vueMinor,
+            hasBoost: array_key_exists(self::BOOST_PACKAGE, $all) || $this->lockHasBoost($path . '/composer.lock'),
         );
+    }
+
+    /**
+     * The Laravel major a constraint floors at, keeping the minor for 5.x
+     * ("^5.8" becomes "5.8") because BOOSTER plans the 5.8 to 6 hop, and whole
+     * majors otherwise ("^10.0" becomes "10"). Null when the constraint cannot
+     * be parsed.
+     */
+    private function laravelMajor(string $constraint): ?string
+    {
+        $bound = $this->lowerBound($constraint, 2);
+        if ($bound === null) {
+            return null;
+        }
+        $major = explode('.', $bound)[0];
+
+        return $major === '5' ? $bound : $major;
     }
 
     /**
@@ -116,6 +136,37 @@ final class ProjectDetector
 
         /** @var array<string, mixed> $data */
         return $data;
+    }
+
+    /**
+     * Whether composer.lock still carries laravel/boost in packages or
+     * packages-dev. A missing or broken lock counts as no: the manifest is the
+     * primary source, and an old app with a stale lock must not break detect.
+     */
+    private function lockHasBoost(string $file): bool
+    {
+        if (!is_file($file)) {
+            return false;
+        }
+        $raw = file_get_contents($file);
+        $data = $raw === false ? null : json_decode($raw, true);
+        if (!is_array($data)) {
+            return false;
+        }
+
+        foreach (['packages', 'packages-dev'] as $section) {
+            $packages = $data[$section] ?? [];
+            if (!is_array($packages)) {
+                continue;
+            }
+            foreach ($packages as $entry) {
+                if (is_array($entry) && ($entry['name'] ?? null) === self::BOOST_PACKAGE) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

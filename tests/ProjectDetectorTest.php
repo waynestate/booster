@@ -73,6 +73,57 @@ final class ProjectDetectorTest extends TestCase
         self::assertFalse((new ProjectDetector())->detect($this->example('raw-php'))->usesWayneCas);
     }
 
+    public function test_boost_is_flagged_from_the_manifest_or_the_lock(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"laravel/framework":"^11.0","laravel/boost":"^1.0"}}');
+        self::assertTrue((new ProjectDetector())->detect($dir)->hasBoost);
+
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require-dev":{"laravel/boost":"^1.0"}}');
+        self::assertTrue((new ProjectDetector())->detect($dir)->hasBoost);
+
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{}}');
+        file_put_contents($dir . '/composer.lock', json_encode(['packages' => [['name' => 'laravel/boost', 'version' => '1.0.0']]]));
+        self::assertTrue((new ProjectDetector())->detect($dir)->hasBoost);
+
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{}}');
+        file_put_contents($dir . '/composer.lock', json_encode(['packages-dev' => [['name' => 'laravel/boost', 'version' => '1.0.0']]]));
+        self::assertTrue((new ProjectDetector())->detect($dir)->hasBoost);
+    }
+
+    public function test_boost_is_absent_without_a_manifest_entry_or_lock_hit(): void
+    {
+        self::assertFalse((new ProjectDetector())->detect($this->example('raw-php'))->hasBoost);
+        self::assertFalse((new ProjectDetector())->detect($this->example('laravel-blade'))->hasBoost);
+
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"laravel/framework":"^11.0"}}');
+        file_put_contents($dir . '/composer.lock', json_encode(['packages' => [['name' => 'laravel/framework', 'version' => '11.0.0']]]));
+        self::assertFalse((new ProjectDetector())->detect($dir)->hasBoost);
+
+        // A broken lock cannot hide or invent Boost: the manifest still decides.
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{}}');
+        file_put_contents($dir . '/composer.lock', '{broken');
+        self::assertFalse((new ProjectDetector())->detect($dir)->hasBoost);
+
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"laravel/boost":"^1.0"}}');
+        file_put_contents($dir . '/composer.lock', '{broken');
+        self::assertTrue((new ProjectDetector())->detect($dir)->hasBoost);
+    }
+
+    public function test_boost_survives_to_array(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"laravel/boost":"^1.0"}}');
+
+        self::assertTrue((new ProjectDetector())->detect($dir)->toArray()['boost']);
+    }
+
     public function test_an_app_without_composer_is_raw_php_with_unknown_version(): void
     {
         $project = (new ProjectDetector())->detect($this->tempDir());
@@ -96,6 +147,28 @@ final class ProjectDetectorTest extends TestCase
         file_put_contents($dir . '/composer.json', '{"require":{"php":"^7.4 || ^8.0"}}');
 
         self::assertSame('7.4', (new ProjectDetector())->detect($dir)->phpVersion);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('laravelConstraints')]
+    public function test_a_laravel_constraint_reads_as_the_major_it_floors_at(string $constraint, ?string $expected): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"laravel/framework":' . json_encode($constraint) . '}}');
+
+        self::assertSame($expected, (new ProjectDetector())->detect($dir)->laravelMajor);
+    }
+
+    /** @return list<array{string, ?string}> */
+    public static function laravelConstraints(): array
+    {
+        return [
+            // 5.x keeps its minor: BOOSTER plans the 5.8 to 6 hop.
+            ['^5.8', '5.8'],
+            ['~5.8', '5.8'],
+            ['^6.0', '6'],
+            ['^10.0', '10'],
+            ['*', null],
+        ];
     }
 
     public function test_broken_json_and_missing_directory_are_tool_errors(): void

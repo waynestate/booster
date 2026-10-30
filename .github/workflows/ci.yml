@@ -10,8 +10,8 @@ permissions:
 
 jobs:
   ci:
-    # pin to a PREFLIGHT tag at its first GitHub release
-    uses: waynestate/preflight/.github/workflows/php-package.yml@65711c350bd0ddf637f0933482d7bdae2a9b3c3b
+    # pinned to the PREFLIGHT 0.1.2 release tag
+    uses: waynestate/preflight/.github/workflows/php-package.yml@0.1.2
     with:
       php-versions: '["8.3","8.4","8.5"]'
       ci-command: composer ci

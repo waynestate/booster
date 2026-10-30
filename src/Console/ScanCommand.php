@@ -12,10 +12,12 @@ use Waynestate\Booster\Report\JsonWriter;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\ProcessRunner;
 use Waynestate\Booster\Scan\PhpCompatScan;
+use Waynestate\Booster\Scan\PhpStanScan;
+use Waynestate\Booster\Scan\RemovalsScan;
 use Waynestate\Booster\ToolError;
 
 /**
- * The advisory scan on its own: "what breaks on PHP X.Y?" without a plan.
+ * The advisory scans on their own: "what breaks on PHP X.Y?" without a plan.
  * Findings are hints for the person upgrading, so the command exits 0 even
  * when it finds a wall full of them; only a bad --php is a tool error.
  */
@@ -28,11 +30,13 @@ final class ScanCommand extends BaseCommand
 
     protected function configure(): void
     {
-        $this->setName('scan')->setDescription('Advisory PHPCompatibility scan: show what will break on a PHP version. Changes nothing.');
+        $this->setName('scan')->setDescription('Advisory scans: show what will break on a PHP version, and what PHPStan says there. Changes nothing.');
         $this
             ->addOption('path', null, InputOption::VALUE_REQUIRED, 'Path to the application.', '.')
             ->addOption('php', null, InputOption::VALUE_REQUIRED, 'The PHP version to ask about (major.minor).')
-            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format (text, json).', 'text');
+            ->addOption('removals', null, InputOption::VALUE_NONE, 'List uses of functions and constructs removed in PHP up to --php, instead of the PHPCompatibility scan.')
+            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format (text, json).', 'text')
+            ->addOption('phpstan', null, InputOption::VALUE_NONE, 'Also run the PHPStan scan (Pinstripe preset) at the same PHP version.');
     }
 
     protected function handle(InputInterface $input, OutputInterface $output): int
@@ -52,12 +56,40 @@ final class ScanCommand extends BaseCommand
             ));
         }
 
-        $scan = (new PhpCompatScan($this->processes))->scan($this->stringOption($input, 'path') ?? '.', $php);
+        if ((bool) $input->getOption('removals')) {
+            // Everything removed between the oldest PHP Booster plans (the
+            // chain floor) and --php, no processes involved.
+            $result = (new RemovalsScan())->scan($this->stringOption($input, 'path') ?? '.', $chain[0], $php);
 
-        $output->writeln(
-            $format === 'json' ? (new JsonWriter())->write($scan->toArray()) : (new TextWriter())->phpCompat($scan),
-            OutputInterface::OUTPUT_RAW,
-        );
+            $output->writeln(
+                $format === 'json' ? (new JsonWriter())->write(['removals' => $result->toArray()]) : implode("\n", (new TextWriter())->removals($result, null)),
+                OutputInterface::OUTPUT_RAW,
+            );
+
+            return self::EXIT_PASS;
+        }
+
+        $path = $this->stringOption($input, 'path') ?? '.';
+        $scan = (new PhpCompatScan($this->processes))->scan($path, $php);
+        $phpstan = (bool) $input->getOption('phpstan')
+            ? (new PhpStanScan($this->processes))->scan($path, $php)
+            : null;
+
+        if ($format === 'json') {
+            $data = $scan->toArray();
+            if ($phpstan !== null) {
+                $data['phpstan'] = $phpstan->toArray();
+            }
+            $text = (new JsonWriter())->write($data);
+        } else {
+            $writer = new TextWriter();
+            $text = $writer->phpCompat($scan);
+            if ($phpstan !== null) {
+                $text .= "\n\n" . $writer->phpStan($phpstan);
+            }
+        }
+
+        $output->writeln($text, OutputInterface::OUTPUT_RAW);
 
         return self::EXIT_PASS;
     }

@@ -31,6 +31,37 @@ final class CliTest extends TestCase
         return $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''));
     }
 
+    /**
+     * A FakeProcessRunner that answers both discovery probes (phpcs -i,
+     * phpstan --version) and hands the real scans to $phpcs and $phpstan.
+     */
+    private function dualFake(callable $phpcs, callable $phpstan): FakeProcessRunner
+    {
+        return new FakeProcessRunner(static function (array $command) use ($phpcs, $phpstan): ProcessResult {
+            if (in_array('-i', $command, true)) {
+                return new ProcessResult(0, self::PHPCOMPAT_STANDARDS, '');
+            }
+            if (in_array('--version', $command, true)) {
+                return new ProcessResult(0, "PHPStan - PHP Static Analysis Tool 2.3.5\n", '');
+            }
+            if (in_array('analyse', $command, true)) {
+                return $phpstan();
+            }
+
+            return $phpcs();
+        });
+    }
+
+    /**
+     * @param array<string, mixed> $files
+     *
+     * @return array<string, mixed>
+     */
+    private function phpstanReport(array $files): array
+    {
+        return ['totals' => ['errors' => 1, 'file_errors' => 1], 'files' => $files, 'errors' => []];
+    }
+
     public function test_plan_prints_the_hops_in_order(): void
     {
         [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84'], $this->cleanPhpcsFake());
@@ -206,6 +237,90 @@ final class CliTest extends TestCase
         self::assertStringContainsString('--php', $out);
     }
 
+    public function test_scan_phpstan_flag_adds_the_phpstan_section(): void
+    {
+        $app = $this->example('raw-php');
+        $report = $this->phpstanReport([
+            $app . '/src/Legacy.php' => [
+                'errors' => 1,
+                'messages' => [['message' => 'Function each() does not exist.', 'line' => 12, 'ignorable' => true, 'identifier' => 'function.notFound']],
+            ],
+        ]);
+        $fake = $this->dualFake(
+            static fn(): ProcessResult => new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''),
+            static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($report), ''),
+        );
+
+        [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $app, '--php' => '8.4', '--phpstan' => true], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Will break on PHP 8.4: no findings.', $out);
+        self::assertStringContainsString('PHPStan on PHP 8.4: 1 finding.', $out);
+        self::assertStringContainsString('src/Legacy.php:12 [function.notFound] Function each()', $out);
+    }
+
+    public function test_scan_without_the_flag_stays_phpcompat_only(): void
+    {
+        $fake = $this->dualFake(
+            static fn(): ProcessResult => new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''),
+            static fn(): ProcessResult => new ProcessResult(1, '{"totals":{"errors":9,"file_errors":9},"files":{},"errors":[]}', ''),
+        );
+
+        [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $this->example('raw-php'), '--php' => '8.4'], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringNotContainsString('PHPStan', $out);
+        self::assertCount(0, $fake->commandsContaining('analyse'));
+    }
+
+    public function test_plan_ends_with_the_phpstan_scan_at_the_destination(): void
+    {
+        $app = $this->example('raw-php');
+        $report = $this->phpstanReport([
+            $app . '/src/Legacy.php' => [
+                'errors' => 1,
+                'messages' => [['message' => 'Function each() does not exist.', 'line' => 12, 'ignorable' => true, 'identifier' => 'function.notFound']],
+            ],
+        ]);
+        $fake = $this->dualFake(
+            static fn(): ProcessResult => new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''),
+            static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($report), ''),
+        );
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $app, '--today' => self::TODAY, '--goal' => 'php-74-to-84'], $fake);
+
+        self::assertSame(0, $exit);
+        // The PHPCompatibility scan asks about the first wall (8.0); the
+        // PHPStan scan asks about where the plan lands (8.4).
+        self::assertStringContainsString('Will break on PHP 8.0: no findings.', $out);
+        self::assertStringContainsString('PHPStan on PHP 8.4: 1 finding.', $out);
+        self::assertStringContainsString('src/Legacy.php:12 [function.notFound] Function each()', $out);
+    }
+
+    public function test_plan_json_carries_the_phpstan_result(): void
+    {
+        $app = $this->example('raw-php');
+        $report = $this->phpstanReport([
+            $app . '/src/Legacy.php' => [
+                'errors' => 1,
+                'messages' => [['message' => 'Function each() does not exist.', 'line' => 12, 'ignorable' => true, 'identifier' => 'function.notFound']],
+            ],
+        ]);
+        $fake = $this->dualFake(
+            static fn(): ProcessResult => new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''),
+            static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($report), ''),
+        );
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $app, '--today' => self::TODAY, '--goal' => 'php-74-to-84', '--format' => 'json'], $fake);
+        $data = json_decode($out, true);
+
+        self::assertSame(0, $exit);
+        self::assertSame('ok', $data['phpstan']['status']);
+        self::assertSame('8.4', $data['phpstan']['test_version']);
+        self::assertSame(1, $data['phpstan']['errors']);
+        self::assertSame('src/Legacy.php', $data['phpstan']['findings'][0]['file']);
+    }
+
     public function test_scan_against_the_broken_fixture_finds_removed_and_deprecated_uses(): void
     {
         // End-to-end against the real phpcs: proves the wiring, the ignore
@@ -235,6 +350,39 @@ final class CliTest extends TestCase
 
         self::assertSame(0, $exit);
         self::assertStringContainsString('Will break on PHP 8.5: no findings.', $out);
+    }
+
+    public function test_scan_phpstan_against_the_broken_fixture_finds_removed_functions(): void
+    {
+        // End-to-end against the real PHPStan and the real Pinstripe preset:
+        // proves the binary discovery, the temporary configuration and the
+        // JSON parsing. At 8.3 the removed functions are gone, and the junk
+        // file under vendor/ stays out of the report.
+        [$exit, $out] = $this->booster([
+            'command' => 'scan',
+            '--path' => dirname(__DIR__) . '/tests/fixtures/phpcompat/broken',
+            '--php' => '8.3',
+            '--phpstan' => true,
+        ]);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('PHPStan on PHP 8.3:', $out);
+        self::assertStringContainsString('broken.php:10 [function.notFound]', $out);
+        self::assertStringContainsString('broken.php:20 [function.notFound]', $out);
+        self::assertStringNotContainsString('junk.php', $out);
+    }
+
+    public function test_scan_phpstan_against_the_clean_fixture_is_quiet(): void
+    {
+        [$exit, $out] = $this->booster([
+            'command' => 'scan',
+            '--path' => dirname(__DIR__) . '/tests/fixtures/phpcompat/clean',
+            '--php' => '8.5',
+            '--phpstan' => true,
+        ]);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('PHPStan on PHP 8.5: no findings.', $out);
     }
 
     public function test_bad_options_are_exit_2(): void
@@ -272,7 +420,7 @@ final class CliTest extends TestCase
 
         [, $json] = $this->booster(['command' => 'hops', '--format' => 'json']);
         $hops = json_decode($json, true)['hops'];
-        self::assertCount(26, $hops);
+        self::assertCount(30, $hops);
         $byId = [];
         foreach ($hops as $hop) {
             $byId[$hop['id']] = $hop;
@@ -289,6 +437,49 @@ final class CliTest extends TestCase
 
         self::assertSame(0, $exit);
         self::assertStringContainsString('laravel-inertia-vue', $out);
+    }
+
+    public function test_detect_shows_boost_yes_or_no(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"php":"^8.3","laravel/framework":"^11.0","laravel/boost":"^1.0"}}');
+
+        [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $dir]);
+        self::assertSame(0, $exit);
+        self::assertMatchesRegularExpression('/^boost\s+yes$/m', $out);
+
+        [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $this->example('raw-php')]);
+        self::assertSame(0, $exit);
+        self::assertMatchesRegularExpression('/^boost\s+no$/m', $out);
+
+        [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $dir, '--format' => 'json']);
+        self::assertSame(0, $exit);
+        self::assertTrue(json_decode($out, true)['boost']);
+    }
+
+    public function test_plan_reports_laravel_boost_only_when_it_is_there(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', json_encode([
+            'require' => ['php' => '^8.3', 'laravel/framework' => '^11.0', 'laravel/boost' => '^1.0'],
+            'require-dev' => ['phpunit/phpunit' => '^11.0'],
+        ]));
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $dir, '--today' => self::TODAY, '--no-scan' => true]);
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Laravel Boost found: the playbooks include Boost prompts.', $out);
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('laravel-blade'), '--today' => self::TODAY, '--no-scan' => true]);
+        self::assertSame(0, $exit);
+        self::assertStringNotContainsString('Laravel Boost found', $out);
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $dir, '--today' => self::TODAY, '--no-scan' => true, '--format' => 'json']);
+        self::assertSame(0, $exit);
+        self::assertTrue(json_decode($out, true)['project']['boost']);
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('laravel-blade'), '--today' => self::TODAY, '--no-scan' => true, '--format' => 'json']);
+        self::assertSame(0, $exit);
+        self::assertFalse(json_decode($out, true)['project']['boost']);
     }
 
     public function test_run_dry_run_prints_the_rector_diff_and_exits_0(): void
@@ -353,6 +544,40 @@ final class CliTest extends TestCase
         self::assertSame(2, $exit);
     }
 
+    public function test_run_rejects_a_bad_memory_limit(): void
+    {
+        [$exit, $out] = $this->booster(['command' => 'run', '--path' => $this->example('raw-php'), '--memory-limit' => 'lots']);
+
+        self::assertSame(2, $exit);
+        self::assertStringContainsString('--memory-limit', $out);
+        self::assertStringContainsString('lots', $out);
+    }
+
+    public function test_run_passes_the_memory_limit_to_rector(): void
+    {
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [$exit] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--dry-run' => true, '--memory-limit' => '4G', '--goal' => 'php-74-to-84',
+        ], $fake);
+
+        self::assertSame(0, $exit);
+        $rectorCalls = array_values(array_filter($fake->calls, static fn(array $c): bool => in_array('process', $c['command'], true)));
+        self::assertNotEmpty($rectorCalls);
+        foreach ($rectorCalls as $call) {
+            self::assertContains('--memory-limit=4G', $call['command']);
+        }
+    }
+
     public function test_run_json_contains_the_baseline_object(): void
     {
         $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
@@ -361,6 +586,9 @@ final class CliTest extends TestCase
             }
             if ($command[0] === 'docker') {
                 return new ProcessResult(0, '', '');
+            }
+            if (self::isProctorCommand($command)) {
+                return new ProcessResult(0, self::proctorFixture('pass-report.json'), '');
             }
 
             return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
@@ -376,6 +604,72 @@ final class CliTest extends TestCase
         self::assertSame('passed', $data['baseline']['status']);
         self::assertSame('7.4', $data['baseline']['php']);
         self::assertSame(0, $data['baseline']['exit_code']);
+    }
+
+    public function test_a_failing_proctor_gate_exits_1_and_advisory_keeps_it_zero(): void
+    {
+        $proctorCalls = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use (&$proctorCalls): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            if (self::isProctorCommand($command)) {
+                // The odd calls are the baselines on the starting PHP (clean); the even calls are the final gates, which find new failures.
+                $proctorCalls++;
+                $fixture = $proctorCalls % 2 === 1 ? 'pass-report.json' : 'fail-report.json';
+                $exit = $proctorCalls % 2 === 1 ? 0 : 1;
+
+                return new ProcessResult($exit, self::proctorFixture($fixture), '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84',
+        ], $fake);
+        self::assertSame(1, $exit);
+        self::assertStringContainsString('PROCTOR: FAIL', $out);
+        self::assertStringContainsString('New:', $out);
+        self::assertStringContainsString('[php-floor]', $out);
+        self::assertStringContainsString('RESULT: FAIL', $out);
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84', '--proctor-advisory' => true,
+        ], $fake);
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Advisory only', $out);
+        self::assertStringContainsString('RESULT: PASS', $out);
+    }
+
+    public function test_preexisting_proctor_findings_do_not_fail_the_run(): void
+    {
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            if (self::isProctorCommand($command)) {
+                // Baseline and final gate see the same failing findings: they predate the upgrade.
+                return new ProcessResult(1, self::proctorFixture('fail-report.json'), '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84',
+        ], $fake);
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('PROCTOR: FAIL', $out);
+        self::assertStringContainsString('Already present (not blocking):', $out);
+        self::assertStringNotContainsString('New:', $out);
+        self::assertStringContainsString('RESULT: PASS', $out);
     }
 
     public function test_run_exits_1_when_the_baseline_fails(): void

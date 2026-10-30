@@ -41,7 +41,7 @@ final class Planner
                     : 'No composer.json found. Pass --from-php=<major.minor> to say which PHP the app runs on.',
             );
         }
-        $fromPhp = $this->normalisePhp($fromPhp, '--from-php');
+        $fromPhp = $this->normalisePhp($fromPhp, $options->fromPhp !== null ? '--from-php' : 'composer.json');
 
         $fromLaravel = null;
         if ($project->type->isLaravel()) {
