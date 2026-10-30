@@ -86,12 +86,15 @@ final class HopExecutor
 
         $baseline = $this->runBaseline($plan, $path, $options);
         if ($baseline->failed() && !$options->allowFailingBaseline) {
-            // The suite is red before Booster touches anything, so a later red gate would be
-            // unprovable. Stop before the first hop and say so plainly.
+            // The suite is red (or never ran) before Booster touches anything, so a later red
+            // gate would be unprovable. Stop before the first hop and say so plainly.
+            $reason = $baseline->status === BaselineResult::INSTALL_FAILED
+                ? sprintf('composer install failed (exit %d) before the app\'s tests ran. Fix the app\'s composer.json and composer.lock, or pass --allow-failing-baseline.', $baseline->exitCode ?? -1)
+                : "the app's tests fail before any change. Fix them or pass --allow-failing-baseline.";
             $results = [];
             foreach ($plan->steps as $step) {
                 $results[] = new StepResult($step->number, $step->hop->id, StepResult::NOT_RUN, [], [
-                    'Not run because the baseline failed: the app\'s tests fail before any change. Fix them or pass --allow-failing-baseline.',
+                    'Not run because the baseline failed: ' . $reason,
                 ]);
             }
 
@@ -193,15 +196,14 @@ final class HopExecutor
 
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
         $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage);
-        $output = self::lastLines($result->stdout . "\n" . $result->stderr, 20);
+        $outcome = TargetImageRunner::gateOutcome($result);
+        $status = match (true) {
+            $outcome->successful() => BaselineResult::PASSED,
+            $outcome->phase === GateOutcome::PHASE_INSTALL => BaselineResult::INSTALL_FAILED,
+            default => BaselineResult::FAILED,
+        };
 
-        return new BaselineResult(
-            $result->successful() ? BaselineResult::PASSED : BaselineResult::FAILED,
-            $php,
-            $result->exitCode,
-            $output,
-            $warning,
-        );
+        return new BaselineResult($status, $php, $outcome->exitCode, $outcome->output, $warning);
     }
 
     /**
@@ -215,27 +217,6 @@ final class HopExecutor
         }
 
         return $plan->steps[0]->phpBefore ?? $plan->project->phpVersion;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private static function lastLines(string $text, int $count): array
-    {
-        $text = trim($text);
-        if ($text === '') {
-            return [];
-        }
-        $lines = explode("\n", $text);
-        if (count($lines) <= $count) {
-            return $lines;
-        }
-        $kept = [];
-        foreach (array_slice($lines, -$count) as $line) {
-            $kept[] = $line;
-        }
-
-        return $kept;
     }
 
     /**
@@ -350,12 +331,15 @@ final class HopExecutor
                         $wanted,
                         $options->reviewThreshold,
                     ), ...self::summaryLines($prepass, $preview)] : [];
+                    // A real run's gate refreshes the lock for these hops; say so now.
+                    $update = $this->lockUpdatePackages($step);
+                    $wouldRun = $update === [] ? [] : [sprintf('would run: composer update -W %s', implode(' ', $update))];
                     if ($incomplete) {
-                        $messages = [...$threshold, sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$inertiaChanges, ...$hop->notes, ...$notes];
+                        $messages = [...$threshold, ...$wouldRun, sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$inertiaChanges, ...$hop->notes, ...$notes];
                     } elseif ($files === []) {
-                        $messages = [...$threshold, 'Dry run: nothing was changed.', ...($migration->manual ?? []), ...$hop->notes, ...$notes];
+                        $messages = [...$threshold, ...$wouldRun, 'Dry run: nothing was changed.', ...($migration->manual ?? []), ...$hop->notes, ...$notes];
                     } else {
-                        $messages = [...$threshold, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$hop->notes, ...$notes];
+                        $messages = [...$threshold, ...$wouldRun, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$hop->notes, ...$notes];
                     }
 
                     return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $files, $messages, $incomplete, $prepass?->files() ?? [], $rules);
@@ -417,10 +401,29 @@ final class HopExecutor
 
                 if (!$options->skipGate) {
                     $gate = $this->runGate($step, $path, $options, $baseline);
-                    if ($gate !== null) {
-                        return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$gate, ...$notes], false, $prepass?->files() ?? []);
+                    if (!$gate->passed) {
+                        return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$gate->lines, ...$notes], false, $prepass?->files() ?? []);
                     }
+                    $messages = [...$messages, ...$gate->lines];
                     $messages[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
+                    $update = $this->lockUpdatePackages($step);
+                    if ($update !== []) {
+                        $messages[] = sprintf('The gate refreshed composer.lock (composer update -W %s).', implode(' ', $update));
+                    }
+                    $unblocked = $this->composer->temporaryUnblocks($path);
+                    if ($unblocked !== []) {
+                        // The unblock is temporary by name: the final target
+                        // ships without it, so the last step fails until it is
+                        // out of composer.json. Earlier steps only warn.
+                        $finding = sprintf(
+                            'composer.json still has Booster\'s temporary advisory unblock for %s (config.policy.advisories.ignore).',
+                            implode(', ', $unblocked),
+                        );
+                        if ($step->number === count($plan->steps)) {
+                            return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, $finding . ' Remove it before release; Booster fails the final target while it is there.', ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$notes], false, $prepass?->files() ?? []);
+                        }
+                        $messages[] = $finding;
+                    }
                 } else {
                     $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
                 }
@@ -580,27 +583,207 @@ final class HopExecutor
     }
 
     /**
-     * @return list<string>|null failure messages, or null when the gate passed
+     * The packages the gate must refresh in the lock for this step. Laravel
+     * and PHPUnit hops raise a package requirement in composer.json, so a
+     * plain `composer install` would hold the old lock (or fail on its stale
+     * content hash); the gate instead runs `composer update -W` for those
+     * packages, and because the app is mounted at /app the refreshed lock
+     * lands in the app itself. PHP hops only move the platform requirement,
+     * which Composer resolves from the lock, so they keep the plain install.
+     *
+     * @return list<string>
      */
-    private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): ?array
+    private function lockUpdatePackages(PlanStep $step): array
+    {
+        $hop = $step->hop;
+        if ($hop->kind !== HopKind::Laravel && $hop->kind !== HopKind::Phpunit) {
+            return [];
+        }
+
+        return array_keys($hop->composerSet);
+    }
+
+    /**
+     * Runs the step's gate. When Composer 2.10's policy blocking refuses the
+     * tagged releases the lock update needs, it writes the temporary advisory
+     * unblock into composer.json and runs the same gate once more: one retry,
+     * never a loop. The same unblock answers the quiet variant of the same
+     * refusal: with dev stability allowed, Composer does not fail the install
+     * phase at all, it locks the branch instead, so the refreshed lock is read
+     * back and a branch version behind a tagged range is treated like the
+     * block.
+     */
+    private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): GateReport
     {
         $php = $step->phpAfter ?? '';
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
-        $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage);
-        if ($result->successful()) {
+        $update = $this->lockUpdatePackages($step);
+        $unblock = [];
+        $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update);
+        $outcome = TargetImageRunner::gateOutcome($result);
+        if (!$outcome->successful() && $outcome->phase === GateOutcome::PHASE_INSTALL && $update !== []) {
+            $blocked = self::advisoryBlock($outcome->output);
+            if ($blocked !== null) {
+                $unblock = [sprintf(
+                    'Composer refused tagged %s %s for known security advisories; Booster added a temporary, scoped unblock (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.',
+                    $blocked['package'],
+                    $blocked['constraint'],
+                )];
+                try {
+                    $unblock = [...$unblock, ...$this->composer->advisoryUnblock($path, $blocked['package'], $blocked['constraint'], $blocked['ids'])];
+                } catch (ToolError $e) {
+                    $unblock[] = 'Could not write the advisory unblock: ' . $e->getMessage();
+                }
+                // The ignore is in composer.json now, so the same command may
+                // load the blocked releases.
+                $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update);
+                $outcome = TargetImageRunner::gateOutcome($result);
+            }
+        }
+        if ($update !== [] && $outcome->phase === GateOutcome::PHASE_TESTS) {
+            $dev = self::devFallback($step, $path);
+            if ($dev !== null) {
+                $unblock[] = sprintf(
+                    'Composer locked %s to %s although the hop asks for %s: the tagged releases were refused for known security advisories; Booster added a temporary, scoped unblock (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.',
+                    $dev['package'],
+                    $dev['version'],
+                    $dev['constraint'],
+                );
+                try {
+                    $unblock = [...$unblock, ...$this->composer->advisoryUnblock($path, $dev['package'], $dev['constraint'], [])];
+                } catch (ToolError $e) {
+                    $unblock[] = 'Could not write the advisory unblock: ' . $e->getMessage();
+                }
+                // The ignore is in composer.json now, so the same command may
+                // load the tagged releases.
+                $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update);
+                $outcome = TargetImageRunner::gateOutcome($result);
+                $still = self::devFallback($step, $path);
+                if ($still !== null) {
+                    // The unblock did not bring the tags back: fail where the
+                    // lock was written, naming what the lock still carries.
+                    $messages = [sprintf(
+                        'Gate failed: composer update -W %s still resolves %s to %s after the unblock; the tagged releases are not loadable.',
+                        implode(' ', $update),
+                        $still['package'],
+                        $still['version'],
+                    )];
+                    $messages[] = 'This step changed composer.json and composer.lock.';
+                    $messages[] = $this->undoHint($path);
+
+                    return new GateReport(false, [...$unblock, ...$messages]);
+                }
+                $unblock[] = sprintf(
+                    '%s now resolves to the tagged release %s.',
+                    $dev['package'],
+                    self::lockedVersions($path)[$dev['package']] ?? 'a tag',
+                );
+            }
+        }
+        if ($outcome->successful()) {
+            return new GateReport(true, $unblock);
+        }
+
+        // A Composer-phase failure is never reported as the test command
+        // exiting N: the tests never ran, so only the Composer phase is named.
+        $what = match (true) {
+            $outcome->phase !== GateOutcome::PHASE_INSTALL => sprintf('"%s" exited %d', $test, $outcome->exitCode),
+            $update === [] => sprintf('composer install failed (exit %d)', $outcome->exitCode),
+            default => sprintf('composer update -W %s failed (exit %d)', implode(' ', $update), $outcome->exitCode),
+        };
+        $messages = [
+            sprintf('Gate failed: %s on PHP %s. The working copy keeps the changes so you can read them.', $what, $php),
+            ...$outcome->output,
+        ];
+        if ($update !== []) {
+            // Both files are named so the undo line below reads as covering both.
+            $messages[] = 'This step changed composer.json and composer.lock.';
+        }
+        $messages[] = $this->undoHint($path);
+        if ($baseline->status === BaselineResult::FAILED) {
+            $messages[] = 'The baseline was already failing, so this gate failure may predate the upgrade.';
+        } elseif ($baseline->status === BaselineResult::INSTALL_FAILED) {
+            $messages[] = 'No baseline to compare against: the baseline\'s composer install failed, so this gate failure cannot be attributed.';
+        }
+
+        return new GateReport(false, [...$unblock, ...$messages]);
+    }
+
+    /**
+     * Reads Composer 2.10's advisory block out of a failed install phase: the
+     * package whose tagged releases were not loaded, the constraint the root
+     * requires, and the advisory IDs Composer named. Null when the failure is
+     * something else (a stale lock, a platform mismatch, ...).
+     *
+     * @param list<string> $output
+     *
+     * @return array{package: string, constraint: string, ids: list<string>}|null
+     */
+    private static function advisoryBlock(array $output): ?array
+    {
+        $text = implode("\n", $output);
+        if (preg_match('#Root composer\.json requires ([A-Za-z0-9_./~-]+) (\S+), found .*?affected by security advisories \(([^)]*)\)#', $text, $m) !== 1) {
+            return null;
+        }
+        if (preg_match_all('/"([^"]+)"/', $m[3], $ids) === 0 || $ids[1] === []) {
             return null;
         }
 
-        $messages = [
-            sprintf('Gate failed: "%s" exited %d on PHP %s. The working copy keeps the changes so you can read them.', $test, $result->exitCode, $php),
-            trim($result->stdout . "\n" . $result->stderr),
-            $this->undoHint($path),
-        ];
-        if ($baseline->failed()) {
-            $messages[] = 'The baseline was already failing, so this gate failure may predate the upgrade.';
+        return ['package' => $m[1], 'constraint' => $m[2], 'ids' => $ids[1]];
+    }
+
+    /**
+     * The package-to-version map of the app's lock file, across packages and
+     * packages-dev (PHPUnit lives in the dev section). Empty when the lock is
+     * missing or unreadable.
+     *
+     * @return array<string, string>
+     */
+    private static function lockedVersions(string $path): array
+    {
+        $lockFile = rtrim($path, '/\\') . '/composer.lock';
+        if (!is_file($lockFile)) {
+            return [];
+        }
+        $lock = json_decode((string) file_get_contents($lockFile), true);
+        if (!is_array($lock)) {
+            return [];
+        }
+        $locked = [];
+        foreach (['packages', 'packages-dev'] as $section) {
+            foreach ((array) ($lock[$section] ?? []) as $package) {
+                if (is_array($package) && isset($package['name'], $package['version'])) {
+                    $locked[(string) $package['name']] = (string) $package['version'];
+                }
+            }
         }
 
-        return $messages;
+        return $locked;
+    }
+
+    /**
+     * A silent dev fallback out of the refreshed lock: a package the hop set
+     * to a tagged range that Composer locked to a branch version anyway,
+     * because every tagged release matching the range was refused for security
+     * advisories and dev stability was allowed. Null when every hop-set
+     * package resolved to a tag (or is absent from the lock).
+     *
+     * @return array{package: string, constraint: string, version: string}|null
+     */
+    private static function devFallback(PlanStep $step, string $path): ?array
+    {
+        $locked = self::lockedVersions($path);
+        foreach ($step->hop->composerSet as $package => $constraint) {
+            if (str_contains($constraint, '-dev') || str_starts_with($constraint, 'dev-')) {
+                continue; // The hop asked for a branch; a dev lock is what it wanted.
+            }
+            $version = $locked[$package] ?? null;
+            if ($version !== null && (str_ends_with($version, '-dev') || str_starts_with($version, 'dev-'))) {
+                return ['package' => $package, 'constraint' => $constraint, 'version' => $version];
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -638,10 +821,10 @@ final class HopExecutor
             $changes[] = 'Build gate passed: npm ci and npm run build are green in the Node container.';
         } elseif (!$options->skipGate) {
             $gate = $this->runGate($step, $path, $options, $baseline);
-            if ($gate !== null) {
-                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate]);
+            if (!$gate->passed) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
             }
-            $changes[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
+            $changes = [...$changes, ...$gate->lines, 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.'];
         } else {
             $changes[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
         }
@@ -714,10 +897,10 @@ final class HopExecutor
             }
             $changes[] = 'Build gate passed: npm ci and npm run build are green in the Node container, and public/build/manifest.json exists.';
             $gate = $this->runGate($step, $path, $options, $baseline);
-            if ($gate !== null) {
-                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate]);
+            if (!$gate->passed) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
             }
-            $changes[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
+            $changes = [...$changes, ...$gate->lines, 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.'];
         } else {
             $changes[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
         }
@@ -936,14 +1119,15 @@ final class HopExecutor
         }
 
         if (!$options->skipGate) {
-            $failure = $this->runBuildGate($path);
-            if ($failure === null) {
-                $failure = $this->runGate($step, $path, $options, $baseline);
+            $buildFailure = $this->runBuildGate($path);
+            if ($buildFailure !== null) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$buildFailure]);
             }
-            if ($failure !== null) {
-                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$failure]);
+            $gate = $this->runGate($step, $path, $options, $baseline);
+            if (!$gate->passed) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
             }
-            $changes[] = 'Gate passed: npm ci, npm run build and the tests are green.';
+            $changes = [...$changes, ...$gate->lines, 'Gate passed: npm ci, npm run build and the tests are green.'];
         } else {
             $changes[] = 'Gate skipped. Run npm ci, npm run build and the tests before the next step.';
         }

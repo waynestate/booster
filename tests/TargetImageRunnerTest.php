@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Tests;
 
 use Waynestate\Booster\Run\GateImage;
+use Waynestate\Booster\Run\GateOutcome;
 use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\Run\TargetImageRunner;
 use Waynestate\Booster\ToolError;
@@ -32,10 +33,69 @@ final class TargetImageRunnerTest extends TestCase
         $last = $fake->calls[count($fake->calls) - 1]['command'];
         self::assertSame(['docker', 'run', '--rm', '-v', '/srv/my app:/app', '-w', '/app'], array_slice($last, 0, 7));
         self::assertContains('booster-target:8.4-' . $this->stamp(), $last);
-        self::assertSame(
-            'composer install --no-interaction --no-progress --prefer-dist && composer test && vendor/bin/proctor check',
-            $last[count($last) - 1],
-        );
+        $script = $last[count($last) - 1];
+        self::assertStringContainsString('composer install --no-interaction --no-progress --prefer-dist >"$install_log" 2>&1', $script);
+        self::assertStringContainsString('composer test >"$tests_log" 2>&1', $script);
+        self::assertStringContainsString('vendor/bin/proctor check >>"$tests_log" 2>&1', $script);
+        self::assertStringContainsString('tail -n 30 "$install_log"', $script);
+        self::assertStringContainsString('BOOSTER_GATE_PHASE=install', $script);
+        self::assertStringContainsString('BOOSTER_GATE_PHASE=tests', $script);
+        self::assertLessThan(strpos($script, 'composer test'), strpos($script, 'composer install'));
+    }
+
+    public function test_the_container_script_reports_the_install_and_test_phases_separately(): void
+    {
+        $script = TargetImageRunner::containerScript('vendor/bin/phpunit', null);
+
+        // Install runs first and bails with its own phase marker; the tests
+        // only run when the install succeeded.
+        self::assertLessThan(strpos($script, 'vendor/bin/phpunit'), strpos($script, 'composer install'));
+        self::assertStringContainsString('if [ "$install_exit" -ne 0 ]; then', $script);
+        self::assertStringContainsString('exit "$install_exit"', $script);
+        self::assertStringNotContainsString('proctor', $script);
+    }
+
+    public function test_gate_outcome_reads_an_install_failure_from_the_markers(): void
+    {
+        $stdout = "Problem 1 of 1\n- The lock file is not up to date with the latest changes in composer.json.\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4\n";
+        $outcome = TargetImageRunner::gateOutcome(new ProcessResult(4, $stdout, ''));
+
+        self::assertSame(GateOutcome::PHASE_INSTALL, $outcome->phase);
+        self::assertSame(4, $outcome->exitCode);
+        self::assertFalse($outcome->successful());
+        self::assertContains('Problem 1 of 1', $outcome->output);
+        foreach ($outcome->output as $line) {
+            self::assertStringStartsNotWith('BOOSTER_GATE_', $line);
+        }
+    }
+
+    public function test_gate_outcome_reads_a_test_failure_from_the_markers(): void
+    {
+        $stdout = "FAILURES!\nBOOSTER_GATE_PHASE=tests\nBOOSTER_GATE_EXIT=1\n";
+        $outcome = TargetImageRunner::gateOutcome(new ProcessResult(1, $stdout, ''));
+
+        self::assertSame(GateOutcome::PHASE_TESTS, $outcome->phase);
+        self::assertSame(1, $outcome->exitCode);
+        self::assertContains('FAILURES!', $outcome->output);
+    }
+
+    public function test_gate_outcome_defaults_to_the_tests_phase_without_markers(): void
+    {
+        $outcome = TargetImageRunner::gateOutcome(new ProcessResult(3, 'some raw output', 'more output'));
+
+        self::assertSame(GateOutcome::PHASE_TESTS, $outcome->phase);
+        self::assertSame(3, $outcome->exitCode);
+        self::assertSame(['some raw output', 'more output'], $outcome->output);
+    }
+
+    public function test_gate_outcome_reads_a_success(): void
+    {
+        $outcome = TargetImageRunner::gateOutcome(new ProcessResult(0, "BOOSTER_GATE_PHASE=tests\n", ''));
+
+        self::assertSame(GateOutcome::PHASE_TESTS, $outcome->phase);
+        self::assertSame(0, $outcome->exitCode);
+        self::assertTrue($outcome->successful());
+        self::assertSame([], $outcome->output);
     }
 
     public function test_the_image_is_built_when_it_is_missing(): void

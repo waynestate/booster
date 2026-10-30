@@ -17,6 +17,12 @@ use Waynestate\Booster\ToolError;
  */
 final class ComposerEditor
 {
+    /** The reason prefix Booster writes into its temporary advisory unblocks. */
+    public const UNBLOCK_REASON_PREFIX = 'Booster temporary unblock';
+
+    /** The prefix older Booster runs wrote; still recognised when reading. */
+    public const LEGACY_UNBLOCK_REASON_PREFIX = 'BOOSTER temporary unblock';
+
     /**
      * @return list<string> human-readable lines about what changed
      */
@@ -60,6 +66,131 @@ final class ComposerEditor
         }
 
         return $changes;
+    }
+
+    /**
+     * The temporary advisory unblock Composer 2.10's policy blocking needs
+     * while an upgrade moves the lock past tagged releases Packagist has
+     * flagged. It writes one scoped entry into composer.json: limited to the
+     * package and the constraint Composer just refused, kept visible to
+     * `composer audit` (on-audit false), and carrying a reason PROCTOR can
+     * find and report until the app is off the blocked versions. Removing
+     * the entry is the app's job once the upgrade is done.
+     *
+     * @param list<string> $advisoryIds
+     *
+     * @return list<string> human-readable lines about what changed
+     */
+    public function advisoryUnblock(string $appPath, string $package, string $constraint, array $advisoryIds): array
+    {
+        $file = rtrim($appPath, '/\\') . '/composer.json';
+        if (!is_file($file)) {
+            throw new ToolError(sprintf('No composer.json at %s, so the advisory unblock has nowhere to go.', $appPath));
+        }
+        $raw = file_get_contents($file);
+        $data = $raw === false ? null : json_decode($raw, true);
+        if (!is_array($data)) {
+            throw new ToolError(sprintf('"%s" is not valid JSON.', $file));
+        }
+
+        // Without named IDs the refusal was the quiet kind: Composer locked a
+        // branch version instead of failing, so the reason says that.
+        $reason = $advisoryIds === []
+            ? sprintf(
+                '%s Packagist advisories block the tagged releases of %s needed for the upgrade, so the lock fell back to a branch version. Remove this entry once the app is off them.',
+                self::UNBLOCK_REASON_PREFIX,
+                $package,
+            )
+            : sprintf(
+                '%s Packagist advisories %s block the tagged releases of %s needed for the upgrade. Remove this entry once the app is off them.',
+                self::UNBLOCK_REASON_PREFIX,
+                implode(', ', $advisoryIds),
+                $package,
+            );
+        $rule = [
+            'constraint' => $constraint,
+            'reason' => $reason,
+            'on-block' => true,
+            'on-audit' => false,
+        ];
+
+        $ignore = $data['config']['policy']['advisories']['ignore'] ?? [];
+        if (!is_array($ignore)) {
+            throw new ToolError(sprintf('The config.policy.advisories.ignore setting in "%s" is neither a list nor a map.', $file));
+        }
+        // A plain list of names is the other allowed shape; normalise it to a map.
+        if ($ignore !== [] && array_is_list($ignore)) {
+            $ignore = array_fill_keys(array_map('strval', $ignore), null);
+        }
+
+        $existing = $ignore[$package] ?? null;
+        if ($existing === null) {
+            $existing = [];
+        } elseif (!is_array($existing)) {
+            $existing = [['reason' => (string) $existing]];
+        } elseif (!array_is_list($existing)) {
+            $existing = [$existing];
+        }
+        if (in_array($rule, $existing, true)) {
+            return [];
+        }
+        $ignore[$package] = [...$existing, $rule];
+        $data['config']['policy']['advisories']['ignore'] = $ignore;
+
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        if (file_put_contents($file, $json . "\n") === false) {
+            throw new ToolError(sprintf('Could not write "%s".', $file));
+        }
+
+        return [sprintf(
+            'Added a temporary advisory unblock to composer.json: config.policy.advisories.ignore.%s for the constraint %s.',
+            $package,
+            $constraint,
+        )];
+    }
+
+    /**
+     * The packages whose config.policy.advisories.ignore entries carry one of
+     * Booster's temporary-unblock reasons (the current prefix or the legacy
+     * all-caps one). Empty when composer.json has none, is missing, or is not
+     * valid JSON: a manifest problem is the gate's to report, not this read.
+     *
+     * @return list<string>
+     */
+    public function temporaryUnblocks(string $appPath): array
+    {
+        $file = rtrim($appPath, '/\\') . '/composer.json';
+        if (!is_file($file)) {
+            return [];
+        }
+        $raw = file_get_contents($file);
+        $data = $raw === false ? null : json_decode($raw, true);
+        if (!is_array($data)) {
+            return [];
+        }
+        $ignore = $data['config']['policy']['advisories']['ignore'] ?? [];
+        if (!is_array($ignore)) {
+            return [];
+        }
+        $packages = [];
+        foreach ($ignore as $package => $rules) {
+            // A package maps to a list of rule objects; older shapes (a bare
+            // string reason, a single object, a null from a normalised name
+            // list) are handled without complaint.
+            if (!is_array($rules) || $rules === []) {
+                continue;
+            }
+            $list = array_is_list($rules) ? $rules : [$rules];
+            foreach ($list as $rule) {
+                $reason = is_array($rule) ? ($rule['reason'] ?? null) : null;
+                if (is_string($reason) && (str_starts_with($reason, self::UNBLOCK_REASON_PREFIX) || str_starts_with($reason, self::LEGACY_UNBLOCK_REASON_PREFIX))) {
+                    $packages[] = (string) $package;
+                    break;
+                }
+            }
+        }
+
+        return $packages;
     }
 
     /**

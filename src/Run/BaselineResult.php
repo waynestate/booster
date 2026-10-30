@@ -17,6 +17,9 @@ final readonly class BaselineResult
 
     public const SKIPPED = 'skipped';
 
+    /** composer install failed before the tests ran, so the suite's state is unknown. */
+    public const INSTALL_FAILED = 'install-failed';
+
     /**
      * @param list<string> $output  the last lines of the run's output
      * @param string|null  $warning an advisory about the suite itself (for example that it holds only Laravel's stock examples)
@@ -31,7 +34,7 @@ final readonly class BaselineResult
 
     public function failed(): bool
     {
-        return $this->status === self::FAILED;
+        return in_array($this->status, [self::FAILED, self::INSTALL_FAILED], true);
     }
 
     /**

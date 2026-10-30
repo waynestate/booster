@@ -337,12 +337,12 @@ PHP 8.1 is past security support; pick a version the policy still supports.
         <li class="seq">
           <span class="seq__t">T−2</span>
           <h3>Raise the constraint</h3>
-          <p>The <code>php</code> or <code>laravel/framework</code> constraint in <code>composer.json</code> goes up, and <code>config.platform.php</code> moves with it. Booster never runs <code>composer update</code>.</p>
+          <p>The <code>php</code> or <code>laravel/framework</code> constraint in <code>composer.json</code> goes up, and <code>config.platform.php</code> moves with it.</p>
         </li>
         <li class="seq">
           <span class="seq__t">T−1</span>
           <h3>The gate</h3>
-          <p>Before the first hop your tests run once on the app's current PHP as the baseline; a red one stops the run unless you pass <code>--allow-failing-baseline</code>. After each hop they run inside <code>booster-target:&lt;php&gt;</code>, built from <code>docker/Dockerfile</code> on the PHP the hop moves to, and after the last hop PROCTOR checks the upgraded app against CREED's policy, blocking only on findings the upgrade introduced. If a red baseline names a missing Mix or Vite manifest, build the front-end assets first. A failure stops the run and leaves the changes for you to read. <code>git checkout .</code> undoes them.</p>
+          <p>Before the first hop your tests run once on the app's current PHP as the baseline; a red one stops the run unless you pass <code>--allow-failing-baseline</code>. After each hop they run inside <code>booster-target:&lt;php&gt;</code>, built from <code>docker/Dockerfile</code> on the PHP the hop moves to. On Laravel and PHPUnit hops the gate refreshes <code>composer.lock</code> for the package the hop moved, so the lock lands on the new major version; if Packagist's security advisories block those releases, whether the install fails outright or Composer quietly locks a branch version where the hop asked for a tag, the gate writes a scoped temporary ignore, retries once, and tells you what it did. The plan's last step then fails until that entry is out of <code>composer.json</code>, so the upgrade never finishes with the unblock still in place. After the last hop PROCTOR checks the upgraded app against CREED's policy, blocking only on findings the upgrade introduced. If a red baseline names a missing Mix or Vite manifest, build the front-end assets first. A failure stops the run and leaves the changes for you to read. <code>git checkout .</code> undoes them.</p>
         </li>
       </ol>
       <p class="sequence__after">Not every hop is Rector. <code>node-pin-24</code> pins Node 26 in <code>package.json</code> and writes <code>.nvmrc</code>; <code>mix-to-vite</code> converts a simple <code>webpack.mix.js</code> and moves the build to Vite. The Vue 2 to 3 move is staged: <code>vue-26-to-27</code>, <code>vue-27-to-compat</code> and <code>vue-compat-codemod</code>, with the <code>vue-2-to-3</code> playbook standing in for all three. Rector doesn't read Vue, so a person works those steps. The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.</p>
@@ -676,7 +676,7 @@ Task:
 
 Constraints:
 - Plan and dry run only, until I say so. Never commit or push.
-- Booster never runs composer update; say which packages will need it after each hop.
+- Laravel and PHPUnit hops refresh composer.lock inside the gate (composer update -W for the package the hop moved), and a Composer-phase failure means the tests never ran. PHP hops keep a plain install: if a committed lock goes stale, say which packages need composer update.
 - Ask me before you guess: a red baseline, a capped hop, or a package that blocks a Laravel major.
 
 Output: the plan with the reason for its order, the SESAME notes if any, the dry-run summary, then your questions.</code></pre>
@@ -759,7 +759,7 @@ Output: the plan sorted by kind, the Inertia checks per Laravel hop, the dry-run
         <li><span class="never__x" aria-hidden="true"></span><h3>Commit, push or open a merge request</h3><p>It edits the working copy and prints a report. A person reads the diff and merges it.</p></li>
         <li><span class="never__x" aria-hidden="true"></span><h3>Start on a dirty tree</h3><p><code>run</code> refuses a working copy that is not under git or has uncommitted changes, so the upgrade diff stands alone. Pass <code>--allow-dirty</code> if you must.</p></li>
         <li><span class="never__x" aria-hidden="true"></span><h3>Aim at an unsupported version</h3><p>An end-of-life target is refused; a security-only one comes with a warning. The dates come from CREED's <code>policy.json</code>, never from Booster's code.</p></li>
-        <li><span class="never__x" aria-hidden="true"></span><h3>Run <code>composer update</code></h3><p>It raises the constraints and stops there. You decide when to resolve them.</p></li>
+        <li><span class="never__x" aria-hidden="true"></span><h3>Resolve more than the hop moves</h3><p>Inside the gate it runs a scoped <code>composer update -W</code> for the package a Laravel or PHPUnit hop moved, so the lock follows the constraint. It never resolves anything else; you decide when to update the rest.</p></li>
         <li><span class="never__x" aria-hidden="true"></span><h3>Pass quietly</h3><p>An unreadable policy, broken JSON, missing Docker or a Rector error stops the run with exit 1 or 2.</p></li>
         <li><span class="never__x" aria-hidden="true"></span><h3>Trust your file names</h3><p>Subprocesses take argument arrays, and control characters are stripped from everything printed. It reads no secrets and makes no network calls of its own.</p></li>
       </ul>

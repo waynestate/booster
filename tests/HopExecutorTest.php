@@ -42,14 +42,16 @@ final class HopExecutorTest extends TestCase
      * @param int            $proctorExit          PROCTOR's exit code (0 pass, 1 fail, 2 tripped); -1 leaves PROCTOR unanswered
      * @param int            $proctorBaselineExit  exit code of the first PROCTOR call (the baseline); -1 answers it like the rest
      * @param string|null    $gitStatusStart       what the first git status prints (the start-of-run read); null answers it like the rest
+     * @param string|null    $baselineStdout       stdout of a failing baseline run; null answers 'FAILURES!' (the tests phase)
+     * @param string|null    $gateStdout           stdout of a failing gate run; null answers 'FAILURES!' (the tests phase)
      */
-    private function fake(int $changedPerHop = 1, string $gitStatus = '', int $gateExit = 0, array $rectorErrors = [], int $baselineExit = 0, int $proctorExit = -1, int $proctorBaselineExit = -1, ?string $gitStatusStart = null): FakeProcessRunner
+    private function fake(int $changedPerHop = 1, string $gitStatus = '', int $gateExit = 0, array $rectorErrors = [], int $baselineExit = 0, int $proctorExit = -1, int $proctorBaselineExit = -1, ?string $gitStatusStart = null, ?string $baselineStdout = null, ?string $gateStdout = null): FakeProcessRunner
     {
         $dockerRuns = 0;
         $proctorRuns = 0;
         $gitRuns = 0;
 
-        return new FakeProcessRunner(static function (array $command) use ($changedPerHop, $gitStatus, $gateExit, $rectorErrors, $baselineExit, $proctorExit, $proctorBaselineExit, $gitStatusStart, &$dockerRuns, &$proctorRuns, &$gitRuns): ProcessResult {
+        return new FakeProcessRunner(static function (array $command) use ($changedPerHop, $gitStatus, $gateExit, $rectorErrors, $baselineExit, $proctorExit, $proctorBaselineExit, $gitStatusStart, $baselineStdout, $gateStdout, &$dockerRuns, &$proctorRuns, &$gitRuns): ProcessResult {
             if ($command[0] === 'git') {
                 $first = $gitRuns === 0;
                 $gitRuns++;
@@ -63,9 +65,10 @@ final class HopExecutorTest extends TestCase
                 }
                 // The first docker run is the baseline; the rest are the per-hop gates.
                 $exit = $dockerRuns === 0 ? $baselineExit : $gateExit;
+                $stdout = $exit !== 0 ? ($dockerRuns === 0 ? ($baselineStdout ?? 'FAILURES!') : ($gateStdout ?? 'FAILURES!')) : '';
                 $dockerRuns++;
 
-                return new ProcessResult($exit, $exit !== 0 ? 'FAILURES!' : '', '');
+                return new ProcessResult($exit, $stdout, '');
             }
             if (self::isProctorCommand($command)) {
                 // The first PROCTOR call is the baseline on the starting PHP; the last is the final gate.
@@ -225,6 +228,41 @@ final class HopExecutorTest extends TestCase
         self::assertStringContainsString('baseline was already failing', implode(' ', $report->results[0]->messages));
     }
 
+    public function test_a_baseline_whose_install_failed_is_not_reported_as_test_failures(): void
+    {
+        $fake = $this->fake(baselineExit: 4, baselineStdout: "Problem 1 of 1\n- The lock file is not up to date with the latest changes in composer.json.\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4");
+        $report = $this->execute($fake, new RunOptions());
+
+        self::assertSame('install-failed', $report->baseline->status);
+        self::assertSame(4, $report->baseline->exitCode);
+        self::assertSame(['not-run', 'not-run'], $this->statuses($report));
+        self::assertTrue($report->failed());
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('composer install failed (exit 4)', $all);
+        self::assertStringNotContainsString("the app's tests fail", $all);
+        $text = (new TextWriter())->run($report);
+        self::assertStringContainsString('Baseline: composer install failed (exit 4)', $text);
+        self::assertStringContainsString('The lock file is not up to date', $text);
+        self::assertStringNotContainsString("The app's tests fail before any change", $text);
+    }
+
+    public function test_an_install_failed_baseline_gives_the_gate_no_baseline_to_compare(): void
+    {
+        $fake = $this->fake(
+            baselineExit: 4,
+            gateExit: 1,
+            baselineStdout: "Your composer.json requires php ^8.3 but your system has 8.1.\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4",
+            gateStdout: 'FAILURES!',
+        );
+        $report = $this->execute($fake, new RunOptions(allowFailingBaseline: true));
+
+        self::assertSame('install-failed', $report->baseline->status);
+        self::assertSame(['gate-failed', 'not-run'], $this->statuses($report));
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('No baseline to compare against', $all);
+        self::assertStringNotContainsString('baseline was already failing', $all);
+    }
+
     public function test_skip_gate_reports_a_skipped_baseline(): void
     {
         $fake = $this->fake();
@@ -245,8 +283,10 @@ final class HopExecutorTest extends TestCase
         self::assertSame(0, $array['baseline']['exit_code']);
     }
 
-    public function test_the_baseline_keeps_only_the_last_twenty_lines(): void
+    public function test_the_baseline_keeps_the_tail_the_container_reports(): void
     {
+        // Tailing happens inside the container (see TargetImageRunnerTest); the host
+        // keeps whatever tail the container printed, with the marker lines removed.
         $lines = '';
         for ($i = 1; $i <= 30; $i++) {
             $lines .= "line {$i}\n";
@@ -261,16 +301,19 @@ final class HopExecutorTest extends TestCase
                     return new ProcessResult(0, '', '');
                 }
 
-                return new ProcessResult(1, $lines, '');
+                return new ProcessResult(1, $lines . "BOOSTER_GATE_PHASE=tests\nBOOSTER_GATE_EXIT=1\n", '');
             }
 
             return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
         });
         $report = $this->execute($fake, new RunOptions(allowFailingBaseline: true));
 
-        self::assertCount(20, $report->baseline->output);
-        self::assertSame('line 11', $report->baseline->output[0]);
-        self::assertSame('line 30', $report->baseline->output[19]);
+        self::assertCount(30, $report->baseline->output);
+        self::assertSame('line 1', $report->baseline->output[0]);
+        self::assertSame('line 30', $report->baseline->output[29]);
+        foreach ($report->baseline->output as $line) {
+            self::assertStringStartsNotWith('BOOSTER_GATE_', $line);
+        }
     }
 
     public function test_rector_is_asked_for_a_preview_before_it_applies(): void
@@ -838,7 +881,7 @@ final class HopExecutorTest extends TestCase
             ->execute($plan, new RunOptions());
 
         $run = array_values(array_filter($fake->calls, static fn(array $c): bool => ($c['command'][1] ?? '') === 'run'))[0]['command'];
-        self::assertStringContainsString('&& composer test', $run[count($run) - 1]);
+        self::assertStringContainsString('composer test >"$tests_log" 2>&1', $run[count($run) - 1]);
     }
 
     public function test_rector_json_paths_become_relative_to_the_app(): void
@@ -1610,5 +1653,479 @@ PHP,
         $laravelSteps = array_values(array_filter($report->results, static fn(StepResult $r): bool => $r->hopId === 'laravel-10-to-11'));
         self::assertCount(1, $laravelSteps);
         self::assertContains('Removed 1 unused import from 1 file after the Rector pass.', $laravelSteps[0]->messages);
+    }
+
+    /**
+     * Plans the laravel-blade example (Laravel 10 to 13, PHP 8.2 to 8.3) and
+     * skips every step but the final Laravel hop, so a run exercises exactly
+     * one gate. The intermediate hops are skipped by id read from the full
+     * plan, so the test does not hard-code hop id spellings.
+     */
+    private function laravelPlan(string $dir): array
+    {
+        $project = (new ProjectDetector())->detect($dir);
+        $planner = new Planner($this->policy(), new HopRegistry());
+        $options = new PlanOptions(fromPhp: '8.2', toPhp: '8.3', fromLaravel: '10', toLaravel: '13');
+        $full = $planner->plan($project, $options, $this->today());
+        $laravelIds = array_values(array_map(
+            static fn(PlanStep $s): string => $s->hop->id,
+            array_filter($full->steps, static fn(PlanStep $s): bool => $s->hop->kind === HopKind::Laravel),
+        ));
+        self::assertSame(['laravel-10-to-11', 'laravel-11-to-12', 'laravel-12-to-13'], $laravelIds);
+        $skip = array_values(array_diff(array_map(static fn(PlanStep $s): string => $s->hop->id, $full->steps), [end($laravelIds)]));
+        $plan = $planner->plan($project, new PlanOptions(fromPhp: '8.2', toPhp: '8.3', fromLaravel: '10', toLaravel: '13', skip: $skip), $this->today());
+
+        return [$dir, $plan];
+    }
+
+    /**
+     * Plans the example as a Laravel 8 app (the test rewrites its composer.json
+     * to ^8.0) and skips every step but the first Laravel hop, so a run
+     * exercises exactly one gate whose constraint is ^9.0: the same constraint
+     * Packagist refused in the live evidence behind the dev-fallback tests.
+     */
+    private function laravelEightPlan(string $dir): array
+    {
+        $project = (new ProjectDetector())->detect($dir);
+        self::assertSame('8', $project->laravelMajor);
+        $planner = new Planner($this->policy(), new HopRegistry());
+        $options = new PlanOptions(fromPhp: '8.0', toPhp: '8.5', fromLaravel: '8', toLaravel: '13');
+        $full = $planner->plan($project, $options, $this->today());
+        self::assertSame('laravel-8-to-9', $full->steps[0]->hop->id);
+        $skip = array_values(array_diff(array_map(static fn(PlanStep $s): string => $s->hop->id, $full->steps), ['laravel-8-to-9']));
+        $plan = $planner->plan($project, new PlanOptions(fromPhp: '8.0', toPhp: '8.5', fromLaravel: '8', toLaravel: '13', skip: $skip), $this->today());
+
+        return [$dir, $plan];
+    }
+
+    /**
+     * Like laravelPlan(), but the run continues one PHP hop past the final
+     * Laravel hop (PHP 8.2 to 8.4), so the Laravel gate is not the plan's last
+     * step: an unblock it adds is a warning, and the final-target failure
+     * lands on the tail step instead.
+     */
+    private function laravelPlanWithTail(string $dir): array
+    {
+        $project = (new ProjectDetector())->detect($dir);
+        $planner = new Planner($this->policy(), new HopRegistry());
+        $options = new PlanOptions(fromPhp: '8.2', toPhp: '8.4', fromLaravel: '10', toLaravel: '13');
+        $full = $planner->plan($project, $options, $this->today());
+        $ids = array_map(static fn(PlanStep $s): string => $s->hop->id, $full->steps);
+        $at = array_search('laravel-12-to-13', $ids, true);
+        self::assertIsInt($at);
+        self::assertSame('php-83-to-84', $ids[$at + 1]);
+        $skip = array_values(array_diff($ids, ['laravel-12-to-13', 'php-83-to-84']));
+        $plan = $planner->plan($project, new PlanOptions(fromPhp: '8.2', toPhp: '8.4', fromLaravel: '10', toLaravel: '13', skip: $skip), $this->today());
+        self::assertSame(['laravel-12-to-13', 'php-83-to-84'], array_map(static fn(PlanStep $s): string => $s->hop->id, $plan->steps));
+
+        return [$dir, $plan];
+    }
+
+    public function test_a_laravel_hop_updates_the_lock_in_the_gate(): void
+    {
+        [$dir, $plan] = $this->laravelPlan($this->copyExample('laravel-blade'));
+        self::assertSame(['laravel-12-to-13'], array_map(static fn(PlanStep $s): string => $s->hop->id, $plan->steps));
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use ($dir, &$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $script = $command[count($command) - 1];
+                $dockerRuns++;
+                if (str_contains($script, 'composer update -W')) {
+                    // Simulate the container writing the refreshed lock through the mount.
+                    file_put_contents($dir . '/composer.lock', json_encode(['packages' => ['laravel/framework' => ['version' => 'v13.39.0']]]));
+                }
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Models/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        $runs = $this->dockerRuns($fake);
+        self::assertCount(2, $runs);
+        $scripts = array_map(static fn(array $run): string => $run['command'][count($run['command']) - 1], $runs);
+        self::assertStringContainsString('composer install --no-interaction --no-progress --prefer-dist', $scripts[0]);
+        self::assertStringContainsString('composer update -W --no-interaction --no-progress laravel/framework', $scripts[1]);
+        self::assertStringNotContainsString('composer install', $scripts[1]);
+        // The refreshed lock lands in the app itself.
+        self::assertFileExists($dir . '/composer.lock');
+        $lock = json_decode((string) file_get_contents($dir . '/composer.lock'), true);
+        self::assertSame('v13.39.0', $lock['packages']['laravel/framework']['version']);
+        self::assertStringContainsString('The gate refreshed composer.lock (composer update -W laravel/framework).', implode(' ', $report->results[0]->messages));
+    }
+
+    public function test_a_laravel_dry_run_says_what_it_would_update_and_runs_nothing(): void
+    {
+        [$dir, $plan] = $this->laravelPlan($this->copyExample('laravel-blade'));
+        $fake = $this->fake();
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions(dryRun: true));
+
+        self::assertSame([], $this->dockerRuns($fake));
+        self::assertSame(StepResult::PREVIEWED, $report->results[0]->status);
+        self::assertStringContainsString('would run: composer update -W laravel/framework', implode(' ', $report->results[0]->messages));
+        self::assertFileDoesNotExist($dir . '/composer.lock');
+    }
+
+    public function test_a_failed_lock_update_fails_the_step_in_the_composer_phase(): void
+    {
+        [$dir, $plan] = $this->laravelPlan($this->copyExample('laravel-blade'));
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use (&$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $dockerRuns++;
+                if ($dockerRuns === 1) {
+                    return new ProcessResult(0, '', '');
+                }
+
+                return new ProcessResult(4, "Problem 1 of 1\n- The lock file is not up to date.\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4", '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => '/srv/app/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('Gate failed: composer update -W laravel/framework failed (exit 4)', $all);
+        self::assertStringContainsString('This step changed composer.json and composer.lock.', $all);
+        self::assertStringContainsString('Undo with:', $all);
+        self::assertStringNotContainsString('"vendor/bin/phpunit" exited', $all);
+        // A stale lock is not an advisory block: no retry, no unblock written.
+        self::assertSame(2, $dockerRuns);
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertArrayNotHasKey('policy', $composer['config'] ?? []);
+    }
+
+    public function test_a_laravel_hop_blocked_by_advisories_unblocks_retries_and_fails_the_final_target(): void
+    {
+        [$dir, $plan] = $this->laravelPlan($this->copyExample('laravel-blade'));
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use ($dir, &$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $script = $command[count($command) - 1];
+                $dockerRuns++;
+                if ($dockerRuns === 2 && str_contains($script, 'composer update -W')) {
+                    // Composer 2.10's policy blocking refuses the tagged releases.
+                    return new ProcessResult(4, "Composer could not find a solution for your request.\n- Root composer.json requires laravel/framework ^13.0, found laravel/framework[v13.0.0, v13.1.0, v13.2.0] but these were not loaded, because they are affected by security advisories (\"PKSA-2026-0001\", \"PKSA-2026-0002\"). Go to https://packagist.org/security-advisories/ to find advisory details.\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4", '');
+                }
+                if (str_contains($script, 'composer update -W')) {
+                    // The retry, with the unblock in place, refreshes the lock.
+                    file_put_contents($dir . '/composer.lock', json_encode(['packages' => ['laravel/framework' => ['version' => 'v13.39.0']]]));
+                }
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Models/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        // The gate itself passes after the retry, but this hop is the plan's
+        // last step, so the final target fails while the unblock remains.
+        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
+        $runs = $this->dockerRuns($fake);
+        self::assertCount(3, $runs);
+        $scripts = array_map(static fn(array $run): string => $run['command'][count($run['command']) - 1], $runs);
+        self::assertStringContainsString('composer install --no-interaction --no-progress --prefer-dist', $scripts[0]);
+        self::assertStringContainsString('composer update -W --no-interaction --no-progress laravel/framework', $scripts[1]);
+        self::assertStringContainsString('composer update -W --no-interaction --no-progress laravel/framework', $scripts[2]);
+        // The temporary unblock is scoped to the package and the refused constraint.
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        $ignore = $composer['config']['policy']['advisories']['ignore']['laravel/framework'];
+        self::assertIsArray($ignore);
+        $rule = $ignore[0];
+        self::assertSame('^13.0', $rule['constraint']);
+        self::assertTrue($rule['on-block']);
+        self::assertFalse($rule['on-audit']);
+        self::assertStringContainsString('Booster temporary unblock', $rule['reason']);
+        self::assertStringContainsString('PKSA-2026-0001', $rule['reason']);
+        self::assertStringContainsString('PKSA-2026-0002', $rule['reason']);
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('Composer refused tagged laravel/framework ^13.0 for known security advisories; Booster added a temporary, scoped unblock (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.', $all);
+        self::assertStringContainsString('Added a temporary advisory unblock to composer.json', $all);
+        self::assertStringContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.", $all);
+        self::assertStringContainsString('Gate passed: tests are green on PHP 8.3.', $all);
+        self::assertFileExists($dir . '/composer.lock');
+    }
+
+    public function test_an_advisory_unblock_that_still_fails_reports_the_failure(): void
+    {
+        [$dir, $plan] = $this->laravelPlan($this->copyExample('laravel-blade'));
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use (&$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $script = $command[count($command) - 1];
+                $dockerRuns++;
+                if ($dockerRuns === 2 && str_contains($script, 'composer update -W')) {
+                    return new ProcessResult(4, "- Root composer.json requires laravel/framework ^13.0, found laravel/framework[v13.0.0] but these were not loaded, because they are affected by security advisories (\"PKSA-2026-0001\").\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4", '');
+                }
+                if ($dockerRuns === 3) {
+                    // The unblock did not help: the same failure comes back.
+                    return new ProcessResult(4, "Composer could not find a solution for your request.\n- Nothing matches your requirements.\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4", '');
+                }
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => '/srv/app/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
+        // Baseline, the blocked gate, and exactly one retry: never a loop.
+        self::assertSame(3, $dockerRuns);
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('Composer refused tagged laravel/framework ^13.0 for known security advisories; Booster added a temporary, scoped unblock (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.', $all);
+        self::assertStringContainsString('Added a temporary advisory unblock to composer.json', $all);
+        self::assertStringContainsString('Gate failed: composer update -W laravel/framework failed (exit 4)', $all);
+        self::assertStringContainsString('Nothing matches your requirements.', $all);
+        self::assertStringContainsString('This step changed composer.json and composer.lock.', $all);
+        // The gate failed, so the final-target finding never gets a turn.
+        self::assertStringNotContainsString("composer.json still has Booster's temporary advisory unblock", $all);
+        // The unblock stays in composer.json for PROCTOR to report.
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertArrayHasKey('laravel/framework', $composer['config']['policy']['advisories']['ignore']);
+    }
+
+    public function test_a_laravel_hop_that_locks_a_dev_branch_unblocks_retries_and_fails_the_final_target(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        file_put_contents($dir . '/composer.json', (string) json_encode([
+            'name' => 'example/laravel-blade',
+            'require' => ['php' => '^8.0', 'laravel/framework' => '^8.0'],
+            'require-dev' => ['phpunit/phpunit' => '^9.0'],
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+        [$dir, $plan] = $this->laravelEightPlan($dir);
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use ($dir, &$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $script = $command[count($command) - 1];
+                $dockerRuns++;
+                if ($dockerRuns === 2 && str_contains($script, 'composer update -W')) {
+                    // Live evidence, 2026-10-30: with dev stability allowed, Composer locked
+                    // the branch instead of refusing, and the install phase still passed.
+                    file_put_contents($dir . '/composer.lock', (string) json_encode(['packages' => [[
+                        'name' => 'laravel/framework',
+                        'version' => '9.x-dev',
+                        'source' => ['reference' => '06605f514a3aba20bdab972cb49a2a3cf0f21532'],
+                    ]]]));
+                }
+                if ($dockerRuns === 3 && str_contains($script, 'composer update -W')) {
+                    // With the unblock in place, the tagged release loads.
+                    file_put_contents($dir . '/composer.lock', (string) json_encode(['packages' => [['name' => 'laravel/framework', 'version' => 'v9.52.16']]]));
+                }
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Models/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        // The gate itself passes after the retry, but this hop is the plan's
+        // last step, so the final target fails while the unblock remains.
+        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
+        $runs = $this->dockerRuns($fake);
+        self::assertCount(3, $runs);
+        $scripts = array_map(static fn(array $run): string => $run['command'][count($run['command']) - 1], $runs);
+        self::assertStringContainsString('composer install --no-interaction --no-progress --prefer-dist', $scripts[0]);
+        self::assertStringContainsString('composer update -W --no-interaction --no-progress laravel/framework', $scripts[1]);
+        self::assertStringContainsString('composer update -W --no-interaction --no-progress laravel/framework', $scripts[2]);
+        // The temporary unblock is scoped to the package and the hop's constraint.
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        $ignore = $composer['config']['policy']['advisories']['ignore']['laravel/framework'];
+        self::assertIsArray($ignore);
+        $rule = $ignore[0];
+        self::assertSame('^9.0', $rule['constraint']);
+        self::assertTrue($rule['on-block']);
+        self::assertFalse($rule['on-audit']);
+        self::assertStringContainsString('Booster temporary unblock', $rule['reason']);
+        self::assertStringContainsString('branch version', $rule['reason']);
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('Composer locked laravel/framework to 9.x-dev although the hop asks for ^9.0: the tagged releases were refused for known security advisories; Booster added a temporary, scoped unblock (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.', $all);
+        self::assertStringContainsString('Added a temporary advisory unblock to composer.json', $all);
+        self::assertStringContainsString('laravel/framework now resolves to the tagged release v9.52.16.', $all);
+        self::assertStringContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.", $all);
+        self::assertStringContainsString('Gate passed: tests are green on PHP 8.0.', $all);
+        $lock = json_decode((string) file_get_contents($dir . '/composer.lock'), true);
+        self::assertSame('v9.52.16', $lock['packages'][0]['version']);
+    }
+
+    public function test_a_laravel_hop_whose_dev_fallback_survives_the_unblock_fails_the_install_phase(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        file_put_contents($dir . '/composer.json', (string) json_encode([
+            'name' => 'example/laravel-blade',
+            'require' => ['php' => '^8.0', 'laravel/framework' => '^8.0'],
+            'require-dev' => ['phpunit/phpunit' => '^9.0'],
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+        [$dir, $plan] = $this->laravelEightPlan($dir);
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use ($dir, &$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $script = $command[count($command) - 1];
+                $dockerRuns++;
+                if (($dockerRuns === 2 || $dockerRuns === 3) && str_contains($script, 'composer update -W')) {
+                    // The unblock did not bring the tags back: the branch stays locked.
+                    file_put_contents($dir . '/composer.lock', (string) json_encode(['packages' => [['name' => 'laravel/framework', 'version' => '9.x-dev']]]));
+                }
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Models/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
+        // Baseline, the gate that locked the branch, and exactly one retry: never a loop.
+        self::assertSame(3, $dockerRuns);
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('Composer locked laravel/framework to 9.x-dev although the hop asks for ^9.0: the tagged releases were refused for known security advisories; Booster added a temporary, scoped unblock (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.', $all);
+        self::assertStringContainsString('Gate failed: composer update -W laravel/framework still resolves laravel/framework to 9.x-dev after the unblock; the tagged releases are not loadable.', $all);
+        self::assertStringContainsString('This step changed composer.json and composer.lock.', $all);
+        // The failure is reported as the lock phase, never as the tests exiting.
+        self::assertStringNotContainsString('exited', $all);
+        // The gate failed, so the final-target finding never gets a turn.
+        self::assertStringNotContainsString("composer.json still has Booster's temporary advisory unblock", $all);
+        // The unblock stays in composer.json for PROCTOR to report.
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertArrayHasKey('laravel/framework', $composer['config']['policy']['advisories']['ignore']);
+    }
+
+    public function test_the_final_step_fails_while_a_booster_unblock_remains(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        [$dir, $plan] = $this->laravelPlan($dir);
+        // An earlier run left its unblock behind; this run adds nothing new.
+        (new ComposerEditor())->advisoryUnblock($dir, 'laravel/framework', '^13.0', ['PKSA-2026-0001']);
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use ($dir, &$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $dockerRuns++;
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Models/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        // Baseline and the gate: the gate is green, but the plan's last step
+        // fails while the unblock remains in composer.json.
+        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
+        self::assertSame(2, $dockerRuns);
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.", $all);
+        self::assertStringContainsString('Gate passed: tests are green on PHP 8.3.', $all);
+        // Nothing was added by this run: only the standing finding is reported.
+        self::assertStringNotContainsString('Composer refused tagged', $all);
+        self::assertStringNotContainsString('Added a temporary advisory unblock to composer.json', $all);
+    }
+
+    public function test_a_non_final_step_only_warns_about_the_unblock(): void
+    {
+        [$dir, $plan] = $this->laravelPlanWithTail($this->copyExample('laravel-blade'));
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use ($dir, &$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $script = $command[count($command) - 1];
+                $dockerRuns++;
+                if ($dockerRuns === 2 && str_contains($script, 'composer update -W')) {
+                    // Composer 2.10's policy blocking refuses the tagged releases.
+                    return new ProcessResult(4, "Composer could not find a solution for your request.\n- Root composer.json requires laravel/framework ^13.0, found laravel/framework[v13.0.0, v13.1.0, v13.2.0] but these were not loaded, because they are affected by security advisories (\"PKSA-2026-0001\", \"PKSA-2026-0002\"). Go to https://packagist.org/security-advisories/ to find advisory details.\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4", '');
+                }
+                if ($dockerRuns === 3 && str_contains($script, 'composer update -W')) {
+                    // The retry, with the unblock in place, refreshes the lock.
+                    file_put_contents($dir . '/composer.lock', json_encode(['packages' => ['laravel/framework' => ['version' => 'v13.39.0']]]));
+                }
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Models/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        // The Laravel hop is not last: it applies with a warning. The tail hop
+        // is last, and the unblock is still in composer.json, so it fails.
+        self::assertSame([StepResult::APPLIED, StepResult::GATE_FAILED], $this->statuses($report));
+        self::assertSame(4, $dockerRuns);
+        $first = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('Composer refused tagged laravel/framework ^13.0 for known security advisories; Booster added a temporary, scoped unblock (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.', $first);
+        self::assertStringContainsString('Added a temporary advisory unblock to composer.json', $first);
+        // The non-final finding is the first sentence only.
+        self::assertStringContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore).", $first);
+        self::assertStringNotContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore). Remove it before release", $first);
+        self::assertStringContainsString('Gate passed: tests are green on PHP 8.3.', $first);
+        $second = implode("\n", $report->results[1]->messages);
+        self::assertStringContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.", $second);
     }
 }
