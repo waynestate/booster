@@ -840,6 +840,115 @@ final class HopExecutorTest extends TestCase
         }
     }
 
+    /**
+     * Like fake(), but only the Laravel hops' Rector calls report errors; the
+     * PHP and PHPUnit hops come back clean. RectorRunner tells them apart with
+     * BOOSTER_RECTOR_SETS (RectorLaravel constants vs Rector set lists).
+     *
+     * @param list<string> $laravelErrors
+     */
+    private function staleVendorFake(array $laravelErrors): FakeProcessRunner
+    {
+        return new FakeProcessRunner(static function (array $command, array $env) use ($laravelErrors): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            $isLaravel = str_contains($env['BOOSTER_RECTOR_SETS'] ?? '', 'RectorLaravel');
+            $files = [['file' => '/tmp/x/src/F0.php', 'diff' => "--- a\n+++ b"]];
+            $errors = $isLaravel ? array_map(static fn(string $m): array => ['message' => $m], $laravelErrors) : [];
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => $files, 'errors' => $errors]), '');
+        });
+    }
+
+    public function test_a_laravel_dry_run_against_an_older_vendor_is_named_not_failed(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        mkdir($dir . '/vendor', 0775, true);
+        file_put_contents($dir . '/vendor/autoload.php', "<?php\n");
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $fake = $this->staleVendorFake([
+            'app/Http/Controllers/A.php: Class Illuminate\\Http\\Request was not found while trying to analyse it - discovering symbols is probably not configured properly. (line 12)',
+            'app/Models/B.php: Class Illuminate\\Support\\Facades\\Request was not found while trying to analyse it - discovering symbols is probably not configured properly. (line 7)',
+        ]);
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions(dryRun: true));
+
+        self::assertFalse($report->failed());
+        $laravel = array_filter($report->results, static fn(StepResult $r): bool => str_starts_with($r->hopId, 'laravel-'));
+        self::assertNotEmpty($laravel);
+        foreach ($laravel as $r) {
+            self::assertSame(StepResult::PREVIEWED, $r->status);
+            self::assertTrue($r->incomplete);
+            self::assertStringContainsString("Can't preview " . $r->hopId . " yet: the app's vendor/ is from an older Laravel", implode(' ', $r->messages));
+        }
+        foreach ($report->results as $r) {
+            if (!str_starts_with($r->hopId, 'laravel-')) {
+                self::assertFalse($r->incomplete, $r->hopId);
+            }
+        }
+    }
+
+    public function test_a_laravel_real_run_against_an_older_vendor_still_errors(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        mkdir($dir . '/vendor', 0775, true);
+        file_put_contents($dir . '/vendor/autoload.php', "<?php\n");
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $fake = $this->staleVendorFake([
+            'app/Http/Controllers/A.php: Class Illuminate\\Http\\Request was not found while trying to analyse it - discovering symbols is probably not configured properly. (line 12)',
+        ]);
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions());
+
+        self::assertTrue($report->failed());
+        $first = null;
+        foreach ($report->results as $r) {
+            if (str_starts_with($r->hopId, 'laravel-') && $r->status !== StepResult::NOT_RUN) {
+                $first = $r;
+
+                break;
+            }
+        }
+        self::assertNotNull($first);
+        self::assertSame(StepResult::ERROR, $first->status);
+        self::assertStringContainsString('Rector reported errors; nothing was changed.', implode(' ', $first->messages));
+        self::assertStringContainsString('Class Illuminate\\Http\\Request was not found', implode(' ', $first->messages));
+    }
+
+    public function test_a_laravel_dry_run_below_the_stale_vendor_share_still_errors(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        mkdir($dir . '/vendor', 0775, true);
+        file_put_contents($dir . '/vendor/autoload.php', "<?php\n");
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $fake = $this->staleVendorFake([
+            'app/Http/Controllers/A.php: Class Illuminate\\Http\\Request was not found while trying to analyse it - discovering symbols is probably not configured properly. (line 12)',
+            'app/Http/Controllers/C.php: Syntax error, unexpected token "endif" (line 30)',
+            'app/Models/D.php: Something else broke entirely (line 5)',
+        ]);
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions(dryRun: true));
+
+        self::assertTrue($report->failed());
+        $first = null;
+        foreach ($report->results as $r) {
+            if (str_starts_with($r->hopId, 'laravel-') && $r->status !== StepResult::NOT_RUN) {
+                $first = $r;
+
+                break;
+            }
+        }
+        self::assertNotNull($first);
+        self::assertSame(StepResult::ERROR, $first->status);
+    }
+
     public function test_a_hop_that_changes_nothing_is_nothing_to_do_and_skips_the_gate(): void
     {
         $dir = $this->copyExample('raw-php');

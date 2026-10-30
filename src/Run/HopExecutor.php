@@ -281,6 +281,16 @@ final class HopExecutor
                 $preview = $this->rector->run($hop, $path, true, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget, $options->memoryLimit);
                 [$stopErrors, $notes] = self::splitRepairedNotes($preview->errors);
                 if ($stopErrors !== []) {
+                    if ($options->dryRun && $hop->kind === HopKind::Laravel && self::staleVendorErrors($stopErrors)) {
+                        // The app's vendor/ still holds an older Laravel, so Rector cannot see the
+                        // classes this hop's rules work on. Name that and point at the earlier hops
+                        // instead of a wall of "class not found" errors; a real run must still stop.
+                        return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [...self::prepassFiles($prepass), ...$preview->files], [sprintf(
+                            "Can't preview %s yet: the app's vendor/ is from an older Laravel, so Rector cannot see the classes this hop uses. Apply the earlier Laravel hops (and composer update), then dry-run again.",
+                            $hop->id,
+                        ), ...$notes], true, $prepass?->files() ?? []);
+                    }
+
                     return new StepResult($step->number, $hop->id, StepResult::ERROR, [...self::prepassFiles($prepass), ...$preview->files], ['Rector reported errors; nothing was changed.', ...self::refusals($stopErrors), ...$notes], false, $prepass?->files() ?? []);
                 }
                 $wanted = $preview->changedCount() + ($prepass?->changedCount() ?? 0);
@@ -498,6 +508,29 @@ final class HopExecutor
         }
 
         return [$stopping, $notes];
+    }
+
+    /**
+     * True when at least 90% of the Rector errors are PHPStan failing to find
+     * an Illuminate class ("Class Illuminate\... was not found"). That wall is
+     * the signature of a Laravel hop previewing against a vendor/ that still
+     * holds an older Laravel, not a problem in the app's own code.
+     *
+     * @param list<string> $errors
+     */
+    private static function staleVendorErrors(array $errors): bool
+    {
+        if ($errors === []) {
+            return false;
+        }
+        $matched = 0;
+        foreach ($errors as $error) {
+            if (preg_match('/Class\s+Illuminate(?:\\\\[A-Za-z0-9_]+)+\s+was not found/', $error) === 1) {
+                $matched++;
+            }
+        }
+
+        return $matched * 10 >= count($errors) * 9;
     }
 
     /**
