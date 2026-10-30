@@ -41,5 +41,6 @@ Playbooks:
 - `booster-cas-to-sesame`: Swap the wayne-cas package for SESAME using its compatibility classes.
 - `booster-node-pin-24`: Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
 - `booster-mix-to-vite`: Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only).
+- `booster-tailwind-3-to-4`: Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool.
 - `booster-vue-2-to-3`: Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue).
 
