@@ -191,6 +191,27 @@ final class PlannerTest extends TestCase
         );
     }
 
+    public function test_phpunit_below_9_gets_a_manual_step_before_the_first_php_8_hop(): void
+    {
+        $plan = $this->planWithComposer(
+            'laravel-blade',
+            [
+                'require' => ['php' => '>=7.3', 'laravel/framework' => '^6.0'],
+                'require-dev' => ['phpunit/phpunit' => '^7.5'],
+            ],
+            new PlanOptions(toPhp: '8.4'),
+        );
+
+        // PHPUnit 7 cannot run on PHP 8, so the plan carries the manual move to
+        // 9 just before the first hop that targets PHP 8.0; from there the
+        // normal PHPUnit hops take over.
+        self::assertSame(
+            ['laravel-6-to-7', 'laravel-7-to-8', 'php-73-to-74', 'phpunit-to-9-manual', 'php-74-to-80', 'laravel-8-to-9', 'php-80-to-81', 'phpunit-9-to-10', 'laravel-9-to-10', 'php-81-to-82', 'phpunit-10-to-11', 'laravel-10-to-11', 'laravel-11-to-12', 'php-82-to-83', 'phpunit-11-to-12', 'laravel-12-to-13', 'php-83-to-84', 'phpunit-12-to-13'],
+            $this->ids($plan),
+        );
+        self::assertCount(1, array_keys($this->ids($plan), 'phpunit-to-9-manual'));
+    }
+
     public function test_an_old_app_never_rests_on_a_pair_laravel_does_not_support(): void
     {
         $plan = $this->plan('laravel-blade', new PlanOptions(fromPhp: '8.1', fromLaravel: '9', toPhp: '8.3', toLaravel: '13'));
@@ -394,6 +415,45 @@ final class PlannerTest extends TestCase
         self::assertStringContainsString('wayne-cas', implode(' ', $plan->warnings));
     }
 
+    public function test_sesame_swap_goes_before_the_laravel_11_hop(): void
+    {
+        $plan = $this->planWithComposer(
+            'laravel-wayne-cas',
+            ['require' => ['php' => '^8.1', 'laravel/framework' => '^9.0']],
+            new PlanOptions(sesame: true, toPhp: '8.4', toLaravel: '12'),
+        );
+
+        // The swap needs PHP 8.3, so the PHP hops reach 8.3 first and the swap
+        // lands right before the hop from Laravel 10 to 11.
+        self::assertSame(
+            ['laravel-9-to-10', 'php-81-to-82', 'php-82-to-83', 'cas-to-sesame', 'laravel-10-to-11', 'laravel-11-to-12', 'php-83-to-84'],
+            $this->ids($plan),
+        );
+    }
+
+    public function test_sesame_swap_still_goes_last_when_the_plan_never_passes_laravel_10(): void
+    {
+        // In the frozen policy Laravel 10 is past security support, so this
+        // test extends its dates: the point is a plan whose Laravel hops stop
+        // at 10, which keeps the old end-of-plan placement for the swap.
+        $policy = $this->policyWith([
+            'laravel' => ['10' => ['active_until' => '2026-12-31', 'security_until' => '2027-12-31']],
+        ]);
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $file = $dir . '/composer.json';
+        $data = json_decode((string) file_get_contents($file), true);
+        self::assertIsArray($data);
+        $data = array_replace_recursive($data, ['require' => ['php' => '^8.3', 'laravel/framework' => '^10.0']]);
+        file_put_contents($file, (string) json_encode($data));
+
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($policy, new HopRegistry()))->plan($project, new PlanOptions(sesame: true, toPhp: '8.3', toLaravel: '10'), $this->today());
+
+        $ids = $this->ids($plan);
+        self::assertSame('cas-to-sesame', $ids[count($ids) - 1]);
+        self::assertCount(1, array_keys($ids, 'cas-to-sesame'));
+    }
+
     public function test_an_eol_target_is_refused(): void
     {
         $this->expectException(ToolError::class);
@@ -584,6 +644,97 @@ final class PlannerTest extends TestCase
     {
         $this->expectException(ToolError::class);
         $this->plan('raw-php', new PlanOptions(skip: ['php-99-to-100']));
+    }
+
+    public function test_until_cuts_the_plan_after_the_named_step(): void
+    {
+        $plan = $this->plan('raw-php', new PlanOptions(until: 'php-81-to-82'));
+
+        self::assertSame(['php-74-to-80', 'php-80-to-81', 'php-81-to-82'], $this->ids($plan));
+        self::assertSame('8.2', $plan->targetPhp);
+        self::assertSame(3, $plan->steps[2]->number);
+    }
+
+    public function test_until_on_the_last_step_keeps_the_whole_plan(): void
+    {
+        $full = $this->plan('raw-php');
+        $cut = $this->plan('raw-php', new PlanOptions(until: 'php-84-to-85'));
+
+        self::assertSame($this->ids($full), $this->ids($cut));
+        self::assertSame('8.5', $cut->targetPhp);
+    }
+
+    public function test_until_cuts_a_laravel_plan_midway_and_moves_the_targets(): void
+    {
+        $plan = $this->plan('laravel-blade', new PlanOptions(until: 'laravel-11-to-12'));
+
+        self::assertSame(['phpunit-10-to-11', 'laravel-10-to-11', 'laravel-11-to-12'], $this->ids($plan));
+        self::assertSame('8.2', $plan->targetPhp);
+        self::assertSame('12', $plan->targetLaravel);
+        self::assertSame('11', $plan->targetPhpunit);
+    }
+
+    public function test_until_with_an_id_not_in_the_plan_is_an_error_listing_the_steps(): void
+    {
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('--until "php-99-to-100" is not a step in the plan. The plan\'s step ids are: php-74-to-80, php-80-to-81, php-81-to-82, php-82-to-83, php-83-to-84, php-84-to-85.');
+        $this->plan('raw-php', new PlanOptions(until: 'php-99-to-100'));
+    }
+
+    public function test_until_on_an_empty_plan_is_an_error(): void
+    {
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('--until "php-84-to-85" is not a step in the plan. The plan has no steps.');
+        $this->plan('raw-php', new PlanOptions(fromPhp: '8.5', toPhp: '8.5', until: 'php-84-to-85'));
+    }
+
+    public function test_only_keeps_just_the_first_step(): void
+    {
+        $plan = $this->plan('raw-php', new PlanOptions(only: 'php-74-to-80'));
+
+        self::assertSame(['php-74-to-80'], $this->ids($plan));
+        self::assertSame(1, $plan->steps[0]->number);
+        self::assertSame('8.0', $plan->targetPhp);
+    }
+
+    public function test_only_a_later_step_is_refused_naming_what_the_app_is_on(): void
+    {
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('--only "php-80-to-81": it starts from PHP 8.0, but the app is on PHP 7.4.');
+        $this->plan('raw-php', new PlanOptions(only: 'php-80-to-81'));
+    }
+
+    public function test_only_refuses_a_laravel_hop_the_app_is_not_ready_for(): void
+    {
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('--only "laravel-12-to-13": it starts from PHP 8.3 and Laravel 12 and PHPUnit 12, but the app is on PHP 8.2 and Laravel 10 and PHPUnit 10.');
+        $this->plan('laravel-blade', new PlanOptions(only: 'laravel-12-to-13'));
+    }
+
+    public function test_only_runs_a_single_laravel_hop_when_the_app_sits_on_it(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        $file = $dir . '/composer.json';
+        $data = json_decode((string) file_get_contents($file), true);
+        self::assertIsArray($data);
+        $data['require']['php'] = '^8.3';
+        unset($data['require-dev']['phpunit/phpunit']);
+        file_put_contents($file, (string) json_encode($data));
+
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(only: 'laravel-10-to-11'), $this->today());
+
+        self::assertSame(['laravel-10-to-11'], $this->ids($plan));
+        self::assertSame('8.3', $plan->targetPhp);
+        self::assertSame('11', $plan->targetLaravel);
+        self::assertNull($plan->targetPhpunit);
+    }
+
+    public function test_only_and_until_together_are_refused(): void
+    {
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('Pass either --until or --only, not both.');
+        $this->plan('raw-php', new PlanOptions(until: 'php-80-to-81', only: 'php-74-to-80'));
     }
 
     public function test_the_plan_follows_the_policy_date(): void

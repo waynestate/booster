@@ -221,7 +221,11 @@ Options shared by `plan` and `run`:
 | `--to-php`, `--to-laravel`, `--to-phpunit` | The target. Default: the newest version the policy supports today (PHPUnit: the newest that runs on the target PHP) |
 | `--sesame` | Include the `wayne-cas` to SESAME swap |
 | `--skip` | A hop id to leave out (repeat it) |
+| `--until` | Cut the plan after this hop id: that step and everything before it stay, and the plan's targets move to where it lands |
+| `--only` | Plan and run just this one hop id. The app must sit on the hop's starting versions, and `--until` and `--only` are never combined |
 | `--with-node` | include the Node front-end hops (Node pin, Mix to Vite, Tailwind, Vue) even when you passed a target version. Without it, any of `--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php` or `--from-laravel` leaves those hops out, and the plan prints: "Node front-end hops were left out because you passed a target version: <hop ids>. Add --with-node to include them." |
+
+Example: an app moving from Laravel 8 to 13 takes the climb in parts. `booster plan --path=../my-app --until=laravel-8-to-9` keeps every hop up to and including the move to Laravel 9, and `booster run` with the same flag applies exactly those hops.
 
 Options for `plan`:
 
@@ -450,11 +454,14 @@ three: skipping it skips them, and a person finishes the job, because Rector doe
 
 ### Hops Booster knows
 
-Thirty-two hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
+Thirty-three hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
 major at a time from 9 to 13, each list read from `data/versions.json` and trimmed to the majors whose Rector ruleset
-is installed ([Hop data](#hop-data)). Then the recipes: `cas-to-sesame` (renames the `wayne-cas` classes to SESAME's
+is installed ([Hop data](#hop-data)). An app whose PHPUnit is below 9 gets `phpunit-to-9-manual`, a manual move to
+`^9.5` placed before the first hop that targets PHP 8.0 (PHPUnit 7 and 8 do not run on PHP 8), and the regular
+PHPUnit hops then take over from 9. Then the recipes: `cas-to-sesame` (renames the `wayne-cas` classes to SESAME's
 compatibility classes and swaps the Composer requirement; planned with `--sesame`, and left out with a warning when
-the plan ends below PHP 8.3, which SESAME needs); `node-pin-24` (planned for any app with a `package.json` that does
+the plan ends below PHP 8.3, which SESAME needs; it lands just before the hop from Laravel 10 to 11, and while PHP is
+still below 8.3 the PHP hops go first); `node-pin-24` (planned for any app with a `package.json` that does
 not already floor Node at the hop data's target, 26 today: sets `engines.node` to `>=26` and writes `.nvmrc`, ahead
 of the front-end hops); `mix-to-vite` (planned when the app has a `webpack.mix.js` and the plan lands on Laravel 9 or
 newer, after `node-pin-24`: writes `vite.config.js`, swaps `laravel-mix` for `vite` and `laravel-vite-plugin` in

@@ -82,11 +82,15 @@ final class Planner
         $fromPhpunit = $project->phpunitMajor;
         $toPhpunit = null;
         $phpunitChain = $this->registry->phpunitChain();
+        $phpunitBeforeManual = $fromPhpunit;
+        $phpunitManualPending = false;
         if ($fromPhpunit !== null) {
             if (!in_array($fromPhpunit, $phpunitChain, true)) {
                 if (version_compare($fromPhpunit, $phpunitChain[0], '<')) {
-                    $warnings[] = sprintf('PHPUnit %s is below what BOOSTER can plan (%s to %s); PHPUnit hops are skipped.', $fromPhpunit, $phpunitChain[0], $phpunitChain[count($phpunitChain) - 1]);
-                    $fromPhpunit = null;
+                    // PHPUnit 7 and 8 do not run on PHP 8, so the plan carries a
+                    // manual move to 9 instead of skipping the PHPUnit hops.
+                    $phpunitManualPending = true;
+                    $fromPhpunit = $phpunitChain[0];
                 } else {
                     throw new ToolError(sprintf('PHPUnit %s is outside what BOOSTER can plan (%s to %s).', $fromPhpunit, $phpunitChain[0], $phpunitChain[count($phpunitChain) - 1]));
                 }
@@ -114,6 +118,7 @@ final class Planner
         $php = $fromPhp;
         $laravel = $fromLaravel;
         $phpunit = $fromPhpunit;
+        $sesamePlanned = false;
         $n = 0;
 
         for ($guard = 0; $guard < 64; $guard++) {
@@ -121,7 +126,32 @@ final class Planner
             $nextPhpunit = $phpunit !== null && $toPhpunit !== null && $phpunit !== $toPhpunit ? $this->registry->nextPhpunit($phpunit) : null;
             $nextPhp = $php !== $toPhp ? $this->registry->nextPhp($php) : null;
 
-            if ($nextLaravel !== null && $this->registry->has(HopRegistry::laravelHopId((string) $laravel, $nextLaravel)) && $this->registry->laravelSupportsPhp($nextLaravel, $php) && $this->phpunitMeetsLaravelFloor($phpunit, $nextLaravel)) {
+            // PHPUnit below 9 cannot run the gates on PHP 8, so the manual move
+            // to 9 lands before the first step that targets PHP 8.0 or newer.
+            if ($phpunitManualPending && (version_compare($php, '8.0', '>=') || ($nextPhp !== null && version_compare($nextPhp, '8.0', '>=')))) {
+                $hop = $this->registry->get(HopRegistry::PHPUNIT_TO_9_MANUAL_ID);
+                $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $laravel, $phpunitBeforeManual, $phpunit);
+                $phpunitManualPending = false;
+                continue;
+            }
+
+            // The SESAME swap needs PHP 8.3, so it goes in just before the hop
+            // from Laravel 10 to 11. While PHP is still below 8.3 that Laravel
+            // hop waits and the PHP hops go first.
+            $sesameCrossing = $options->sesame
+                && $project->usesWayneCas
+                && !$sesamePlanned
+                && $laravel === '10'
+                && $nextLaravel === '11'
+                && version_compare($toPhp, '8.3', '>=');
+            if ($sesameCrossing && version_compare($php, '8.3', '>=')) {
+                $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+                $sesamePlanned = true;
+                continue;
+            }
+            $holdLaravel = $sesameCrossing;
+
+            if (!$holdLaravel && $nextLaravel !== null && $this->registry->has(HopRegistry::laravelHopId((string) $laravel, $nextLaravel)) && $this->registry->laravelSupportsPhp($nextLaravel, $php) && $this->phpunitMeetsLaravelFloor($phpunit, $nextLaravel)) {
                 $hop = $this->registry->get(HopRegistry::laravelHopId((string) $laravel, $nextLaravel));
                 $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $nextLaravel, $phpunit, $phpunit);
                 $laravel = $nextLaravel;
@@ -205,14 +235,12 @@ final class Planner
             }
         }
 
-        if ($options->sesame) {
-            if (!$project->usesWayneCas) {
-                $warnings[] = 'Asked for the SESAME swap, but composer.json does not require cit-web-infra/wayne-cas; skipped.';
-            } elseif (version_compare($php, '8.3', '<')) {
-                $warnings[] = 'SESAME needs PHP 8.3 or newer; the swap was left out because the plan ends below that.';
-            } else {
-                $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
-            }
+        if ($options->sesame && !$project->usesWayneCas) {
+            $warnings[] = 'Asked for the SESAME swap, but composer.json does not require cit-web-infra/wayne-cas; skipped.';
+        } elseif ($options->sesame && !$sesamePlanned && version_compare($php, '8.3', '<')) {
+            $warnings[] = 'SESAME needs PHP 8.3 or newer; the swap was left out because the plan ends below that.';
+        } elseif ($options->sesame && !$sesamePlanned) {
+            $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
         } elseif ($project->usesWayneCas) {
             $warnings[] = 'The app uses wayne-cas. Add --sesame to plan the swap to SESAME.';
         }
@@ -224,6 +252,16 @@ final class Planner
         }
 
         $steps = $this->withoutSkipped($steps, $options->skip);
+        $selected = $options->until !== null || $options->only !== null;
+        $steps = $this->applyStepSelection($steps, $project, $options, $fromPhp, $fromLaravel, $phpunitBeforeManual);
+        if ($selected) {
+            // The cut plan ends where its last step lands, so the report and
+            // the gates agree with the steps that remain.
+            $last = $steps[count($steps) - 1];
+            $toPhp = $last->phpAfter;
+            $toLaravel = $last->laravelAfter;
+            $toPhpunit = $last->phpunitAfter;
+        }
 
         if ($steps === []) {
             $warnings[] = 'Nothing to do: the app is already at the target.';
@@ -259,6 +297,93 @@ final class Planner
         }
 
         return $kept;
+    }
+
+    /**
+     * Applies --until and --only. --until keeps the named step and everything
+     * before it. --only keeps just the named step, which must be the first
+     * step of the plan, so the app really sits on its starting versions. An
+     * id that is not in the plan is an error listing the step ids, like a bad
+     * --skip.
+     *
+     * @param list<PlanStep> $steps
+     *
+     * @return list<PlanStep>
+     */
+    private function applyStepSelection(array $steps, Project $project, PlanOptions $options, string $fromPhp, ?string $fromLaravel, ?string $fromPhpunit): array
+    {
+        if ($options->until === null && $options->only === null) {
+            return $steps;
+        }
+        if ($options->until !== null && $options->only !== null) {
+            throw new ToolError('Pass either --until or --only, not both.');
+        }
+        $id = $options->only ?? $options->until;
+        $flag = $options->only !== null ? 'only' : 'until';
+
+        $index = null;
+        foreach ($steps as $i => $step) {
+            if ($step->hop->id === $id) {
+                $index = $i;
+                break;
+            }
+        }
+        if ($index === null) {
+            $ids = array_map(static fn(PlanStep $step): string => $step->hop->id, $steps);
+            throw new ToolError(sprintf(
+                '--%s "%s" is not a step in the plan. %s',
+                $flag,
+                $id,
+                $ids === [] ? 'The plan has no steps.' : 'The plan\'s step ids are: ' . implode(', ', $ids) . '.',
+            ));
+        }
+
+        if ($options->only === null) {
+            return array_slice($steps, 0, $index + 1);
+        }
+
+        $step = $steps[$index];
+        $mismatch = $this->onlyStartMismatch($step, $project, $fromPhp, $fromLaravel, $fromPhpunit);
+        if ($mismatch !== null) {
+            throw new ToolError(sprintf('--only "%s": %s', $id, $mismatch));
+        }
+        if ($index > 0) {
+            throw new ToolError(sprintf(
+                '--only "%s": the plan runs this hop after "%s"; run the earlier steps first.',
+                $id,
+                $steps[$index - 1]->hop->id,
+            ));
+        }
+
+        return [new PlanStep(1, $step->hop, $step->phpBefore, $step->phpAfter, $step->laravelBefore, $step->laravelAfter, $step->phpunitBefore, $step->phpunitAfter, $step->gates)];
+    }
+
+    /**
+     * What --only refuses: the hop's starting versions versus what the app is
+     * on now. Names each dimension that differs, or null when the hop starts
+     * exactly where the plan starts.
+     */
+    private function onlyStartMismatch(PlanStep $step, Project $project, string $fromPhp, ?string $fromLaravel, ?string $fromPhpunit): ?string
+    {
+        $expected = [];
+        $actual = [];
+        if ($step->phpBefore !== null && $step->phpBefore !== $fromPhp) {
+            $expected[] = 'PHP ' . $step->phpBefore;
+            $actual[] = 'PHP ' . ($project->phpVersion ?? $fromPhp);
+        }
+        if ($step->laravelBefore !== null && $step->laravelBefore !== $fromLaravel) {
+            $expected[] = 'Laravel ' . $step->laravelBefore;
+            $actual[] = 'Laravel ' . ($project->laravelMajor ?? $fromLaravel);
+        }
+        if ($step->phpunitBefore !== null && $step->phpunitBefore !== $fromPhpunit) {
+            $expected[] = 'PHPUnit ' . $step->phpunitBefore;
+            $actual[] = 'PHPUnit ' . ($project->phpunitMajor ?? $fromPhpunit);
+        }
+        if ($expected === []) {
+            return null;
+        }
+
+        return sprintf('it starts from %s, but the app is on %s.', implode(' and ', $expected), implode(' and ', $actual));
     }
 
     /**
