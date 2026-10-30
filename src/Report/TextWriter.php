@@ -174,6 +174,11 @@ final class TextWriter
     public function run(RunReport $report): string
     {
         $lines = [$report->dryRun ? 'BOOSTER dry run (nothing was changed)' : 'BOOSTER run', ''];
+        if ($report->testEnvKeys !== []) {
+            // Keys only: the values may hold credentials and never reach a report.
+            $lines[] = sprintf('Test environment: %s (values are not shown).', implode(', ', $report->testEnvKeys));
+            $lines[] = '';
+        }
         foreach ($this->baselineLines($report->baseline) as $line) {
             $lines[] = $line;
         }
@@ -214,6 +219,10 @@ final class TextWriter
         }
         foreach ($this->proctorLines($report) as $line) {
             $lines[] = $line;
+        }
+        if ($report->deployScript !== null) {
+            $lines[] = 'Added deployments/' . $report->deployScript . ': Citadel runs it once, first, so existing deployments install the upgraded vendor/.';
+            $lines[] = 'Undo with: rm deployments/' . $report->deployScript . ' (inside the app).';
         }
         $lines[] = 'RESULT: ' . ($report->failed() ? 'FAIL' : 'PASS');
         if ($report->dryRun && $previewedFiles !== []) {
@@ -294,6 +303,14 @@ final class TextWriter
                     $lines[] = '   php-floor: fixed by the upgrade.';
                 }
             }
+        }
+        if ($comparison === null && $proctor->status === ProctorResult::FAILED && $proctor->failures !== []) {
+            // No steps means no before/after to split, so the findings stand as-is.
+            $lines[] = '   Findings:';
+            foreach ($proctor->failures as $failure) {
+                $lines[] = $this->findingLine($failure);
+            }
+            $lines[] = '   Fix the findings above.';
         }
 
         return $lines;

@@ -37,6 +37,7 @@ final class RunCommand extends BaseCommand
         $this
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Show the diffs Rector would make and change nothing.')
             ->addOption('max-changes', null, InputOption::VALUE_REQUIRED, 'Hard limit on files changed per hop, with no prompt (0 = no limit). Without it, a hop over 200 files asks first, or stops when not interactive.', null)
+            ->addOption('test-env', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Environment variable (KEY=VALUE) passed to the baseline and every gate container with -e; repeat it. Values never appear in the report.')
             ->addOption('memory-limit', null, InputOption::VALUE_REQUIRED, 'Memory limit for the Rector process (for example 2G), or -1 for no limit.', RectorRunner::DEFAULT_MEMORY_LIMIT)
             ->addOption('skip-gate', null, InputOption::VALUE_NONE, 'Do not run the tests in the target image after each hop, or the PROCTOR check at the end.')
             ->addOption('image', null, InputOption::VALUE_REQUIRED, 'Run the gate in this Docker image instead of building booster-target (it needs php and composer on PATH): one name for every PHP version, a {php} template such as registry/php-apache:{php}, or a map such as 8.0=foo:1,8.1=bar:2.')
@@ -58,6 +59,14 @@ final class RunCommand extends BaseCommand
                 throw new ToolError(sprintf('Invalid --max-changes value "%s". Expected a whole number.', $capRaw));
             }
             $cap = (int) $capRaw;
+        }
+
+        $testEnv = [];
+        foreach ((array) $input->getOption('test-env') as $pair) {
+            if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*=/', (string) $pair) !== 1) {
+                throw new ToolError(sprintf('Invalid --test-env value "%s". Expected KEY=VALUE, where KEY is a valid environment variable name.', $pair));
+            }
+            $testEnv[] = $pair;
         }
 
         $memoryLimit = $this->stringOption($input, 'memory-limit') ?? RectorRunner::DEFAULT_MEMORY_LIMIT;
@@ -103,6 +112,7 @@ final class RunCommand extends BaseCommand
             proctorCommand: $this->stringOption($input, 'proctor-command'),
             memoryLimit: $memoryLimit,
             proctorAdvisory: (bool) $input->getOption('proctor-advisory'),
+            testEnv: $testEnv,
         ));
 
         $output->writeln(

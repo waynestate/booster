@@ -242,6 +242,7 @@ Options for `run`:
 | `--allow-failing-baseline` | Continue when the baseline fails; later gate failures are labelled as pre-existing |
 | `--allow-dirty` | Run even when the working copy has uncommitted changes |
 | `--test-command` | What runs the app's tests in the image (default `composer test`, else `vendor/bin/phpunit`) |
+| `--test-env` | Environment variable (`KEY=VALUE`) passed to the baseline and every gate container with `-e`; repeat it. The report names the keys only, never the values |
 | `--proctor-command` | An extra command run in the image after the tests, for example a PROCTOR check |
 | `--proctor-advisory` | Report the PROCTOR result but do not fail the run on it. Applied automatically when the run stops before the final target (`--until`, `--only`, or a target past security support) |
 
@@ -394,6 +395,12 @@ final class SmokeTest extends TestCase
 
 That is the whole point: the app boots, encryption and sessions work, and the front door still sends guests to CAS.
 It passes on the old PHP and must still pass on the new one, which is what the gate is for.
+
+Those values live in `phpunit.xml`, committed with the app. When you would rather not commit them, pass them on the
+command line instead; Booster forwards each one to the baseline and every gate container with `-e`, and the report
+names the keys only, never the values:
+
+    booster run --path= --test-env DB_CONNECTION=sqlite --test-env DB_DATABASE=:memory:
 
 #### What a hop does
 
@@ -557,6 +564,25 @@ the bundled policy, then recomputes it from the frozen feeds in `tests/fixtures/
 `bin/hop-data-bot.php`, against the live feeds; when a feed moved while the file slept, the robot opens (or updates)
 a merge request on Booster itself with the new file, and a person merges it. [MAINTAINING.md](https://github.com/waynestate/booster/blob/HEAD/MAINTAINING.md) covers
 the token the robot needs.
+
+### Deploying on Citadel
+
+When a real (not dry) run changes `composer.lock` and the app has a `deployments/` directory, Booster writes one
+deployment script, `deployments/0000_composer_install_`:
+
+```sh
+#!/bin/sh
+# Added by Booster: this upgrade changed composer.lock. Citadel runs each deployment script once, in name order,
+# so a new name makes existing deployments install the new vendor/ before anything else runs.
+set -e
+composer install --no-dev --no-interaction --optimize-autoloader
+php artisan migrate --force
+```
+
+Citadel runs every `deployments/` script exactly once, in name order, and the leading `0000` puts this one first. So
+when the app next deploys, every existing deployment installs the upgraded `vendor/` before any other script runs. The
+`php artisan migrate --force` line appears only for apps that have an `artisan` file; raw PHP apps get the `composer
+install` alone. Commit the script with the rest of the upgrade. To drop it again, delete the named file.
 
 ### Checks
 

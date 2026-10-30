@@ -737,6 +737,82 @@ final class CliTest extends TestCase
         }
     }
 
+    public function test_run_rejects_a_bad_test_env(): void
+    {
+        foreach (['no-equals', '1BAD=x', '=value'] as $bad) {
+            [$exit, $out] = $this->booster(['command' => 'run', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--test-env' => $bad]);
+
+            self::assertSame(2, $exit);
+            self::assertStringContainsString('--test-env', $out);
+            self::assertStringContainsString($bad, $out);
+        }
+    }
+
+    public function test_run_passes_test_env_to_the_gate_and_reports_keys_only(): void
+    {
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            if (self::isProctorCommand($command)) {
+                return new ProcessResult(0, self::proctorFixture('pass-report.json'), '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--format' => 'json', '--goal' => 'php-74-to-84',
+            '--test-env' => ['DB_CONNECTION=sqlite', 'DB_DATABASE=:memory:'],
+        ], $fake);
+        $data = json_decode($out, true);
+
+        self::assertSame(0, $exit);
+        self::assertSame(['DB_CONNECTION', 'DB_DATABASE'], $data['test_env']);
+        // Every docker run (the baseline and each gate) carries each variable on its own -e.
+        $dockerRuns = array_values(array_filter($fake->calls, static fn(array $c): bool => ($c['command'][0] ?? '') === 'docker' && ($c['command'][1] ?? '') === 'run'));
+        self::assertNotEmpty($dockerRuns);
+        foreach ($dockerRuns as $call) {
+            foreach (['DB_CONNECTION=sqlite', 'DB_DATABASE=:memory:'] as $pair) {
+                $i = array_search($pair, $call['command'], true);
+                self::assertNotFalse($i);
+                self::assertSame('-e', $call['command'][$i - 1]);
+            }
+        }
+        // The values never reach the report; only the keys do.
+        self::assertStringNotContainsString('sqlite', $out);
+        self::assertStringNotContainsString(':memory:', $out);
+    }
+
+    public function test_run_text_report_names_test_env_keys_but_not_values(): void
+    {
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            if (self::isProctorCommand($command)) {
+                return new ProcessResult(0, self::proctorFixture('pass-report.json'), '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84',
+            '--test-env' => ['DB_CONNECTION=sqlite', 'DB_DATABASE=:memory:'],
+        ], $fake);
+
+        self::assertStringContainsString('Test environment: DB_CONNECTION, DB_DATABASE (values are not shown).', $out);
+        self::assertStringNotContainsString('sqlite', $out);
+        self::assertStringNotContainsString(':memory:', $out);
+    }
+
     public function test_run_json_contains_the_baseline_object(): void
     {
         $fake = new FakeProcessRunner(static function (array $command): ProcessResult {

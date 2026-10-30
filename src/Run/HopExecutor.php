@@ -85,6 +85,15 @@ final class HopExecutor
         // dry run creates nothing, so only an --allow-dirty real run needs the
         // status read.
         $this->startingUntracked = !$options->dryRun && $options->allowDirty ? $this->untrackedPaths($path) : [];
+        // The report names the --test-env variables by key only; the values may
+        // hold credentials and must never reach a report or a log.
+        $testEnvKeys = array_map(
+            static fn(string $pair): string => substr($pair, 0, (int) strpos($pair, '=')),
+            $options->testEnv,
+        );
+        // The composer.lock fingerprint before any hop, so the run can tell
+        // whether the upgrade changed it and write the Citadel install script.
+        $lockBefore = $options->dryRun ? null : $this->lockFingerprint($path);
 
         $baseline = $this->runBaseline($plan, $path, $options);
         if ($baseline->failed() && !$options->allowFailingBaseline) {
@@ -100,7 +109,7 @@ final class HopExecutor
                 ]);
             }
 
-            return new RunReport($plan, $options->dryRun, $baseline, $results);
+            return new RunReport($plan, $options->dryRun, $baseline, $results, testEnvKeys: $testEnvKeys);
         }
 
         $results = [];
@@ -123,13 +132,21 @@ final class HopExecutor
         }
 
         $proctor = $this->runProctorGate($plan, $path, $options, $results);
-        $comparison = $proctor === null ? null : ProctorComparison::compare($proctorBaseline, $proctor);
+        // With steps the final gate reads against the pre-upgrade baseline; with
+        // no steps there is nothing to compare, so the single result stands alone.
+        $comparison = $proctor === null || $plan->steps === [] ? null : ProctorComparison::compare($proctorBaseline, $proctor);
         // A run that stops before the final target (an EOL stop, --until or
         // --only) cannot prove the app at that target, so the PROCTOR gate
         // reports instead of blocking.
         $advisory = $options->proctorAdvisory || $plan->stopsEarly;
+        // When the upgrade changed composer.lock and the app deploys on Citadel,
+        // write the once-only install script so existing deployments pick up the
+        // new vendor/ first. A dry run changes no lock, so it writes none.
+        $deployScript = $options->dryRun
+            ? null
+            : (new CitadelDeployScript())->writeIfLockChanged($path, $lockBefore, (new \DateTimeImmutable('now'))->format('YmdHi'));
 
-        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison);
+        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys, deployScript: $deployScript);
     }
 
     /**
@@ -159,15 +176,16 @@ final class HopExecutor
 
     /**
      * The PROCTOR gate: once every step finished without failing, measure the
-     * upgraded app against the CREED policy on the final PHP. Skipped for dry
-     * runs, when the gate is skipped, when the plan has no steps, or when a
+     * app against the CREED policy on the final PHP. With no steps there is
+     * nothing to upgrade, so it runs once on the app's current PHP and stands
+     * on its own. Skipped for dry runs, when the gate is skipped, or when a
      * step left the run unfinished.
      *
      * @param list<StepResult> $results
      */
     private function runProctorGate(Plan $plan, string $path, RunOptions $options, array $results): ?ProctorResult
     {
-        if ($options->dryRun || $options->skipGate || $plan->steps === [] || $this->proctor === null) {
+        if ($options->dryRun || $options->skipGate || $this->proctor === null) {
             return null;
         }
         foreach ($results as $result) {
@@ -175,7 +193,9 @@ final class HopExecutor
                 return null;
             }
         }
-        $php = $plan->targetPhp ?? $this->startingPhp($plan);
+        // With no steps there is nothing to land on, so the single check runs
+        // on the app's current PHP; otherwise it lands where the last step did.
+        $php = $plan->steps === [] ? $this->startingPhp($plan) : ($plan->targetPhp ?? $this->startingPhp($plan));
         if ($php === null) {
             return null;
         }
@@ -201,7 +221,7 @@ final class HopExecutor
         }
 
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
-        $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage);
+        $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, [], $options->testEnv);
         $outcome = TargetImageRunner::gateOutcome($result);
         $status = match (true) {
             $outcome->successful() => BaselineResult::PASSED,
@@ -630,7 +650,7 @@ final class HopExecutor
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
         $update = $this->lockUpdatePackages($step);
         $unblock = [];
-        $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update);
+        $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update, $options->testEnv);
         $outcome = TargetImageRunner::gateOutcome($result);
         if (!$outcome->successful() && $outcome->phase === GateOutcome::PHASE_INSTALL && $update !== []) {
             $blocked = self::advisoryBlock($outcome->output);
@@ -647,7 +667,7 @@ final class HopExecutor
                 }
                 // The ignore is in composer.json now, so the same command may
                 // load the blocked releases.
-                $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update);
+                $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update, $options->testEnv);
                 $outcome = TargetImageRunner::gateOutcome($result);
             }
         }
@@ -667,7 +687,7 @@ final class HopExecutor
                 }
                 // The ignore is in composer.json now, so the same command may
                 // load the tagged releases.
-                $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update);
+                $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update, $options->testEnv);
                 $outcome = TargetImageRunner::gateOutcome($result);
                 $still = self::devFallback($step, $path);
                 if ($still !== null) {
@@ -1923,6 +1943,22 @@ final class HopExecutor
         }
 
         return 'Undo with: git checkout . && git clean -fd -- ' . implode(' ', $created) . ' (inside the app).';
+    }
+
+    /**
+     * The composer.lock fingerprint (its md5, or null when the file is absent),
+     * so the run can tell whether the upgrade changed the lock at all.
+     */
+    private function lockFingerprint(string $path): ?string
+    {
+        $lock = $path . '/composer.lock';
+        if (!is_file($lock)) {
+            return null;
+        }
+        $hash = md5_file($lock);
+
+        // A lock we cannot read counts as absent, so no change is reported.
+        return $hash === false ? null : $hash;
     }
 
     /** @return list<string> the app's untracked paths from one git status */

@@ -25,5 +25,11 @@ final readonly class RunOptions
         public ?string $proctorCommand = null,
         public string $memoryLimit = RectorRunner::DEFAULT_MEMORY_LIMIT,
         public bool $proctorAdvisory = false,
+        /**
+         * Environment variables (KEY=VALUE) passed to the baseline and every gate container with -e; validated by the command.
+         *
+         * @var list<string>
+         */
+        public array $testEnv = [],
     ) {}
 }

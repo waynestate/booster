@@ -19,6 +19,10 @@ final readonly class RunReport
         public ?ProctorResult $proctor = null,
         public bool $proctorAdvisory = false,
         public ?ProctorComparison $proctorComparison = null,
+        /** @var list<string> keys of the --test-env variables passed to the baseline and gates; values never appear */
+        public array $testEnvKeys = [],
+        /** The deployments/ script this run wrote because composer.lock changed, or null when it wrote none. */
+        public ?string $deployScript = null,
     ) {}
 
     public function failed(): bool
@@ -47,12 +51,14 @@ final readonly class RunReport
         return [
             'tool' => 'booster',
             'dry_run' => $this->dryRun,
+            'test_env' => $this->testEnvKeys,
             'result' => $this->failed() ? 'fail' : 'pass',
             'baseline' => $this->baseline->toArray(),
             'plan' => $this->plan->toArray(),
             'results' => array_map(static fn(StepResult $r): array => $r->toArray(), $this->results),
             'proctor' => $this->proctorArray(),
             'proctor_advisory' => $this->proctorAdvisory,
+            'deploy_script' => $this->deployScript,
         ];
     }
 
