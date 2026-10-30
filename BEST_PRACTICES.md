@@ -29,9 +29,12 @@ tag for how Booster holds each rule today.
   moves to. A red baseline stops the run unless `--allow-failing-baseline` is passed.
 - **The lock follows the hop.** `Enforced`: Laravel and PHPUnit hops refresh `composer.lock` inside the gate
   (`composer update -W` for the package the hop moved), and a Composer-phase failure is reported as one, never as
-  the test command exiting nonzero. When Composer 2.10's policy blocking refuses the tagged releases, the gate
-  writes a scoped temporary ignore into `config.policy.advisories.ignore`, retries once, and reports the unblock;
-  PROCTOR keeps naming the entry until the app removes it.
+  the test command exiting nonzero. When Composer 2.10's policy blocking refuses the tagged releases, whether
+  loudly (the install phase fails and names the advisories) or quietly (the lock lands on a branch version where
+  the hop asked for a tagged range, which Booster reads back and treats like the block), the gate writes a scoped
+  temporary ignore into `config.policy.advisories.ignore`, retries once, and reports the unblock; PROCTOR keeps
+  naming the entry until the app removes it. The unblock never ships: after a gated step passes, Booster warns
+  while one of its entries remains, and the plan's last step fails until it is out of `composer.json`.
 - **Write characterization tests for code that has none.** `Documented`: the playbooks ask for it before the PHP 8.0
   hop.
 

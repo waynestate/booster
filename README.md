@@ -407,12 +407,21 @@ under `Pre-pass fixes:`.
    Composer phase and Composer's own output, because the tests never ran.
 
 Composer 2.10 refuses to load tagged releases Packagist has flagged with a security advisory, and hops that move
-onto Laravel 9 or 10 most often meet that block. When the gate's lock update hits it, Booster writes a temporary
-entry to `config.policy.advisories.ignore` in `composer.json`: scoped to the package and the constraint Composer
-refused, kept visible to `composer audit`, and carrying a reason PROCTOR can find and report until the app removes
-it. The gate then retries once. If the retry still fails, the run stops with the unblock and the failure both in
-the report, and the entry stays in `composer.json`; removing it is the app's job once it is off the blocked
-versions.
+onto Laravel 9 or 10 most often meet that block. The refusal has two faces. The loud one fails the install phase
+and names the advisories. The quiet one happens when the app allows dev stability: Composer does not fail at all,
+it locks the branch instead, `9.x-dev` where the hop asks for `^9.0`. Booster reads the refreshed lock back and
+treats a branch version behind a tagged range like the block. Either way it writes a temporary entry to
+`config.policy.advisories.ignore` in `composer.json`: scoped to the package and the constraint Composer refused,
+kept visible to `composer audit`, and carrying a reason PROCTOR can find and report until the app removes it. The
+gate then retries once. If the retry still fails, the run stops with the unblock and the failure both in the
+report, and the entry stays in `composer.json`.
+
+The unblock is temporary by name, and Booster enforces that. When a gated step passes, Booster re-reads
+`config.policy.advisories.ignore` and reports every entry whose reason carries its own prefix (`Booster temporary
+unblock`; older runs wrote `BOOSTER temporary unblock`, which it still recognises). A step that is not the plan's
+last one applies with a warning; the plan's last step fails until the entry is out of `composer.json`, so the
+final target never ships with the unblock still in place. Removing the entry is the app's job once it is off the
+blocked versions.
 
 The `--image` value names the image the baseline and every gate run in, and it takes three shapes:
 
