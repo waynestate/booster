@@ -62,7 +62,9 @@ abstract class BaseCommand extends Command
             ->addOption('with-node', null, InputOption::VALUE_NONE, 'Include the Node front-end hops (Node pin, Mix to Vite, Tailwind, Vue) even when you passed a target version')
             ->addOption('sesame', null, InputOption::VALUE_NONE, 'Include the wayne-cas to SESAME swap.')
             ->addOption('skip', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hop id to leave out (repeatable).')
-            ->addOption('no-package-check', null, InputOption::VALUE_NONE, 'Skip the Packagist dependency check (for offline use).');
+            ->addOption('no-package-check', null, InputOption::VALUE_NONE, 'Skip the Packagist dependency check (for offline use).')
+            ->addOption('until', null, InputOption::VALUE_REQUIRED, 'Cut the plan after this hop id: that step and everything before it stay.')
+            ->addOption('only', null, InputOption::VALUE_REQUIRED, "Plan and run just this one hop id; the app must sit on the hop's starting versions.");
     }
 
     protected function format(InputInterface $input): string
@@ -117,6 +119,8 @@ abstract class BaseCommand extends Command
             withNode: (bool) $input->getOption('with-node'),
             skip: is_array($skip) ? array_values(array_map('strval', $skip)) : [],
             noPackageCheck: (bool) $input->getOption('no-package-check'),
+            until: $this->stringOption($input, 'until'),
+            only: $this->stringOption($input, 'only'),
         );
 
         return (new Planner($policy, new HopRegistry(), new HttpPackageFetcher()))->plan($project, $options, $this->today($input));

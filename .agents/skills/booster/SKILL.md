@@ -38,6 +38,7 @@ Playbooks:
 - `booster-phpunit-10-to-11`: Move PHPUnit 10 tests to PHPUnit 11.
 - `booster-phpunit-11-to-12`: Move PHPUnit 11 tests to PHPUnit 12.
 - `booster-phpunit-12-to-13`: Move PHPUnit 12 tests to PHPUnit 13.
+- `booster-phpunit-to-9-manual`: Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves.
 - `booster-cas-to-sesame`: Swap the wayne-cas package for SESAME using its compatibility classes.
 - `booster-node-pin-24`: Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
 - `booster-mix-to-vite`: Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only).

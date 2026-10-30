@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Project;
 
+use Composer\Semver\Constraint\Bound;
 use Composer\Semver\VersionParser;
 use Throwable;
 use Waynestate\Booster\ToolError;
@@ -64,11 +65,20 @@ final class ProjectDetector
 
         $phpConstraint = $require['php'] ?? null;
         $scripts = $this->section($composer, 'scripts');
+        $manifestPhp = is_string($phpConstraint) ? $this->lowerBound($phpConstraint, 2) : null;
+        $lock = $this->lockPhpRange($path . '/composer.lock', $composer);
+
+        // The manifest may allow a PHP the lock cannot install on; the lock
+        // wins, because that is the PHP the installed tree actually runs on.
+        $phpVersion = $manifestPhp;
+        if ($lock['floor'] !== null && $manifestPhp !== null && version_compare($manifestPhp, $lock['floor'], '<')) {
+            $phpVersion = $lock['floor'];
+        }
 
         return new Project(
             path: $path,
             hasComposer: $composer !== [],
-            phpVersion: is_string($phpConstraint) ? $this->lowerBound($phpConstraint, 2) : null,
+            phpVersion: $phpVersion,
             laravelMajor: $laravel,
             phpunitMajor: $phpunit,
             vueMajor: $vue,
@@ -80,6 +90,13 @@ final class ProjectDetector
             hasMixFile: is_file($path . '/webpack.mix.js'),
             vueMinor: $vueMinor,
             hasBoost: array_key_exists(self::BOOST_PACKAGE, $all) || $this->lockHasBoost($path . '/composer.lock'),
+            manifestPhp: $manifestPhp,
+            lockPhpFloor: $lock['floor'],
+            lockPhpCeiling: $lock['ceiling'],
+            lockFloorPackage: $lock['floorPackage'],
+            lockFloorConstraint: $lock['floorConstraint'],
+            lockCeilingPackage: $lock['ceilingPackage'],
+            lockCeilingConstraint: $lock['ceilingConstraint'],
         );
     }
 
@@ -118,6 +135,140 @@ final class ProjectDetector
         $segments = explode('.', $bound->getVersion());
 
         return implode('.', array_slice($segments, 0, $parts));
+    }
+
+    /**
+     * The PHP range composer.lock allows: the highest lower bound and the
+     * lowest upper bound across every require.php in packages and
+     * packages-dev, each parsed with Composer's semver parser. A
+     * platform-overrides.php or config.platform.php pin in composer.json is
+     * the PHP the lock was resolved for, so it raises the floor too. A
+     * missing or broken lock, and a constraint that cannot be parsed, change
+     * nothing: the manifest stays the primary source.
+     *
+     * @param array<string, mixed> $composer
+     *
+     * @return array{floor: ?string, floorPackage: ?string, floorConstraint: ?string, ceiling: ?string, ceilingPackage: ?string, ceilingConstraint: ?string}
+     */
+    private function lockPhpRange(string $lockFile, array $composer): array
+    {
+        $range = ['floor' => null, 'floorPackage' => null, 'floorConstraint' => null, 'ceiling' => null, 'ceilingPackage' => null, 'ceilingConstraint' => null];
+        if (!is_file($lockFile)) {
+            return $range;
+        }
+        $raw = file_get_contents($lockFile);
+        $data = $raw === false ? null : json_decode($raw, true);
+        if (!is_array($data)) {
+            return $range;
+        }
+
+        $parser = new VersionParser();
+        foreach (['packages', 'packages-dev'] as $section) {
+            $packages = $data[$section] ?? [];
+            if (!is_array($packages)) {
+                continue;
+            }
+            foreach ($packages as $entry) {
+                if (!is_array($entry)) {
+                    continue;
+                }
+                $name = $entry['name'] ?? null;
+                $require = $entry['require'] ?? null;
+                $constraint = is_array($require) ? ($require['php'] ?? null) : null;
+                if (!is_string($name) || !is_string($constraint)) {
+                    continue;
+                }
+                try {
+                    $bounds = $parser->parseConstraints($constraint);
+                } catch (Throwable) {
+                    continue;
+                }
+                $lower = $bounds->getLowerBound();
+                if (!$lower->isZero()) {
+                    $floor = $this->majorMinor($lower->getVersion());
+                    if ($floor !== null && ($range['floor'] === null || version_compare($floor, $range['floor'], '>'))) {
+                        $range['floor'] = $floor;
+                        $range['floorPackage'] = $name;
+                        $range['floorConstraint'] = $constraint;
+                    }
+                }
+                $upper = $bounds->getUpperBound();
+                if (!$upper->isPositiveInfinity()) {
+                    $ceiling = $this->exclusiveCeiling($upper);
+                    if ($ceiling !== null && ($range['ceiling'] === null || version_compare($ceiling, $range['ceiling'], '<'))) {
+                        $range['ceiling'] = $ceiling;
+                        $range['ceilingPackage'] = $name;
+                        $range['ceilingConstraint'] = $constraint;
+                    }
+                }
+            }
+        }
+
+        $pin = $this->platformPhp($composer);
+        if ($pin !== null && ($range['floor'] === null || version_compare($pin, $range['floor'], '>'))) {
+            $range['floor'] = $pin;
+            $range['floorPackage'] = 'composer.json';
+            $range['floorConstraint'] = $pin;
+        }
+
+        return $range;
+    }
+
+    /** "8.0.30" to "8.0"; null when the version has no major.minor shape. */
+    private function majorMinor(string $version): ?string
+    {
+        if (preg_match('/^\d+\.\d+/', $version) !== 1) {
+            return null;
+        }
+        $segments = explode('.', $version);
+
+        return $segments[0] . '.' . $segments[1];
+    }
+
+    /**
+     * The exclusive ceiling a bound sets, as major.minor: "<8.1" gives "8.1",
+     * and an inclusive bound gets its minor bumped ("<=8.0" gives "8.1").
+     */
+    private function exclusiveCeiling(Bound $bound): ?string
+    {
+        $base = $this->majorMinor($bound->getVersion());
+        if ($base === null) {
+            return null;
+        }
+        if ($bound->isInclusive()) {
+            $segments = explode('.', $base);
+            $minor = ((int) $segments[1]) + 1;
+            if ($minor > 9) {
+                $segments[0] = (string) (((int) $segments[0]) + 1);
+                $minor = 0;
+            }
+            $base = $segments[0] . '.' . $minor;
+        }
+
+        return $base;
+    }
+
+    /**
+     * The PHP composer.json pins for resolution (platform-overrides.php, else
+     * config.platform.php), as major.minor: the PHP the lock was resolved for.
+     *
+     * @param array<string, mixed> $composer
+     */
+    private function platformPhp(array $composer): ?string
+    {
+        $overrides = $composer['platform-overrides'] ?? null;
+        $config = $composer['config'] ?? null;
+        $platform = is_array($config) ? ($config['platform'] ?? null) : null;
+        foreach ([
+            is_array($overrides) ? ($overrides['php'] ?? null) : null,
+            is_array($platform) ? ($platform['php'] ?? null) : null,
+        ] as $pin) {
+            if (is_string($pin) && preg_match('/^\d+\.\d+/', $pin) === 1) {
+                return $this->majorMinor($pin);
+            }
+        }
+
+        return null;
     }
 
     /**

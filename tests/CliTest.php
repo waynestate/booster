@@ -106,6 +106,35 @@ final class CliTest extends TestCase
         self::assertStringContainsString('Will break on PHP 8.0: no findings.', $out);
     }
 
+    public function test_plan_until_cuts_the_printed_plan(): void
+    {
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--until' => 'php-80-to-81'], $this->cleanPhpcsFake());
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('1. php-74-to-80', $out);
+        self::assertStringContainsString('2. php-80-to-81', $out);
+        self::assertStringNotContainsString('php-81-to-82', $out);
+        self::assertStringContainsString('PHP: 7.4 -> 8.1', $out);
+    }
+
+    public function test_plan_only_prints_a_single_step(): void
+    {
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--only' => 'php-74-to-80'], $this->cleanPhpcsFake());
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('1. php-74-to-80', $out);
+        self::assertStringNotContainsString('php-80-to-81', $out);
+        self::assertStringContainsString('PHP: 7.4 -> 8.0', $out);
+    }
+
+    public function test_plan_refuses_until_and_only_together(): void
+    {
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--until' => 'php-80-to-81', '--only' => 'php-74-to-80']);
+
+        self::assertSame(2, $exit);
+        self::assertStringContainsString('not both', $out);
+    }
+
     public function test_plan_json_is_machine_readable(): void
     {
         [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('laravel-blade'), '--today' => self::TODAY, '--format' => 'json'], $this->cleanPhpcsFake());
@@ -468,11 +497,12 @@ final class CliTest extends TestCase
         self::assertStringContainsString('vue-27-to-compat', $out);
         self::assertStringContainsString('vue-compat-codemod', $out);
         self::assertStringContainsString('tailwind-3-to-4', $out);
+        self::assertStringContainsString('phpunit-to-9-manual', $out);
         self::assertStringContainsString('[playbook]', $out);
 
         [, $json] = $this->booster(['command' => 'hops', '--format' => 'json']);
         $hops = json_decode($json, true)['hops'];
-        self::assertCount(32, $hops);
+        self::assertCount(33, $hops);
         $byId = [];
         foreach ($hops as $hop) {
             $byId[$hop['id']] = $hop;
@@ -482,6 +512,7 @@ final class CliTest extends TestCase
         self::assertFalse($byId['vue-compat-codemod']['manual']);
         self::assertFalse($byId['tailwind-3-to-4']['manual']);
         self::assertTrue($byId['vue-2-to-3']['manual']);
+        self::assertTrue($byId['phpunit-to-9-manual']['manual']);
         self::assertSame(['vue-26-to-27', 'vue-27-to-compat', 'vue-compat-codemod'], $byId['vue-2-to-3']['alias_of']);
     }
 

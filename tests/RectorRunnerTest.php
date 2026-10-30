@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Tests;
 
+use Rector\Config\RectorConfig;
+use Rector\Configuration\Option;
+use Rector\Configuration\Parameter\SimpleParameterProvider;
 use Waynestate\Booster\Hop\HopRegistry;
+use Waynestate\Booster\Packaging\PharFiles;
 use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\Run\RectorResult;
 use Waynestate\Booster\Run\RectorRunner;
@@ -184,5 +188,33 @@ final class RectorRunnerTest extends TestCase
         self::assertSame(1, $result->changedCount());
         self::assertSame([], $result->rules());
         self::assertSame([], $result->errors);
+    }
+
+    public function test_the_shared_config_skips_ide_helper_files(): void
+    {
+        // The real Rector binary is not available in the test suite, so load the
+        // config Booster ships and read back the skip list it registers.
+        $saved = [];
+        foreach (['BOOSTER_APP_PATH', 'BOOSTER_RECTOR_SETS', 'BOOSTER_CLASS_RENAMES', 'BOOSTER_PHP_TARGET', 'BOOSTER_BOOTSTRAP'] as $name) {
+            $saved[$name] = getenv($name);
+        }
+        putenv('BOOSTER_APP_PATH=' . $this->tempDir());
+        putenv('BOOSTER_RECTOR_SETS=');
+        putenv('BOOSTER_CLASS_RENAMES=');
+        putenv('BOOSTER_PHP_TARGET=');
+        putenv('BOOSTER_BOOTSTRAP=');
+
+        try {
+            $configure = require PharFiles::path('config/rector.php');
+            $configure(new RectorConfig());
+
+            $skip = SimpleParameterProvider::provideArrayParameter(Option::SKIP);
+            self::assertContains('*_ide_helper*.php', $skip);
+            self::assertContains('*.phpstorm.meta.php', $skip);
+        } finally {
+            foreach ($saved as $name => $value) {
+                $value === false ? putenv($name) : putenv("{$name}={$value}");
+            }
+        }
     }
 }

@@ -129,6 +129,13 @@ The one-command form for a forced image upgrade:
 booster run --path=../my-app --goal=php-74-to-84
 ```
 
+When the app carries a `composer.lock`, `detect` also reads the PHP range the locked packages allow: the highest
+`require.php` floor and the lowest ceiling across `packages` and `packages-dev`, raised by a `platform-overrides.php`
+or `config.platform.php` pin in `composer.json` when one is set. If that floor sits above the floor `composer.json`
+claims, Booster plans from the lock's floor and prints a warning saying so; if the first PHP hop lands at or above
+the lock's ceiling, a second warning notes that hop will need a `composer update` to keep the lock installable.
+Without a lock, `composer.json` stays the sole source.
+
 A plan for the bundled Laravel 10 example app on PHP 8.2 looks like this (the order keeps the app on a PHP and
 Laravel pair Laravel supports at every step):
 
@@ -215,7 +222,11 @@ Options shared by `plan` and `run`:
 | `--sesame` | Include the `wayne-cas` to SESAME swap |
 | `--skip` | A hop id to leave out (repeat it) |
 | `--no-package-check` | Skip the Packagist dependency check (for offline use) |
+| `--until` | Cut the plan after this hop id: that step and everything before it stay, and the plan's targets move to where it lands |
+| `--only` | Plan and run just this one hop id. The app must sit on the hop's starting versions, and `--until` and `--only` are never combined |
 | `--with-node` | include the Node front-end hops (Node pin, Mix to Vite, Tailwind, Vue) even when you passed a target version. Without it, any of `--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php` or `--from-laravel` leaves those hops out, and the plan prints: "Node front-end hops were left out because you passed a target version: <hop ids>. Add --with-node to include them." |
+
+Example: an app moving from Laravel 8 to 13 takes the climb in parts. `booster plan --path=../my-app --until=laravel-8-to-9` keeps every hop up to and including the move to Laravel 9, and `booster run` with the same flag applies exactly those hops.
 
 Options for `plan`:
 
@@ -340,6 +351,59 @@ suite was red before any change, so a later red gate is not proof of a bad hop. 
   the suite can be red before any hop. Build the assets before the baseline (the app's usual `npm ci && npm run
   build`), or pass `--allow-failing-baseline` knowing why.
 
+### A smoke test for WSU apps
+
+Laravel's stock tests do not fit a WSU app. `tests/Feature/ExampleTest.php` asks for `/` and expects 200, but on a
+real app the front page sits behind CAS, so an unauthenticated request is a redirect to the sign-in URL, never a
+200. The stock suite also assumes an `APP_URL` that points somewhere real and an `APP_KEY` that exists; a fresh
+checkout has neither, so the suite is red before any change, and even a green run of it proves nothing about the
+upgrade. When Booster sees only the two stock example tests, it says so next to the baseline:
+
+    The app's tests are only Laravel's stock examples, so the gate cannot prove anything. See "A smoke test for WSU apps" in the README.
+
+Write one small test that proves the app boots and its front door still works. It needs a few environment values in
+`phpunit.xml`, because the test environment starts empty:
+
+```xml
+<php>
+    <env name="APP_ENV" value="testing"/>
+    <env name="APP_KEY" value="base64:c21va2UtdGVzdC1rZXkwMDAwMDAwMDAwMDAwMDAwMDA="/>
+    <env name="APP_URL" value="http://localhost"/>
+</php>
+```
+
+`APP_KEY` can be any throwaway 32-byte key (`php artisan key:generate --show`); it never leaves the test
+environment. If the app touches the database while booting, point the tests at an in-memory SQLite database:
+
+```xml
+    <env name="DB_CONNECTION" value="sqlite"/>
+    <env name="DB_DATABASE" value=":memory:"/>
+```
+
+And the test itself, in `tests/Feature/SmokeTest.php`:
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+final class SmokeTest extends TestCase
+{
+    public function test_a_guest_is_sent_to_the_cas_login(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('/login', (string) $response->headers->get('Location'));
+    }
+}
+```
+
+That is the whole point: the app boots, encryption and sessions work, and the front door still sends guests to CAS.
+It passes on the old PHP and must still pass on the new one, which is what the gate is for.
+
 ### What a hop does
 
 On PHP hops a pre-pass runs first: PHP 4 era `$a = &new Foo();` becomes a plain assignment, because PHP 7 and newer
@@ -403,11 +467,14 @@ three: skipping it skips them, and a person finishes the job, because Rector doe
 
 ### Hops Booster knows
 
-Thirty-two hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
+Thirty-three hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
 major at a time from 9 to 13, each list read from `data/versions.json` and trimmed to the majors whose Rector ruleset
-is installed ([Hop data](#hop-data)). Then the recipes: `cas-to-sesame` (renames the `wayne-cas` classes to SESAME's
+is installed ([Hop data](#hop-data)). An app whose PHPUnit is below 9 gets `phpunit-to-9-manual`, a manual move to
+`^9.5` placed before the first hop that targets PHP 8.0 (PHPUnit 7 and 8 do not run on PHP 8), and the regular
+PHPUnit hops then take over from 9. Then the recipes: `cas-to-sesame` (renames the `wayne-cas` classes to SESAME's
 compatibility classes and swaps the Composer requirement; planned with `--sesame`, and left out with a warning when
-the plan ends below PHP 8.3, which SESAME needs); `node-pin-24` (planned for any app with a `package.json` that does
+the plan ends below PHP 8.3, which SESAME needs; it lands just before the hop from Laravel 10 to 11, and while PHP is
+still below 8.3 the PHP hops go first); `node-pin-24` (planned for any app with a `package.json` that does
 not already floor Node at the hop data's target, 26 today: sets `engines.node` to `>=26` and writes `.nvmrc`, ahead
 of the front-end hops); `mix-to-vite` (planned when the app has a `webpack.mix.js` and the plan lands on Laravel 9 or
 newer, after `node-pin-24`: writes `vite.config.js`, swaps `laravel-mix` for `vite` and `laravel-vite-plugin` in
