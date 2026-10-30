@@ -146,11 +146,15 @@ final class TargetImageRunner
     /**
      * The argument array for `docker run`, exposed so tests can assert on it.
      *
+     * @param list<string> $env environment variables (KEY=VALUE) passed to the container with -e
      * @return list<string>
      */
-    public function runCommand(string $appPath, string $php, string $script, ?int $uid = null, ?int $gid = null, ?string $image = null): array
+    public function runCommand(string $appPath, string $php, string $script, ?int $uid = null, ?int $gid = null, ?string $image = null, array $env = []): array
     {
         $command = [$this->docker, 'run', '--rm', '-v', $appPath . ':/app', '-w', '/app', '-e', 'COMPOSER_HOME=/tmp/composer', '-e', 'HOME=/tmp'];
+        foreach ($env as $pair) {
+            array_push($command, '-e', $pair);
+        }
         if ($uid !== null && $gid !== null) {
             // Keep files the container writes owned by the person running Booster.
             array_push($command, '--user', $uid . ':' . $gid);
@@ -177,8 +181,9 @@ final class TargetImageRunner
 
     /**
      * @param list<string> $updatePackages see containerScript()
+     * @param list<string> $env            environment variables (KEY=VALUE) passed to the container with -e
      */
-    public function run(string $appPath, string $php, string $testCommand, ?string $extraCommand = null, ?GateImage $image = null, array $updatePackages = []): ProcessResult
+    public function run(string $appPath, string $php, string $testCommand, ?string $extraCommand = null, ?GateImage $image = null, array $updatePackages = [], array $env = []): ProcessResult
     {
         $version = $this->processes->run([$this->docker, 'version', '--format', '{{.Server.Version}}'], null, [], 30);
         if (!$version->successful()) {
@@ -199,7 +204,7 @@ final class TargetImageRunner
         $gid = function_exists('posix_getgid') ? posix_getgid() : null;
 
         return $this->processes->run(
-            $this->runCommand($appPath, $php, self::containerScript($testCommand, $extraCommand, $updatePackages), $uid, $gid, $resolved),
+            $this->runCommand($appPath, $php, self::containerScript($testCommand, $extraCommand, $updatePackages), $uid, $gid, $resolved, $env),
             null,
             [],
             3600,

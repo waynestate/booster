@@ -19,6 +19,8 @@ final readonly class RunReport
         public ?ProctorResult $proctor = null,
         public bool $proctorAdvisory = false,
         public ?ProctorComparison $proctorComparison = null,
+        /** @var list<string> keys of the --test-env variables passed to the baseline and gates; values never appear */
+        public array $testEnvKeys = [],
     ) {}
 
     public function failed(): bool
@@ -47,6 +49,7 @@ final readonly class RunReport
         return [
             'tool' => 'booster',
             'dry_run' => $this->dryRun,
+            'test_env' => $this->testEnvKeys,
             'result' => $this->failed() ? 'fail' : 'pass',
             'baseline' => $this->baseline->toArray(),
             'plan' => $this->plan->toArray(),

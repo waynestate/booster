@@ -189,6 +189,21 @@ final class TargetImageRunnerTest extends TestCase
         self::assertContains('1000:1000', $command);
     }
 
+    public function test_test_env_variables_are_passed_to_the_container(): void
+    {
+        $command = (new TargetImageRunner(new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '', ''))))
+            ->runCommand('/app', '8.4', 'true', null, null, null, ['DB_CONNECTION=sqlite', 'DB_DATABASE=:memory:']);
+
+        // The first seven args stay put; the user env rides on after the built-in env.
+        self::assertSame(['docker', 'run', '--rm', '-v', '/app:/app', '-w', '/app'], array_slice($command, 0, 7));
+        foreach (['DB_CONNECTION=sqlite', 'DB_DATABASE=:memory:'] as $pair) {
+            $i = array_search($pair, $command, true);
+            self::assertNotFalse($i);
+            self::assertSame('-e', $command[$i - 1]);
+            self::assertGreaterThan(array_search('HOME=/tmp', $command, true), $i);
+        }
+    }
+
     public function test_the_given_image_is_used_and_nothing_is_built(): void
     {
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '', ''));

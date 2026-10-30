@@ -173,6 +173,11 @@ final class TextWriter
     public function run(RunReport $report): string
     {
         $lines = [$report->dryRun ? 'BOOSTER dry run (nothing was changed)' : 'BOOSTER run', ''];
+        if ($report->testEnvKeys !== []) {
+            // Keys only: the values may hold credentials and never reach a report.
+            $lines[] = sprintf('Test environment: %s (values are not shown).', implode(', ', $report->testEnvKeys));
+            $lines[] = '';
+        }
         foreach ($this->baselineLines($report->baseline) as $line) {
             $lines[] = $line;
         }

@@ -83,6 +83,12 @@ final class HopExecutor
         // dry run creates nothing, so only an --allow-dirty real run needs the
         // status read.
         $this->startingUntracked = !$options->dryRun && $options->allowDirty ? $this->untrackedPaths($path) : [];
+        // The report names the --test-env variables by key only; the values may
+        // hold credentials and must never reach a report or a log.
+        $testEnvKeys = array_map(
+            static fn(string $pair): string => substr($pair, 0, (int) strpos($pair, '=')),
+            $options->testEnv,
+        );
 
         $baseline = $this->runBaseline($plan, $path, $options);
         if ($baseline->failed() && !$options->allowFailingBaseline) {
@@ -98,7 +104,7 @@ final class HopExecutor
                 ]);
             }
 
-            return new RunReport($plan, $options->dryRun, $baseline, $results);
+            return new RunReport($plan, $options->dryRun, $baseline, $results, testEnvKeys: $testEnvKeys);
         }
 
         $results = [];
@@ -127,7 +133,7 @@ final class HopExecutor
         // reports instead of blocking.
         $advisory = $options->proctorAdvisory || $plan->stopsEarly;
 
-        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison);
+        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys);
     }
 
     /**
@@ -199,7 +205,7 @@ final class HopExecutor
         }
 
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
-        $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage);
+        $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, [], $options->testEnv);
         $outcome = TargetImageRunner::gateOutcome($result);
         $status = match (true) {
             $outcome->successful() => BaselineResult::PASSED,
@@ -625,7 +631,7 @@ final class HopExecutor
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
         $update = $this->lockUpdatePackages($step);
         $unblock = [];
-        $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update);
+        $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update, $options->testEnv);
         $outcome = TargetImageRunner::gateOutcome($result);
         if (!$outcome->successful() && $outcome->phase === GateOutcome::PHASE_INSTALL && $update !== []) {
             $blocked = self::advisoryBlock($outcome->output);
@@ -642,7 +648,7 @@ final class HopExecutor
                 }
                 // The ignore is in composer.json now, so the same command may
                 // load the blocked releases.
-                $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update);
+                $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update, $options->testEnv);
                 $outcome = TargetImageRunner::gateOutcome($result);
             }
         }
@@ -662,7 +668,7 @@ final class HopExecutor
                 }
                 // The ignore is in composer.json now, so the same command may
                 // load the tagged releases.
-                $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update);
+                $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update, $options->testEnv);
                 $outcome = TargetImageRunner::gateOutcome($result);
                 $still = self::devFallback($step, $path);
                 if ($still !== null) {
