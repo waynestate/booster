@@ -44,6 +44,14 @@ final class HopExecutor
 
     private ?RemovalsScan $removals = null;
 
+    /**
+     * Untracked paths the app held before the run, so undo hints name only
+     * this run's creations.
+     *
+     * @var list<string>
+     */
+    private array $startingUntracked = [];
+
     private function registry(): HopRegistry
     {
         return $this->registry ?? new HopRegistry();
@@ -70,6 +78,11 @@ final class HopExecutor
         if (!$options->dryRun && !$options->allowDirty) {
             $this->assertCleanGitTree($path);
         }
+        // Files the user already held untracked, so the undo hint never tells
+        // them to delete their own work. A checked clean tree holds none, and a
+        // dry run creates nothing, so only an --allow-dirty real run needs the
+        // status read.
+        $this->startingUntracked = !$options->dryRun && $options->allowDirty ? $this->untrackedPaths($path) : [];
 
         $baseline = $this->runBaseline($plan, $path, $options);
         if ($baseline->failed() && !$options->allowFailingBaseline) {
@@ -169,8 +182,13 @@ final class HopExecutor
     private function runBaseline(Plan $plan, string $path, RunOptions $options): BaselineResult
     {
         $php = $this->startingPhp($plan);
+        // The scan is cheap and must happen even when the baseline itself is
+        // skipped, so a dry run still names a suite that proves nothing.
+        $warning = StockTests::onlyStockExamples($path)
+            ? "The app's tests are only Laravel's stock examples, so the gate cannot prove anything. See \"A smoke test for WSU apps\" in the README."
+            : null;
         if ($options->dryRun || $options->skipGate || $php === null) {
-            return new BaselineResult(BaselineResult::SKIPPED, $php, null);
+            return new BaselineResult(BaselineResult::SKIPPED, $php, null, [], $warning);
         }
 
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
@@ -182,6 +200,7 @@ final class HopExecutor
             $php,
             $result->exitCode,
             $output,
+            $warning,
         );
     }
 
@@ -281,6 +300,16 @@ final class HopExecutor
                 $preview = $this->rector->run($hop, $path, true, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget, $options->memoryLimit);
                 [$stopErrors, $notes] = self::splitRepairedNotes($preview->errors);
                 if ($stopErrors !== []) {
+                    if ($options->dryRun && $hop->kind === HopKind::Laravel && self::staleVendorErrors($stopErrors)) {
+                        // The app's vendor/ still holds an older Laravel, so Rector cannot see the
+                        // classes this hop's rules work on. Name that and point at the earlier hops
+                        // instead of a wall of "class not found" errors; a real run must still stop.
+                        return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [...self::prepassFiles($prepass), ...$preview->files], [sprintf(
+                            "Can't preview %s yet: the app's vendor/ is from an older Laravel, so Rector cannot see the classes this hop uses. Apply the earlier Laravel hops (and composer update), then dry-run again.",
+                            $hop->id,
+                        ), ...$notes], true, $prepass?->files() ?? []);
+                    }
+
                     return new StepResult($step->number, $hop->id, StepResult::ERROR, [...self::prepassFiles($prepass), ...$preview->files], ['Rector reported errors; nothing was changed.', ...self::refusals($stopErrors), ...$notes], false, $prepass?->files() ?? []);
                 }
                 $wanted = $preview->changedCount() + ($prepass?->changedCount() ?? 0);
@@ -343,6 +372,33 @@ final class HopExecutor
                 }
                 if ($appliedErrors !== []) {
                     return new StepResult($step->number, $hop->id, StepResult::ERROR, [...self::prepassFiles($prepass), ...$applied->files], ['Rector reported errors while applying.', ...self::refusals($appliedErrors), ...$notes], false, $prepass?->files() ?? []);
+                }
+                if ($hop->kind === HopKind::Laravel) {
+                    // Rector rewrites code but does not tidy imports, so a rename
+                    // leaves a dead `use` behind. Clean the files this hop changed.
+                    $importsRemoved = 0;
+                    $importFiles = 0;
+                    foreach ($applied->files as $entry) {
+                        $file = $entry['file'];
+                        if (!str_ends_with($file, '.php')) {
+                            continue;
+                        }
+                        $absolute = str_starts_with($file, '/') || preg_match('#^[A-Za-z]:/#', $file) === 1 ? $file : $path . '/' . $file;
+                        $removed = UnusedImports::cleanFile($absolute);
+                        if ($removed > 0) {
+                            $importsRemoved += $removed;
+                            $importFiles++;
+                        }
+                    }
+                    if ($importsRemoved > 0) {
+                        $messages[] = sprintf(
+                            'Removed %d unused import%s from %d file%s after the Rector pass.',
+                            $importsRemoved,
+                            $importsRemoved === 1 ? '' : 's',
+                            $importFiles,
+                            $importFiles === 1 ? '' : 's',
+                        );
+                    }
                 }
                 // The CAS config and model traits move only after Rector succeeded,
                 // because they assume the class renames are in place.
@@ -501,6 +557,29 @@ final class HopExecutor
     }
 
     /**
+     * True when at least 90% of the Rector errors are PHPStan failing to find
+     * an Illuminate class ("Class Illuminate\... was not found"). That wall is
+     * the signature of a Laravel hop previewing against a vendor/ that still
+     * holds an older Laravel, not a problem in the app's own code.
+     *
+     * @param list<string> $errors
+     */
+    private static function staleVendorErrors(array $errors): bool
+    {
+        if ($errors === []) {
+            return false;
+        }
+        $matched = 0;
+        foreach ($errors as $error) {
+            if (preg_match('/Class\s+Illuminate(?:\\\\[A-Za-z0-9_]+)+\s+was not found/', $error) === 1) {
+                $matched++;
+            }
+        }
+
+        return $matched * 10 >= count($errors) * 9;
+    }
+
+    /**
      * @return list<string>|null failure messages, or null when the gate passed
      */
     private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): ?array
@@ -515,7 +594,7 @@ final class HopExecutor
         $messages = [
             sprintf('Gate failed: "%s" exited %d on PHP %s. The working copy keeps the changes so you can read them.', $test, $result->exitCode, $php),
             trim($result->stdout . "\n" . $result->stderr),
-            'Undo with: git checkout . (inside the app).',
+            $this->undoHint($path),
         ];
         if ($baseline->failed()) {
             $messages[] = 'The baseline was already failing, so this gate failure may predate the upgrade.';
@@ -683,7 +762,7 @@ final class HopExecutor
             return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [
                 sprintf('vue-upgrade-tool exited %d in the Node container. The working copy keeps any changes it made, so read them before continuing.', $result->exitCode),
                 trim($result->stdout . "\n" . $result->stderr),
-                'Undo with: git checkout . (inside the app).',
+                $this->undoHint($path),
                 ...$hop->notes,
             ]);
         }
@@ -802,7 +881,7 @@ final class HopExecutor
                 return [
                     sprintf('Build gate failed: "%s" exited %d in the Node container. The working copy keeps the changes so you can read them.', implode(' ', $argv), $result->exitCode),
                     trim($result->stdout . "\n" . $result->stderr),
-                    'Undo with: git checkout . (inside the app).',
+                    $this->undoHint($path),
                 ];
             }
         }
@@ -847,7 +926,7 @@ final class HopExecutor
             return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [
                 sprintf('The Tailwind upgrade tool failed: "npx -y %s" exited %d. The working copy keeps whatever it wrote, so you can read it.', $toolVersion, $tool->exitCode),
                 trim($tool->stdout . "\n" . $tool->stderr),
-                'Undo with: git checkout . (inside the app).',
+                $this->undoHint($path),
             ]);
         }
 
@@ -1471,7 +1550,7 @@ final class HopExecutor
                 return [
                     sprintf('Build gate failed: "%s" exited %d in the Node container. The working copy keeps the changes so you can read them.', implode(' ', $argv), $result->exitCode),
                     trim($result->stdout . "\n" . $result->stderr),
-                    'Undo with: git checkout . (inside the app).',
+                    $this->undoHint($path),
                 ];
             }
         }
@@ -1630,6 +1709,39 @@ final class HopExecutor
         $scripts = is_array($composer) && is_array($composer['scripts'] ?? null) ? $composer['scripts'] : [];
 
         return array_key_exists('test', $scripts) ? 'composer test' : 'vendor/bin/phpunit';
+    }
+
+    /**
+     * The undo line for a failed step. "git checkout ." restores changed
+     * tracked files; files this run created are untracked and survive that, so
+     * when the working tree holds any they are named for "git clean" too. Only
+     * paths absent from the start-of-run status are named, so a user's own
+     * untracked files (--allow-dirty) stay out of the clean list. A directory
+     * untracked at start keeps its single "dir/" entry when it gains files, so
+     * it stays out too: name nothing you cannot prove this run created.
+     */
+    private function undoHint(string $path): string
+    {
+        $created = array_values(array_diff($this->untrackedPaths($path), $this->startingUntracked));
+        if ($created === []) {
+            return 'Undo with: git checkout . (inside the app).';
+        }
+
+        return 'Undo with: git checkout . && git clean -fd -- ' . implode(' ', $created) . ' (inside the app).';
+    }
+
+    /** @return list<string> the app's untracked paths from one git status */
+    private function untrackedPaths(string $path): array
+    {
+        $status = $this->processes->run(['git', '-C', $path, 'status', '--porcelain'], null, [], 60);
+        $paths = [];
+        foreach (explode("\n", trim($status->stdout)) as $line) {
+            if (str_starts_with($line, '?? ') && strlen($line) > 3) {
+                $paths[] = trim(substr($line, 3), '"');
+            }
+        }
+
+        return $paths;
     }
 
     private function assertCleanGitTree(string $path): void

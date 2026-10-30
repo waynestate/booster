@@ -16,6 +16,7 @@ use Waynestate\Booster\Plan\PlanStep;
 use Waynestate\Booster\Plan\Planner;
 use Waynestate\Booster\Project\ProjectDetector;
 use Waynestate\Booster\Report\TextWriter;
+use Waynestate\Booster\Run\BaselineResult;
 use Waynestate\Booster\Run\ComposerEditor;
 use Waynestate\Booster\Run\HopExecutor;
 use Waynestate\Booster\Run\NodeRunner;
@@ -40,15 +41,20 @@ final class HopExecutorTest extends TestCase
      * @param int            $baselineExit         exit code of the baseline docker run (the first one)
      * @param int            $proctorExit          PROCTOR's exit code (0 pass, 1 fail, 2 tripped); -1 leaves PROCTOR unanswered
      * @param int            $proctorBaselineExit  exit code of the first PROCTOR call (the baseline); -1 answers it like the rest
+     * @param string|null    $gitStatusStart       what the first git status prints (the start-of-run read); null answers it like the rest
      */
-    private function fake(int $changedPerHop = 1, string $gitStatus = '', int $gateExit = 0, array $rectorErrors = [], int $baselineExit = 0, int $proctorExit = -1, int $proctorBaselineExit = -1): FakeProcessRunner
+    private function fake(int $changedPerHop = 1, string $gitStatus = '', int $gateExit = 0, array $rectorErrors = [], int $baselineExit = 0, int $proctorExit = -1, int $proctorBaselineExit = -1, ?string $gitStatusStart = null): FakeProcessRunner
     {
         $dockerRuns = 0;
         $proctorRuns = 0;
+        $gitRuns = 0;
 
-        return new FakeProcessRunner(static function (array $command) use ($changedPerHop, $gitStatus, $gateExit, $rectorErrors, $baselineExit, $proctorExit, $proctorBaselineExit, &$dockerRuns, &$proctorRuns): ProcessResult {
+        return new FakeProcessRunner(static function (array $command) use ($changedPerHop, $gitStatus, $gateExit, $rectorErrors, $baselineExit, $proctorExit, $proctorBaselineExit, $gitStatusStart, &$dockerRuns, &$proctorRuns, &$gitRuns): ProcessResult {
             if ($command[0] === 'git') {
-                return new ProcessResult(0, $gitStatus, '');
+                $first = $gitRuns === 0;
+                $gitRuns++;
+
+                return new ProcessResult(0, $first && $gitStatusStart !== null ? $gitStatusStart : $gitStatus, '');
             }
             if ($command[0] === 'docker') {
                 $isRun = ($command[1] ?? '') === 'run';
@@ -336,7 +342,11 @@ final class HopExecutorTest extends TestCase
         $report = $this->execute($fake, new RunOptions(allowDirty: true, skipGate: true));
 
         self::assertFalse($report->failed());
-        self::assertSame([], array_filter($fake->calls, static fn(array $c): bool => $c['command'][0] === 'git'));
+        // The refusal check is skipped; the one status read is the undo hint's
+        // record of what the user already had untracked.
+        $gitCalls = array_values(array_filter($fake->calls, static fn(array $c): bool => $c['command'][0] === 'git'));
+        self::assertCount(1, $gitCalls);
+        self::assertSame(['status', '--porcelain'], array_slice($gitCalls[0]['command'], 3));
     }
 
     public function test_a_diff_over_an_explicit_max_changes_stops_the_run_before_anything_is_applied(): void
@@ -545,6 +555,60 @@ final class HopExecutorTest extends TestCase
         self::assertSame(['gate-failed', 'not-run'], $this->statuses($report));
         self::assertStringContainsString('git checkout', implode(' ', $report->results[0]->messages));
         self::assertStringContainsString('FAILURES!', implode(' ', $report->results[0]->messages));
+    }
+
+    public function test_the_undo_hint_names_files_the_run_created(): void
+    {
+        $report = $this->execute($this->fake(gitStatusStart: '', gitStatus: "?? src/NewThing.php\n?? generated/\n", gateExit: 1), new RunOptions(allowDirty: true));
+
+        self::assertSame(['gate-failed', 'not-run'], $this->statuses($report));
+        self::assertStringContainsString('Undo with: git checkout . && git clean -fd -- src/NewThing.php generated/ (inside the app).', implode(' ', $report->results[0]->messages));
+    }
+
+    public function test_the_undo_hint_stays_plain_when_nothing_was_created(): void
+    {
+        $report = $this->execute($this->fake(gateExit: 1), new RunOptions());
+        $messages = implode(' ', $report->results[0]->messages);
+
+        self::assertStringContainsString('Undo with: git checkout . (inside the app).', $messages);
+        self::assertStringNotContainsString('git clean', $messages);
+    }
+
+    public function test_the_undo_hint_names_the_file_a_hop_created_from_a_clean_start(): void
+    {
+        $report = $this->execute($this->fake(gitStatusStart: '', gitStatus: "?? config/sesame.php\n", gateExit: 1), new RunOptions());
+
+        self::assertSame(['gate-failed', 'not-run'], $this->statuses($report));
+        self::assertStringContainsString('Undo with: git checkout . && git clean -fd -- config/sesame.php (inside the app).', implode(' ', $report->results[0]->messages));
+    }
+
+    public function test_the_undo_hint_leaves_the_users_own_untracked_files_alone(): void
+    {
+        // notes.txt and generated/ were the user's before the run; only
+        // config/sesame.php is this run's. generated/ gained a file inside but
+        // keeps its one porcelain entry, so it stays out of the clean list.
+        $report = $this->execute(
+            $this->fake(gitStatusStart: "?? notes.txt\n?? generated/\n", gitStatus: "?? notes.txt\n?? generated/\n?? config/sesame.php\n", gateExit: 1),
+            new RunOptions(allowDirty: true),
+        );
+
+        self::assertSame(['gate-failed', 'not-run'], $this->statuses($report));
+        $messages = implode(' ', $report->results[0]->messages);
+        self::assertStringContainsString('Undo with: git checkout . && git clean -fd -- config/sesame.php (inside the app).', $messages);
+        self::assertStringNotContainsString('notes.txt', $messages);
+        self::assertStringNotContainsString('generated/', $messages);
+    }
+
+    public function test_the_undo_hint_stays_plain_when_the_run_created_nothing_new(): void
+    {
+        $report = $this->execute(
+            $this->fake(gitStatusStart: "?? notes.txt\n", gitStatus: "?? notes.txt\n", gateExit: 1),
+            new RunOptions(allowDirty: true),
+        );
+        $messages = implode(' ', $report->results[0]->messages);
+
+        self::assertStringContainsString('Undo with: git checkout . (inside the app).', $messages);
+        self::assertStringNotContainsString('git clean', $messages);
     }
 
     public function test_rector_errors_stop_the_run_without_applying(): void
@@ -838,6 +902,115 @@ final class HopExecutorTest extends TestCase
         foreach ($report->results as $r) {
             self::assertFalse($r->incomplete);
         }
+    }
+
+    /**
+     * Like fake(), but only the Laravel hops' Rector calls report errors; the
+     * PHP and PHPUnit hops come back clean. RectorRunner tells them apart with
+     * BOOSTER_RECTOR_SETS (RectorLaravel constants vs Rector set lists).
+     *
+     * @param list<string> $laravelErrors
+     */
+    private function staleVendorFake(array $laravelErrors): FakeProcessRunner
+    {
+        return new FakeProcessRunner(static function (array $command, array $env) use ($laravelErrors): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            $isLaravel = str_contains($env['BOOSTER_RECTOR_SETS'] ?? '', 'RectorLaravel');
+            $files = [['file' => '/tmp/x/src/F0.php', 'diff' => "--- a\n+++ b"]];
+            $errors = $isLaravel ? array_map(static fn(string $m): array => ['message' => $m], $laravelErrors) : [];
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => $files, 'errors' => $errors]), '');
+        });
+    }
+
+    public function test_a_laravel_dry_run_against_an_older_vendor_is_named_not_failed(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        mkdir($dir . '/vendor', 0775, true);
+        file_put_contents($dir . '/vendor/autoload.php', "<?php\n");
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $fake = $this->staleVendorFake([
+            'app/Http/Controllers/A.php: Class Illuminate\\Http\\Request was not found while trying to analyse it - discovering symbols is probably not configured properly. (line 12)',
+            'app/Models/B.php: Class Illuminate\\Support\\Facades\\Request was not found while trying to analyse it - discovering symbols is probably not configured properly. (line 7)',
+        ]);
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions(dryRun: true));
+
+        self::assertFalse($report->failed());
+        $laravel = array_filter($report->results, static fn(StepResult $r): bool => str_starts_with($r->hopId, 'laravel-'));
+        self::assertNotEmpty($laravel);
+        foreach ($laravel as $r) {
+            self::assertSame(StepResult::PREVIEWED, $r->status);
+            self::assertTrue($r->incomplete);
+            self::assertStringContainsString("Can't preview " . $r->hopId . " yet: the app's vendor/ is from an older Laravel", implode(' ', $r->messages));
+        }
+        foreach ($report->results as $r) {
+            if (!str_starts_with($r->hopId, 'laravel-')) {
+                self::assertFalse($r->incomplete, $r->hopId);
+            }
+        }
+    }
+
+    public function test_a_laravel_real_run_against_an_older_vendor_still_errors(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        mkdir($dir . '/vendor', 0775, true);
+        file_put_contents($dir . '/vendor/autoload.php', "<?php\n");
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $fake = $this->staleVendorFake([
+            'app/Http/Controllers/A.php: Class Illuminate\\Http\\Request was not found while trying to analyse it - discovering symbols is probably not configured properly. (line 12)',
+        ]);
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions());
+
+        self::assertTrue($report->failed());
+        $first = null;
+        foreach ($report->results as $r) {
+            if (str_starts_with($r->hopId, 'laravel-') && $r->status !== StepResult::NOT_RUN) {
+                $first = $r;
+
+                break;
+            }
+        }
+        self::assertNotNull($first);
+        self::assertSame(StepResult::ERROR, $first->status);
+        self::assertStringContainsString('Rector reported errors; nothing was changed.', implode(' ', $first->messages));
+        self::assertStringContainsString('Class Illuminate\\Http\\Request was not found', implode(' ', $first->messages));
+    }
+
+    public function test_a_laravel_dry_run_below_the_stale_vendor_share_still_errors(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        mkdir($dir . '/vendor', 0775, true);
+        file_put_contents($dir . '/vendor/autoload.php', "<?php\n");
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $fake = $this->staleVendorFake([
+            'app/Http/Controllers/A.php: Class Illuminate\\Http\\Request was not found while trying to analyse it - discovering symbols is probably not configured properly. (line 12)',
+            'app/Http/Controllers/C.php: Syntax error, unexpected token "endif" (line 30)',
+            'app/Models/D.php: Something else broke entirely (line 5)',
+        ]);
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions(dryRun: true));
+
+        self::assertTrue($report->failed());
+        $first = null;
+        foreach ($report->results as $r) {
+            if (str_starts_with($r->hopId, 'laravel-') && $r->status !== StepResult::NOT_RUN) {
+                $first = $r;
+
+                break;
+            }
+        }
+        self::assertNotNull($first);
+        self::assertSame(StepResult::ERROR, $first->status);
     }
 
     public function test_a_hop_that_changes_nothing_is_nothing_to_do_and_skips_the_gate(): void
@@ -1280,5 +1453,162 @@ final class HopExecutorTest extends TestCase
         self::assertStringContainsString('PROCTOR baseline could not be taken: the baseline run tripped: PROCTOR could not read composer.json.', $text);
         self::assertStringContainsString('New:', $text);
         self::assertStringContainsString('RESULT: FAIL', $text);
+    }
+
+    /**
+     * Copies laravel-blade and gives it Laravel's two stock example tests. With
+     * $keepRealTest the app's own PostTest.php stays beside them.
+     */
+    private function stockExample(bool $keepRealTest = false): string
+    {
+        $dir = $this->copyExample('laravel-blade');
+        if (!$keepRealTest) {
+            unlink($dir . '/tests/PostTest.php');
+        }
+        $feature = $dir . '/tests/Feature';
+        $unit = $dir . '/tests/Unit';
+        if (!is_dir($feature)) {
+            mkdir($feature, 0775, true);
+        }
+        if (!is_dir($unit)) {
+            mkdir($unit, 0775, true);
+        }
+        file_put_contents(
+            $feature . '/ExampleTest.php',
+            <<<'PHP'
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_the_application_returns_a_successful_response(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertStatus(200);
+    }
+}
+PHP,
+        );
+        file_put_contents(
+            $unit . '/ExampleTest.php',
+            <<<'PHP'
+<?php
+
+namespace Tests\Unit;
+
+use PHPUnit\Framework\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_that_true_is_true(): void
+    {
+        $this->assertTrue(true);
+    }
+}
+PHP,
+        );
+
+        return $dir;
+    }
+
+    /** Like execute(), but for an app directory that is already prepared. */
+    private function executePrepared(string $dir, RunOptions $options): RunReport
+    {
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $fake = $this->fake();
+        $executor = new HopExecutor(
+            new RectorRunner($fake, '/fake/rector'),
+            new ComposerEditor(),
+            new TargetImageRunner($fake),
+            $fake,
+        );
+
+        return $executor->execute($plan, $options);
+    }
+
+    public function test_a_suite_of_only_stock_examples_is_named_next_to_the_baseline(): void
+    {
+        $report = $this->executePrepared($this->stockExample(), new RunOptions());
+
+        self::assertSame("The app's tests are only Laravel's stock examples, so the gate cannot prove anything. See \"A smoke test for WSU apps\" in the README.", $report->baseline->warning);
+        $text = (new TextWriter())->run($report);
+        self::assertStringContainsString("The app's tests are only Laravel's stock examples", $text);
+    }
+
+    public function test_the_stock_test_warning_shows_on_a_dry_run_too(): void
+    {
+        $report = $this->executePrepared($this->stockExample(), new RunOptions(dryRun: true));
+
+        self::assertSame(BaselineResult::SKIPPED, $report->baseline->status);
+        self::assertNotNull($report->baseline->warning);
+    }
+
+    public function test_a_real_test_beside_the_stock_examples_silences_the_warning(): void
+    {
+        $report = $this->executePrepared($this->stockExample(true), new RunOptions());
+
+        self::assertNull($report->baseline->warning);
+    }
+
+    public function test_a_laravel_hop_removes_the_imports_its_changes_left_unused(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        $controller = $dir . '/app/Http/Controllers/ThingController.php';
+        if (!is_dir(dirname($controller))) {
+            mkdir(dirname($controller), 0775, true);
+        }
+        // The post-Rector state of the file: Gone was renamed away, leaving its import dead.
+        file_put_contents($controller, implode("\n", [
+            '<?php',
+            '',
+            'namespace App\Http\Controllers;',
+            '',
+            'use App\Models\Gone;',
+            'use App\Models\Post;',
+            'use Illuminate\Routing\Controller;',
+            '',
+            'class ThingController extends Controller',
+            '{',
+            '    public function index(): Post',
+            '    {',
+            '        return Post::first();',
+            '    }',
+            '}',
+            '',
+        ]));
+
+        $fake = new FakeProcessRunner(static function (array $command, array $env, ?string $cwd) use ($dir): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Http/Controllers/ThingController.php', 'diff' => "--- a\n+++ b"]], 'errors' => []]), '');
+        });
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $executor = new HopExecutor(
+            new RectorRunner($fake, '/fake/rector'),
+            new ComposerEditor(),
+            new TargetImageRunner($fake),
+            $fake,
+        );
+        $report = $executor->execute($plan, new RunOptions());
+
+        $content = (string) file_get_contents($controller);
+        self::assertStringNotContainsString('use App\Models\Gone;', $content);
+        self::assertStringContainsString('use App\Models\Post;', $content);
+        self::assertStringContainsString('use Illuminate\Routing\Controller;', $content);
+
+        $laravelSteps = array_values(array_filter($report->results, static fn(StepResult $r): bool => $r->hopId === 'laravel-10-to-11'));
+        self::assertCount(1, $laravelSteps);
+        self::assertContains('Removed 1 unused import from 1 file after the Rector pass.', $laravelSteps[0]->messages);
     }
 }

@@ -321,6 +321,9 @@ final class TextWriter
             BaselineResult::SKIPPED => ['Baseline: SKIPPED (no gate in this run).'],
             default => [sprintf('Baseline: %s.', $baseline->status)],
         };
+        if ($baseline->warning !== null) {
+            $lines[] = $baseline->warning;
+        }
         if ($baseline->status === BaselineResult::FAILED) {
             $joined = implode("\n", $baseline->output);
             if (preg_match('/mix-manifest\.json|Vite manifest not found|public\/build\/manifest\.json/i', $joined) === 1) {

@@ -37,6 +37,11 @@ foreach (['vendor', 'node_modules', 'storage', 'bootstrap/cache', '.git', 'publi
 }
 // Blade templates end in .php but are not PHP files.
 $skip[] = '*.blade.php';
+// IDE helper files (_ide_helper.php and friends, .phpstorm.meta.php) are editor
+// output, not app source. They sit at the app root or in subdirectories, so the
+// patterns match at any depth.
+$skip[] = '*_ide_helper*.php';
+$skip[] = '*.phpstorm.meta.php';
 
 $cache = getenv('BOOSTER_RECTOR_CACHE');
 

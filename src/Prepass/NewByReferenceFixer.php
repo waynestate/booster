@@ -169,6 +169,11 @@ final class NewByReferenceFixer
                 }
             }
             $name = $file->getFilename();
+            // IDE helper files are editor output, not app source.
+            $lower = strtolower($name);
+            if ($lower === '.phpstorm.meta.php' || (str_starts_with($lower, '_ide_helper') && str_ends_with($lower, '.php'))) {
+                continue;
+            }
             $dot = strrpos($name, '.');
             if ($dot === false) {
                 continue;
