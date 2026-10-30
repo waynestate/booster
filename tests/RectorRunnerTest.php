@@ -128,4 +128,15 @@ final class RectorRunnerTest extends TestCase
         self::assertCount(2, $result->errors);
         self::assertStringContainsString("\u{FFFD}", $result->errors[1]);
     }
+
+    public function test_parse_keeps_line_number(): void
+    {
+        $json = '{"file_diffs": [], "errors": [{"file":"src/A.php","message":"Syntax error, unexpected token","line":12},{"file":"src/B.php","message":"Something went wrong on line 5","line":9}]}';
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, $json, ''));
+        $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), '/srv/acme-app', true, '8.0');
+        self::assertSame([
+            'src/A.php: Syntax error, unexpected token (line 12)',
+            'src/B.php: Something went wrong on line 5',
+        ], $result->errors);
+    }
 }

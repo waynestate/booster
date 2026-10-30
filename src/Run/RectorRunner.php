@@ -216,6 +216,10 @@ final class RectorRunner
             if (is_array($error)) {
                 $file = is_string($error['file'] ?? null) ? $error['file'] . ': ' : '';
                 $message = is_string($error['message'] ?? null) ? $error['message'] : 'unknown error';
+                // Keep Rector's own line number so a parse refusal can name it.
+                if (is_int($error['line'] ?? null) && preg_match('/line \d+/i', $message) !== 1) {
+                    $message .= ' (line ' . $error['line'] . ')';
+                }
                 $errors[] = $file . $message;
             } elseif (is_string($error)) {
                 $errors[] = $error;
