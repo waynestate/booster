@@ -519,8 +519,10 @@ final class HopExecutor
      * write vite.config.js, swap laravel-mix for vite and laravel-vite-plugin
      * in package.json, rename MIX_ keys to VITE_ in .env.example, rewrite
      * Blade mix() tags where the mapping is unambiguous, delete
-     * webpack.mix.js. Anything outside the simple shape is refused with a
-     * message that names the offending call.
+     * webpack.mix.js. A production-only mix.version() block is dropped with a
+     * note, because Vite hashes production assets by default. Anything else
+     * outside the simple shape is refused with a message that names the
+     * offending call.
      */
     private function runMixHop(PlanStep $step, string $path, Plan $plan, RunOptions $options, BaselineResult $baseline): StepResult
     {
@@ -558,13 +560,14 @@ final class HopExecutor
                     $build->vue ? ' plus Vue' : '',
                     MixFile::FILE,
                 ),
+                ...$build->notes,
                 ...$this->bladeNotes($path, $build),
                 ...$hop->notes,
             ]);
         }
 
         [$changes, $files] = $this->applyMixToVite($path, $build);
-        $changes = [...$changes, ...$this->bladeNotes($path, $build), ...$this->withoutMixNotes($path)];
+        $changes = [...$changes, ...$build->notes, ...$this->bladeNotes($path, $build), ...$this->withoutMixNotes($path)];
 
         if (!$options->skipGate) {
             $failure = $this->runBuildGate($path);

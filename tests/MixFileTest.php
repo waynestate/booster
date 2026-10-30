@@ -11,6 +11,12 @@ use Waynestate\Booster\ToolError;
 
 final class MixFileTest extends TestCase
 {
+    /** The note a dropped production-version block leaves in the parse result. */
+    private const PRODUCTION_NOTE = 'webpack.mix.js: dropped "if (mix.inProduction()) { mix.version(); }", Vite hashes production assets by default.';
+
+    /** Matches the refusal reason that names the only accepted inProduction form. */
+    private const IN_PRODUCTION_REFUSAL = '/unsupported Mix call "inProduction" \(only if \(mix\.inProduction\(\)\) \{ mix\.version\(\); \} is accepted\)/';
+
     public function test_it_parses_a_simple_js_file(): void
     {
         $build = MixFile::parse(<<<'JS'
@@ -210,5 +216,130 @@ final class MixFileTest extends TestCase
 
         self::assertInstanceOf(MixBuild::class, $build);
         self::assertCount(1, $build->entries);
+    }
+
+    public function test_it_drops_the_braced_production_version_block(): void
+    {
+        $build = MixFile::parse(<<<'JS'
+        const mix = require('laravel-mix');
+
+        mix.js('resources/js/app.js', 'public/js/app.js');
+        if (mix.inProduction()) { mix.version(); }
+        JS);
+
+        self::assertFalse($build->vue);
+        self::assertCount(1, $build->entries);
+        self::assertSame(MixEntry::JS, $build->entries[0]->type);
+        self::assertSame('resources/js/app.js', $build->entries[0]->input);
+        self::assertSame('public/js/app.js', $build->entries[0]->output);
+        self::assertSame([self::PRODUCTION_NOTE], $build->notes);
+    }
+
+    public function test_it_drops_the_braceless_production_version_block(): void
+    {
+        $build = MixFile::parse(<<<'JS'
+        const mix = require('laravel-mix');
+
+        mix.js('resources/js/app.js', 'public/js/app.js');
+        if (mix.inProduction()) mix.version();
+        JS);
+
+        self::assertFalse($build->vue);
+        self::assertCount(1, $build->entries);
+        self::assertSame(MixEntry::JS, $build->entries[0]->type);
+        self::assertSame('resources/js/app.js', $build->entries[0]->input);
+        self::assertSame('public/js/app.js', $build->entries[0]->output);
+        self::assertSame([self::PRODUCTION_NOTE], $build->notes);
+    }
+
+    public function test_it_drops_the_multiline_braced_production_version_block(): void
+    {
+        $build = MixFile::parse(<<<'JS'
+        const mix = require('laravel-mix');
+
+        mix.js('resources/js/app.js', 'public/js/app.js');
+        if (mix.inProduction()) {
+            mix.version();
+        }
+        JS);
+
+        self::assertFalse($build->vue);
+        self::assertCount(1, $build->entries);
+        self::assertSame(MixEntry::JS, $build->entries[0]->type);
+        self::assertSame('resources/js/app.js', $build->entries[0]->input);
+        self::assertSame('public/js/app.js', $build->entries[0]->output);
+        self::assertSame([self::PRODUCTION_NOTE], $build->notes);
+    }
+
+    public function test_it_refuses_a_negated_in_production_condition(): void
+    {
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessageMatches(self::IN_PRODUCTION_REFUSAL);
+
+        MixFile::parse(<<<'JS'
+        const mix = require('laravel-mix');
+
+        mix.js('resources/js/app.js', 'public/js/app.js');
+        if (!mix.inProduction()) { mix.version(); }
+        JS);
+    }
+
+    public function test_it_refuses_an_else_branch_after_the_production_block(): void
+    {
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessageMatches(self::IN_PRODUCTION_REFUSAL);
+
+        MixFile::parse(<<<'JS'
+        const mix = require('laravel-mix');
+
+        mix.js('resources/js/app.js', 'public/js/app.js');
+        if (mix.inProduction()) { mix.version(); } else { console.log('development'); }
+        JS);
+    }
+
+    public function test_it_refuses_a_production_block_with_another_call(): void
+    {
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessageMatches(self::IN_PRODUCTION_REFUSAL);
+
+        MixFile::parse(<<<'JS'
+        const mix = require('laravel-mix');
+
+        mix.js('resources/js/app.js', 'public/js/app.js');
+        if (mix.inProduction()) { mix.version(); mix.sourceMaps(); }
+        JS);
+    }
+
+    public function test_it_refuses_in_production_used_as_a_value(): void
+    {
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessageMatches(self::IN_PRODUCTION_REFUSAL);
+
+        MixFile::parse(<<<'JS'
+        const mix = require('laravel-mix');
+
+        mix.js('resources/js/app.js', 'public/js/app.js');
+        const production = mix.inProduction();
+        JS);
+    }
+
+    public function test_the_refusal_lists_the_accepted_calls(): void
+    {
+        try {
+            MixFile::parse(<<<'JS'
+            const mix = require('laravel-mix');
+
+            mix.options.process = false;
+            mix.js('resources/js/app.js', 'public/js/app.js');
+            JS);
+            self::fail('A file with mix.options was refused.');
+        } catch (ToolError $e) {
+            self::assertStringContainsString('unsupported Mix call "options"', $e->getMessage());
+            self::assertStringContainsString(
+                'BOOSTER converts the simple shape only (mix.js(), .vue(), .sass(), .postCss(), .version(), and if (mix.inProduction()) { mix.version(); })',
+                $e->getMessage(),
+            );
+            self::assertStringContainsString('https://laravel.com/docs/9.x/upgrade#vite', $e->getMessage());
+        }
     }
 }

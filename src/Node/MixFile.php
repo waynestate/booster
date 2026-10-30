@@ -9,9 +9,12 @@ use Waynestate\Booster\ToolError;
 /**
  * Reads a simple webpack.mix.js without executing it. The simple shape is one
  * or more mix.js('<in>', '<out>') calls, each optionally chained with .vue(),
- * .sass('<in>', '<out>'), .postCss('<in>', '<out>', [...]) and .version().
- * Anything else earns a refusal that names the first unsupported call, so the
- * developer follows the manual Vite migration guide instead of guessing.
+ * .sass('<in>', '<out>'), .postCss('<in>', '<out>', [...]) and .version(),
+ * plus at most the one conditional Vite makes redundant: an
+ * if (mix.inProduction()) { mix.version(); } block, which is dropped with a
+ * note because Vite hashes production assets by default. Anything else earns
+ * a refusal that names the first unsupported call, so the developer follows
+ * the manual Vite migration guide instead of guessing.
  */
 final class MixFile
 {
@@ -23,11 +26,20 @@ final class MixFile
     public const FILE = 'webpack.mix.js';
 
     /**
+     * The accepted production-version conditional, braced or braceless, with
+     * free whitespace around every token and an optional trailing semicolon.
+     */
+    private const PRODUCTION_VERSION_IF = '/\bif\s*\(\s*mix\s*\.\s*inProduction\s*\(\s*\)\s*\)\s*(?:\{\s*mix\s*\.\s*version\s*\(\s*\)\s*;?\s*\}|mix\s*\.\s*version\s*\(\s*\)\s*;?)/';
+
+    private const PRODUCTION_NOTE = 'dropped "if (mix.inProduction()) { mix.version(); }", Vite hashes production assets by default.';
+
+    /**
      * @throws ToolError when the file uses a call outside the simple shape
      */
     public static function parse(string $text): MixBuild
     {
         $code = self::stripComments($text);
+        [$code, $notes] = self::dropProductionVersionBlocks($code);
         $entries = [];
         $vue = false;
         $violation = null;
@@ -54,10 +66,68 @@ final class MixFile
         }
 
         if ($violation !== null) {
-            throw new ToolError(self::refusal(sprintf('unsupported Mix call "%s"', $violation[0])));
+            throw new ToolError(self::refusal(self::violationReason($violation[0])));
         }
 
-        return new MixBuild($entries, $vue);
+        return new MixBuild($entries, $vue, $notes);
+    }
+
+    /**
+     * Replaces every accepted if (mix.inProduction()) { mix.version(); } block
+     * with whitespace, keeping offsets stable for the scans that follow. A
+     * near miss (a negated condition, an else branch, another call in the
+     * block, the call used as a value) is left in place so the scan refuses
+     * it by name.
+     *
+     * @return array{0: string, 1: list<string>}
+     */
+    private static function dropProductionVersionBlocks(string $code): array
+    {
+        if (preg_match_all(self::PRODUCTION_VERSION_IF, $code, $matches, PREG_OFFSET_CAPTURE) === false) {
+            return [$code, []];
+        }
+
+        $notes = [];
+        $kept = '';
+        $cursor = 0;
+        foreach ($matches[0] as [$text, $offset]) {
+            $end = $offset + strlen($text);
+            if (!str_contains($text, '{') && self::statementHasATail($code, $end)) {
+                continue;
+            }
+            if (preg_match('/^\s*else\b/A', substr($code, $end)) === 1) {
+                continue;
+            }
+            $kept .= substr($code, $cursor, $offset - $cursor) . str_repeat(' ', strlen($text));
+            $cursor = $end;
+            $notes[] = self::FILE . ': ' . self::PRODUCTION_NOTE;
+        }
+        $kept .= substr($code, $cursor);
+
+        return [$kept, array_values(array_unique($notes))];
+    }
+
+    /**
+     * A braceless statement must stand alone on its line; anything after it
+     * on the same line means the if is doing something Booster does not own.
+     */
+    private static function statementHasATail(string $code, int $end): bool
+    {
+        $tail = substr($code, $end);
+        $newline = strpos($tail, "\n");
+        $rest = $newline === false ? $tail : substr($tail, 0, $newline);
+
+        return trim($rest) !== '';
+    }
+
+    /** The refusal reason for one unsupported call, with the accepted conditional named for inProduction. */
+    private static function violationReason(string $name): string
+    {
+        if ($name === 'inProduction') {
+            return 'unsupported Mix call "inProduction" (only if (mix.inProduction()) { mix.version(); } is accepted)';
+        }
+
+        return sprintf('unsupported Mix call "%s"', $name);
     }
 
     /**
@@ -164,7 +234,7 @@ final class MixFile
     private static function refusal(string $reason): string
     {
         return sprintf(
-            'Refusing to convert %s: %s. BOOSTER converts the simple shape only (mix.js, .vue(), .sass(), .postCss(), .version()); follow the manual Vite migration guide at %s.',
+            'Refusing to convert %s: %s. BOOSTER converts the simple shape only (mix.js(), .vue(), .sass(), .postCss(), .version(), and if (mix.inProduction()) { mix.version(); }); follow the manual Vite migration guide at %s.',
             self::FILE,
             $reason,
             self::GUIDE,

@@ -140,6 +140,56 @@ final class MixToViteTest extends TestCase
         self::assertStringContainsString('Gate passed: tests are green on PHP 8.3.', $messages);
     }
 
+    public function test_an_applied_hop_reports_the_dropped_production_block(): void
+    {
+        $dir = $this->tempDir();
+        $this->makeApp($dir);
+        file_put_contents(
+            $dir . '/webpack.mix.js',
+            <<<'JS'
+            const mix = require('laravel-mix');
+
+            mix.js('resources/js/app.js', 'public/js')
+                .vue()
+                .sass('resources/sass/app.scss', 'public/css');
+            if (mix.inProduction()) { mix.version(); }
+            JS,
+        );
+        $report = $this->runMix($this->fake($dir), new RunOptions(), $dir);
+
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        self::assertFileDoesNotExist($dir . '/webpack.mix.js');
+        self::assertStringContainsString(
+            'webpack.mix.js: dropped "if (mix.inProduction()) { mix.version(); }", Vite hashes production assets by default.',
+            implode("\n", $report->results[0]->messages),
+        );
+    }
+
+    public function test_a_dry_run_reports_the_dropped_production_block(): void
+    {
+        $dir = $this->tempDir();
+        $this->makeApp($dir);
+        file_put_contents(
+            $dir . '/webpack.mix.js',
+            <<<'JS'
+            const mix = require('laravel-mix');
+
+            mix.js('resources/js/app.js', 'public/js')
+                .vue()
+                .sass('resources/sass/app.scss', 'public/css');
+            if (mix.inProduction()) { mix.version(); }
+            JS,
+        );
+        $report = $this->runMix($this->fake($dir), new RunOptions(dryRun: true), $dir);
+
+        self::assertSame([StepResult::PREVIEWED], $this->statuses($report));
+        self::assertFileExists($dir . '/webpack.mix.js');
+        self::assertStringContainsString(
+            'webpack.mix.js: dropped "if (mix.inProduction()) { mix.version(); }", Vite hashes production assets by default.',
+            implode("\n", $report->results[0]->messages),
+        );
+    }
+
     public function test_a_complex_mix_file_is_refused_and_changes_nothing(): void
     {
         $dir = $this->tempDir();
