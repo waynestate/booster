@@ -417,17 +417,19 @@ final class CliTest extends TestCase
         self::assertStringContainsString('vue-2-to-3', $out);
         self::assertStringContainsString('vue-26-to-27', $out);
         self::assertStringContainsString('vue-27-to-compat', $out);
+        self::assertStringContainsString('tailwind-3-to-4', $out);
         self::assertStringContainsString('[playbook]', $out);
 
         [, $json] = $this->booster(['command' => 'hops', '--format' => 'json']);
         $hops = json_decode($json, true)['hops'];
-        self::assertCount(30, $hops);
+        self::assertCount(31, $hops);
         $byId = [];
         foreach ($hops as $hop) {
             $byId[$hop['id']] = $hop;
         }
         self::assertFalse($byId['node-pin-24']['manual']);
         self::assertFalse($byId['vue-27-to-compat']['manual']);
+        self::assertFalse($byId['tailwind-3-to-4']['manual']);
         self::assertTrue($byId['vue-2-to-3']['manual']);
         self::assertSame(['vue-26-to-27', 'vue-27-to-compat'], $byId['vue-2-to-3']['alias_of']);
     }

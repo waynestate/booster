@@ -37,6 +37,8 @@
     "vite_version": "^8.3",
     "laravel_vite_plugin_version": "^3.2",
     "vue_plugin_version": "^6.0",
+    "tailwind_upgrade_version": "^4.1",
+    "tailwind_version": "^4.1",
     "vue_27": "^2.7",
     "vue_compat": "^3.5",
     "vue_loader_compat": "^17.4",
@@ -95,5 +97,27 @@
             "8.3",
             "8.5"
         ]
+    },
+    "inertia_laravel": {
+        "5.8": null,
+        "6": null,
+        "7": null,
+        "8": null,
+        "9": null,
+        "10": null,
+        "11": "^2.0",
+        "12": "^2.0",
+        "13": "^2.0"
+    },
+    "inertia_vue3": {
+        "5.8": null,
+        "6": null,
+        "7": null,
+        "8": null,
+        "9": null,
+        "10": null,
+        "11": "^2.0",
+        "12": "^2.0",
+        "13": "^2.0"
     }
 }

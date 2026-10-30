@@ -95,6 +95,55 @@ final class HopRegistryTest extends PhpUnitTestCase
         self::assertFalse($hop->isManual());
     }
 
+    public function test_the_registry_exposes_the_tailwind_hop(): void
+    {
+        $registry = new HopRegistry();
+        $hop = $registry->get(HopRegistry::TAILWIND_ID);
+
+        self::assertSame(HopKind::Node, $hop->kind);
+        self::assertSame('3', $hop->from);
+        self::assertSame('4', $hop->to);
+        self::assertTrue($hop->buildGate);
+        self::assertFalse($hop->isManual());
+        self::assertSame('^4.1', $registry->tailwindUpgradeVersion());
+        self::assertSame('^4.1', $registry->tailwindVersion());
+        self::assertContains('https://tailwindcss.com/docs/upgrade-guide', $hop->links);
+    }
+
+    public function test_inertia_changes_pin_both_packages_from_laravel_11_up(): void
+    {
+        $registry = new HopRegistry();
+        foreach (['11', '12', '13'] as $major) {
+            self::assertSame(
+                ['composer' => ['inertiajs/inertia-laravel' => '^2.0'], 'npm' => ['@inertiajs/vue3' => '^2.0'], 'notes' => []],
+                $registry->inertiaChanges($major),
+                $major,
+            );
+        }
+    }
+
+    public function test_inertia_changes_below_laravel_11_pin_nothing_and_note_the_gap(): void
+    {
+        $changes = (new HopRegistry())->inertiaChanges('10');
+
+        self::assertSame([], $changes['composer']);
+        self::assertSame([], $changes['npm']);
+        self::assertCount(1, $changes['notes']);
+        self::assertStringContainsString('Laravel 10', $changes['notes'][0]);
+    }
+
+    public function test_the_laravel_hops_carry_the_inertia_note_only_where_they_pin_nothing(): void
+    {
+        $registry = new HopRegistry();
+        $oldNotes = $registry->get(HopRegistry::laravelHopId('9', '10'))->notes;
+        $newNotes = $registry->get(HopRegistry::laravelHopId('12', '13'))->notes;
+
+        self::assertContains('Inertia: BOOSTER pins no inertia-laravel or @inertiajs/vue3 constraint for Laravel 10; check the Inertia docs for the versions that support it.', $oldNotes);
+        foreach ($newNotes as $note) {
+            self::assertStringStartsNotWith('Inertia:', $note);
+        }
+    }
+
     public function test_the_php_80_hop_asks_for_extra_review(): void
     {
         self::assertTrue((new HopRegistry())->get('php-74-to-80')->extraReview);

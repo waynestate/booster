@@ -21,6 +21,9 @@ final class HopRegistry
     /** The Mix to Vite hop. The package versions it installs live in the data file. */
     public const MIX_TO_VITE_ID = 'mix-to-vite';
 
+    /** The Tailwind 3 to 4 hop. The tool and pin versions live in the data file. */
+    public const TAILWIND_ID = 'tailwind-3-to-4';
+
     /** The staged hop that moves a Vue 2.6 front end onto Vue 2.7. */
     public const VUE_26_TO_27_ID = 'vue-26-to-27';
 
@@ -50,6 +53,10 @@ final class HopRegistry
 
     private readonly string $vuePluginVersion;
 
+    private readonly string $tailwindUpgradeVersion;
+
+    private readonly string $tailwindVersion;
+
     private readonly string $vue27Version;
 
     private readonly string $vueCompatVersion;
@@ -65,6 +72,12 @@ final class HopRegistry
     /** @var array<string, array{0: string, 1: string}> */
     private readonly array $laravelPhp;
 
+    /** @var array<string, string|null> */
+    private readonly array $inertiaLaravel;
+
+    /** @var array<string, string|null> */
+    private readonly array $inertiaVue3;
+
     /** @var array<string, Hop> */
     private array $hops = [];
 
@@ -78,12 +91,16 @@ final class HopRegistry
         $this->viteVersion = self::scalar($data, 'vite_version');
         $this->laravelVitePluginVersion = self::scalar($data, 'laravel_vite_plugin_version');
         $this->vuePluginVersion = self::scalar($data, 'vue_plugin_version');
+        $this->tailwindUpgradeVersion = self::scalar($data, 'tailwind_upgrade_version');
+        $this->tailwindVersion = self::scalar($data, 'tailwind_version');
         $this->vue27Version = self::scalar($data, 'vue_27');
         $this->vueCompatVersion = self::scalar($data, 'vue_compat');
         $this->vueLoaderCompatVersion = self::scalar($data, 'vue_loader_compat');
         $this->phpunitPhp = self::stringTable($data, 'phpunit_php');
         $this->laravelPhpunit = self::stringTable($data, 'laravel_phpunit');
         $this->laravelPhp = self::rangeTable($data, 'laravel_php');
+        $this->inertiaLaravel = self::nullableStringTable($data, 'inertia_laravel');
+        $this->inertiaVue3 = self::nullableStringTable($data, 'inertia_vue3');
 
         $this->addPhpHops();
         $this->addLaravelHops();
@@ -91,6 +108,7 @@ final class HopRegistry
         $this->add($this->sesameHop());
         $this->add($this->nodePinHop());
         $this->add($this->mixToViteHop());
+        $this->add($this->tailwindHop());
         foreach ($this->vueHops() as $hop) {
             $this->add($hop);
         }
@@ -167,6 +185,16 @@ final class HopRegistry
         return $this->vuePluginVersion;
     }
 
+    public function tailwindUpgradeVersion(): string
+    {
+        return $this->tailwindUpgradeVersion;
+    }
+
+    public function tailwindVersion(): string
+    {
+        return $this->tailwindVersion;
+    }
+
     public function vue27Version(): string
     {
         return $this->vue27Version;
@@ -213,6 +241,56 @@ final class HopRegistry
     public function laravelPhp(): array
     {
         return $this->laravelPhp;
+    }
+
+    /**
+     * The inertia-laravel constraint each Laravel major pairs with, or null
+     * where BOOSTER pins nothing and the app keeps what it has.
+     *
+     * @return array<string, string|null>
+     */
+    public function inertiaLaravel(): array
+    {
+        return $this->inertiaLaravel;
+    }
+
+    /**
+     * The @inertiajs/vue3 constraint each Laravel major pairs with, or null
+     * where BOOSTER pins nothing and the app keeps what it has.
+     *
+     * @return array<string, string|null>
+     */
+    public function inertiaVue3(): array
+    {
+        return $this->inertiaVue3;
+    }
+
+    /**
+     * The Inertia constraints a Laravel hop should raise for an Inertia/Vue
+     * app moving to $laravelTo: composer and npm maps (empty where BOOSTER
+     * pins nothing for that major) plus the note to surface when neither is
+     * pinned. One source of truth for the executor and the hop's notes.
+     *
+     * @return array{composer: array<string, string>, npm: array<string, string>, notes: list<string>}
+     */
+    public function inertiaChanges(string $laravelTo): array
+    {
+        $composer = [];
+        $constraint = $this->inertiaLaravel[$laravelTo] ?? null;
+        if ($constraint !== null) {
+            $composer['inertiajs/inertia-laravel'] = $constraint;
+        }
+        $npm = [];
+        $constraint = $this->inertiaVue3[$laravelTo] ?? null;
+        if ($constraint !== null) {
+            $npm['@inertiajs/vue3'] = $constraint;
+        }
+        $notes = [];
+        if ($composer === [] && $npm === []) {
+            $notes[] = sprintf('Inertia: BOOSTER pins no inertia-laravel or @inertiajs/vue3 constraint for Laravel %s; check the Inertia docs for the versions that support it.', $laravelTo);
+        }
+
+        return ['composer' => $composer, 'npm' => $npm, 'notes' => $notes];
     }
 
     /** The PHP version Booster can move to from $from, or null at the end of the chain. */
@@ -305,6 +383,31 @@ final class HopRegistry
                 throw new ToolError(sprintf('Hop data key "%s" must map majors to version strings.', $key));
             }
             $table[(string) $major] = $floor;
+        }
+
+        return $table;
+    }
+
+    /**
+     * A table whose values may be null: null means BOOSTER pins nothing for
+     * that major, which is a decision, not a missing entry.
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return array<string, string|null>
+     */
+    private static function nullableStringTable(array $data, string $key): array
+    {
+        $value = $data[$key] ?? null;
+        if (!is_array($value)) {
+            throw new ToolError(sprintf('Hop data key "%s" must be a JSON object.', $key));
+        }
+        $table = [];
+        foreach ($value as $major => $constraint) {
+            if ((!is_string($constraint) && !is_null($constraint)) || (is_string($constraint) && $constraint === '')) {
+                throw new ToolError(sprintf('Hop data key "%s" must map majors to version strings or null.', $key));
+            }
+            $table[(string) $major] = $constraint;
         }
 
         return $table;
@@ -423,6 +526,7 @@ final class HopRegistry
                 notes: [
                     'Check the shared database server against the Laravel ' . $to . ' database floor before you apply this hop.',
                     'Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.',
+                    ...$this->inertiaChanges($to)['notes'],
                 ],
                 links: [sprintf('https://laravel.com/docs/%s.x/upgrade', $to)],
             ));
@@ -531,6 +635,30 @@ final class HopRegistry
                 'Replace withoutMix() with withoutVite() by hand; Booster lists the files that call it.',
             ],
             links: ['https://laravel.com/docs/9.x/upgrade#vite'],
+        );
+    }
+
+    /**
+     * The Tailwind 3 to 4 hop. It runs the official @tailwindcss/upgrade tool
+     * in the Node container, then normalizes package.json itself: the tool
+     * rewrites the CSS and the config, BOOSTER owns the dependency pins.
+     */
+    private function tailwindHop(): Hop
+    {
+        return new Hop(
+            id: self::TAILWIND_ID,
+            kind: HopKind::Node,
+            from: '3',
+            to: '4',
+            summary: 'Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool.',
+            buildGate: true,
+            notes: [
+                'Booster runs npx @tailwindcss/upgrade, then pins tailwindcss to ' . $this->tailwindVersion . ', adds the matching Vite or PostCSS plugin, and removes autoprefixer and postcss-import, which Tailwind 4 folds in.',
+                'MANUAL: plugins listed in tailwind.config.js are not migrated by the tool; move their logic into CSS @plugin or @utility rules by hand.',
+                'MANUAL: @apply inside Vue SFC <style> blocks needs @reference "tailwindcss" at the top of the block, or the classes do not resolve.',
+                'Tailwind 4 raises the browser floor: Safari 16.4+, Chrome 111+, Firefox 128+. Check the app\'s supported browsers before you ship.',
+            ],
+            links: ['https://tailwindcss.com/docs/upgrade-guide'],
         );
     }
 
