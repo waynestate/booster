@@ -26,8 +26,13 @@ final class TargetImageRunner
     /** The recipe default, and what every PHP 7.2 and up build gets. */
     public const COMPOSER_VERSION_CURRENT = '2.10.3';
 
-    /** True once a --image image has been found locally or pulled, so the check runs once per run. */
-    private bool $customImageReady = false;
+    /**
+     * The --image images found locally or pulled, so each resolved image is
+     * checked once per run.
+     *
+     * @var array<string, true>
+     */
+    private array $customImagesReady = [];
 
     public function __construct(
         private readonly ProcessRunner $processes,
@@ -98,24 +103,28 @@ final class TargetImageRunner
         }
     }
 
-    public function run(string $appPath, string $php, string $testCommand, ?string $extraCommand = null, ?string $image = null): ProcessResult
+    public function run(string $appPath, string $php, string $testCommand, ?string $extraCommand = null, ?GateImage $image = null): ProcessResult
     {
         $version = $this->processes->run([$this->docker, 'version', '--format', '{{.Server.Version}}'], null, [], 30);
         if (!$version->successful()) {
             throw new ToolError('Docker is not available, so the target-image gate cannot run. Start Docker, or pass --skip-gate and run the tests yourself.');
         }
 
+        $resolved = null;
         if ($image === null) {
             $this->ensureImage($php);
         } else {
-            $this->ensureCustomImage($image);
+            // The option may be a template or a map, so the image is resolved
+            // per call from the PHP version of this baseline or gate.
+            $resolved = $image->forPhp($php);
+            $this->ensureCustomImage($resolved);
         }
 
         $uid = function_exists('posix_getuid') ? posix_getuid() : null;
         $gid = function_exists('posix_getgid') ? posix_getgid() : null;
 
         return $this->processes->run(
-            $this->runCommand($appPath, $php, self::containerScript($testCommand, $extraCommand), $uid, $gid, $image),
+            $this->runCommand($appPath, $php, self::containerScript($testCommand, $extraCommand), $uid, $gid, $resolved),
             null,
             [],
             3600,
@@ -123,12 +132,13 @@ final class TargetImageRunner
     }
 
     /**
-     * A --image image belongs to the user, so Booster never builds one. It must
-     * exist locally before the first hop uses it; pull it once if it does not.
+     * A --image image belongs to the user, so Booster never builds one. Each
+     * resolved image must exist locally before its first hop uses it; pull it
+     * once if it does not.
      */
     private function ensureCustomImage(string $image): void
     {
-        if ($this->customImageReady) {
+        if (isset($this->customImagesReady[$image])) {
             return;
         }
         if (!$this->processes->run([$this->docker, 'image', 'inspect', $image], null, [], 60)->successful()) {
@@ -138,6 +148,6 @@ final class TargetImageRunner
             }
         }
 
-        $this->customImageReady = true;
+        $this->customImagesReady[$image] = true;
     }
 }
