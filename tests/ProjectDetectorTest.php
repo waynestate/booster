@@ -83,6 +83,28 @@ final class ProjectDetectorTest extends TestCase
         self::assertSame('7.4', (new ProjectDetector())->detect($dir)->phpVersion);
     }
 
+    #[\PHPUnit\Framework\Attributes\DataProvider('laravelConstraints')]
+    public function test_a_laravel_constraint_reads_as_the_major_it_floors_at(string $constraint, ?string $expected): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"laravel/framework":' . json_encode($constraint) . '}}');
+
+        self::assertSame($expected, (new ProjectDetector())->detect($dir)->laravelMajor);
+    }
+
+    /** @return list<array{string, ?string}> */
+    public static function laravelConstraints(): array
+    {
+        return [
+            // 5.x keeps its minor: BOOSTER plans the 5.8 to 6 hop.
+            ['^5.8', '5.8'],
+            ['~5.8', '5.8'],
+            ['^6.0', '6'],
+            ['^10.0', '10'],
+            ['*', null],
+        ];
+    }
+
     public function test_broken_json_and_missing_directory_are_tool_errors(): void
     {
         $dir = $this->tempDir();
