@@ -103,9 +103,8 @@ final class CasMigrationTest extends TestCase
         namespace App;
 
         use Waynestate\Sesame\WayneCas\ReadOnlyAttributes;
-        use Waynestate\Sesame\WayneCas\WayneCasable;
 
-        class User implements WayneCasable
+        class User implements \Waynestate\Sesame\WayneCas\WayneCasable
         {
             use ReadOnlyAttributes;
         }
@@ -132,11 +131,11 @@ final class CasMigrationTest extends TestCase
         $result = $this->migrate($dir);
 
         self::assertSame(
-            'app/User.php: rewritten to implements WayneCasable plus use ReadOnlyAttributes.',
+            'app/User.php: rewritten to implements \Waynestate\Sesame\WayneCas\WayneCasable; uses \Waynestate\Sesame\WayneCas\ReadOnlyAttributes; the wayne-cas import was removed.',
             $result->changes[0],
         );
         self::assertSame(
-            ['file' => 'app/User.php', 'diff' => 'implements WayneCasable plus use ReadOnlyAttributes'],
+            ['file' => 'app/User.php', 'diff' => 'implements \Waynestate\Sesame\WayneCas\WayneCasable; uses \Waynestate\Sesame\WayneCas\ReadOnlyAttributes; import removed'],
             $result->files[0],
         );
     }
@@ -160,23 +159,22 @@ final class CasMigrationTest extends TestCase
         $dry = $this->migrate($dir, true);
 
         self::assertSame(
-            'Dry run: would rewrite app/User.php: WayneCasable trait renamed to \Waynestate\Sesame\WayneCas\WayneCasable.',
+            'Dry run: would rewrite app/User.php: rewritten to implements \Waynestate\Sesame\WayneCas\WayneCasable; uses \Waynestate\Sesame\WayneCas\ReadOnlyAttributes; the wayne-cas import was removed.',
             $dry->changes[0],
         );
         self::assertSame(
-            ['file' => 'app/User.php', 'diff' => 'WayneCasable trait renamed to \Waynestate\Sesame\WayneCas\WayneCasable'],
+            ['file' => 'app/User.php', 'diff' => 'implements \Waynestate\Sesame\WayneCas\WayneCasable; uses \Waynestate\Sesame\WayneCas\ReadOnlyAttributes; import removed'],
             $dry->files[0],
         );
 
         $result = $this->migrate($dir);
         $model = (string) file_get_contents($dir . '/app/User.php');
-        self::assertStringContainsString('use Waynestate\\Sesame\\WayneCas\\WayneCasable;', $model);
+        self::assertStringContainsString('class User implements \Waynestate\Sesame\WayneCas\WayneCasable', $model);
         self::assertStringNotContainsString('WSU\\WayneCas', $model);
-        self::assertSame(1, substr_count($model, 'implements WayneCasable'));
-        self::assertStringContainsString('    use ReadOnlyAttributes;', $model);
+        self::assertStringContainsString('    use \Waynestate\Sesame\WayneCas\ReadOnlyAttributes;', $model);
         self::assertStringNotContainsString('use WayneCasable;', $model);
         self::assertSame(
-            'app/User.php: WayneCasable trait renamed to \Waynestate\Sesame\WayneCas\WayneCasable.',
+            'app/User.php: rewritten to implements \Waynestate\Sesame\WayneCas\WayneCasable; uses \Waynestate\Sesame\WayneCas\ReadOnlyAttributes; the wayne-cas import was removed.',
             $result->changes[0],
         );
     }
@@ -203,10 +201,10 @@ final class CasMigrationTest extends TestCase
         self::assertFileDoesNotExist($dir . '/config/sesame.php');
         self::assertCount(2, $result->changes);
         self::assertStringStartsWith('Dry run: would write config/sesame.php', $result->changes[0]);
-        // The example model already uses ReadOnlyAttributes, so its diff is a
-        // trait rename, not an added interface plus trait.
+        // The example model already uses ReadOnlyAttributes, so its diff adds
+        // the interface and drops the now-dead wayne-cas import.
         self::assertSame(
-            'Dry run: would rewrite app/User.php: WayneCasable trait renamed to \Waynestate\Sesame\WayneCas\WayneCasable.',
+            'Dry run: would rewrite app/User.php: rewritten to implements \Waynestate\Sesame\WayneCas\WayneCasable; the wayne-cas import was removed.',
             $result->changes[1],
         );
     }
@@ -251,10 +249,11 @@ final class CasMigrationTest extends TestCase
         $this->migrate($dir);
 
         $model = (string) file_get_contents($dir . '/app/Member.php');
-        self::assertStringContainsString('class Member implements MustVerifyEmail, WayneCasable', $model);
-        self::assertStringContainsString("use Waynestate\\Sesame\\WayneCas\\WayneCasable;\nuse Waynestate\\Sesame\\WayneCas\\ReadOnlyAttributes;", $model);
-        self::assertStringContainsString('    use ReadOnlyAttributes;', $model);
-        self::assertSame(1, substr_count($model, 'use ReadOnlyAttributes;'));
+        self::assertStringContainsString('class Member implements MustVerifyEmail, \Waynestate\Sesame\WayneCas\WayneCasable', $model);
+        self::assertStringContainsString('use Illuminate\Contracts\Auth\MustVerifyEmail;', $model);
+        self::assertSame(1, substr_count($model, 'use \Waynestate\Sesame\WayneCas\ReadOnlyAttributes;'));
+        self::assertStringNotContainsString('WSU\\WayneCas', $model);
+        self::assertStringNotContainsString('use WayneCasable;', $model);
     }
 
     public function test_it_does_not_duplicate_read_only_attributes(): void
@@ -279,7 +278,7 @@ final class CasMigrationTest extends TestCase
         $this->migrate($dir);
 
         $model = (string) file_get_contents($dir . '/app/User.php');
-        self::assertStringContainsString('class User implements WayneCasable', $model);
+        self::assertStringContainsString('class User implements \Waynestate\Sesame\WayneCas\WayneCasable', $model);
         self::assertSame(1, substr_count($model, 'use ReadOnlyAttributes;'));
         self::assertStringNotContainsString('use WayneCasable;', $model);
     }
@@ -294,6 +293,122 @@ final class CasMigrationTest extends TestCase
 
         self::assertSame($source, (string) file_get_contents($dir . '/app/Ghost.php'));
         self::assertStringContainsString('app/Ghost.php: BOOSTER found no import for WayneCasable', implode(' ', $result->manual));
+        self::assertSame(['app/Ghost.php'], $result->failures);
+    }
+
+    public function test_it_rewrites_a_fully_qualified_trait_use_without_an_import(): void
+    {
+        // Rector renames the trait to its fully qualified name and drops the
+        // short-name import; Booster must still move it to implements.
+        $dir = $this->tempDir();
+        mkdir($dir . '/app', 0775, true);
+        file_put_contents($dir . '/app/User.php', <<<'PHP'
+        <?php
+
+        namespace App;
+
+        class User
+        {
+            use \Waynestate\Sesame\WayneCas\WayneCasable;
+        }
+        PHP . "\n");
+        $result = $this->migrate($dir);
+
+        $expected = <<<'PHP'
+        <?php
+
+        namespace App;
+
+        class User implements \Waynestate\Sesame\WayneCas\WayneCasable
+        {
+            use \Waynestate\Sesame\WayneCas\ReadOnlyAttributes;
+        }
+        PHP . "\n";
+        self::assertSame($expected, (string) file_get_contents($dir . '/app/User.php'));
+        self::assertSame(
+            'app/User.php: rewritten to implements \Waynestate\Sesame\WayneCas\WayneCasable; uses \Waynestate\Sesame\WayneCas\ReadOnlyAttributes.',
+            $result->changes[0],
+        );
+        self::assertSame([], $result->failures);
+    }
+
+    public function test_it_fixes_the_read_only_attributes_signature(): void
+    {
+        $dir = $this->tempDir();
+        mkdir($dir . '/app', 0775, true);
+        file_put_contents($dir . '/app/User.php', <<<'PHP'
+        <?php
+
+        namespace App;
+
+        use WSU\WayneCas\WayneCasable;
+
+        class User
+        {
+            use WayneCasable;
+
+            protected function getReadOnlyAttributes($persistedAttributes)
+            {
+                return [];
+            }
+        }
+        PHP . "\n");
+        $result = $this->migrate($dir);
+
+        $model = (string) file_get_contents($dir . '/app/User.php');
+        self::assertStringContainsString('public function getReadOnlyAttributes($persistedAttributes = []): array', $model);
+        self::assertStringNotContainsString('protected function getReadOnlyAttributes', $model);
+        self::assertStringContainsString('getReadOnlyAttributes() now matches the compat interface', implode(' ', $result->changes));
+        self::assertSame([], $result->failures);
+    }
+
+    public function test_a_duplicate_trait_use_is_left_alone_and_flagged(): void
+    {
+        $dir = $this->tempDir();
+        mkdir($dir . '/app', 0775, true);
+        $source = <<<'PHP'
+        <?php
+
+        namespace App;
+
+        use WSU\WayneCas\WayneCasable;
+
+        class User
+        {
+            use WayneCasable;
+
+            use WayneCasable;
+        }
+        PHP . "\n";
+        file_put_contents($dir . '/app/User.php', $source);
+        $result = $this->migrate($dir);
+
+        self::assertSame($source, (string) file_get_contents($dir . '/app/User.php'));
+        self::assertStringContainsString('found 2 WayneCasable trait uses', implode(' ', $result->manual));
+        self::assertSame(['app/User.php'], $result->failures);
+    }
+
+    public function test_an_already_migrated_model_is_left_alone(): void
+    {
+        $dir = $this->tempDir();
+        mkdir($dir . '/app', 0775, true);
+        $source = <<<'PHP'
+        <?php
+
+        namespace App;
+
+        class User implements \Waynestate\Sesame\WayneCas\WayneCasable
+        {
+            use \Waynestate\Sesame\WayneCas\ReadOnlyAttributes;
+        }
+        PHP . "\n";
+        file_put_contents($dir . '/app/User.php', $source);
+        $result = $this->migrate($dir);
+
+        self::assertSame($source, (string) file_get_contents($dir . '/app/User.php'));
+        self::assertSame([], $result->changes);
+        self::assertSame([], $result->files);
+        self::assertSame([], $result->failures);
     }
 
     /** Loads a generated config/sesame.php with the test doubles in place. */

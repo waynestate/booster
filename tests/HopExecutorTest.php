@@ -1234,7 +1234,7 @@ final class HopExecutorTest extends TestCase
         self::assertFileExists($dir . '/config/wayne-cas.php');
         self::assertStringContainsString("'base_url' => Setting::get('SESAME_CAS_BASE_URL') ?? 'https://cas.example.edu/cas'", (string) file_get_contents($dir . '/config/sesame.php'));
         self::assertStringContainsString("'user_resolver' => env('SESAME_USER_RESOLVER', \Waynestate\Sesame\WayneCas\UserResolver::class)", (string) file_get_contents($dir . '/config/sesame.php'));
-        self::assertStringContainsString('class User implements WayneCasable', (string) file_get_contents($dir . '/app/User.php'));
+        self::assertStringContainsString('class User implements \Waynestate\Sesame\WayneCas\WayneCasable', (string) file_get_contents($dir . '/app/User.php'));
         $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
         self::assertSame('^0.2', $composer['require']['waynestate/sesame']);
         self::assertArrayNotHasKey('cit-web-infra/wayne-cas', $composer['require']);
