@@ -27,6 +27,8 @@ final readonly class Project
         public bool $hasPackageJson = false,
         public ?string $nodeMajor = null,
         public bool $hasMixFile = false,
+        public ?string $vueMinor = null,
+        public bool $hasBoost = false,
     ) {}
 
     /**
@@ -45,6 +47,7 @@ final readonly class Project
             'node' => $this->nodeMajor,
             'mix_file' => $this->hasMixFile,
             'wayne_cas' => $this->usesWayneCas,
+            'boost' => $this->hasBoost,
         ];
     }
 }

@@ -9,10 +9,11 @@ must land. Rockets need fuel, and this one runs on fresh version data and workin
 - `waynestate/booster` on Packagist, with the CLI `bin/booster`. An optional single-file phar (`build/booster.phar`)
   is built locally and not published yet.
 - Runtime dependencies: `rector/rector`, `driftingly/rector-laravel`, `symfony/console`, `symfony/process`,
-  `composer/semver`. No other stack package at runtime. Box (for the phar) lives in `tools/box/`, outside the main
-  lock file.
-- **Its policy comes from CREED.** `src/Creed/` is a generated copy of CREED's reader and `policy.json`. Never
-  hand-edit it. `BOOSTER_POLICY` points Booster at another `policy.json` at runtime.
+  `composer/semver`, plus the stack packages `waynestate/proctor` (the check gate) and `waynestate/creed` (the
+  version policy). Box (for the phar) lives in `tools/box/`, outside the main lock file.
+- **Its policy comes from CREED.** Booster reads `policy.json` from the installed `waynestate/creed` package, so a
+  new CREED release is picked up with `composer update waynestate/creed`. `--policy` and `BOOSTER_POLICY` point
+  Booster at another `policy.json` at runtime.
 - Some hops run tools in Docker (for example Node in `node:<lts>`), so the upgrade gate needs a Docker daemon.
 
 ## Where it lives
@@ -28,7 +29,6 @@ directly.
 | Install | `composer install` | `composer install` |
 | All checks (what CI runs) | `composer ci` | `composer ci` |
 | Build the phar (Docker only) | `.\scripts\build-phar.ps1` | `scripts/build-phar.sh` |
-| Check the CREED copy | `$env:CREED_PATH = "..\creed"; composer creed-copy:check` | `CREED_PATH=../creed composer creed-copy:check` |
 
 With only Docker:
 
@@ -36,9 +36,8 @@ With only Docker:
 docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install --no-interaction && composer ci"
 ```
 
-`composer ci` runs `composer validate --strict`, PHPUnit, Pint, PHPStan and `composer audit`. It does not run the
-CREED copy check, which needs a CREED checkout. The phar scripts install Box in `tools/box`, build from a clean copy
-with `--no-dev`, and finish with `php build/booster.phar --version`.
+`composer ci` runs `composer validate --strict`, PHPUnit, Pint, PHPStan and `composer audit`. The phar scripts
+install Box in `tools/box`, build from a clean copy with `--no-dev`, and finish with `php build/booster.phar --version`.
 
 ## CI
 
@@ -46,16 +45,16 @@ with `--no-dev`, and finish with `php build/booster.phar --version`.
 - **GitHub:** `.github/workflows/ci.yml` calls Preflight's reusable workflow with `composer ci`.
 - Green means `composer ci` passed on all three PHP versions on both.
 
-## Refreshing the CREED copy
+## Updating the CREED policy
 
 Whenever CREED's policy or reader changes:
 
 ```
-php ../creed/bin/export.php --namespace='Waynestate\Booster\Creed' --to=src/Creed
+composer update waynestate/creed
 ```
 
-Then the copy check and `composer ci`, and commit with the CREED commit in the message. When a new Laravel or PHP
-line appears in CREED, check whether Booster needs a new hop for it.
+Then `composer ci`, and commit with the CREED release in the message. When a new Laravel or PHP line appears in
+CREED, check whether Booster needs a new hop for it.
 
 ## Adding a hop
 
@@ -68,7 +67,7 @@ line appears in CREED, check whether Booster needs a new hop for it.
 
 1. Move the lines under `## [Unreleased]` in `CHANGELOG.md` (Keep a Changelog) to a new `## [X.Y.Z] - YYYY-MM-DD`
    heading.
-2. `composer ci` and the CREED copy check green locally, then both pipelines green for that commit.
+2. `composer ci` green locally, then both pipelines green for that commit.
 3. Run a secrets scan of the history and check that nothing internal (server names, people, app names, IDs) is in the
    tree.
 4. Tag `X.Y.Z` (no `v`) on GitLab. The mirror carries the tag to GitHub, and Packagist picks it up from there.

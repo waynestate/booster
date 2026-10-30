@@ -50,7 +50,7 @@ abstract class BaseCommand extends Command
         $this
             ->addOption('path', null, InputOption::VALUE_REQUIRED, 'Path to the application.', '.')
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format (text, json).', 'text')
-            ->addOption('policy', null, InputOption::VALUE_REQUIRED, "Path to CREED's policy.json (default: BOOSTER_POLICY, then the bundled copy).")
+            ->addOption('policy', null, InputOption::VALUE_REQUIRED, "Path to CREED's policy.json (default: BOOSTER_POLICY, then the waynestate/creed package).")
             ->addOption('today', null, InputOption::VALUE_REQUIRED, "Override today's date (YYYY-MM-DD).")
             ->addOption('goal', null, InputOption::VALUE_REQUIRED, 'Shorthand such as php-74-to-84: sets --from-php and --to-php.')
             ->addOption('from-php', null, InputOption::VALUE_REQUIRED, 'The PHP version the app runs on (major.minor).')

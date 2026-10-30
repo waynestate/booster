@@ -8,6 +8,7 @@ use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Run\BaselineResult;
 use Waynestate\Booster\Run\ProctorResult;
 use Waynestate\Booster\Run\RunReport;
+use Waynestate\Booster\Scan\RemovalsResult;
 use Waynestate\Booster\Scan\ScanResult;
 
 /**
@@ -20,7 +21,10 @@ final class TextWriter
     /** How many findings the text report shows before it says "and more". */
     private const MAX_FINDINGS = 20;
 
-    public function plan(Plan $plan): string
+    /**
+     * @param array<int, RemovalsResult> $removalsByStep removals result per PHP step number
+     */
+    public function plan(Plan $plan, array $removalsByStep = []): string
     {
         $p = $plan->project;
         $lines = [
@@ -35,6 +39,9 @@ final class TextWriter
             $lines[] = sprintf('  PHPUnit: %s -> %s', $p->phpunitMajor ?? 'unknown', $plan->targetPhpunit);
         }
         $lines[] = sprintf('  policy: %s (today %s)', self::clean($plan->policyOrigin), $plan->today);
+        if ($p->hasBoost) {
+            $lines[] = '  Laravel Boost found: the playbooks include Boost prompts.';
+        }
         $lines[] = '';
 
         foreach ($plan->steps as $step) {
@@ -42,6 +49,12 @@ final class TextWriter
             $lines[] = '   ' . $step->hop->summary;
             if ($step->hop->extraReview) {
                 $lines[] = '   Give this hop the most review time.';
+            }
+            $removals = $removalsByStep[$step->number] ?? null;
+            if ($removals instanceof RemovalsResult) {
+                foreach ($this->removals($removals) as $line) {
+                    $lines[] = '   ' . $line;
+                }
             }
         }
         if ($plan->steps === []) {
@@ -91,6 +104,72 @@ final class TextWriter
         return implode("\n", $lines);
     }
 
+    /**
+     * The advisory PHPStan section that follows a plan: what static analysis
+     * says at the target PHP version, or why the scan could not run.
+     */
+    public function phpStan(ScanResult $scan): string
+    {
+        if (!$scan->ok) {
+            $lines = ['PHPStan scan: could not run'];
+            foreach (explode("\n", self::clean((string) $scan->error)) as $line) {
+                $lines[] = '   ' . $line;
+            }
+
+            return implode("\n", $lines);
+        }
+
+        if ($scan->findings === []) {
+            return sprintf('PHPStan on PHP %s: no findings.', $scan->testVersion);
+        }
+
+        $count = count($scan->findings);
+        $lines = [sprintf('PHPStan on PHP %s: %d %s.', $scan->testVersion, $count, $count === 1 ? 'finding' : 'findings')];
+        foreach (array_slice($scan->findings, 0, self::MAX_FINDINGS) as $finding) {
+            $tag = $finding->source !== '' ? $finding->source : $finding->severity;
+            $lines[] = sprintf('   %s:%d [%s] %s', self::clean($finding->file), $finding->line, $tag, self::clean($finding->message));
+        }
+        $hidden = count($scan->findings) - self::MAX_FINDINGS;
+        if ($hidden > 0) {
+            $lines[] = sprintf('   (%d more findings...)', $hidden);
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * The advisory removals block for one PHP hop: what the language removes
+     * between the hop's two versions, and where the app still uses it.
+     * $maxFindings caps the listed lines; null lists every finding
+     * (booster scan --removals).
+     *
+     * @return list<string>
+     */
+    public function removals(RemovalsResult $result, ?int $maxFindings = self::MAX_FINDINGS): array
+    {
+        if ($result->total === 0) {
+            return [sprintf('Removed between PHP %s and PHP %s: none found.', $result->from, $result->to)];
+        }
+
+        $lines = [sprintf(
+            'Removed between PHP %s and PHP %s: %d hit%s (advisory).',
+            $result->from,
+            $result->to,
+            $result->total,
+            $result->total === 1 ? '' : 's',
+        )];
+        $shown = $maxFindings === null ? $result->findings : array_slice($result->findings, 0, $maxFindings);
+        foreach ($shown as $finding) {
+            $lines[] = sprintf('%s:%d %s -> %s', self::clean($finding->file), $finding->line, self::clean($finding->label), self::clean($finding->replacement));
+        }
+        $hidden = $result->total - count($shown);
+        if ($hidden > 0) {
+            $lines[] = sprintf('(%d more...)', $hidden);
+        }
+
+        return $lines;
+    }
+
     public function run(RunReport $report): string
     {
         $lines = [$report->dryRun ? 'BOOSTER dry run (nothing was changed)' : 'BOOSTER run', ''];
@@ -120,6 +199,12 @@ final class TextWriter
                     $lines[] = '   changed ' . self::clean($file['file']);
                 }
             }
+            if ($r->prepass !== []) {
+                $lines[] = '   Pre-pass fixes:';
+                foreach ($r->prepass as $fix) {
+                    $lines[] = sprintf('      %s: %d %s', self::clean($fix['file']), $fix['rewrites'], $fix['rewrites'] === 1 ? 'rewrite' : 'rewrites');
+                }
+            }
         }
         $lines[] = '';
         if ($report->dryRun && $previewedFiles !== []) {
@@ -141,7 +226,8 @@ final class TextWriter
 
     /**
      * The PROCTOR gate section: what the policy check said about the upgraded
-     * app, or nothing when the gate did not run.
+     * app, its failing findings split against the baseline measured before the
+     * first hop, or nothing when the gate did not run.
      *
      * @return list<string>
      */
@@ -151,6 +237,7 @@ final class TextWriter
         if ($proctor === null) {
             return [];
         }
+        $comparison = $report->proctorComparison;
         $php = $proctor->php ?? '?';
         $advisory = $report->proctorAdvisory ? ' Advisory only (--proctor-advisory), so this does not fail the run.' : '';
         $lines = [];
@@ -159,13 +246,12 @@ final class TextWriter
                 $lines[] = sprintf('PROCTOR: PASS on PHP %s (the upgraded app meets the policy).', $php);
                 break;
             case ProctorResult::FAILED:
-                $count = count($proctor->failures);
-                $lines[] = sprintf('PROCTOR: FAIL on PHP %s (%d finding%s).%s', $php, $count, $count === 1 ? '' : 's', $advisory);
-                foreach ($proctor->failures as $failure) {
-                    $where = $failure['path'] !== null ? ' (' . self::clean($failure['path']) . ':' . $failure['line'] . ')' : '';
-                    $lines[] = '   [' . $failure['check'] . '] ' . self::clean($failure['message']) . $where;
+                if ($comparison !== null && $comparison->baselineTaken) {
+                    $lines[] = sprintf('PROCTOR: FAIL on PHP %s (%d new, %d already present).%s', $php, count($comparison->new), count($comparison->alreadyPresent), $advisory);
+                } else {
+                    $count = count($proctor->failures);
+                    $lines[] = sprintf('PROCTOR: FAIL on PHP %s (%d finding%s).%s', $php, $count, $count === 1 ? '' : 's', $advisory);
                 }
-                $lines[] = '   Fix the findings above, then run the upgrade again.';
                 break;
             default:
                 $lines[] = sprintf('PROCTOR: TRIPPED on PHP %s (exit %d). The check could not finish.%s', $php, $proctor->exitCode, $advisory);
@@ -177,8 +263,47 @@ final class TextWriter
                 $lines[] = '   Fix the tool error above, then run the upgrade again.';
                 break;
         }
+        if ($comparison !== null) {
+            if (!$comparison->baselineTaken) {
+                $lines[] = '   PROCTOR baseline could not be taken: ' . self::clean((string) $comparison->baselineError) . '. The run blocks on any failure until there is a baseline to compare against.';
+            }
+            if ($comparison->new !== []) {
+                $lines[] = '   New:';
+                foreach ($comparison->new as $failure) {
+                    $lines[] = $this->findingLine($failure);
+                }
+                $lines[] = '   Fix the findings above, then run the upgrade again.';
+            }
+            if ($comparison->alreadyPresent !== []) {
+                $lines[] = '   Already present (not blocking):';
+                foreach ($comparison->alreadyPresent as $failure) {
+                    $lines[] = $this->findingLine($failure);
+                }
+            }
+            if ($comparison->fixed !== []) {
+                $lines[] = '   Fixed by the upgrade:';
+                foreach ($comparison->fixed as $failure) {
+                    $lines[] = $this->findingLine($failure);
+                }
+                if ($comparison->phpFloorFixed()) {
+                    $lines[] = '   php-floor: fixed by the upgrade.';
+                }
+            }
+        }
 
         return $lines;
+    }
+
+    /**
+     * One finding as a report line: check, message and where it was found.
+     *
+     * @param array{check: string, rule: string, message: string, path: ?string, line: int} $failure
+     */
+    private function findingLine(array $failure): string
+    {
+        $where = $failure['path'] !== null ? ' (' . self::clean($failure['path']) . ':' . $failure['line'] . ')' : '';
+
+        return '   [' . $failure['check'] . '] ' . self::clean($failure['message']) . $where;
     }
 
     /**

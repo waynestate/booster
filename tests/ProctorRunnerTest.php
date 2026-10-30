@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Tests;
 
+use Waynestate\Booster\Policy\PolicyLocator;
 use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\Run\ProctorResult;
 use Waynestate\Booster\Run\ProctorRunner;
@@ -43,12 +44,12 @@ final class ProctorRunnerTest extends TestCase
         $this->runner($fake)->run('/srv/app', '8', '/srv/policy.json', '2026-10-28');
     }
 
-    public function test_the_bundled_snapshot_uses_boosters_own_policy_copy(): void
+    public function test_the_creed_package_origin_uses_the_packages_policy_file(): void
     {
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, self::proctorFixture('pass-report.json'), ''));
-        $this->runner($fake)->run('/srv/app', '8.3', 'bundled snapshot', '2026-10-28');
+        $this->runner($fake)->run('/srv/app', '8.3', PolicyLocator::defaultOrigin(), '2026-10-28');
 
-        self::assertContains('--policy=' . dirname(__DIR__) . '/src/Creed/policy.json', $fake->calls[0]['command']);
+        self::assertContains('--policy=' . dirname(__DIR__) . '/vendor/waynestate/creed/policy/policy.json', $fake->calls[0]['command']);
     }
 
     public function test_a_passing_report_is_passed(): void

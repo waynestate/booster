@@ -3,8 +3,7 @@
     "exclude": [
         "vendor",
         "tests/fixtures",
-        "examples",
-        "src/Creed"
+        "examples"
     ],
     "notPath": [
         "bin/agent-ready.php"

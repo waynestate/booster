@@ -18,6 +18,8 @@ final class ProjectDetector
 {
     private const WAYNE_CAS_PACKAGE = 'cit-web-infra/wayne-cas';
 
+    private const BOOST_PACKAGE = 'laravel/boost';
+
     public function detect(string $path): Project
     {
         if (!is_dir($path)) {
@@ -41,6 +43,7 @@ final class ProjectDetector
         $vueConstraint = $deps['vue'] ?? null;
         $hasVue = array_key_exists('vue', $deps);
         $vue = is_string($vueConstraint) ? $this->lowerBound($vueConstraint, 1) : null;
+        $vueMinor = is_string($vueConstraint) ? $this->lowerBound($vueConstraint, 2) : null;
 
         $engines = $this->section($package, 'engines');
         $nodeConstraint = $engines['node'] ?? null;
@@ -75,6 +78,8 @@ final class ProjectDetector
             hasPackageJson: $package !== [],
             nodeMajor: $node,
             hasMixFile: is_file($path . '/webpack.mix.js'),
+            vueMinor: $vueMinor,
+            hasBoost: array_key_exists(self::BOOST_PACKAGE, $all) || $this->lockHasBoost($path . '/composer.lock'),
         );
     }
 
@@ -131,6 +136,37 @@ final class ProjectDetector
 
         /** @var array<string, mixed> $data */
         return $data;
+    }
+
+    /**
+     * Whether composer.lock still carries laravel/boost in packages or
+     * packages-dev. A missing or broken lock counts as no: the manifest is the
+     * primary source, and an old app with a stale lock must not break detect.
+     */
+    private function lockHasBoost(string $file): bool
+    {
+        if (!is_file($file)) {
+            return false;
+        }
+        $raw = file_get_contents($file);
+        $data = $raw === false ? null : json_decode($raw, true);
+        if (!is_array($data)) {
+            return false;
+        }
+
+        foreach (['packages', 'packages-dev'] as $section) {
+            $packages = $data[$section] ?? [];
+            if (!is_array($packages)) {
+                continue;
+            }
+            foreach ($packages as $entry) {
+                if (is_array($entry) && ($entry['name'] ?? null) === self::BOOST_PACKAGE) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

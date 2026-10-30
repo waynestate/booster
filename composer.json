@@ -19,25 +19,29 @@
         "rector/rector": "^2.8",
         "symfony/console": "^7.1",
         "symfony/process": "^7.1",
-        "waynestate/proctor": "^0.2"
+        "waynestate/proctor": "^0.2",
+        "waynestate/creed": "^0.1"
     },
     "require-dev": {
         "laravel/pint": "^1.32",
         "phpcompatibility/php-compatibility": "^10.0.0@alpha",
         "phpstan/phpstan": "^2.1",
         "phpunit/phpunit": "^11.5",
-        "squizlabs/php_codesniffer": "^3.13"
+        "squizlabs/php_codesniffer": "^3.13",
+        "waynestate/pinstripe": "^0.1"
     },
     "suggest": {
         "phpcompatibility/php-compatibility": "Optional: enables the PHP compatibility advisory scan (booster plan, booster scan). Install with composer require --dev phpcompatibility/php-compatibility:\"^10.0@alpha\"",
-        "squizlabs/php_codesniffer": "Optional: the PHP_CodeSniffer runner the PHP compatibility scan needs."
+        "squizlabs/php_codesniffer": "Optional: the PHP_CodeSniffer runner the PHP compatibility scan needs.",
+        "waynestate/pinstripe": "Optional: the Pinstripe PHPStan preset the PHPStan advisory scan runs against (booster plan, booster scan --phpstan). Install with composer require --dev waynestate/pinstripe:\"^0.1\""
     },
     "config": {
         "audit": {
             "abandoned": "report"
         },
         "allow-plugins": {
-            "dealerdirect/phpcodesniffer-composer-installer": true
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "phpstan/extension-installer": false
         },
         "platform": {
             "php": "8.3.0"
@@ -47,7 +51,6 @@
         "lint": "pint --test",
         "fix": "pint",
         "analyse": "phpstan analyse --memory-limit=1G",
-        "creed-copy:check": "php \"$CREED_PATH/bin/export.php\" --check --namespace='Waynestate\\Booster\\Creed' --to=src/Creed",
         "ci": [
             "@composer validate --strict",
             "phpunit",
@@ -62,7 +65,6 @@
     },
     "scripts-descriptions": {
         "ci": "Run every CI check: manifest, tests, style, static analysis, audit, hop data freshness, agent-ready files",
-        "creed-copy:check": "Verify src/Creed still matches a fresh export from the CREED checkout in $CREED_PATH",
         "site:agent-ready": "Rewrite the Markdown twins, llms.txt, llms-full.txt, robots.txt and sitemap.xml in site/ (Squire's agent-ready kit).",
         "site:agent-ready-check": "Fail when the agent-ready files are stale, a page lacks its Markdown link, a prompt drifts from the docs, or the kit was edited here."
     },

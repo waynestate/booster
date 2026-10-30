@@ -13,6 +13,14 @@ Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
 2. `booster run --path=<app>` applies the plan and stops at the first failing gate.
 3. If a hop is capped, split the work with `--skip`; do not raise `--max-changes` blindly.
 
+Only if the app has Laravel Boost (`booster detect` says so):
+
+- Use `search-docs` for the Vite front-end docs and check the app's build config against them.
+- Use `browser-logs` after a page load to catch front-end errors the change might surface.
+- Run `last-error` and `read-log-entries` after the build and the tests.
+
+Boost is read-only help. Booster's gate stays the authority: never skip a gate because Boost says so.
+
 What Rector cannot do (check these by hand):
 
 - The pin is a floor, not a ceiling: engines.node ">=26" still allows newer Node majors.

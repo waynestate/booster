@@ -50,12 +50,78 @@ final class ProjectDetectorTest extends TestCase
         self::assertNull($plain->nodeMajor);
     }
 
+    public function test_the_vue_minor_comes_from_the_constraint(): void
+    {
+        $spa = (new ProjectDetector())->detect($this->example('vue-spa'));
+        self::assertSame('2', $spa->vueMajor);
+        self::assertSame('2.7', $spa->vueMinor);
+
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/package.json', '{"dependencies":{"vue":"^2.6.14"}}');
+        self::assertSame('2.6', (new ProjectDetector())->detect($dir)->vueMinor);
+
+        $bare = $this->tempDir();
+        file_put_contents($bare . '/package.json', '{"dependencies":{"vue":"^2"}}');
+        self::assertSame('2.0', (new ProjectDetector())->detect($bare)->vueMinor);
+    }
+
     public function test_wayne_cas_is_flagged(): void
     {
         $project = (new ProjectDetector())->detect($this->example('laravel-wayne-cas'));
 
         self::assertTrue($project->usesWayneCas);
         self::assertFalse((new ProjectDetector())->detect($this->example('raw-php'))->usesWayneCas);
+    }
+
+    public function test_boost_is_flagged_from_the_manifest_or_the_lock(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"laravel/framework":"^11.0","laravel/boost":"^1.0"}}');
+        self::assertTrue((new ProjectDetector())->detect($dir)->hasBoost);
+
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require-dev":{"laravel/boost":"^1.0"}}');
+        self::assertTrue((new ProjectDetector())->detect($dir)->hasBoost);
+
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{}}');
+        file_put_contents($dir . '/composer.lock', json_encode(['packages' => [['name' => 'laravel/boost', 'version' => '1.0.0']]]));
+        self::assertTrue((new ProjectDetector())->detect($dir)->hasBoost);
+
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{}}');
+        file_put_contents($dir . '/composer.lock', json_encode(['packages-dev' => [['name' => 'laravel/boost', 'version' => '1.0.0']]]));
+        self::assertTrue((new ProjectDetector())->detect($dir)->hasBoost);
+    }
+
+    public function test_boost_is_absent_without_a_manifest_entry_or_lock_hit(): void
+    {
+        self::assertFalse((new ProjectDetector())->detect($this->example('raw-php'))->hasBoost);
+        self::assertFalse((new ProjectDetector())->detect($this->example('laravel-blade'))->hasBoost);
+
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"laravel/framework":"^11.0"}}');
+        file_put_contents($dir . '/composer.lock', json_encode(['packages' => [['name' => 'laravel/framework', 'version' => '11.0.0']]]));
+        self::assertFalse((new ProjectDetector())->detect($dir)->hasBoost);
+
+        // A broken lock cannot hide or invent Boost: the manifest still decides.
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{}}');
+        file_put_contents($dir . '/composer.lock', '{broken');
+        self::assertFalse((new ProjectDetector())->detect($dir)->hasBoost);
+
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"laravel/boost":"^1.0"}}');
+        file_put_contents($dir . '/composer.lock', '{broken');
+        self::assertTrue((new ProjectDetector())->detect($dir)->hasBoost);
+    }
+
+    public function test_boost_survives_to_array(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"laravel/boost":"^1.0"}}');
+
+        self::assertTrue((new ProjectDetector())->detect($dir)->toArray()['boost']);
     }
 
     public function test_an_app_without_composer_is_raw_php_with_unknown_version(): void

@@ -18,6 +18,7 @@ final readonly class RunReport
         public array $results,
         public ?ProctorResult $proctor = null,
         public bool $proctorAdvisory = false,
+        public ?ProctorComparison $proctorComparison = null,
     ) {}
 
     public function failed(): bool
@@ -30,11 +31,12 @@ final readonly class RunReport
                 return true;
             }
         }
-        if ($this->proctor !== null && !$this->proctorAdvisory && $this->proctor->blocking()) {
-            return true;
+        if ($this->proctor === null || $this->proctorAdvisory) {
+            return false;
         }
+        $comparison = $this->proctorComparison;
 
-        return false;
+        return $comparison !== null ? $comparison->blocking : $this->proctor->blocking();
     }
 
     /**
@@ -49,8 +51,45 @@ final readonly class RunReport
             'baseline' => $this->baseline->toArray(),
             'plan' => $this->plan->toArray(),
             'results' => array_map(static fn(StepResult $r): array => $r->toArray(), $this->results),
-            'proctor' => $this->proctor?->toArray(),
+            'proctor' => $this->proctorArray(),
             'proctor_advisory' => $this->proctorAdvisory,
+        ];
+    }
+
+    /**
+     * The PROCTOR section of the JSON report: the final run, whether it blocks
+     * the run, its failing findings split into new, already present and fixed
+     * against the baseline measured before the first hop, and why the baseline
+     * could not be taken when it was not.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function proctorArray(): ?array
+    {
+        if ($this->proctor === null) {
+            return null;
+        }
+        $comparison = $this->proctorComparison;
+        $blocking = $comparison?->blocking;
+        $new = $comparison?->new;
+        $alreadyPresent = $comparison?->alreadyPresent;
+        $fixed = $comparison?->fixed;
+        $baselineTaken = $comparison?->baselineTaken;
+
+        return [
+            'status' => $this->proctor->status,
+            'exit_code' => $this->proctor->exitCode,
+            'php' => $this->proctor->php,
+            'failures' => $this->proctor->failures,
+            'error' => $this->proctor->error,
+            'blocking' => $blocking ?? $this->proctor->blocking(),
+            'new' => $new ?? [],
+            'already_present' => $alreadyPresent ?? [],
+            'fixed' => $fixed ?? [],
+            'baseline' => [
+                'taken' => $baselineTaken ?? false,
+                'error' => $comparison?->baselineError,
+            ],
         ];
     }
 }

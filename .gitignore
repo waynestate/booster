@@ -3,5 +3,6 @@
 /tools/box/vendor/
 /.phpunit.result.cache
 /.phpunit.cache/
+/.subversion/
 /.env
 /.env.backup

@@ -14,8 +14,12 @@ use Waynestate\Booster\Node\MixBuild;
 use Waynestate\Booster\Node\MixFile;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanStep;
+use Waynestate\Booster\Prepass\NewByReferenceFixer;
+use Waynestate\Booster\Prepass\PrepassResult;
 use Waynestate\Booster\Project\AppType;
 use Waynestate\Booster\Refresh\HopDataRefresher;
+use Waynestate\Booster\Report\TextWriter;
+use Waynestate\Booster\Scan\RemovalsScan;
 use Waynestate\Booster\ToolError;
 
 /**
@@ -37,9 +41,23 @@ final class HopExecutor
         private readonly CasMigration $casMigration = new CasMigration(),
     ) {}
 
+    private ?RemovalsScan $removals = null;
+
     private function registry(): HopRegistry
     {
         return $this->registry ?? new HopRegistry();
+    }
+
+    private ?NewByReferenceFixer $fixer = null;
+
+    private function fixer(): NewByReferenceFixer
+    {
+        return $this->fixer ??= new NewByReferenceFixer();
+    }
+
+    private function removalsScanner(): RemovalsScan
+    {
+        return $this->removals ??= new RemovalsScan();
     }
 
     public function execute(Plan $plan, RunOptions $options): RunReport
@@ -67,6 +85,10 @@ final class HopExecutor
         }
 
         $results = [];
+        // Measure the app against the CREED policy on the PHP it is on now, so
+        // the final gate can tell pre-existing findings from ones the upgrade
+        // introduces.
+        $proctorBaseline = $this->runProctorBaseline($plan, $path, $options);
         foreach ($plan->steps as $step) {
             $result = $this->runStep($step, $path, $plan, $options, $baseline);
             $results[] = $result;
@@ -82,8 +104,34 @@ final class HopExecutor
         }
 
         $proctor = $this->runProctorGate($plan, $path, $options, $results);
+        $comparison = $proctor === null ? null : ProctorComparison::compare($proctorBaseline, $proctor);
 
-        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $options->proctorAdvisory);
+        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $options->proctorAdvisory, $comparison);
+    }
+
+    /**
+     * The PROCTOR baseline: measure the app against the CREED policy on the
+     * PHP it is on now, before the first hop, so the final gate can tell
+     * pre-existing findings from ones the upgrade introduces. Skipped for dry
+     * runs, when the gate is skipped, or when the plan has no steps, like the
+     * final run. A tool error is recorded as a tripped baseline so the final
+     * gate falls back to blocking on any failure and says why.
+     */
+    private function runProctorBaseline(Plan $plan, string $path, RunOptions $options): ?ProctorResult
+    {
+        if ($options->dryRun || $options->skipGate || $plan->steps === [] || $this->proctor === null) {
+            return null;
+        }
+        $php = $this->startingPhp($plan);
+        if ($php === null) {
+            return null;
+        }
+
+        try {
+            return $this->proctor->run($path, $php, $plan->policyOrigin, $plan->today);
+        } catch (ToolError $e) {
+            return new ProctorResult(ProctorResult::TRIPPED, 2, $php, [], $e->getMessage());
+        }
     }
 
     /**
@@ -170,7 +218,40 @@ final class HopExecutor
         return $kept;
     }
 
+    /**
+     * Runs one step. For PHP hops it first lists what the language removes
+     * between the hop's two versions: an advisory in the step's messages,
+     * never a failure and never a reason to stop.
+     */
     private function runStep(PlanStep $step, string $path, Plan $plan, RunOptions $options, BaselineResult $baseline): StepResult
+    {
+        $result = $this->runStepCore($step, $path, $plan, $options, $baseline);
+        $removals = $this->removalsLines($step, $path);
+        if ($removals === '') {
+            return $result;
+        }
+
+        return new StepResult($step->number, $step->hop->id, $result->status, $result->files, [$removals, ...$result->messages], $result->incomplete, $result->prepass);
+    }
+
+    /**
+     * The advisory removals block for a PHP hop, or '' when the hop is not a
+     * PHP hop or the app has no uses of removed functions or constructs.
+     */
+    private function removalsLines(PlanStep $step, string $path): string
+    {
+        if ($step->hop->kind !== HopKind::Php || $step->phpBefore === null || $step->phpAfter === null) {
+            return '';
+        }
+        $result = $this->removalsScanner()->scan($path, $step->phpBefore, $step->phpAfter);
+        if ($result->total === 0) {
+            return '';
+        }
+
+        return implode("\n", (new TextWriter())->removals($result));
+    }
+
+    private function runStepCore(PlanStep $step, string $path, Plan $plan, RunOptions $options, BaselineResult $baseline): StepResult
     {
         $hop = $step->hop;
         if ($hop->isManual()) {
@@ -186,77 +267,155 @@ final class HopExecutor
                 };
             }
 
-            $phpunitTarget = $hop->kind === HopKind::Phpunit ? $hop->to : null;
-            $preview = $this->rector->run($hop, $path, true, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget, $options->memoryLimit);
-            [$stopErrors, $notes] = self::splitRepairedNotes($preview->errors);
-            if ($stopErrors !== []) {
-                return new StepResult($step->number, $hop->id, StepResult::ERROR, $preview->files, ['Rector reported errors; nothing was changed.', ...$stopErrors, ...$notes]);
-            }
-            if ($preview->changedCount() > $options->maxChanges) {
-                return new StepResult($step->number, $hop->id, StepResult::CAPPED, $preview->files, [sprintf(
-                    'Rector wants to change %d files and the cap is %d. Nothing was changed. Review with --dry-run, then raise --max-changes or use --skip to split the work.',
-                    $preview->changedCount(),
-                    $options->maxChanges,
-                ), ...$notes]);
-            }
-            if ($options->dryRun) {
-                // A Laravel hop previews through the app's own autoloader; without vendor/ Rector
-                // cannot see the app's classes, so the diff is a lower bound, not the whole change.
-                $incomplete = $hop->kind === HopKind::Laravel && !is_file($path . '/vendor/autoload.php');
-                $migration = $hop->kind === HopKind::Sesame ? $this->casMigration->migrate($path, true) : null;
-                [$inertiaChanges, $inertiaFiles] = $this->inertiaChangesFor($hop, $step, $plan, true);
-                $files = [...$preview->files, ...($migration->files ?? []), ...$inertiaFiles];
-                if ($incomplete) {
-                    $messages = [sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$inertiaChanges, ...$hop->notes, ...$notes];
-                } elseif ($files === []) {
-                    $messages = ['Dry run: nothing was changed.', ...($migration->manual ?? []), ...$hop->notes, ...$notes];
+            // PHP hops get the new-by-reference pre-pass first: modern PHP refuses to compile
+            // "$a = &new Foo();", so without the rewrite Rector never gets a parse tree and the
+            // hop stops with nothing changed. The rewrite lands on the working copy, and a dry
+            // run puts every original byte back.
+            $prepass = $hop->kind === HopKind::Php ? $this->fixer()->fixTree($path, true) : null;
+            $keepPrepass = false;
+            try {
+                $phpunitTarget = $hop->kind === HopKind::Phpunit ? $hop->to : null;
+                $preview = $this->rector->run($hop, $path, true, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget, $options->memoryLimit);
+                [$stopErrors, $notes] = self::splitRepairedNotes($preview->errors);
+                if ($stopErrors !== []) {
+                    return new StepResult($step->number, $hop->id, StepResult::ERROR, [...self::prepassFiles($prepass), ...$preview->files], ['Rector reported errors; nothing was changed.', ...self::refusals($stopErrors), ...$notes], false, $prepass?->files() ?? []);
+                }
+                $wanted = $preview->changedCount() + ($prepass?->changedCount() ?? 0);
+                if ($wanted > $options->maxChanges) {
+                    return new StepResult($step->number, $hop->id, StepResult::CAPPED, [...self::prepassFiles($prepass), ...$preview->files], [sprintf(
+                        'This hop wants to change %d files (%d from the pre-pass, %d from Rector) and the cap is %d. Nothing was changed. Review with --dry-run, then raise --max-changes or use --skip to split the work.',
+                        $wanted,
+                        $prepass?->changedCount() ?? 0,
+                        $preview->changedCount(),
+                        $options->maxChanges,
+                    ), ...$notes], false, $prepass?->files() ?? []);
+                }
+                if ($options->dryRun) {
+                    // A Laravel hop previews through the app's own autoloader; without vendor/ Rector
+                    // cannot see the app's classes, so the diff is a lower bound, not the whole change.
+                    $incomplete = $hop->kind === HopKind::Laravel && !is_file($path . '/vendor/autoload.php');
+                    $migration = $hop->kind === HopKind::Sesame ? $this->casMigration->migrate($path, true) : null;
+                    [$inertiaChanges, $inertiaFiles] = $this->inertiaChangesFor($hop, $step, $plan, true);
+                    $files = [...self::prepassFiles($prepass), ...$preview->files, ...($migration->files ?? []), ...$inertiaFiles];
+                    if ($incomplete) {
+                        $messages = [sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$inertiaChanges, ...$hop->notes, ...$notes];
+                    } elseif ($files === []) {
+                        $messages = ['Dry run: nothing was changed.', ...($migration->manual ?? []), ...$hop->notes, ...$notes];
+                    } else {
+                        $messages = [...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$hop->notes, ...$notes];
+                    }
+
+                    return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $files, $messages, $incomplete, $prepass?->files() ?? []);
+                }
+
+                $keepPrepass = true;
+                $applied = $this->rector->run($hop, $path, false, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget, $options->memoryLimit);
+                $messages = $this->composer->apply($hop, $path);
+                [$appliedErrors, $appliedNotes] = self::splitRepairedNotes($applied->errors);
+                foreach ($appliedNotes as $note) {
+                    if (!in_array($note, $notes, true)) {
+                        $notes[] = $note;
+                    }
+                }
+                if ($appliedErrors !== []) {
+                    return new StepResult($step->number, $hop->id, StepResult::ERROR, [...self::prepassFiles($prepass), ...$applied->files], ['Rector reported errors while applying.', ...self::refusals($appliedErrors), ...$notes], false, $prepass?->files() ?? []);
+                }
+                // The CAS config and model traits move only after Rector succeeded,
+                // because they assume the class renames are in place.
+                $migration = $hop->kind === HopKind::Sesame ? $this->casMigration->migrate($path, false) : null;
+                [$inertiaChanges, $inertiaFiles] = $this->inertiaChangesFor($hop, $step, $plan, false);
+                $files = [...self::prepassFiles($prepass), ...$applied->files, ...($migration->files ?? []), ...$inertiaFiles];
+                if (($prepass?->changedCount() ?? 0) === 0 && $applied->changedCount() === 0 && $messages === [] && ($migration->changes ?? []) === [] && $inertiaChanges === []) {
+                    // Nothing changed, so there is nothing for the gate to prove; skip it.
+                    return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
+                        'Nothing to do: Rector changed no files and composer.json already allows the target, so the gate was skipped.',
+                        ...($migration->manual ?? []),
+                        ...$hop->notes,
+                        ...$notes,
+                    ]);
+                }
+
+                if (!$options->skipGate) {
+                    $gate = $this->runGate($step, $path, $options, $baseline);
+                    if ($gate !== null) {
+                        return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$gate, ...$notes], false, $prepass?->files() ?? []);
+                    }
+                    $messages[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
                 } else {
-                    $messages = [...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$hop->notes, ...$notes];
+                    $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
                 }
 
-                return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $files, $messages, $incomplete);
-            }
-
-            $applied = $this->rector->run($hop, $path, false, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget, $options->memoryLimit);
-            $messages = $this->composer->apply($hop, $path);
-            [$appliedErrors, $appliedNotes] = self::splitRepairedNotes($applied->errors);
-            foreach ($appliedNotes as $note) {
-                if (!in_array($note, $notes, true)) {
-                    $notes[] = $note;
+                return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$messages, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$hop->notes, ...$notes], false, $prepass?->files() ?? []);
+            } finally {
+                if ($prepass !== null && !$keepPrepass) {
+                    $prepass->restore();
                 }
             }
-            if ($appliedErrors !== []) {
-                return new StepResult($step->number, $hop->id, StepResult::ERROR, $applied->files, ['Rector reported errors while applying.', ...$appliedErrors, ...$notes]);
-            }
-            // The CAS config and model traits move only after Rector succeeded,
-            // because they assume the class renames are in place.
-            $migration = $hop->kind === HopKind::Sesame ? $this->casMigration->migrate($path, false) : null;
-            [$inertiaChanges, $inertiaFiles] = $this->inertiaChangesFor($hop, $step, $plan, false);
-            $files = [...$applied->files, ...($migration->files ?? []), ...$inertiaFiles];
-            if ($applied->changedCount() === 0 && $messages === [] && ($migration->changes ?? []) === [] && $inertiaChanges === []) {
-                // Nothing changed, so there is nothing for the gate to prove; skip it.
-                return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
-                    'Nothing to do: Rector changed no files and composer.json already allows the target, so the gate was skipped.',
-                    ...($migration->manual ?? []),
-                    ...$hop->notes,
-                    ...$notes,
-                ]);
-            }
-
-            if (!$options->skipGate) {
-                $gate = $this->runGate($step, $path, $options, $baseline);
-                if ($gate !== null) {
-                    return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$gate, ...$notes]);
-                }
-                $messages[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
-            } else {
-                $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
-            }
-
-            return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$messages, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$hop->notes, ...$notes]);
         } catch (ToolError $e) {
             return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [$e->getMessage()]);
         }
+    }
+
+    /**
+     * Pre-pass fixes as StepResult file entries, so they show in the per-step
+     * file list and count as changed files.
+     *
+     * @return list<array{file: string, diff: string}>
+     */
+    private static function prepassFiles(?PrepassResult $prepass): array
+    {
+        if ($prepass === null) {
+            return [];
+        }
+
+        return array_map(static fn(array $fix): array => [
+            'file' => $fix['file'],
+            'diff' => sprintf('pre-pass: %d new-by-reference rewrite%s', $fix['rewrites'], $fix['rewrites'] === 1 ? '' : 's'),
+        ], $prepass->files());
+    }
+
+    /**
+     * Turns Rector parse errors into named refusals: the file (and the line,
+     * when the message carries one) is named, and the reader is told that a
+     * person is needed. Every other error passes through untouched.
+     *
+     * @param list<string> $errors
+     *
+     * @return list<string>
+     */
+    private static function refusals(array $errors): array
+    {
+        $out = [];
+        foreach ($errors as $error) {
+            $out[] = self::refusal($error) ?? $error;
+        }
+
+        return $out;
+    }
+
+    /**
+     * One refusal for a parse error Rector reports as "Syntax error ..." or
+     * "Invalid numeric literal": BOOSTER cannot repair those by tooling, so
+     * the file needs a person.
+     */
+    private static function refusal(string $error): ?string
+    {
+        foreach (['Syntax error', 'Invalid numeric literal'] as $phrase) {
+            $at = strpos($error, $phrase);
+            if ($at === false) {
+                continue;
+            }
+            $message = substr($error, $at);
+            $file = $at >= 2 && substr($error, $at - 2, 2) === ': ' ? substr($error, 0, $at - 2) : null;
+            $where = '';
+            if ($file !== null) {
+                $where = preg_match('/line (\d+)/i', $message, $m) === 1 ? $file . ' line ' . $m[1] : $file;
+            }
+
+            return ($where !== '' ? $where . ': ' : '') . '"' . $message . '" cannot be repaired by tooling, so BOOSTER stops here and the file needs a person.';
+        }
+
+        return null;
     }
 
     /**
@@ -316,16 +475,20 @@ final class HopExecutor
     {
         $hop = $step->hop;
         if ($options->dryRun) {
+            $phrases = self::nodeChangePhrases($hop);
+
             return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [], [
-                sprintf('Dry run: would set %s in package.json and write .nvmrc with %s.', implode(', ', self::npmSetPhrases($hop->npmSet)), $hop->to),
+                $phrases === [] ? 'Dry run: would edit package.json.' : 'Dry run: would ' . self::joinPhrases($phrases) . '.',
                 ...$hop->notes,
             ]);
         }
 
         [$changes, $files] = $this->applyNodeChanges($hop, $path);
         if ($changes === []) {
+            $phrases = self::nodeAlreadyPhrases($hop);
+
             return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
-                'Nothing to do: package.json already sets ' . implode(' and ', self::npmSetPhrases($hop->npmSet)) . ' and .nvmrc already pins ' . $hop->to . ', so the gate was skipped.',
+                $phrases === [] ? 'Nothing to do: package.json already matches the hop, so the gate was skipped.' : 'Nothing to do: ' . self::joinPhrases($phrases) . ', so the gate was skipped.',
                 ...$hop->notes,
             ]);
         }
@@ -842,16 +1005,40 @@ final class HopExecutor
                     $edited = true;
                 }
             }
+            foreach ($hop->npmSetIfPresent as $key => $value) {
+                [$section, $name] = self::splitDependencyKey($key);
+                if ($section === null || !array_key_exists($name, $package[$section] ?? [])) {
+                    continue;
+                }
+                if (self::getNested($package, $key) !== $value) {
+                    $package = self::setNested($package, $key, $value);
+                    $changes[] = 'package.json: ' . $key . ' to ' . $value;
+                    $files[] = ['file' => 'package.json', 'diff' => $key . ' to ' . $value];
+                    $edited = true;
+                }
+            }
+            foreach ($hop->npmRemove as $name) {
+                foreach (['dependencies', 'devDependencies'] as $section) {
+                    if (is_array($package[$section] ?? null) && array_key_exists($name, $package[$section])) {
+                        unset($package[$section][$name]);
+                        $changes[] = 'package.json: removed ' . $name . ' from ' . $section;
+                        $files[] = ['file' => 'package.json', 'diff' => 'removed ' . $name . ' from ' . $section];
+                        $edited = true;
+                    }
+                }
+            }
             if ($edited) {
                 file_put_contents($packageFile, json_encode($package, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
             }
         }
 
-        $nvmrc = $path . '/.nvmrc';
-        if (!is_file($nvmrc) || trim((string) file_get_contents($nvmrc)) !== $hop->to) {
-            file_put_contents($nvmrc, $hop->to . "\n");
-            $changes[] = '.nvmrc: ' . $hop->to;
-            $files[] = ['file' => '.nvmrc', 'diff' => 'pins ' . $hop->to];
+        if ($hop->pinNode) {
+            $nvmrc = $path . '/.nvmrc';
+            if (!is_file($nvmrc) || trim((string) file_get_contents($nvmrc)) !== $hop->to) {
+                file_put_contents($nvmrc, $hop->to . "\n");
+                $changes[] = '.nvmrc: ' . $hop->to;
+                $files[] = ['file' => '.nvmrc', 'diff' => 'pins ' . $hop->to];
+            }
         }
 
         return [$changes, $files];
@@ -1055,18 +1242,106 @@ final class HopExecutor
     }
 
     /**
-     * @param array<string, string> $npmSet
+     * What a node hop will change, in the order it changes it: set values,
+     * set-if-present values, removals, then the .nvmrc pin.
      *
      * @return list<string>
      */
-    private static function npmSetPhrases(array $npmSet): array
+    private static function nodeChangePhrases(Hop $hop): array
     {
         $phrases = [];
-        foreach ($npmSet as $key => $value) {
-            $phrases[] = $key . ' to ' . $value;
+        foreach ($hop->npmSet as $key => $value) {
+            $phrases[] = 'set ' . self::npmName($key) . ' to ' . $value . ' in package.json';
+        }
+        foreach ($hop->npmSetIfPresent as $key => $value) {
+            $phrases[] = 'set ' . self::npmName($key) . ' to ' . $value . ' in package.json if it is listed';
+        }
+        foreach ($hop->npmRemove as $name) {
+            $phrases[] = 'remove ' . $name . ' from package.json';
+        }
+        if ($hop->pinNode) {
+            $phrases[] = 'write .nvmrc with ' . $hop->to;
         }
 
         return $phrases;
+    }
+
+    /**
+     * Why a node hop has nothing left to do: the set values already match,
+     * the removed packages are absent, and the .nvmrc already pins.
+     *
+     * @return list<string>
+     */
+    private static function nodeAlreadyPhrases(Hop $hop): array
+    {
+        $phrases = [];
+        if ($hop->npmSet !== []) {
+            $parts = [];
+            foreach ($hop->npmSet as $key => $value) {
+                $parts[] = self::npmName($key) . ' to ' . $value;
+            }
+            $phrases[] = 'package.json already sets ' . implode(', ', $parts);
+        }
+        if ($hop->npmRemove !== []) {
+            $phrases[] = 'package.json does not list ' . implode(', ', $hop->npmRemove);
+        }
+        if ($hop->pinNode) {
+            $phrases[] = '.nvmrc already pins ' . $hop->to;
+        }
+
+        return $phrases;
+    }
+
+    /**
+     * Join human phrases with commas and a final "and", the way a person
+     * would read them out loud.
+     *
+     * @param list<string> $phrases
+     */
+    private static function joinPhrases(array $phrases): string
+    {
+        $count = count($phrases);
+        if ($count === 0) {
+            return '';
+        }
+        if ($count === 1) {
+            return $phrases[0];
+        }
+        if ($count === 2) {
+            return $phrases[0] . ' and ' . $phrases[1];
+        }
+
+        return implode(', ', array_slice($phrases, 0, -1)) . ' and ' . $phrases[$count - 1];
+    }
+
+    /**
+     * The package name behind a dot-path: "dependencies.vue" is "vue", while
+     * "engines.node" stays "engines.node".
+     */
+    private static function npmName(string $key): string
+    {
+        [, $name] = self::splitDependencyKey($key);
+
+        return $name;
+    }
+
+    /**
+     * Split a dependency dot-path into its section and package name. A path
+     * that is not a dependencies or devDependencies entry comes back with a
+     * null section and the whole key as the name.
+     *
+     * @return array{0: ?string, 1: string}
+     */
+    private static function splitDependencyKey(string $key): array
+    {
+        foreach (['dependencies', 'devDependencies'] as $section) {
+            $prefix = $section . '.';
+            if (str_starts_with($key, $prefix)) {
+                return [$section, substr($key, strlen($prefix))];
+            }
+        }
+
+        return [null, $key];
     }
 
     /**

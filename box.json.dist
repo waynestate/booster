@@ -5,9 +5,10 @@
     "check-requirements": true,
     "files": [
         "config/rector.php",
+        "data/removals.json",
         "data/versions.json",
         "docker/Dockerfile",
-        "src/Creed/policy.json",
+        "vendor/waynestate/creed/policy/policy.json",
         "resources/policy.schema.json"
     ]
 }

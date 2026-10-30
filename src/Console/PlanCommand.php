@@ -13,6 +13,8 @@ use Waynestate\Booster\Report\JsonWriter;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\ProcessRunner;
 use Waynestate\Booster\Scan\PhpCompatScan;
+use Waynestate\Booster\Scan\PhpStanScan;
+use Waynestate\Booster\Scan\RemovalsScan;
 
 final class PlanCommand extends BaseCommand
 {
@@ -25,7 +27,7 @@ final class PlanCommand extends BaseCommand
     {
         $this->setName('plan')->setDescription('Show the ordered hops from the app to a supported version. Changes nothing.');
         $this->addAppOptions();
-        $this->addOption('no-scan', null, InputOption::VALUE_NONE, 'Skip the advisory PHPCompatibility scan of the first PHP hop target.');
+        $this->addOption('no-scan', null, InputOption::VALUE_NONE, 'Skip the advisory scans (PHPCompatibility and PHPStan).');
     }
 
     protected function handle(InputInterface $input, OutputInterface $output): int
@@ -34,11 +36,32 @@ final class PlanCommand extends BaseCommand
         $plan = $this->buildPlan($input);
 
         $scan = null;
+        $phpstan = null;
         if (!(bool) $input->getOption('no-scan')) {
             $target = $this->firstPhpTarget($plan);
             if ($target !== null) {
                 $scan = (new PhpCompatScan($this->processes))->scan($plan->project->path, $target);
             }
+            if ($plan->targetPhp !== null) {
+                // The PHPStan scan asks about the destination, not the first
+                // wall: by then the earlier hops have fixed what they fix, so
+                // this is what static analysis will say where the plan lands.
+                $phpstan = (new PhpStanScan($this->processes))->scan($plan->project->path, $plan->targetPhp);
+            }
+        }
+
+        // The removals scan is cheap (no processes), so it always runs, unlike
+        // the PHPCompatibility scan behind --no-scan.
+        $removalsByStep = [];
+        $removalsJson = [];
+        $removals = new RemovalsScan();
+        foreach ($plan->steps as $step) {
+            if ($step->hop->kind !== HopKind::Php || $step->phpBefore === null || $step->phpAfter === null) {
+                continue;
+            }
+            $result = $removals->scan($plan->project->path, $step->phpBefore, $step->phpAfter);
+            $removalsByStep[$step->number] = $result;
+            $removalsJson[] = ['step' => $step->number, 'hop' => $step->hop->id, ...$result->toArray()];
         }
 
         if ($format === 'json') {
@@ -46,12 +69,19 @@ final class PlanCommand extends BaseCommand
             if ($scan !== null) {
                 $data['php_compat'] = $scan->toArray();
             }
+            if ($phpstan !== null) {
+                $data['phpstan'] = $phpstan->toArray();
+            }
+            $data['removals'] = $removalsJson;
             $text = (new JsonWriter())->write($data);
         } else {
             $writer = new TextWriter();
-            $text = $writer->plan($plan);
+            $text = $writer->plan($plan, $removalsByStep);
             if ($scan !== null) {
                 $text .= "\n\n" . $writer->phpCompat($scan);
+            }
+            if ($phpstan !== null) {
+                $text .= "\n\n" . $writer->phpStan($phpstan);
             }
         }
 
