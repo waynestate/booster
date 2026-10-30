@@ -90,6 +90,39 @@ final class TextWriter
         return implode("\n", $lines);
     }
 
+    /**
+     * The advisory PHPStan section that follows a plan: what static analysis
+     * says at the target PHP version, or why the scan could not run.
+     */
+    public function phpStan(ScanResult $scan): string
+    {
+        if (!$scan->ok) {
+            $lines = ['PHPStan scan: could not run'];
+            foreach (explode("\n", self::clean((string) $scan->error)) as $line) {
+                $lines[] = '   ' . $line;
+            }
+
+            return implode("\n", $lines);
+        }
+
+        if ($scan->findings === []) {
+            return sprintf('PHPStan on PHP %s: no findings.', $scan->testVersion);
+        }
+
+        $count = count($scan->findings);
+        $lines = [sprintf('PHPStan on PHP %s: %d %s.', $scan->testVersion, $count, $count === 1 ? 'finding' : 'findings')];
+        foreach (array_slice($scan->findings, 0, self::MAX_FINDINGS) as $finding) {
+            $tag = $finding->source !== '' ? $finding->source : $finding->severity;
+            $lines[] = sprintf('   %s:%d [%s] %s', self::clean($finding->file), $finding->line, $tag, self::clean($finding->message));
+        }
+        $hidden = count($scan->findings) - self::MAX_FINDINGS;
+        if ($hidden > 0) {
+            $lines[] = sprintf('   (%d more findings...)', $hidden);
+        }
+
+        return implode("\n", $lines);
+    }
+
     public function run(RunReport $report): string
     {
         $lines = [$report->dryRun ? 'BOOSTER dry run (nothing was changed)' : 'BOOSTER run', ''];

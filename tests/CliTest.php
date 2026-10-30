@@ -31,6 +31,37 @@ final class CliTest extends TestCase
         return $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''));
     }
 
+    /**
+     * A FakeProcessRunner that answers both discovery probes (phpcs -i,
+     * phpstan --version) and hands the real scans to $phpcs and $phpstan.
+     */
+    private function dualFake(callable $phpcs, callable $phpstan): FakeProcessRunner
+    {
+        return new FakeProcessRunner(static function (array $command) use ($phpcs, $phpstan): ProcessResult {
+            if (in_array('-i', $command, true)) {
+                return new ProcessResult(0, self::PHPCOMPAT_STANDARDS, '');
+            }
+            if (in_array('--version', $command, true)) {
+                return new ProcessResult(0, "PHPStan - PHP Static Analysis Tool 2.3.5\n", '');
+            }
+            if (in_array('analyse', $command, true)) {
+                return $phpstan();
+            }
+
+            return $phpcs();
+        });
+    }
+
+    /**
+     * @param array<string, mixed> $files
+     *
+     * @return array<string, mixed>
+     */
+    private function phpstanReport(array $files): array
+    {
+        return ['totals' => ['errors' => 1, 'file_errors' => 1], 'files' => $files, 'errors' => []];
+    }
+
     public function test_plan_prints_the_hops_in_order(): void
     {
         [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84'], $this->cleanPhpcsFake());
@@ -204,6 +235,90 @@ final class CliTest extends TestCase
         [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $this->example('raw-php')]);
         self::assertSame(2, $exit);
         self::assertStringContainsString('--php', $out);
+    }
+
+    public function test_scan_phpstan_flag_adds_the_phpstan_section(): void
+    {
+        $app = $this->example('raw-php');
+        $report = $this->phpstanReport([
+            $app . '/src/Legacy.php' => [
+                'errors' => 1,
+                'messages' => [['message' => 'Function each() does not exist.', 'line' => 12, 'ignorable' => true, 'identifier' => 'function.notFound']],
+            ],
+        ]);
+        $fake = $this->dualFake(
+            static fn(): ProcessResult => new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''),
+            static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($report), ''),
+        );
+
+        [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $app, '--php' => '8.4', '--phpstan' => true], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Will break on PHP 8.4: no findings.', $out);
+        self::assertStringContainsString('PHPStan on PHP 8.4: 1 finding.', $out);
+        self::assertStringContainsString('src/Legacy.php:12 [function.notFound] Function each()', $out);
+    }
+
+    public function test_scan_without_the_flag_stays_phpcompat_only(): void
+    {
+        $fake = $this->dualFake(
+            static fn(): ProcessResult => new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''),
+            static fn(): ProcessResult => new ProcessResult(1, '{"totals":{"errors":9,"file_errors":9},"files":{},"errors":[]}', ''),
+        );
+
+        [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $this->example('raw-php'), '--php' => '8.4'], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringNotContainsString('PHPStan', $out);
+        self::assertCount(0, $fake->commandsContaining('analyse'));
+    }
+
+    public function test_plan_ends_with_the_phpstan_scan_at_the_destination(): void
+    {
+        $app = $this->example('raw-php');
+        $report = $this->phpstanReport([
+            $app . '/src/Legacy.php' => [
+                'errors' => 1,
+                'messages' => [['message' => 'Function each() does not exist.', 'line' => 12, 'ignorable' => true, 'identifier' => 'function.notFound']],
+            ],
+        ]);
+        $fake = $this->dualFake(
+            static fn(): ProcessResult => new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''),
+            static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($report), ''),
+        );
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $app, '--today' => self::TODAY, '--goal' => 'php-74-to-84'], $fake);
+
+        self::assertSame(0, $exit);
+        // The PHPCompatibility scan asks about the first wall (8.0); the
+        // PHPStan scan asks about where the plan lands (8.4).
+        self::assertStringContainsString('Will break on PHP 8.0: no findings.', $out);
+        self::assertStringContainsString('PHPStan on PHP 8.4: 1 finding.', $out);
+        self::assertStringContainsString('src/Legacy.php:12 [function.notFound] Function each()', $out);
+    }
+
+    public function test_plan_json_carries_the_phpstan_result(): void
+    {
+        $app = $this->example('raw-php');
+        $report = $this->phpstanReport([
+            $app . '/src/Legacy.php' => [
+                'errors' => 1,
+                'messages' => [['message' => 'Function each() does not exist.', 'line' => 12, 'ignorable' => true, 'identifier' => 'function.notFound']],
+            ],
+        ]);
+        $fake = $this->dualFake(
+            static fn(): ProcessResult => new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''),
+            static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($report), ''),
+        );
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $app, '--today' => self::TODAY, '--goal' => 'php-74-to-84', '--format' => 'json'], $fake);
+        $data = json_decode($out, true);
+
+        self::assertSame(0, $exit);
+        self::assertSame('ok', $data['phpstan']['status']);
+        self::assertSame('8.4', $data['phpstan']['test_version']);
+        self::assertSame(1, $data['phpstan']['errors']);
+        self::assertSame('src/Legacy.php', $data['phpstan']['findings'][0]['file']);
     }
 
     public function test_scan_against_the_broken_fixture_finds_removed_and_deprecated_uses(): void
