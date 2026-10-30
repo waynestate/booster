@@ -98,7 +98,7 @@ final class MixFile
             if (preg_match('/^\s*else\b/A', substr($code, $end)) === 1) {
                 continue;
             }
-            $kept .= str_repeat(' ', $offset - $cursor) . str_repeat(' ', strlen($text));
+            $kept .= substr($code, $cursor, $offset - $cursor) . str_repeat(' ', strlen($text));
             $cursor = $end;
             $notes[] = self::FILE . ': ' . self::PRODUCTION_NOTE;
         }
