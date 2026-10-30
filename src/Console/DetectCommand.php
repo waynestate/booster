@@ -31,11 +31,38 @@ final class DetectCommand extends BaseCommand
             return self::EXIT_PASS;
         }
 
+        $warning = $project->lockFloorWarning();
+        if ($warning !== null) {
+            $output->writeln('Warning: ' . TextWriter::clean($warning), OutputInterface::OUTPUT_RAW);
+            $output->writeln('', OutputInterface::OUTPUT_RAW);
+        }
+
         foreach ($project->toArray() as $key => $value) {
-            $shown = is_bool($value) ? ($value ? 'yes' : 'no') : (string) ($value ?? 'unknown');
+            $shown = is_array($value)
+                ? self::lockRangeText($value)
+                : (is_bool($value) ? ($value ? 'yes' : 'no') : (string) ($value ?? 'unknown'));
             $output->writeln(sprintf('%-14s %s', $key, TextWriter::clean($shown)), OutputInterface::OUTPUT_RAW);
         }
 
         return self::EXIT_PASS;
+    }
+
+    /**
+     * The one array value detect prints: the lock's PHP range as a span.
+     *
+     * @param array<string, mixed> $range
+     */
+    private static function lockRangeText(array $range): string
+    {
+        $floor = is_string($range['floor'] ?? null) ? $range['floor'] : null;
+        $ceiling = is_string($range['ceiling'] ?? null) ? $range['ceiling'] : null;
+        if ($floor !== null && $ceiling !== null) {
+            return $floor . ' to <' . $ceiling;
+        }
+        if ($floor !== null) {
+            return '>= ' . $floor;
+        }
+
+        return '< ' . (string) $ceiling;
     }
 }

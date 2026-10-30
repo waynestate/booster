@@ -90,6 +90,61 @@ final class PlannerTest extends TestCase
         }
     }
 
+    public function test_the_lock_floor_warning_plans_from_the_lock_floor(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"php":"^7.3|^8.0"}}');
+        file_put_contents($dir . '/composer.lock', (string) json_encode([
+            'packages' => [
+                ['name' => 'acme/floor-pkg', 'version' => '1.0.0', 'require' => ['php' => '>=8.0']],
+                ['name' => 'acme/ceiling-pkg', 'version' => '1.0.0', 'require' => ['php' => '<8.1']],
+            ],
+        ]));
+
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(), $this->today());
+
+        self::assertSame('8.0', $plan->project->phpVersion);
+        self::assertSame('php-80-to-81', $plan->steps[0]->hop->id);
+        self::assertContains(
+            'composer.json allows PHP 7.3, but the lock needs PHP 8.0 or newer (acme/floor-pkg requires >=8.0). Planning from PHP 8.0.',
+            $plan->warnings,
+        );
+        // The first hop lands exactly on the exclusive ceiling, where the
+        // lock can no longer install without an update.
+        self::assertContains(
+            'The lock also needs PHP below 8.1 (acme/ceiling-pkg requires <8.1); the first PHP hop will need composer update for it.',
+            $plan->warnings,
+        );
+    }
+
+    public function test_the_lock_ceiling_warns_when_the_first_php_hop_leaves_its_range(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"php":"^8.1"}}');
+        file_put_contents($dir . '/composer.lock', (string) json_encode([
+            'packages' => [
+                ['name' => 'acme/floor-pkg', 'version' => '1.0.0', 'require' => ['php' => '>=8.0']],
+                ['name' => 'acme/ceiling-pkg', 'version' => '1.0.0', 'require' => ['php' => '<8.1']],
+            ],
+        ]));
+
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(), $this->today());
+
+        // The manifest floor (8.1) is at or above the lock floor (8.0), so the
+        // baseline stays put and no floor warning appears; the first hop
+        // (8.1 to 8.2) leaves the lock's below-8.1 range.
+        self::assertSame('8.1', $plan->project->phpVersion);
+        foreach ($plan->warnings as $warning) {
+            self::assertStringStartsNotWith('composer.json allows PHP', $warning);
+        }
+        self::assertContains(
+            'The lock also needs PHP below 8.1 (acme/ceiling-pkg requires <8.1); the first PHP hop will need composer update for it.',
+            $plan->warnings,
+        );
+    }
+
     public function test_laravel_and_php_hops_are_interleaved_inside_the_support_overlap(): void
     {
         $plan = $this->plan('laravel-blade');

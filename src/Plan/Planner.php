@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Plan;
 
 use DateTimeImmutable;
+use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Policy\Policy;
 use Waynestate\Booster\Policy\PolicyException;
@@ -167,6 +168,26 @@ final class Planner
                 ));
             }
             break;
+        }
+
+        // The lock may allow a narrower PHP span than composer.json claims.
+        // Say so before the hops: the floor moved the baseline, and a ceiling
+        // below the first hop's landing point means that hop needs a
+        // composer update to keep the lock installable.
+        $lockFloorWarning = $project->lockFloorWarning();
+        if ($lockFloorWarning !== null) {
+            $warnings[] = $lockFloorWarning;
+        }
+        $firstPhpTarget = null;
+        foreach ($steps as $step) {
+            if ($step->hop->kind === HopKind::Php && $step->phpAfter !== null) {
+                $firstPhpTarget = $step->phpAfter;
+                break;
+            }
+        }
+        $lockCeilingWarning = $project->lockCeilingWarning($firstPhpTarget);
+        if ($lockCeilingWarning !== null) {
+            $warnings[] = $lockCeilingWarning;
         }
 
         $frontEndHops = $this->frontEndHopIds($project, $laravel);

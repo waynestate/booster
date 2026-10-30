@@ -149,6 +149,112 @@ final class ProjectDetectorTest extends TestCase
         self::assertSame('7.4', (new ProjectDetector())->detect($dir)->phpVersion);
     }
 
+    public function test_the_lock_php_range_raises_the_detected_floor(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"php":"^7.3|^8.0"}}');
+        file_put_contents($dir . '/composer.lock', (string) json_encode([
+            'packages' => [
+                ['name' => 'acme/floor-pkg', 'version' => '1.0.0', 'require' => ['php' => '>=8.0']],
+                ['name' => 'acme/ceiling-pkg', 'version' => '1.0.0', 'require' => ['php' => '<8.1']],
+            ],
+            'packages-dev' => [
+                ['name' => 'acme/dev-pkg', 'version' => '1.0.0', 'require' => ['php' => '^8.0']],
+            ],
+        ]));
+
+        $project = (new ProjectDetector())->detect($dir);
+
+        self::assertSame('8.0', $project->phpVersion);
+        self::assertSame('7.3', $project->manifestPhp);
+        self::assertSame('8.0', $project->lockPhpFloor);
+        self::assertSame('8.1', $project->lockPhpCeiling);
+        self::assertSame(
+            'composer.json allows PHP 7.3, but the lock needs PHP 8.0 or newer (acme/floor-pkg requires >=8.0). Planning from PHP 8.0.',
+            $project->lockFloorWarning(),
+        );
+        self::assertSame(['floor' => '8.0', 'ceiling' => '8.1'], $project->toArray()['php_lock_range']);
+    }
+
+    public function test_a_lock_without_php_requirements_changes_nothing(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"php":"^7.3|^8.0"}}');
+        file_put_contents($dir . '/composer.lock', (string) json_encode([
+            'packages' => [['name' => 'acme/plain', 'version' => '1.0.0']],
+            'packages-dev' => [['name' => 'acme/dev-plain', 'version' => '1.0.0', 'require' => []]],
+        ]));
+
+        $project = (new ProjectDetector())->detect($dir);
+
+        self::assertSame('7.3', $project->phpVersion);
+        self::assertNull($project->lockPhpFloor);
+        self::assertNull($project->lockPhpCeiling);
+        self::assertNull($project->lockFloorWarning());
+        self::assertArrayNotHasKey('php_lock_range', $project->toArray());
+    }
+
+    public function test_no_lock_changes_nothing(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"php":"^7.3|^8.0"}}');
+
+        $project = (new ProjectDetector())->detect($dir);
+
+        self::assertSame('7.3', $project->phpVersion);
+        self::assertNull($project->lockPhpFloor);
+        self::assertNull($project->lockPhpCeiling);
+        self::assertNull($project->lockFloorWarning());
+        self::assertArrayNotHasKey('php_lock_range', $project->toArray());
+    }
+
+    public function test_a_broken_lock_changes_nothing(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"php":"^7.3|^8.0"}}');
+        file_put_contents($dir . '/composer.lock', '{broken');
+
+        $project = (new ProjectDetector())->detect($dir);
+
+        self::assertSame('7.3', $project->phpVersion);
+        self::assertNull($project->lockPhpFloor);
+        self::assertNull($project->lockFloorWarning());
+    }
+
+    public function test_a_lower_lock_floor_does_not_move_the_baseline(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"php":"^8.1"}}');
+        file_put_contents($dir . '/composer.lock', (string) json_encode([
+            'packages' => [['name' => 'acme/floor-pkg', 'version' => '1.0.0', 'require' => ['php' => '>=8.0']]],
+        ]));
+
+        $project = (new ProjectDetector())->detect($dir);
+
+        self::assertSame('8.1', $project->phpVersion);
+        self::assertSame('8.0', $project->lockPhpFloor);
+        self::assertNull($project->lockPhpCeiling);
+        self::assertNull($project->lockFloorWarning());
+        self::assertSame(['floor' => '8.0', 'ceiling' => null], $project->toArray()['php_lock_range']);
+    }
+
+    public function test_a_platform_pin_is_reported_as_the_lock_floor(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"php":"^7.3"},"config":{"platform":{"php":"8.0"}}}');
+        file_put_contents($dir . '/composer.lock', (string) json_encode(['packages' => [['name' => 'acme/plain', 'version' => '1.0.0']]]));
+
+        $project = (new ProjectDetector())->detect($dir);
+
+        self::assertSame('8.0', $project->phpVersion);
+        self::assertSame('8.0', $project->lockPhpFloor);
+        self::assertNull($project->lockPhpCeiling);
+        self::assertSame(
+            'composer.json allows PHP 7.3, but the lock needs PHP 8.0 or newer (composer.json pins PHP 8.0 as the platform). Planning from PHP 8.0.',
+            $project->lockFloorWarning(),
+        );
+    }
+
     #[\PHPUnit\Framework\Attributes\DataProvider('laravelConstraints')]
     public function test_a_laravel_constraint_reads_as_the_major_it_floors_at(string $constraint, ?string $expected): void
     {
