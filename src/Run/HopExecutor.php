@@ -225,8 +225,9 @@ final class HopExecutor
      */
     private function runStep(PlanStep $step, string $path, Plan $plan, RunOptions $options, BaselineResult $baseline): StepResult
     {
-        $result = $this->runStepCore($step, $path, $plan, $options, $baseline);
+        // Scan first: the advisory must describe the app as it was before the hop rewrites it.
         $removals = $this->removalsLines($step, $path);
+        $result = $this->runStepCore($step, $path, $plan, $options, $baseline);
         if ($removals === '') {
             return $result;
         }
