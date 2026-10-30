@@ -17,6 +17,12 @@ use Waynestate\Booster\ToolError;
  */
 final class ComposerEditor
 {
+    /** The reason prefix Booster writes into its temporary advisory unblocks. */
+    public const UNBLOCK_REASON_PREFIX = 'Booster temporary unblock';
+
+    /** The prefix older Booster runs wrote; still recognised when reading. */
+    public const LEGACY_UNBLOCK_REASON_PREFIX = 'BOOSTER temporary unblock';
+
     /**
      * @return list<string> human-readable lines about what changed
      */
@@ -91,11 +97,13 @@ final class ComposerEditor
         // branch version instead of failing, so the reason says that.
         $reason = $advisoryIds === []
             ? sprintf(
-                'BOOSTER temporary unblock: Packagist advisories block the tagged releases of %s needed for the upgrade, so the lock fell back to a branch version. Remove this entry once the app is off them.',
+                '%s Packagist advisories block the tagged releases of %s needed for the upgrade, so the lock fell back to a branch version. Remove this entry once the app is off them.',
+                self::UNBLOCK_REASON_PREFIX,
                 $package,
             )
             : sprintf(
-                'BOOSTER temporary unblock: Packagist advisories %s block the tagged releases of %s needed for the upgrade. Remove this entry once the app is off them.',
+                '%s Packagist advisories %s block the tagged releases of %s needed for the upgrade. Remove this entry once the app is off them.',
+                self::UNBLOCK_REASON_PREFIX,
                 implode(', ', $advisoryIds),
                 $package,
             );
@@ -139,6 +147,50 @@ final class ComposerEditor
             $package,
             $constraint,
         )];
+    }
+
+    /**
+     * The packages whose config.policy.advisories.ignore entries carry one of
+     * Booster's temporary-unblock reasons (the current prefix or the legacy
+     * all-caps one). Empty when composer.json has none, is missing, or is not
+     * valid JSON: a manifest problem is the gate's to report, not this read.
+     *
+     * @return list<string>
+     */
+    public function temporaryUnblocks(string $appPath): array
+    {
+        $file = rtrim($appPath, '/\\') . '/composer.json';
+        if (!is_file($file)) {
+            return [];
+        }
+        $raw = file_get_contents($file);
+        $data = $raw === false ? null : json_decode($raw, true);
+        if (!is_array($data)) {
+            return [];
+        }
+        $ignore = $data['config']['policy']['advisories']['ignore'] ?? [];
+        if (!is_array($ignore)) {
+            return [];
+        }
+        $packages = [];
+        foreach ($ignore as $package => $rules) {
+            // A package maps to a list of rule objects; older shapes (a bare
+            // string reason, a single object, a null from a normalised name
+            // list) are handled without complaint.
+            if (!is_array($rules) || $rules === []) {
+                continue;
+            }
+            $list = array_is_list($rules) ? $rules : [$rules];
+            foreach ($list as $rule) {
+                $reason = is_array($rule) ? ($rule['reason'] ?? null) : null;
+                if (is_string($reason) && (str_starts_with($reason, self::UNBLOCK_REASON_PREFIX) || str_starts_with($reason, self::LEGACY_UNBLOCK_REASON_PREFIX))) {
+                    $packages[] = (string) $package;
+                    break;
+                }
+            }
+        }
+
+        return $packages;
     }
 
     /**

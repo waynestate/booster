@@ -410,6 +410,20 @@ final class HopExecutor
                     if ($update !== []) {
                         $messages[] = sprintf('The gate refreshed composer.lock (composer update -W %s).', implode(' ', $update));
                     }
+                    $unblocked = $this->composer->temporaryUnblocks($path);
+                    if ($unblocked !== []) {
+                        // The unblock is temporary by name: the final target
+                        // ships without it, so the last step fails until it is
+                        // out of composer.json. Earlier steps only warn.
+                        $finding = sprintf(
+                            'composer.json still has Booster\'s temporary advisory unblock for %s (config.policy.advisories.ignore).',
+                            implode(', ', $unblocked),
+                        );
+                        if ($step->number === count($plan->steps)) {
+                            return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, $finding . ' Remove it before release; Booster fails the final target while it is there.', ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$notes], false, $prepass?->files() ?? []);
+                        }
+                        $messages[] = $finding;
+                    }
                 } else {
                     $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
                 }
@@ -611,10 +625,9 @@ final class HopExecutor
             $blocked = self::advisoryBlock($outcome->output);
             if ($blocked !== null) {
                 $unblock = [sprintf(
-                    'Composer refused to load the tagged releases of %s (%s): they are affected by security advisories (%s).',
+                    'Composer refused tagged %s %s for known security advisories; Booster added a temporary, scoped unblock (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.',
                     $blocked['package'],
                     $blocked['constraint'],
-                    implode(', ', $blocked['ids']),
                 )];
                 try {
                     $unblock = [...$unblock, ...$this->composer->advisoryUnblock($path, $blocked['package'], $blocked['constraint'], $blocked['ids'])];
@@ -625,14 +638,13 @@ final class HopExecutor
                 // load the blocked releases.
                 $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update);
                 $outcome = TargetImageRunner::gateOutcome($result);
-                $unblock[] = 'The gate was retried with the unblock in place. Remove the entry from composer.json once the app is off the blocked versions; PROCTOR reports it until then.';
             }
         }
         if ($update !== [] && $outcome->phase === GateOutcome::PHASE_TESTS) {
             $dev = self::devFallback($step, $path);
             if ($dev !== null) {
                 $unblock[] = sprintf(
-                    'Composer locked %s to %s although the hop asks for %s: the tagged releases were refused for security advisories.',
+                    'Composer locked %s to %s although the hop asks for %s: the tagged releases were refused for known security advisories; Booster added a temporary, scoped unblock (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.',
                     $dev['package'],
                     $dev['version'],
                     $dev['constraint'],
