@@ -46,7 +46,7 @@
     <a class="masthead__brand" href="#main">
       <img src="brand/booster-avatar-256.png" width="36" height="36" alt="">
       <span class="masthead__name">BOOSTER</span>
-      <span class="masthead__ver">0.1</span>
+      <span class="masthead__ver">1.0</span>
     </a>
     <nav class="masthead__nav" aria-label="On this page">
       <a href="#record">Record</a>
@@ -123,7 +123,7 @@
   <!-- ========================================================= record card -->
   <!-- The magic: pick an app, press Run the plan, and watch the countdown,
        each dose stamped as its gate passes, and the version climb. The data is
-        real Booster 0.1 output for the example apps in examples/. -->
+         real Booster 1.0 output for the example apps in examples/. -->
   <section class="section section--record" id="record" aria-labelledby="record-title">
     <div class="wsu-container">
       <div class="head head--split">
@@ -342,10 +342,10 @@ Php 8.1 is past security support; pick a version the policy still supports.
         <li class="seq">
           <span class="seq__t">T−1</span>
           <h3>The gate</h3>
-          <p>Your tests run inside <code>booster-target:&lt;php&gt;</code>, built from <code>docker/Dockerfile</code> on the PHP the hop moves to. A failure stops the run and leaves the changes for you to read. <code>git checkout .</code> undoes them.</p>
+          <p>Before the first hop your tests run once on the app's current PHP as the baseline; a red one stops the run unless you pass <code>--allow-failing-baseline</code>. After each hop they run inside <code>booster-target:&lt;php&gt;</code>, built from <code>docker/Dockerfile</code> on the PHP the hop moves to, and after the last hop PROCTOR checks the upgraded app against CREED's policy, blocking only on findings the upgrade introduced. If a red baseline names a missing Mix or Vite manifest, build the front-end assets first. A failure stops the run and leaves the changes for you to read. <code>git checkout .</code> undoes them.</p>
         </li>
       </ol>
-      <p class="sequence__after">Not every hop is Rector. <code>node-pin-24</code> and <code>mix-to-vite</code> edit <code>package.json</code> and the build config. <code>vue-2-to-3</code> is a playbook: Rector doesn't read Vue, so Booster lists the steps and the official guide, and a person does the work. The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.</p>
+      <p class="sequence__after">Not every hop is Rector. <code>node-pin-24</code> pins Node 26 in <code>package.json</code> and writes <code>.nvmrc</code>; <code>mix-to-vite</code> converts a simple <code>webpack.mix.js</code> and moves the build to Vite. The Vue 2 to 3 move is staged: <code>vue-26-to-27</code>, <code>vue-27-to-compat</code> and <code>vue-compat-codemod</code>, with the <code>vue-2-to-3</code> playbook standing in for all three. Rector doesn't read Vue, so a person works those steps. The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.</p>
     </div>
   </section>
 
@@ -357,53 +357,75 @@ Php 8.1 is past security support; pick a version the policy still supports.
         <h2 id="commands-title">The whole kit.</h2>
         <div class="cmds" role="tablist" aria-label="Commands">
           <button class="cmd" role="tab" id="tab-detect" aria-controls="out-detect" aria-selected="true" tabindex="0"><span class="cmd__name">detect</span><span class="cmd__does">Which of the five stack shapes, and which versions</span></button>
-          <button class="cmd" role="tab" id="tab-plan" aria-controls="out-plan" aria-selected="false" tabindex="-1"><span class="cmd__name">plan</span><span class="cmd__does">The ordered hops and the warnings. Changes nothing.</span></button>
+          <button class="cmd" role="tab" id="tab-plan" aria-controls="out-plan" aria-selected="false" tabindex="-1"><span class="cmd__name">plan</span><span class="cmd__does">The ordered hops, the warnings and the scans. Changes nothing.</span></button>
           <button class="cmd" role="tab" id="tab-run" aria-controls="out-run" aria-selected="false" tabindex="-1"><span class="cmd__name">run</span><span class="cmd__does">Runs the plan; <code>--dry-run</code> previews every hop</span></button>
           <button class="cmd" role="tab" id="tab-hops" aria-controls="out-hops" aria-selected="false" tabindex="-1"><span class="cmd__name">hops</span><span class="cmd__does">Every hop Booster knows</span></button>
           <button class="cmd" role="tab" id="tab-init" aria-controls="out-init" aria-selected="false" tabindex="-1"><span class="cmd__name">init</span><span class="cmd__does">Writes the coding-tab playbooks to <code>.agents/skills</code></span></button>
         </div>
-        <p class="commands__exits">There's also <code>scan</code>, which reports what will break on a given PHP and always exits 0. Exit codes: <strong>0</strong> pass · <strong>1</strong> the baseline failed, or a hop was capped, errored or failed its gate · <strong>2</strong> bad usage or a target the policy does not support.</p>
+        <p class="commands__exits">There's also <code>scan</code>, which reports what will break on a given PHP (<code>--removals</code> for removed functions, <code>--phpstan</code> for static analysis) and always exits 0. Exit codes: <strong>0</strong> pass · <strong>1</strong> the baseline failed, or a hop was capped, errored or failed its gate · <strong>2</strong> bad usage or a target the policy does not support.</p>
       </div>
 
       <!-- A greenbar printout, tractor-feed holes and all. Output is real
-            Booster 0.1 output against the bundled example apps. -->
+            Booster 1.0 output against the bundled example apps. -->
       <div class="printout">
         <span class="printout__feed printout__feed--l" aria-hidden="true"></span>
         <span class="printout__feed printout__feed--r" aria-hidden="true"></span>
         <div class="printout__paper">
 <pre class="out" role="tabpanel" id="out-detect" aria-labelledby="tab-detect" tabindex="0"><span class="out__cmd">$ bin/booster detect --path=examples/vue-spa</span>
-path           examples/vue-spa
+ path           examples/vue-spa
 app_type       raw-php-vue
 composer_json  yes
 php            8.0
 laravel        unknown
+phpunit        unknown
 vue            2
-wayne_cas      no</pre>
-<pre class="out" role="tabpanel" id="out-plan" aria-labelledby="tab-plan" tabindex="0" hidden><span class="out__cmd">$ bin/booster plan --path=examples/raw-php</span>
-Booster plan for examples/raw-php
+node           unknown
+mix_file       no
+wayne_cas      no
+boost          no</pre>
+<pre class="out" role="tabpanel" id="out-plan" aria-labelledby="tab-plan" tabindex="0" hidden><span class="out__cmd">$ bin/booster plan --path=examples/raw-php --today=2026-10-29</span>
+BOOSTER plan for examples/raw-php
   app type: raw-php
   PHP: 7.4 -> 8.5
-  policy: bundled snapshot (today 2026-10-28)
+  policy: waynestate/creed 0.1.3 (today 2026-10-29)
 
 1. php-74-to-80  [target-image-tests]
    Move PHP 7.4 code to PHP 8.0.
    Give this hop the most review time.
+   Removed between PHP 7.4 and PHP 8.0: none found.
 2. php-80-to-81  [target-image-tests]
    Move PHP 8.0 code to PHP 8.1.
+   Removed between PHP 8.0 and PHP 8.1: none found.
 3. php-81-to-82  [target-image-tests]
    Move PHP 8.1 code to PHP 8.2.
+   Removed between PHP 8.1 and PHP 8.2: none found.
 4. php-82-to-83  [target-image-tests]
    Move PHP 8.2 code to PHP 8.3.
+   Removed between PHP 8.2 and PHP 8.3: none found.
 5. php-83-to-84  [target-image-tests]
    Move PHP 8.3 code to PHP 8.4.
+   Removed between PHP 8.3 and PHP 8.4: none found.
 6. php-84-to-85  [target-image-tests]
-   Move PHP 8.4 code to PHP 8.5.</pre>
+   Move PHP 8.4 code to PHP 8.5.
+   Removed between PHP 8.4 and PHP 8.5: none found.
+
+Will break on PHP 8.0: no findings.
+
+PHPStan on PHP 8.5: 3 findings.
+   src/Legacy.php:20 [missingType.parameter] Method Example\Legacy::className() has parameter $object with no type specified.
+   src/Legacy.php:22 [return.type] Method Example\Legacy::className() should return string but returns class-string|false.
+   src/Legacy.php:25 [parameter.implicitlyNullable] Deprecated in PHP 8.4: Parameter #1 $label (string) is implicitly nullable via default value null.</pre>
 <pre class="out" role="tabpanel" id="out-run" aria-labelledby="tab-run" tabindex="0" hidden><span class="out__cmd">$ bin/booster run --path=examples/raw-php --to-php=8.2 --dry-run</span>
-Booster dry run (nothing was changed)
+BOOSTER dry run (nothing was changed)
+
+Baseline: SKIPPED (no gate in this run).
 
 1. php-74-to-80: PREVIEWED (1 files)
-   Dry run: nothing was changed.
+   Largest risk hop: loose comparison of numbers and strings changed, many warnings became thrown errors, and arithmetic on arrays throws.
+   Write or extend tests before applying this hop; only tests and review find behaviour changes here.
    --- src/Legacy.php
+   --- Original
+   +++ New
 <span class="out__del">   -    public function __construct(string $name)</span>
 <span class="out__add">   +    public function __construct(private string $name)</span>
 <span class="out__del">   -        return strpos($text, 'admin') !== false;</span>
@@ -411,22 +433,38 @@ Booster dry run (nothing was changed)
 <span class="out__del">   -        return get_class($object);</span>
 <span class="out__add">   +        return $object::class;</span>
 2. php-80-to-81: PREVIEWED (0 files)
+   Dry run: nothing was changed.
+   mysqli now throws on errors by default; PDO on MySQL returns native int and float types; htmlspecialchars() now escapes single quotes.
+   Passing null to a non-nullable built-in parameter is deprecated: check the log after the run.
 3. php-81-to-82: PREVIEWED (0 files)
+   Dry run: nothing was changed.
 
-RESULT: PASS</pre>
+Unique files across hops: 1. Later hops were previewed against the original tree, so the same file can appear in several hops.
+
+RESULT: PASS
+Dry run: these changes were previewed, none were applied.</pre>
 <pre class="out" role="tabpanel" id="out-hops" aria-labelledby="tab-hops" tabindex="0" hidden><span class="out__cmd">$ bin/booster hops</span>
+php-55-to-56       Move PHP 5.5 code to PHP 5.6.
 php-56-to-70       Move PHP 5.6 code to PHP 7.0.
 php-70-to-71       Move PHP 7.0 code to PHP 7.1.
   …                one PHP minor at a time …
 php-84-to-85       Move PHP 8.4 code to PHP 8.5.
-laravel-8-to-9     Move a Laravel 8 app to Laravel 9.
+laravel-5.8-to-6   Move a Laravel 5.8 app to Laravel 6.
   …                one Laravel major at a time …
 laravel-12-to-13   Move a Laravel 12 app to Laravel 13.
-cas-to-sesame      Swap the wayne-cas package for SESAME
-                   using its compatibility classes (stub recipe).
-vue-2-to-3         Move a Vue 2 front end to Vue 3. [playbook]</pre>
+phpunit-9-to-10    Move PHPUnit 9 tests to PHPUnit 10.
+  …                one PHPUnit major at a time …
+phpunit-12-to-13   Move PHPUnit 12 tests to PHPUnit 13.
+cas-to-sesame      Swap the wayne-cas package for SESAME using its compatibility classes.
+node-pin-24        Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
+mix-to-vite        Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only).
+tailwind-3-to-4    Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool.
+vue-26-to-27       Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API.
+vue-27-to-compat   Move a Vue 2.7 front end to Vue 3 through the @vue/compat build.
+vue-compat-codemod Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists.
+vue-2-to-3         Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue). [playbook]</pre>
 <pre class="out" role="tabpanel" id="out-init" aria-labelledby="tab-init" tabindex="0" hidden><span class="out__cmd">$ bin/booster init --path=../my-app</span>
-Wrote 19 playbooks, 19 changed.
+Wrote 33 playbooks, 33 changed.
 
 <span class="out__cmd">$ bin/booster init --path=../my-app --check</span>
 <span class="out__note"># exits 1 when a playbook is stale, so CI notices</span></pre>
@@ -493,7 +531,11 @@ docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-
           </div>
           <div class="soon">
             <p class="soon__label"><span class="chip chip--soon">On Packagist</span></p>
-            <p>It's <code>waynestate/booster</code> on Packagist. Give it its own folder, not your app's <code>vendor/</code>, because it needs PHP 8.3 even when your app doesn't. Clone it as above, or run <code>composer create-project waynestate/booster booster ^0.1</code>.</p>
+            <p>It's <code>waynestate/booster</code> on Packagist. Give it its own folder, not your app's <code>vendor/</code>, because it needs PHP 8.3 even when your app doesn't. Clone it as above, or run <code>composer create-project waynestate/booster booster ^1.0</code>.</p>
+          </div>
+          <div class="soon">
+            <p class="soon__label"><span class="chip chip--soon">Single file</span></p>
+            <p>Every version tag publishes <code>booster.phar</code> as a release asset on GitLab and GitHub. Run it with <code>php booster.phar</code>; every command works from the phar. Preflight and apps without Composer access use this form.</p>
           </div>
         </div>
       </div>
