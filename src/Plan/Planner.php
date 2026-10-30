@@ -29,6 +29,7 @@ final class Planner
     public function __construct(
         private readonly Policy $policy,
         private readonly HopRegistry $registry,
+        private readonly ?PackageFetcher $packages = null,
     ) {}
 
     public function plan(Project $project, PlanOptions $options, DateTimeImmutable $today): Plan
@@ -267,7 +268,14 @@ final class Planner
             $warnings[] = 'Nothing to do: the app is already at the target.';
         }
 
-        return new Plan($project, $today->format('Y-m-d'), $this->policy->origin(), $toPhp, $toLaravel, $toPhpunit, $steps, $warnings);
+        $packageChecks = [];
+        if ($this->packages !== null && !$options->noPackageCheck) {
+            $report = (new PackageCompat($this->packages, $this->registry))->check($project, $steps);
+            $warnings = [...$warnings, ...$report->warnings()];
+            $packageChecks = $report->checks;
+        }
+
+        return new Plan($project, $today->format('Y-m-d'), $this->policy->origin(), $toPhp, $toLaravel, $toPhpunit, $steps, $warnings, $packageChecks);
     }
 
     /**

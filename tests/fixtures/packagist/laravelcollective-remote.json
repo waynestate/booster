@@ -1,0 +1,152 @@
+{
+    "minified": "composer/2.0",
+    "packages": {
+        "laravelcollective/remote": [
+            {
+                "name": "laravelcollective/remote",
+                "description": "Remote SSH access for The Laravel Framework.",
+                "keywords": [],
+                "homepage": "http://laravelcollective.com",
+                "version": "v6.2.1",
+                "version_normalized": "6.2.1.0",
+                "license": [
+                    "MIT"
+                ],
+                "authors": [
+                    {
+                        "name": "Taylor Otwell",
+                        "email": "taylorotwell@gmail.com"
+                    },
+                    {
+                        "name": "Tom Shafer",
+                        "email": "tj@tjshafer.com"
+                    }
+                ],
+                "source": {
+                    "url": "https://github.com/LaravelCollective/remote.git",
+                    "type": "git",
+                    "reference": "35ce8e947ef7952eac7ac96cce2b71f7de7c8862"
+                },
+                "dist": {
+                    "url": "https://api.github.com/repos/LaravelCollective/remote/zipball/35ce8e947ef7952eac7ac96cce2b71f7de7c8862",
+                    "type": "zip",
+                    "shasum": "",
+                    "reference": "35ce8e947ef7952eac7ac96cce2b71f7de7c8862"
+                },
+                "type": "library",
+                "support": {
+                    "issues": "https://github.com/LaravelCollective/remote/issues",
+                    "source": "https://github.com/LaravelCollective/remote"
+                },
+                "funding": [],
+                "time": "2023-04-25T02:34:56+00:00",
+                "published-time": "2023-04-25T02:37:00+00:00",
+                "autoload": {
+                    "psr-4": {
+                        "Collective\\Remote\\": "src/"
+                    }
+                },
+                "extra": {
+                    "laravel": {
+                        "aliases": {
+                            "SSH": "Collective\\Remote\\RemoteFacade"
+                        },
+                        "providers": [
+                            "Collective\\Remote\\RemoteServiceProvider"
+                        ]
+                    },
+                    "branch-alias": {
+                        "dev-master": "6.x-dev"
+                    }
+                },
+                "require": {
+                    "php": ">=7.2",
+                    "illuminate/support": "^6.0|^7.0|^8.0",
+                    "illuminate/filesystem": "^6.0|^7.0|^8.0",
+                    "phpseclib/phpseclib": "^2.0"
+                },
+                "require-dev": {
+                    "illuminate/console": "^6.0|^7.0|^8.0",
+                    "mockery/mockery": "~1.0",
+                    "phpunit/phpunit": "~5.5"
+                },
+                "abandoned": "spatie/ssh"
+            },
+            {
+                "version": "v6.2.0",
+                "version_normalized": "6.2.0.0",
+                "source": {
+                    "url": "https://github.com/LaravelCollective/remote.git",
+                    "type": "git",
+                    "reference": "f4b200f24f76307b09d7a5af230ea7119cbf9811"
+                },
+                "dist": {
+                    "url": "https://api.github.com/repos/LaravelCollective/remote/zipball/f4b200f24f76307b09d7a5af230ea7119cbf9811",
+                    "type": "zip",
+                    "shasum": "",
+                    "reference": "f4b200f24f76307b09d7a5af230ea7119cbf9811"
+                },
+                "time": "2020-09-07T20:21:24+00:00",
+                "published-time": "2020-09-15T08:47:17+00:00"
+            },
+            {
+                "version": "v6.1.1",
+                "version_normalized": "6.1.1.0",
+                "source": {
+                    "url": "https://github.com/LaravelCollective/remote.git",
+                    "type": "git",
+                    "reference": "5b2e49f4e80343b4c43d39124e7cee531329c9fb"
+                },
+                "dist": {
+                    "url": "https://api.github.com/repos/LaravelCollective/remote/zipball/5b2e49f4e80343b4c43d39124e7cee531329c9fb",
+                    "type": "zip",
+                    "shasum": "",
+                    "reference": "5b2e49f4e80343b4c43d39124e7cee531329c9fb"
+                },
+                "time": "2020-05-17T19:49:09+00:00",
+                "published-time": "2020-05-17T19:54:50+00:00",
+                "extra": {
+                    "laravel": {
+                        "aliases": {
+                            "SSH": "Collective\\Remote\\RemoteFacade"
+                        },
+                        "providers": [
+                            "Collective\\Remote\\RemoteServiceProvider"
+                        ]
+                    },
+                    "branch-alias": {
+                        "dev-master": "6.0-dev"
+                    }
+                },
+                "require": {
+                    "php": ">=7.2",
+                    "illuminate/support": "^6.0|^7.0",
+                    "illuminate/filesystem": "^6.0|^7.0",
+                    "phpseclib/phpseclib": "^2.0"
+                },
+                "require-dev": {
+                    "illuminate/console": "^6.0|^7.0",
+                    "mockery/mockery": "~1.0",
+                    "phpunit/phpunit": "~5.5"
+                }
+            },
+            {
+                "version": "v6.1.0",
+                "version_normalized": "6.1.0.0",
+                "source": {
+                    "url": "https://github.com/LaravelCollective/remote.git",
+                    "type": "git",
+                    "reference": "8402c5b9fbec1e05e930b12c27aec52674cbc483"
+                },
+                "dist": {
+                    "url": "https://api.github.com/repos/LaravelCollective/remote/zipball/8402c5b9fbec1e05e930b12c27aec52674cbc483",
+                    "type": "zip",
+                    "shasum": "",
+                    "reference": "8402c5b9fbec1e05e930b12c27aec52674cbc483"
+                },
+                "time": "2020-03-02T17:00:38+00:00",
+                "published-time": "2020-03-02T17:02:15+00:00"
+            }
+        ]
+    }
+}

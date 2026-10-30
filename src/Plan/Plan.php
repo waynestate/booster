@@ -13,8 +13,9 @@ use Waynestate\Booster\Project\Project;
 final readonly class Plan
 {
     /**
-     * @param list<PlanStep> $steps
-     * @param list<string>   $warnings
+     * @param list<PlanStep>     $steps
+     * @param list<string>       $warnings
+     * @param list<PackageCheck> $packageChecks
      */
     public function __construct(
         public Project $project,
@@ -25,6 +26,7 @@ final readonly class Plan
         public ?string $targetPhpunit,
         public array $steps,
         public array $warnings,
+        public array $packageChecks = [],
     ) {}
 
     /**
@@ -41,6 +43,7 @@ final readonly class Plan
             'target_phpunit' => $this->targetPhpunit,
             'steps' => array_map(static fn(PlanStep $s): array => $s->toArray(), $this->steps),
             'warnings' => $this->warnings,
+            'package_checks' => array_map(static fn(PackageCheck $c): array => $c->toArray(), $this->packageChecks),
         ];
     }
 }
