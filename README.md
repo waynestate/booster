@@ -257,11 +257,11 @@ Options for `run`:
 | `--allow-dirty` | Run even when the working copy has uncommitted changes |
 | `--test-command` | What runs the app's tests in the image (default `composer test`, else `vendor/bin/phpunit`) |
 | `--proctor-command` | An extra command run in the image after the tests, for example a PROCTOR check |
-| `--proctor-advisory` | Report the PROCTOR result but do not fail the run on it |
+| `--proctor-advisory` | Report the PROCTOR result but do not fail the run on it. Applied automatically when the run stops before the final target (`--until`, `--only`, or a target past security support) |
 
 Exit codes: `0` pass, `1` the baseline failed, a hop was capped, errored or failed its gate, or the PROCTOR check
 found new findings, `2` bad usage (bad option, unreadable policy, broken `composer.json`, a target the policy does
-not support).
+not know).
 
 ### The PHPCompatibility scan
 
@@ -515,8 +515,9 @@ Vite or PostCSS plugin and removes `autoprefixer` and `postcss-import`); and the
 `vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod`, with the `vue-2-to-3` playbook standing in for all three.
 `booster hops` prints them all.
 
-Booster plans only what the policy supports as a target. Moving to PHP 8.1 is refused because 8.1 is past security
-support; passing through it on the way to a newer version is fine.
+Booster plans any target the policy knows. A target past security support is allowed as a stop on the way up, with a
+plan warning that names the date its security support ended. A version the policy does not list at all is still
+refused by name.
 
 ## Configuration
 

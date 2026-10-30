@@ -61,12 +61,16 @@ The overlap
 
 Booster mixes the PHP and Laravel hops so the app is on a supported pair after every hop. Laravel 10 runs on PHP 8.1 to 8.3, 11 on 8.2 to 8.4, 12 on 8.2 to 8.5, 13 on 8.3 or newer. If you ask for a pair that can't exist, Booster refuses before anything runs.
 
-The target also has to be one CREED's policy still supports. A plan can pass through PHP 8.1, but it can't stop there:
+The target also has to be one CREED's policy knows. A plan can pass through PHP 8.1 and even stop there, with a warning that says so:
 
 ```
 $ bin/booster plan --path=examples/raw-php --to-php=8.1
-PHP 8.1 is past security support; pick a version the policy still supports.
-exit 2
+BOOSTER plan for examples/raw-php
+  app type: raw-php
+  PHP: 7.4 -> 8.1
+...
+Warning: PHP 8.1 is past security support since 2025-12-31. Use it only as a stop on the way up.
+exit 0
 ```
 
 supported pair not a pair Laravel supports the Laravel and PHP hops for Laravel 10 on PHP 8.2
@@ -96,7 +100,7 @@ The commands
 
 ## The whole kit.
 
-There's also `scan`, which reports what will break on a given PHP (`--removals` for removed functions, `--phpstan` for static analysis) and always exits 0. Exit codes: **0** pass · **1** the baseline failed, or a hop was capped, errored or failed its gate · **2** bad usage or a target the policy does not support.
+There's also `scan`, which reports what will break on a given PHP (`--removals` for removed functions, `--phpstan` for static analysis) and always exits 0. Exit codes: **0** pass · **1** the baseline failed, or a hop was capped, errored or failed its gate · **2** bad usage or a target the policy does not know.
 
 **detectWhich of the five stack shapes, and which versions**
 
