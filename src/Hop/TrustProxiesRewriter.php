@@ -9,6 +9,7 @@ namespace Waynestate\Booster\Hop;
  * fideloper/proxy. This moves the stock middleware class from the Fideloper
  * package to the framework parent and replaces the removed
  * HEADER_X_FORWARDED_ALL constant with the individual header constants. A file
+ * the app already moved to the framework parent is a quiet no-op, and a file
  * the app customised gets left alone with a manual note instead, because its
  * proxy list may carry addresses no rule should guess at.
  */
@@ -38,6 +39,12 @@ final class TrustProxiesRewriter
         $hasParent = str_contains($raw, self::OLD_PARENT);
         $hasHeaders = str_contains($raw, self::OLD_HEADERS);
         if (!$hasParent && !$hasHeaders) {
+            // Nothing to rewrite. An app that already moved to the framework
+            // parent is done, so this is a silent no-op; any other customised
+            // file gets a manual note instead.
+            if (str_contains($raw, self::NEW_PARENT)) {
+                return new TrustProxiesResult([], [], []);
+            }
             return new TrustProxiesResult([], [], [sprintf(
                 '%s is not the stock Laravel 8 middleware, so Booster left it alone. Point it at the Illuminate\\Http\\Middleware\\TrustProxies parent and replace %s with the individual HEADER_X_FORWARDED_* constants by hand.',
                 self::FILE,

@@ -53,6 +53,23 @@ final class TrustProxiesRewriterTest extends TestCase
     }
     PHP;
 
+    /** A file the app already moved to the framework parent. */
+    private const MIGRATED = <<<'PHP'
+    <?php
+
+    namespace App\Http\Middleware;
+
+    use Illuminate\Http\Middleware\TrustProxies as Middleware;
+    use Illuminate\Http\Request;
+
+    class TrustProxies extends Middleware
+    {
+        protected $proxies;
+
+        protected $headers = Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_HOST | Request::HEADER_X_FORWARDED_PORT | Request::HEADER_X_FORWARDED_PROTO | Request::HEADER_X_FORWARDED_AWS_ELB;
+    }
+    PHP;
+
     private function appWith(?string $middleware): string
     {
         $dir = $this->tempDir();
@@ -103,6 +120,19 @@ final class TrustProxiesRewriterTest extends TestCase
         self::assertCount(1, $result->manual);
         self::assertStringContainsString('app/Http/Middleware/TrustProxies.php is not the stock Laravel 8 middleware, so Booster left it alone.', $result->manual[0]);
         self::assertStringContainsString('Request::HEADER_X_FORWARDED_ALL', $result->manual[0]);
+    }
+
+    public function test_an_already_migrated_middleware_is_a_silent_no_op(): void
+    {
+        $dir = $this->appWith(self::MIGRATED);
+        $result = (new TrustProxiesRewriter())->rewrite($dir, false);
+        $content = (string) file_get_contents($dir . '/app/Http/Middleware/TrustProxies.php');
+
+        self::assertSame(self::MIGRATED, $content);
+        self::assertSame([], $result->changes);
+        self::assertSame([], $result->files);
+        self::assertSame([], $result->manual);
+        self::assertSame(0, $result->changedCount());
     }
 
     public function test_a_missing_middleware_changes_nothing_and_notes_nothing(): void
