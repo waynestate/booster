@@ -41,5 +41,7 @@ Playbooks:
 - `booster-cas-to-sesame`: Swap the wayne-cas package for SESAME using its compatibility classes.
 - `booster-node-pin-24`: Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
 - `booster-mix-to-vite`: Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only).
+- `booster-vue-26-to-27`: Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API.
+- `booster-vue-27-to-compat`: Move a Vue 2.7 front end to Vue 3 through the @vue/compat build.
 - `booster-vue-2-to-3`: Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue).
 

@@ -412,9 +412,15 @@ final class HopExecutorTest extends TestCase
 
     public function test_manual_hops_are_reported_and_never_fail_the_run(): void
     {
-        $report = $this->execute($this->fake(), new RunOptions(skipGate: true), 'vue-spa', new PlanOptions(fromPhp: '8.3', toPhp: '8.3'));
+        // The staged Vue hops are automated Node hops, so the manual playbook is built by hand.
+        $dir = $this->copyExample('vue-spa');
+        $fake = $this->fake();
+        $step = new PlanStep(1, (new HopRegistry())->get(HopRegistry::VUE_2_TO_3_ID), '8.3', '8.3', null, null, null, null, [Planner::GATE_MANUAL]);
+        $plan = new Plan((new ProjectDetector())->detect($dir), '2026-10-28', 'test', '8.3', null, null, [$step], []);
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions(skipGate: true));
 
-        self::assertSame('manual', $this->statuses($report)[count($report->results) - 1]);
+        self::assertSame([StepResult::MANUAL], $this->statuses($report));
         self::assertFalse($report->failed());
     }
 
@@ -427,13 +433,34 @@ final class HopExecutorTest extends TestCase
         $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake, new NodeRunner($fake)))
             ->execute($plan, new RunOptions(skipGate: true));
 
-        self::assertSame(['applied', 'manual'], $this->statuses($report));
+        self::assertSame(['applied', 'applied'], $this->statuses($report));
         $target = (new HopRegistry())->nodePinTarget();
         $package = json_decode((string) file_get_contents($dir . '/package.json'), true);
         self::assertSame('>=' . $target, $package['engines']['node']);
         self::assertSame('example-vue-spa', $package['name']);
         self::assertSame($target . "\n", (string) file_get_contents($dir . '/.nvmrc'));
         self::assertStringContainsString('engines.node to >=' . $target, implode(' ', $report->results[0]->messages));
+    }
+
+    public function test_the_staged_vue_hops_apply_in_order(): void
+    {
+        $dir = $this->copyExample('vue-spa');
+        $registry = new HopRegistry();
+        $plan = (new Planner($this->policy(), $registry))->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3'), $this->today());
+        $fake = $this->fake();
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake, new NodeRunner($fake)))
+            ->execute($plan, new RunOptions(skipGate: true));
+
+        self::assertSame(['applied', 'applied'], $this->statuses($report));
+        self::assertSame([HopRegistry::NODE_PIN_ID, HopRegistry::VUE_27_TO_COMPAT_ID], array_map(static fn(StepResult $r): string => $r->hopId, $report->results));
+        $package = json_decode((string) file_get_contents($dir . '/package.json'), true);
+        self::assertSame($registry->vueCompatVersion(), $package['dependencies']['vue']);
+        self::assertSame($registry->vueCompatVersion(), $package['dependencies']['@vue/compat']);
+        self::assertSame($registry->vueCompatVersion(), $package['devDependencies']['@vue/compiler-sfc']);
+        // vue-loader is not listed in the example, so the set-if-present value must not add it.
+        self::assertArrayNotHasKey('vue-loader', $package['devDependencies']);
+        self::assertArrayNotHasKey('vue-template-compiler', $package['dependencies']);
+        self::assertSame($registry->nodePinTarget() . "\n", (string) file_get_contents($dir . '/.nvmrc'));
     }
 
     public function test_a_node_hop_dry_run_changes_nothing(): void
@@ -446,7 +473,7 @@ final class HopExecutorTest extends TestCase
         $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake, new NodeRunner($fake)))
             ->execute($plan, new RunOptions(dryRun: true));
 
-        self::assertSame(['previewed', 'manual'], $this->statuses($report));
+        self::assertSame(['previewed', 'previewed'], $this->statuses($report));
         self::assertSame($before, file_get_contents($dir . '/package.json'));
         self::assertFileDoesNotExist($dir . '/.nvmrc');
         $target = (new HopRegistry())->nodePinTarget();

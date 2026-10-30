@@ -414,19 +414,21 @@ final class CliTest extends TestCase
         self::assertStringContainsString('php-74-to-80', $out);
         self::assertStringContainsString('node-pin-24', $out);
         self::assertStringContainsString('vue-2-to-3', $out);
+        self::assertStringContainsString('vue-26-to-27', $out);
+        self::assertStringContainsString('vue-27-to-compat', $out);
         self::assertStringContainsString('[playbook]', $out);
 
         [, $json] = $this->booster(['command' => 'hops', '--format' => 'json']);
         $hops = json_decode($json, true)['hops'];
-        self::assertCount(28, $hops);
-        $pin = null;
+        self::assertCount(30, $hops);
+        $byId = [];
         foreach ($hops as $hop) {
-            if ($hop['id'] === 'node-pin-24') {
-                $pin = $hop;
-            }
+            $byId[$hop['id']] = $hop;
         }
-        self::assertNotNull($pin);
-        self::assertFalse($pin['manual']);
+        self::assertFalse($byId['node-pin-24']['manual']);
+        self::assertFalse($byId['vue-27-to-compat']['manual']);
+        self::assertTrue($byId['vue-2-to-3']['manual']);
+        self::assertSame(['vue-26-to-27', 'vue-27-to-compat'], $byId['vue-2-to-3']['alias_of']);
     }
 
     public function test_detect_names_the_permutation(): void
