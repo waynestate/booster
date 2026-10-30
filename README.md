@@ -214,6 +214,7 @@ Options shared by `plan` and `run`:
 | `--to-php`, `--to-laravel`, `--to-phpunit` | The target. Default: the newest version the policy supports today (PHPUnit: the newest that runs on the target PHP) |
 | `--sesame` | Include the `wayne-cas` to SESAME swap |
 | `--skip` | A hop id to leave out (repeat it) |
+| `--with-node` | include the Node front-end hops (Node pin, Mix to Vite, Tailwind, Vue) even when you passed a target version. Without it, any of `--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php` or `--from-laravel` leaves those hops out, and the plan prints: "Node front-end hops were left out because you passed a target version: <hop ids>. Add --with-node to include them." |
 
 Options for `plan`:
 
@@ -362,7 +363,7 @@ of the front-end hops); `mix-to-vite` (planned when the app has a `webpack.mix.j
 newer, after `node-pin-24`: writes `vite.config.js`, swaps `laravel-mix` for `vite` and `laravel-vite-plugin` in
 `package.json`, renames `MIX_` keys to `VITE_` in `.env.example`, rewrites Blade `mix()` script and link tags into one
 `@vite([...])` line per layout when every referenced asset maps to a Mix entry, and deletes `webpack.mix.js`; the
-simple shape only: `mix.js`, `.vue()`, `.sass()`, `.postCss()` and `.version()`, anything else is refused by name, a
+simple shape only: `mix.js`, `.vue()`, `.sass()`, `.postCss()`, `.version()` and `if (mix.inProduction()) { mix.version(); }` (dropped with a note, since Vite hashes production assets), anything else is refused by name, a
 Vue 2 front end must take `vue-2-to-3` first, and `withoutMix()` calls are listed for a manual rename to
 `withoutVite()`); `tailwind-3-to-4` (planned when `package.json` carries `tailwindcss` below 4, after `node-pin-24`
 and `mix-to-vite`: runs the official `@tailwindcss/upgrade` tool, pins `tailwindcss` to `^4.1`, adds the matching
