@@ -30,7 +30,10 @@ final class HopRegistry
     /** The staged hop that moves a Vue 2.7 front end onto Vue 3 through @vue/compat. */
     public const VUE_27_TO_COMPAT_ID = 'vue-27-to-compat';
 
-    /** The manual playbook that stands in for the two staged Vue hops. */
+    /** The staged hop that runs the vue-upgrade-tool codemod over a compat-mode front end. */
+    public const VUE_COMPAT_CODEMOD_ID = 'vue-compat-codemod';
+
+    /** The manual playbook that stands in for the three staged Vue hops. */
     public const VUE_2_TO_3_ID = 'vue-2-to-3';
 
     /** The lowest Laravel major whose upgrade guide ships Vite as the front-end tool. */
@@ -62,6 +65,8 @@ final class HopRegistry
     private readonly string $vueCompatVersion;
 
     private readonly string $vueLoaderCompatVersion;
+
+    private readonly string $vueUpgradeToolVersion;
 
     /** @var array<string, string> */
     private readonly array $phpunitPhp;
@@ -96,6 +101,7 @@ final class HopRegistry
         $this->vue27Version = self::scalar($data, 'vue_27');
         $this->vueCompatVersion = self::scalar($data, 'vue_compat');
         $this->vueLoaderCompatVersion = self::scalar($data, 'vue_loader_compat');
+        $this->vueUpgradeToolVersion = self::scalar($data, 'vue_upgrade_tool_version');
         $this->phpunitPhp = self::stringTable($data, 'phpunit_php');
         $this->laravelPhpunit = self::stringTable($data, 'laravel_phpunit');
         $this->laravelPhp = self::rangeTable($data, 'laravel_php');
@@ -208,6 +214,11 @@ final class HopRegistry
     public function vueLoaderCompatVersion(): string
     {
         return $this->vueLoaderCompatVersion;
+    }
+
+    public function vueUpgradeToolVersion(): string
+    {
+        return $this->vueUpgradeToolVersion;
     }
 
     /**
@@ -664,9 +675,10 @@ final class HopRegistry
 
     /**
      * The Vue 2 to 3 hops in run order: the 2.6 to 2.7 step, the compat build
-     * that lands on Vue 3, and the manual playbook that stands in for both.
-     * The planner picks the steps an app still needs; the playbook stays so a
-     * person can follow the whole move by hand.
+     * that lands on Vue 3, the codemod that rewrites what it can, and the
+     * manual playbook that stands in for all of them. The planner picks the
+     * steps an app still needs; the playbook stays so a person can follow the
+     * whole move by hand.
      *
      * @return list<Hop>
      */
@@ -675,6 +687,7 @@ final class HopRegistry
         return [
             $this->vue26To27Hop(),
             $this->vue27ToCompatHop(),
+            $this->vueCompatCodemodHop(),
             $this->vue2To3Hop(),
         ];
     }
@@ -725,6 +738,30 @@ final class HopRegistry
         );
     }
 
+    /**
+     * The codemod hop. It runs the lightly maintained vue-upgrade-tool over
+     * the app's front end in the Node container and keeps every manual item
+     * the tool lists in the hop result. It expects @vue/compat in
+     * package.json, so it lands after the compat hop and before the playbook.
+     */
+    private function vueCompatCodemodHop(): Hop
+    {
+        return new Hop(
+            id: self::VUE_COMPAT_CODEMOD_ID,
+            kind: HopKind::Node,
+            from: '3-compat',
+            to: '3',
+            summary: 'Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists.',
+            buildGate: true,
+            notes: [
+                'vue-upgrade-tool is lightly maintained; review every change it makes before you trust the diff.',
+                'The tool lists the items it cannot fix; Booster keeps them in the hop result, so work through that list before you switch @vue/compat MODE to 3.',
+                'The codemod needs @vue/compat in package.json, which the vue-27-to-compat hop installs; run that hop first.',
+            ],
+            links: ['https://github.com/vuejs/vue-upgrade'],
+        );
+    }
+
     private function vue2To3Hop(): Hop
     {
         return new Hop(
@@ -733,10 +770,10 @@ final class HopRegistry
             from: '2',
             to: '3',
             summary: 'Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue).',
-            aliasOf: [self::VUE_26_TO_27_ID, self::VUE_27_TO_COMPAT_ID],
+            aliasOf: [self::VUE_26_TO_27_ID, self::VUE_27_TO_COMPAT_ID, self::VUE_COMPAT_CODEMOD_ID],
             notes: [
-                'Booster stages this move as two Node hops, vue-26-to-27 and vue-27-to-compat; this playbook covers the manual work between and around them.',
-                'Run the official Vue 3 migration build first, then fix each warning it prints.',
+                'Booster stages this move as three Node hops, vue-26-to-27, vue-27-to-compat and vue-compat-codemod; this playbook covers the manual work between and around them.',
+                'The vue-compat-codemod hop runs vue-upgrade-tool and keeps every manual item it lists in the hop result; work through that list, then switch @vue/compat MODE to 3 and remove the compat package.',
                 'Vue 2 reached end of life on 2023-12-31; the policy lists it as past its grace window.',
                 'Moving to Vue 3 usually means moving Vuex to Pinia and Vue Router 3 to 4.',
             ],

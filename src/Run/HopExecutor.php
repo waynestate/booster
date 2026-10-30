@@ -263,6 +263,7 @@ final class HopExecutor
                 return match ($hop->id) {
                     HopRegistry::MIX_TO_VITE_ID => $this->runMixHop($step, $path, $plan, $options, $baseline),
                     HopRegistry::TAILWIND_ID => $this->runTailwindHop($step, $path, $options, $baseline),
+                    HopRegistry::VUE_COMPAT_CODEMOD_ID => $this->runVueCompatCodemodHop($step, $path, $options),
                     default => $this->runNodeHop($step, $path, $options, $baseline),
                 };
             }
@@ -583,6 +584,183 @@ final class HopExecutor
         }
 
         return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$changes, ...$hop->notes]);
+    }
+
+    /**
+     * The Vue compat codemod hop. It runs vue-upgrade-tool over the app's
+     * front end in the Node container, keeps every manual item the tool lists
+     * as a hop message, and gates on the app's build (plus its tests, when the
+     * app defines an npm test script). The tool expects @vue/compat in
+     * package.json, so the hop refuses to run before the vue-27-to-compat hop
+     * has landed.
+     */
+    private function runVueCompatCodemodHop(PlanStep $step, string $path, RunOptions $options): StepResult
+    {
+        $hop = $step->hop;
+        $version = $this->registry()->vueUpgradeToolVersion();
+
+        if (!$this->packageHasCompat($path)) {
+            $message = 'Refusing to run the codemod: package.json does not list @vue/compat, so the app needs vue-27-to-compat first. Run that hop, then run this hop again.';
+
+            return $options->dryRun
+                ? new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [], ['Dry run: ' . $message, ...$hop->notes])
+                : new StepResult($step->number, $hop->id, StepResult::ERROR, [], [$message, ...$hop->notes]);
+        }
+
+        if ($options->dryRun) {
+            return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [], [
+                sprintf('Dry run: would run npx --yes vue-upgrade-tool@%s --files src/**/* in the Node container and gate on the build.', $version),
+                ...$hop->notes,
+            ]);
+        }
+
+        if ($this->node === null) {
+            return new StepResult($step->number, $hop->id, StepResult::ERROR, [], ['The codemod needs a Node runner, but this BOOSTER has none configured.', ...$hop->notes]);
+        }
+
+        $result = $this->node->run($path, ['npx', '--yes', 'vue-upgrade-tool@' . $version, '--files', 'src/**/*']);
+        if (!$result->successful()) {
+            return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [
+                sprintf('vue-upgrade-tool exited %d in the Node container. The working copy keeps any changes it made, so read them before continuing.', $result->exitCode),
+                trim($result->stdout . "\n" . $result->stderr),
+                'Undo with: git checkout . (inside the app).',
+                ...$hop->notes,
+            ]);
+        }
+
+        [$items, $total, $recognized] = self::parseCodemodOutput($result);
+        $changes = $recognized
+            ? [sprintf('vue-upgrade-tool@%s ran in the Node container; %d manual item(s) remain.', $version, $total)]
+            : ['codemod ran; manual items could not be counted, see the tool output'];
+
+        if (!$options->skipGate) {
+            $failure = $this->runFrontEndGate($path);
+            if ($failure !== null) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, [], [...$changes, ...$items, ...$failure]);
+            }
+            $changes[] = $recognized
+                ? sprintf('Build gate passed: npm ci and npm run build are green in the Node container, and %d manual item(s) remain from the codemod.', $total)
+                : 'Build gate passed: npm ci and npm run build are green in the Node container.';
+        } else {
+            $changes[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
+        }
+
+        return new StepResult($step->number, $hop->id, StepResult::APPLIED, [], [...$changes, ...$items, ...$hop->notes]);
+    }
+
+    /** Whether the app's package.json lists @vue/compat, the precondition the codemod needs. */
+    private function packageHasCompat(string $path): bool
+    {
+        $packageFile = $path . '/package.json';
+        if (!is_file($packageFile)) {
+            return false;
+        }
+        $package = json_decode((string) file_get_contents($packageFile), true);
+        if (!is_array($package)) {
+            return false;
+        }
+        foreach (['dependencies', 'devDependencies'] as $section) {
+            $list = $package[$section] ?? null;
+            if (is_array($list) && array_key_exists('@vue/compat', $list)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** The raw codemod output kept in hop messages is trimmed to this many bytes. */
+    private const CODEMOD_OUTPUT_CAP = 4000;
+
+    /**
+     * The codemod output, turned into hop messages. A line that starts with a
+     * file path and a colon is one of the tool's manual items and gets a
+     * "Manual item" prefix; anything else (banners, summaries) is kept
+     * verbatim so nothing the tool says is lost, but only the file lines
+     * count as manual items. The messages are capped at 20 lines, the rest
+     * counted.
+     *
+     * When the output is non-empty but holds no manual item, its shape is not
+     * recognised: the hop must not fail on that, so the whole output is kept
+     * as one message (trimmed to CODEMOD_OUTPUT_CAP) and flagged uncountable.
+     *
+     * @return array{0: list<string>, 1: int, 2: bool} the capped messages, the manual item count, and whether the output was recognised
+     */
+    private static function parseCodemodOutput(ProcessResult $result): array
+    {
+        $raw = trim($result->stdout . "\n" . $result->stderr);
+        if ($raw === '') {
+            return [[], 0, true];
+        }
+        $lines = preg_split('/\R/', $raw) ?: [];
+        $items = [];
+        $manual = 0;
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            if (preg_match('/^[\w.@\-\/]+\.\w{1,8}:\s/i', $line) === 1) {
+                $manual++;
+                $items[] = 'Manual item: ' . $line;
+            } else {
+                $items[] = $line;
+            }
+        }
+        if ($manual === 0) {
+            if (strlen($raw) > self::CODEMOD_OUTPUT_CAP) {
+                $raw = substr($raw, 0, self::CODEMOD_OUTPUT_CAP) . '...';
+            }
+
+            return [[$raw], 0, false];
+        }
+        if (count($items) > 20) {
+            $items = [...array_slice($items, 0, 20), sprintf('and %d more', count($items) - 20)];
+        }
+
+        return [$items, $manual, true];
+    }
+
+    /**
+     * The front-end gate for the codemod hop: npm ci, npm run build, and npm
+     * test when the app defines that script.
+     *
+     * @return list<string>|null failure messages, or null when the gate passed
+     */
+    private function runFrontEndGate(string $path): ?array
+    {
+        if ($this->node === null) {
+            return ['The build gate needs a Node runner, but this BOOSTER has none configured.'];
+        }
+        $argvs = [['npm', 'ci'], ['npm', 'run', 'build']];
+        if ($this->hasNpmTestScript($path)) {
+            $argvs[] = ['npm', 'test'];
+        }
+        foreach ($argvs as $argv) {
+            $result = $this->node->run($path, $argv);
+            if (!$result->successful()) {
+                return [
+                    sprintf('Build gate failed: "%s" exited %d in the Node container. The working copy keeps the changes so you can read them.', implode(' ', $argv), $result->exitCode),
+                    trim($result->stdout . "\n" . $result->stderr),
+                    'Undo with: git checkout . (inside the app).',
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /** Whether the app's package.json defines an npm test script. */
+    private function hasNpmTestScript(string $path): bool
+    {
+        $packageFile = $path . '/package.json';
+        if (!is_file($packageFile)) {
+            return false;
+        }
+        $package = json_decode((string) file_get_contents($packageFile), true);
+        $scripts = is_array($package) ? ($package['scripts'] ?? null) : null;
+
+        return is_array($scripts) && array_key_exists('test', $scripts);
     }
 
     /**

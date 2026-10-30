@@ -21,8 +21,8 @@ Boost is read-only help. Booster's gate stays the authority: never skip a gate b
 
 What Rector cannot do (check these by hand):
 
-- Booster stages this move as two Node hops, vue-26-to-27 and vue-27-to-compat; this playbook covers the manual work between and around them.
-- Run the official Vue 3 migration build first, then fix each warning it prints.
+- Booster stages this move as three Node hops, vue-26-to-27, vue-27-to-compat and vue-compat-codemod; this playbook covers the manual work between and around them.
+- The vue-compat-codemod hop runs vue-upgrade-tool and keeps every manual item it lists in the hop result; work through that list, then switch @vue/compat MODE to 3 and remove the compat package.
 - Vue 2 reached end of life on 2023-12-31; the policy lists it as past its grace window.
 - Moving to Vue 3 usually means moving Vuex to Pinia and Vue Router 3 to 4.
 

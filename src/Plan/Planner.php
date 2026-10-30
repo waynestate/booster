@@ -237,9 +237,10 @@ final class Planner
 
     /**
      * The Vue hops a Vue 2 app still needs, in run order: the 2.6 to 2.7 step
-     * when the app sits below 2.7, then the compat build that lands on Vue 3.
-     * The manual playbook (vue-2-to-3) is never planned; it stands in for both
-     * and skipping it skips them.
+     * when the app sits below 2.7, then the compat build that lands on Vue 3,
+     * then the codemod that rewrites what it can. The manual playbook
+     * (vue-2-to-3) is never planned; it stands in for all of them and skipping
+     * it skips them.
      *
      * @return list<string>
      */
@@ -248,7 +249,7 @@ final class Planner
         if ($project->vueMajor !== '2') {
             return [];
         }
-        $ids = [HopRegistry::VUE_27_TO_COMPAT_ID];
+        $ids = [HopRegistry::VUE_27_TO_COMPAT_ID, HopRegistry::VUE_COMPAT_CODEMOD_ID];
         if (version_compare($project->vueMinor ?? '2.0', '2.7', '<')) {
             array_unshift($ids, HopRegistry::VUE_26_TO_27_ID);
         }

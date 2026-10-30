@@ -31,6 +31,7 @@ final class RefreshHopDataTest extends TestCase
         HopDataRefresher::FEED_VITE => 'npm-vite-dist-tags.json',
         HopDataRefresher::FEED_LARAVEL_VITE_PLUGIN => 'npm-laravel-vite-plugin-dist-tags.json',
         HopDataRefresher::FEED_VUE_PLUGIN => 'npm-vitejs-plugin-vue-dist-tags.json',
+        HopDataRefresher::FEED_VUE_UPGRADE_TOOL => 'npm-vue-upgrade-tool-dist-tags.json',
     ];
 
     /** The hop data as it stood before this refresh: Node 24, the old Laravel-to-PHPUnit floors. */
@@ -48,6 +49,7 @@ final class RefreshHopDataTest extends TestCase
             'vue_27' => '^2.7',
             'vue_compat' => '^3.5',
             'vue_loader_compat' => '^17.4',
+            'vue_upgrade_tool_version' => '1.0.37',
             'phpunit_php' => ['9' => '7.3', '10' => '8.1', '11' => '8.2', '12' => '8.3', '13' => '8.4'],
             'laravel_phpunit' => ['10' => '9', '11' => '10', '12' => '11', '13' => '12'],
             'laravel_php' => [
@@ -109,6 +111,8 @@ final class RefreshHopDataTest extends TestCase
         self::assertSame('^2.7', $result['vue_27']);
         self::assertSame('^3.5', $result['vue_compat']);
         self::assertSame('^17.4', $result['vue_loader_compat']);
+        // The codemod pin tracks the feed's latest release, exactly.
+        self::assertSame('1.0.37', $result['vue_upgrade_tool_version']);
     }
 
     public function test_a_refresh_is_idempotent(): void
@@ -255,6 +259,34 @@ final class RefreshHopDataTest extends TestCase
             ['v6.0.10', '^6.0'],
             ['latest', null],
         ];
+    }
+
+    #[DataProvider('exactFromTagProvider')]
+    public function test_exact_from_tag_keeps_the_full_version(string $tag, ?string $expected): void
+    {
+        self::assertSame($expected, HopDataRefresher::exactFromTag($tag));
+    }
+
+    /** @return list<array{string, ?string}> */
+    public static function exactFromTagProvider(): array
+    {
+        return [
+            ['1.0.37', '1.0.37'],
+            ['v1.0.37', '1.0.37'],
+            ['8.3', '8.3'],
+            ['latest', null],
+            ['8.3.5-beta.1', null],
+        ];
+    }
+
+    public function test_a_non_version_latest_tag_keeps_the_on_file_pin(): void
+    {
+        $feeds = $this->feeds();
+        $feeds[HopDataRefresher::FEED_VUE_UPGRADE_TOOL] = ['latest' => 'canary'];
+
+        $result = (new HopDataRefresher($this->policy()))->refresh($this->oldData(), $feeds, new DateTimeImmutable('2026-10-29'));
+
+        self::assertSame('1.0.37', $result['vue_upgrade_tool_version']);
     }
 
     public function test_a_missing_feed_is_a_tool_error(): void
