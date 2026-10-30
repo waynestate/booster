@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Tests;
 
+use FilesystemIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Waynestate\Booster\Hop\Hop;
 use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Hop\HopRegistry;
@@ -624,6 +627,80 @@ final class HopExecutorTest extends TestCase
         self::assertFalse($report->failed());
         self::assertCount(1, $this->dockerRuns($fake));
         self::assertStringContainsString('Nothing to do', implode(' ', $report->results[0]->messages));
+    }
+
+    /**
+     * Plans only the cas-to-sesame hop from the wayne-cas example and runs it.
+     *
+     * @return array{0: string, 1: RunReport} the temp dir and the report
+     */
+    private function executeSesameHop(FakeProcessRunner $fake, RunOptions $options): array
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $project = (new ProjectDetector())->detect($dir);
+        // PHP and Laravel stay where the example has them, so the plan is the
+        // cas-to-sesame hop alone.
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '12', sesame: true), $this->today());
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+
+        return [$dir, $executor->execute($plan, $options)];
+    }
+
+    public function test_the_sesame_hop_moves_config_and_rewrites_the_model(): void
+    {
+        $fake = $this->fake(changedPerHop: 0);
+        [$dir, $report] = $this->executeSesameHop($fake, new RunOptions(skipGate: true));
+
+        self::assertSame(['applied'], $this->statuses($report));
+        self::assertFileExists($dir . '/config/sesame.php');
+        self::assertFileExists($dir . '/config/wayne-cas.php');
+        self::assertStringContainsString("'base_url' => 'https://cas.example.edu/cas'", (string) file_get_contents($dir . '/config/sesame.php'));
+        self::assertStringContainsString('class User implements WayneCasable', (string) file_get_contents($dir . '/app/User.php'));
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertSame('^0.2', $composer['require']['waynestate/sesame']);
+        self::assertArrayNotHasKey('cit-web-infra/wayne-cas', $composer['require']);
+        self::assertSame(['config/sesame.php', 'app/User.php'], array_map(static fn(array $f): string => $f['file'], $report->results[0]->files));
+        $messages = implode(' ', $report->results[0]->messages);
+        foreach (['DUO_HOSTNAME', 'DUO_IKEY', 'DUO_SKEY', 'DUO_AKEY'] as $needle) {
+            self::assertStringContainsString($needle, $messages);
+        }
+        self::assertStringContainsString('Gate skipped', $messages);
+    }
+
+    public function test_the_sesame_hop_dry_run_reports_but_changes_nothing(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $before = $this->snapshot($dir);
+        $fake = $this->fake(changedPerHop: 0);
+        [, $report] = $this->executeSesameHop($fake, new RunOptions(dryRun: true));
+
+        self::assertSame(['previewed'], $this->statuses($report));
+        self::assertSame($before, $this->snapshot($dir));
+        self::assertFileDoesNotExist($dir . '/config/sesame.php');
+        self::assertCount(2, $report->results[0]->files);
+        $messages = implode(' ', $report->results[0]->messages);
+        self::assertStringContainsString('Dry run: would write config/sesame.php', $messages);
+        self::assertStringContainsString('Dry run: would rewrite app/User.php', $messages);
+    }
+
+    /**
+     * Every file in the tree, by relative path and content.
+     *
+     * @return array<string, string>
+     */
+    private function snapshot(string $dir): array
+    {
+        $out = [];
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS));
+        foreach ($iterator as $file) {
+            if ($file->isFile()) {
+                $relative = str_replace('\\', '/', substr($file->getPathname(), strlen($dir) + 1));
+                $out[$relative] = (string) file_get_contents($file->getPathname());
+            }
+        }
+        ksort($out);
+
+        return $out;
     }
 
     public function test_the_proctor_gate_passes_after_the_last_hop(): void

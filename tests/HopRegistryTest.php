@@ -33,6 +33,15 @@ final class HopRegistryTest extends PhpUnitTestCase
         }
     }
 
+    public function test_the_sesame_hop_pins_the_released_constraint_and_drops_the_cas_package(): void
+    {
+        $hop = (new HopRegistry())->get('cas-to-sesame');
+
+        self::assertSame(['waynestate/sesame' => '^0.2'], $hop->composerSet);
+        self::assertSame(['cit-web-infra/wayne-cas'], $hop->composerRemove);
+        self::assertStringNotContainsString('stub', $hop->summary);
+    }
+
     public function test_php_hops_cover_every_adjacent_pair_once(): void
     {
         $registry = new HopRegistry();
