@@ -227,10 +227,11 @@ final class PackageCompat
     }
 
     /**
-     * Un-minifies a composer/2.0 document the way Composer does: each version
-     * entry only carries the keys that changed, "__unset" removes a key, and
-     * whatever remains carries forward across chunks. The result keeps
-     * Packagist's newest-first order.
+     * Un-minifies a composer/2.0 document the way Composer does. Packagist's
+     * p2 format lists each package's versions as a list, newest first, and
+     * with "minified": "composer/2.0" every entry after the first carries only
+     * the keys that changed from the previous one, "__unset" removing a key.
+     * The result maps version string to its full entry, newest first.
      *
      * @param array<string, mixed> $document
      *
@@ -239,22 +240,58 @@ final class PackageCompat
     private function expandPackages(array $document): array
     {
         $expanded = [];
-        foreach ((array) ($document['packages'] ?? []) as $name => $chunks) {
-            $carried = [];
+        foreach ((array) ($document['packages'] ?? []) as $name => $entries) {
             $versions = [];
-            foreach ((array) $chunks as $chunk) {
-                foreach ((array) $chunk as $version => $changes) {
-                    foreach ((array) $changes as $key => $value) {
-                        if ($value === '__unset') {
-                            unset($carried[$key]);
-                        } else {
-                            $carried[$key] = $value;
-                        }
-                    }
-                    $versions[(string) $version] = $carried;
+            foreach ($this->expandMinified(array_values((array) $entries)) as $entry) {
+                if (!is_string($entry['version'] ?? null)) {
+                    continue;
                 }
+                $versions[$entry['version']] = $entry;
             }
             $expanded[(string) $name] = $versions;
+        }
+
+        return $expanded;
+    }
+
+    /**
+     * The metadata-minifier expansion: the first entry is complete, each later
+     * entry only carries the keys that changed, and "__unset" removes a key.
+     * Uses composer/metadata-minifier when it happens to be installed, and the
+     * same algorithm here otherwise, so Booster needs no dependency on it.
+     *
+     * @param list<mixed> $entries
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function expandMinified(array $entries): array
+    {
+        if (class_exists(\Composer\MetadataMinifier\MetadataMinifier::class)) {
+            return array_values(array_filter(
+                \Composer\MetadataMinifier\MetadataMinifier::expand($entries),
+                'is_array',
+            ));
+        }
+
+        $expanded = [];
+        $expandedVersion = null;
+        foreach ($entries as $versionData) {
+            if (!is_array($versionData)) {
+                continue;
+            }
+            if (!$expandedVersion) {
+                $expandedVersion = $versionData;
+                $expanded[] = $expandedVersion;
+                continue;
+            }
+            foreach ($versionData as $key => $val) {
+                if ($val === '__unset') {
+                    unset($expandedVersion[$key]);
+                } else {
+                    $expandedVersion[$key] = $val;
+                }
+            }
+            $expanded[] = $expandedVersion;
         }
 
         return $expanded;

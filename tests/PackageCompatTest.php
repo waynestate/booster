@@ -15,6 +15,12 @@ use Waynestate\Booster\Project\ProjectDetector;
  * asked of Packagist (here: of fixtures), and the first hop its newest stable
  * release cannot reach becomes a warning. All fetches go through
  * FixturePackageFetcher, so nothing in this file touches the network.
+ *
+ * The four public fixtures are real Packagist p2 captures (trimmed to their
+ * newest versions): fideloper/proxy caps at Laravel 9, laravelcollective/
+ * remote caps at Laravel 8 and is abandoned, fzaninotto/faker is abandoned
+ * with no replacement and needs PHP 7 or lower, beyondcode/laravel-dump-
+ * server requires only illuminate components and caps at Laravel 12.
  */
 final class PackageCompatTest extends TestCase
 {
@@ -43,7 +49,7 @@ final class PackageCompatTest extends TestCase
     }
 
     /**
-     * @param array<string, string> $files packagist package name => fixture file
+     * @param array<string, string|array<string, mixed>> $files packagist package name => fixture file or p2 document
      */
     private function fetcher(array $files): FixturePackageFetcher
     {
@@ -57,55 +63,84 @@ final class PackageCompatTest extends TestCase
 
     public function test_a_package_capped_below_the_target_blocks_the_first_hop_it_cannot_reach(): void
     {
-        $fetcher = $this->fetcher(['acme/capped-laravel' => 'acme-capped-laravel.json']);
-        $plan = $this->planWith(['require' => ['acme/capped-laravel' => '^2.0']], $fetcher);
+        $fetcher = $this->fetcher(['fideloper/proxy' => 'fideloper-proxy.json']);
+        $plan = $this->planWith(['require' => ['fideloper/proxy' => '^4.4']], $fetcher);
 
-        self::assertSame(['https://repo.packagist.org/p2/acme/capped-laravel.json'], $fetcher->fetched);
+        self::assertSame(['https://repo.packagist.org/p2/fideloper/proxy.json'], $fetcher->fetched);
         self::assertCount(1, $plan->packageChecks);
         $check = $plan->packageChecks[0];
-        self::assertSame('acme/capped-laravel', $check->package);
-        self::assertSame('2.3.0', $check->newest);
-        self::assertSame('laravel-10-to-11', $check->blocks);
+        self::assertSame('fideloper/proxy', $check->package);
+        self::assertSame('4.4.2', $check->newest);
+        // The app sits on Laravel 10, already past the package's ceiling of 9,
+        // so its newest release cannot follow the plan at all: the very first
+        // hop is the one it blocks.
+        self::assertSame('phpunit-10-to-11', $check->blocks);
         self::assertFalse($check->abandoned);
         self::assertTrue($check->checked);
         self::assertContains(
-            'acme/capped-laravel 2.3.0 supports Laravel up to 10 (or PHP up to 8.3), so it blocks laravel-10-to-11. Replace or upgrade it first.',
+            'fideloper/proxy 4.4.2 supports Laravel up to 9 (or PHP up to 9), so it blocks phpunit-10-to-11. Replace or upgrade it first.',
             $plan->warnings,
         );
         self::assertSame([
-            ['package' => 'acme/capped-laravel', 'newest' => '2.3.0', 'blocks' => 'laravel-10-to-11', 'abandoned' => false, 'checked' => true],
+            ['package' => 'fideloper/proxy', 'newest' => '4.4.2', 'blocks' => 'phpunit-10-to-11', 'abandoned' => false, 'checked' => true],
         ], $plan->toArray()['package_checks']);
     }
 
-    public function test_an_illuminate_only_package_is_judged_by_its_loosest_constraint(): void
+    public function test_an_illuminate_only_package_is_judged_by_its_component_constraints(): void
     {
-        $fetcher = $this->fetcher(['acme/illuminate-user' => 'acme-illuminate-user.json']);
-        $plan = $this->planWith(['require' => ['acme/illuminate-user' => '^3.0']], $fetcher);
+        $fetcher = $this->fetcher(['beyondcode/laravel-dump-server' => 'beyondcode-laravel-dump-server.json']);
+        $plan = $this->planWith(['require' => ['beyondcode/laravel-dump-server' => '^2.0']], $fetcher);
 
         $check = $plan->packageChecks[0];
-        self::assertSame('3.1.0', $check->newest);
-        // illuminate/auth ^10.0 would cap at Laravel 10; the loosest constraint
-        // (illuminate/database >=10.0 <12.0) caps at 11, and that is what the
-        // warning names.
-        self::assertSame('laravel-11-to-12', $check->blocks);
+        self::assertSame('2.1.0', $check->newest);
+        // Its illuminate/console, illuminate/http and illuminate/support
+        // constraints all cap at Laravel 12, so the hop into 13 is the first
+        // one its newest release cannot reach.
+        self::assertSame('laravel-12-to-13', $check->blocks);
         self::assertContains(
-            'acme/illuminate-user 3.1.0 supports Laravel up to 11 (or PHP up to 8.3), so it blocks laravel-11-to-12. Replace or upgrade it first.',
+            'beyondcode/laravel-dump-server 2.1.0 supports Laravel up to 12 (or PHP up to 9), so it blocks laravel-12-to-13. Replace or upgrade it first.',
             $plan->warnings,
         );
     }
 
-    public function test_an_abandoned_package_warns_but_does_not_block(): void
+    public function test_an_abandoned_package_warns_and_names_its_replacement(): void
     {
-        $fetcher = $this->fetcher(['acme/abandoned' => 'acme-abandoned.json']);
-        $plan = $this->planWith(['require' => ['acme/abandoned' => '^1.0']], $fetcher);
+        $fetcher = $this->fetcher(['laravelcollective/remote' => 'laravelcollective-remote.json']);
+        $plan = $this->planWith(['require' => ['laravelcollective/remote' => '^6.0']], $fetcher);
 
         $check = $plan->packageChecks[0];
-        self::assertSame('1.4.0', $check->newest);
-        self::assertNull($check->blocks);
+        self::assertSame('v6.2.1', $check->newest);
+        // The app sits on Laravel 10, past the package's ceiling of 8, so it
+        // blocks from the first hop, exactly like a package that is already
+        // out of reach.
+        self::assertSame('phpunit-10-to-11', $check->blocks);
         self::assertTrue($check->abandoned);
-        self::assertSame('acme/successor', $check->replacement);
-        self::assertContains('acme/abandoned is abandoned (use acme/successor instead).', $plan->warnings);
-        self::assertNotContains('Not checked: acme/abandoned (offline).', $plan->warnings);
+        self::assertSame('spatie/ssh', $check->replacement);
+        self::assertContains(
+            'laravelcollective/remote v6.2.1 supports Laravel up to 8 (or PHP up to 9), so it blocks phpunit-10-to-11. Replace or upgrade it first.',
+            $plan->warnings,
+        );
+        self::assertContains('laravelcollective/remote is abandoned (use spatie/ssh instead).', $plan->warnings);
+        self::assertNotContains('Not checked: laravelcollective/remote (offline).', $plan->warnings);
+    }
+
+    public function test_an_abandoned_package_without_a_replacement_says_so(): void
+    {
+        $fetcher = $this->fetcher(['fzaninotto/faker' => 'fzaninotto-faker.json']);
+        $plan = $this->planWith(['require-dev' => ['fzaninotto/faker' => '^1.9']], $fetcher);
+
+        $check = $plan->packageChecks[0];
+        self::assertSame('v1.9.2', $check->newest);
+        // It cannot run on any PHP Booster plans, so it blocks the very first
+        // hop of the plan.
+        self::assertSame('phpunit-10-to-11', $check->blocks);
+        self::assertTrue($check->abandoned);
+        self::assertNull($check->replacement);
+        self::assertContains(
+            'fzaninotto/faker v1.9.2 supports PHP up to 7, so it blocks phpunit-10-to-11. Replace or upgrade it first.',
+            $plan->warnings,
+        );
+        self::assertContains('fzaninotto/faker is abandoned with no replacement.', $plan->warnings);
     }
 
     public function test_a_package_behind_a_vcs_repository_is_not_fetched_and_is_labelled(): void
@@ -158,9 +193,9 @@ final class PackageCompatTest extends TestCase
 
     public function test_no_package_check_skips_every_fetch(): void
     {
-        $fetcher = $this->fetcher(['acme/capped-laravel' => 'acme-capped-laravel.json']);
+        $fetcher = $this->fetcher(['fideloper/proxy' => 'fideloper-proxy.json']);
         $plan = $this->planWith(
-            ['require' => ['acme/capped-laravel' => '^2.0']],
+            ['require' => ['fideloper/proxy' => '^4.4']],
             $fetcher,
             new PlanOptions(noPackageCheck: true),
         );
@@ -168,13 +203,13 @@ final class PackageCompatTest extends TestCase
         self::assertSame([], $fetcher->fetched);
         self::assertSame([], $plan->packageChecks);
         foreach ($plan->warnings as $warning) {
-            self::assertStringNotContainsString('acme/', $warning);
+            self::assertStringNotContainsString('fideloper/', $warning);
         }
     }
 
     public function test_planning_without_a_fetcher_never_checks_packages(): void
     {
-        $plan = $this->planWith(['require' => ['acme/capped-laravel' => '^2.0']], null);
+        $plan = $this->planWith(['require' => ['fideloper/proxy' => '^4.4']], null);
 
         self::assertSame([], $plan->packageChecks);
     }
