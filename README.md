@@ -387,7 +387,7 @@ under `Pre-pass fixes:`.
    and the message points at `--memory-limit`.
 2. Rector runs for real, with only that hop's rules.
 3. `composer.json` is edited: the `php` or `laravel/framework` constraint is raised, and `config.platform.php` moves
-   with it when the app already pins it. Booster never runs `composer update` and never creates the key.
+   with it when the app already pins it. Booster never creates that key.
 4. The gate runs the app's tests inside `booster-target:<php>-<stamp>`, a container built from `docker/Dockerfile`
    on the PHP the hop moves to. The stamp is a short hash of the recipe, so an edited `docker/Dockerfile` rebuilds
    the image instead of reusing a stale one. The image carries the extension set Citadel's apps run with: intl,
@@ -397,6 +397,18 @@ under `Pre-pass fixes:`.
     them (`git checkout .` undoes them). To check the image itself,
     `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and
     verifies its extension list; it needs Docker and a few minutes per version, so it is not part of `composer ci`.
+5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package
+   the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. Every other hop, and
+   the baseline, run a plain `composer install`. The two phases report separately: a Composer failure names the
+   Composer phase and Composer's own output, because the tests never ran.
+
+Composer 2.10 refuses to load tagged releases Packagist has flagged with a security advisory, and hops that move
+onto Laravel 9 or 10 most often meet that block. When the gate's lock update hits it, Booster writes a temporary
+entry to `config.policy.advisories.ignore` in `composer.json`: scoped to the package and the constraint Composer
+refused, kept visible to `composer audit`, and carrying a reason PROCTOR can find and report until the app removes
+it. The gate then retries once. If the retry still fails, the run stops with the unblock and the failure both in
+the report, and the entry stays in `composer.json`; removing it is the app's job once it is off the blocked
+versions.
 
 The `--image` value names the image the baseline and every gate run in, and it takes three shapes:
 

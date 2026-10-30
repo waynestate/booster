@@ -27,6 +27,11 @@ tag for how Booster holds each rule today.
 - **Start from a green baseline** and **run the tests on the target image.** `Checked`: `run` records a baseline of the
   app's suite on its current PHP before the first hop, and the gate runs the suite in a container on the PHP the hop
   moves to. A red baseline stops the run unless `--allow-failing-baseline` is passed.
+- **The lock follows the hop.** `Enforced`: Laravel and PHPUnit hops refresh `composer.lock` inside the gate
+  (`composer update -W` for the package the hop moved), and a Composer-phase failure is reported as one, never as
+  the test command exiting nonzero. When Composer 2.10's policy blocking refuses the tagged releases, the gate
+  writes a scoped temporary ignore into `config.policy.advisories.ignore`, retries once, and reports the unblock;
+  PROCTOR keeps naming the entry until the app removes it.
 - **Write characterization tests for code that has none.** `Documented`: the playbooks ask for it before the PHP 8.0
   hop.
 

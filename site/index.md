@@ -85,10 +85,10 @@ Inside one dose
    Rector runs with only that hop's rules, from Booster's own `vendor/`. That's how an app on PHP 7.4 gets rewritten by a Rector running on 8.3 or newer.
 3. T−2
    ### Raise the constraint
-   The `php` or `laravel/framework` constraint in `composer.json` goes up, and `config.platform.php` moves with it. Booster never runs `composer update`.
+   The `php` or `laravel/framework` constraint in `composer.json` goes up, and `config.platform.php` moves with it.
 4. T−1
    ### The gate
-   Before the first hop your tests run once on the app's current PHP as the baseline; a red one stops the run unless you pass `--allow-failing-baseline`. After each hop they run inside `booster-target:<php>`, built from `docker/Dockerfile` on the PHP the hop moves to, and after the last hop PROCTOR checks the upgraded app against CREED's policy, blocking only on findings the upgrade introduced. If a red baseline names a missing Mix or Vite manifest, build the front-end assets first. A failure stops the run and leaves the changes for you to read. `git checkout .` undoes them.
+   Before the first hop your tests run once on the app's current PHP as the baseline; a red one stops the run unless you pass `--allow-failing-baseline`. After each hop they run inside `booster-target:<php>`, built from `docker/Dockerfile` on the PHP the hop moves to. On Laravel and PHPUnit hops the gate refreshes `composer.lock` for the package the hop moved, so the lock lands on the new major version; if Packagist's security advisories block those releases, the gate writes a scoped temporary ignore, retries once, and tells you what it did. After the last hop PROCTOR checks the upgraded app against CREED's policy, blocking only on findings the upgrade introduced. If a red baseline names a missing Mix or Vite manifest, build the front-end assets first. A failure stops the run and leaves the changes for you to read. `git checkout .` undoes them.
 
 Not every hop is Rector. `node-pin-24` pins Node 26 in `package.json` and writes `.nvmrc`; `mix-to-vite` converts a simple `webpack.mix.js` and moves the build to Vite. The Vue 2 to 3 move is staged: `vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod`, with the `vue-2-to-3` playbook standing in for all three. Rector doesn't read Vue, so a person works those steps. The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.
 
@@ -282,7 +282,7 @@ Task:
 
 Constraints:
 - Plan and dry run only, until I say so. Never commit or push.
-- Booster never runs composer update; say which packages will need it after each hop.
+- Laravel and PHPUnit hops refresh composer.lock inside the gate (composer update -W for the package the hop moved), and a Composer-phase failure means the tests never ran. PHP hops keep a plain install: if a committed lock goes stale, say which packages need composer update.
 - Ask me before you guess: a red baseline, a capped hop, or a package that blocks a Laravel major.
 
 Output: the plan with the reason for its order, the SESAME notes if any, the dry-run summary, then your questions.
@@ -358,8 +358,8 @@ Side effects are limited to the diff in your working copy. Read it, then merge i
   `run` refuses a working copy that is not under git or has uncommitted changes, so the upgrade diff stands alone. Pass `--allow-dirty` if you must.
 - ### Aim at an unsupported version
   An end-of-life target is refused; a security-only one comes with a warning. The dates come from CREED's `policy.json`, never from Booster's code.
-- ### Run `composer update`
-  It raises the constraints and stops there. You decide when to resolve them.
+- ### Resolve more than the hop moves
+  Inside the gate it runs a scoped `composer update -W` for the package a Laravel or PHPUnit hop moved, so the lock follows the constraint. It never resolves anything else; you decide when to update the rest.
 - ### Pass quietly
   An unreadable policy, broken JSON, missing Docker or a Rector error stops the run with exit 1 or 2.
 - ### Trust your file names
