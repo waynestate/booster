@@ -35,6 +35,7 @@ final readonly class Project
         public bool $hasMixFile = false,
         public ?string $vueMinor = null,
         public bool $hasBoost = false,
+        public bool $hasHelmet = false,
         public ?string $manifestPhp = null,
         public ?string $lockPhpFloor = null,
         public ?string $lockPhpCeiling = null,
@@ -61,6 +62,7 @@ final readonly class Project
             'mix_file' => $this->hasMixFile,
             'wayne_cas' => $this->usesWayneCas,
             'boost' => $this->hasBoost,
+            'helmet' => $this->hasHelmet,
         ];
         if ($this->lockPhpFloor !== null || $this->lockPhpCeiling !== null) {
             $array['php_lock_range'] = ['floor' => $this->lockPhpFloor, 'ceiling' => $this->lockPhpCeiling];

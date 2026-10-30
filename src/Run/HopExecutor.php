@@ -10,6 +10,7 @@ use RecursiveIteratorIterator;
 use Waynestate\Booster\Hop\Hop;
 use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Hop\HopRegistry;
+use Waynestate\Booster\Hop\TrustProxiesRewriter;
 use Waynestate\Booster\Node\MixBuild;
 use Waynestate\Booster\Node\MixFile;
 use Waynestate\Booster\Plan\Plan;
@@ -40,6 +41,7 @@ final class HopExecutor
         private readonly ?HopRegistry $registry = null,
         private readonly ?ProctorRunner $proctor = null,
         private readonly CasMigration $casMigration = new CasMigration(),
+        private readonly TrustProxiesRewriter $trustProxies = new TrustProxiesRewriter(),
     ) {}
 
     private ?RemovalsScan $removals = null;
@@ -328,8 +330,9 @@ final class HopExecutor
                     // cannot see the app's classes, so the diff is a lower bound, not the whole change.
                     $incomplete = $hop->kind === HopKind::Laravel && !is_file($path . '/vendor/autoload.php');
                     $migration = $hop->kind === HopKind::Sesame ? $this->casMigration->migrate($path, true) : null;
+                    $proxies = $hop->id === HopRegistry::laravelHopId('8', '9') ? $this->trustProxies->rewrite($path, true) : null;
                     [$inertiaChanges, $inertiaFiles] = $this->inertiaChangesFor($hop, $step, $plan, true);
-                    $files = [...self::prepassFiles($prepass), ...$preview->files, ...($migration->files ?? []), ...$inertiaFiles];
+                    $files = [...self::prepassFiles($prepass), ...$preview->files, ...($migration->files ?? []), ...($proxies->files ?? []), ...$inertiaFiles];
                     $threshold = $overThreshold ? [sprintf(
                         'Over the review threshold: this hop changes %d files (threshold %d). Read the per-rule summary below.',
                         $wanted,
@@ -341,9 +344,9 @@ final class HopExecutor
                     if ($incomplete) {
                         $messages = [...$threshold, ...$wouldRun, sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$inertiaChanges, ...$hop->notes, ...$notes];
                     } elseif ($files === []) {
-                        $messages = [...$threshold, ...$wouldRun, 'Dry run: nothing was changed.', ...($migration->manual ?? []), ...$hop->notes, ...$notes];
+                        $messages = [...$threshold, ...$wouldRun, 'Dry run: nothing was changed.', ...($migration->manual ?? []), ...($proxies->manual ?? []), ...$hop->notes, ...$notes];
                     } else {
-                        $messages = [...$threshold, ...$wouldRun, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$hop->notes, ...$notes];
+                        $messages = [...$threshold, ...$wouldRun, ...($migration->changes ?? []), ...($proxies->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...($proxies->manual ?? []), ...$hop->notes, ...$notes];
                     }
 
                     return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $files, $messages, $incomplete, $prepass?->files() ?? [], $rules);
@@ -391,13 +394,15 @@ final class HopExecutor
                 // The CAS config and model traits move only after Rector succeeded,
                 // because they assume the class renames are in place.
                 $migration = $hop->kind === HopKind::Sesame ? $this->casMigration->migrate($path, false) : null;
+                $proxies = $hop->id === HopRegistry::laravelHopId('8', '9') ? $this->trustProxies->rewrite($path, false) : null;
                 [$inertiaChanges, $inertiaFiles] = $this->inertiaChangesFor($hop, $step, $plan, false);
-                $files = [...self::prepassFiles($prepass), ...$applied->files, ...($migration->files ?? []), ...$inertiaFiles];
-                if (($prepass?->changedCount() ?? 0) === 0 && $applied->changedCount() === 0 && $messages === [] && ($migration->changes ?? []) === [] && $inertiaChanges === []) {
+                $files = [...self::prepassFiles($prepass), ...$applied->files, ...($migration->files ?? []), ...($proxies->files ?? []), ...$inertiaFiles];
+                if (($prepass?->changedCount() ?? 0) === 0 && $applied->changedCount() === 0 && $messages === [] && ($migration->changes ?? []) === [] && ($proxies->changes ?? []) === [] && $inertiaChanges === []) {
                     // Nothing changed, so there is nothing for the gate to prove; skip it.
                     return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
                         'Nothing to do: Rector changed no files and composer.json already allows the target, so the gate was skipped.',
                         ...($migration->manual ?? []),
+                        ...($proxies->manual ?? []),
                         ...$hop->notes,
                         ...$notes,
                     ]);
@@ -406,7 +411,7 @@ final class HopExecutor
                 if (!$options->skipGate) {
                     $gate = $this->runGate($step, $path, $options, $baseline);
                     if (!$gate->passed) {
-                        return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$gate->lines, ...$notes], false, $prepass?->files() ?? []);
+                        return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...($proxies->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...($proxies->manual ?? []), ...$gate->lines, ...$notes], false, $prepass?->files() ?? []);
                     }
                     $messages = [...$messages, ...$gate->lines];
                     $messages[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
@@ -426,7 +431,7 @@ final class HopExecutor
                             implode(', ', $unblocked),
                         );
                         if ($step->number === count($plan->steps) && !$plan->stopsEarly) {
-                            return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, $finding . ' Remove it before release; Booster fails the final target while it is there.', ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$notes], false, $prepass?->files() ?? []);
+                            return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, $finding . ' Remove it before release; Booster fails the final target while it is there.', ...($migration->changes ?? []), ...($proxies->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...($proxies->manual ?? []), ...$notes], false, $prepass?->files() ?? []);
                         }
                         $messages[] = $finding;
                     }
@@ -434,7 +439,7 @@ final class HopExecutor
                     $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
                 }
 
-                return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$messages, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$hop->notes, ...$notes], false, $prepass?->files() ?? []);
+                return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$messages, ...($migration->changes ?? []), ...($proxies->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...($proxies->manual ?? []), ...$hop->notes, ...$notes], false, $prepass?->files() ?? []);
             } finally {
                 if ($prepass !== null && !$keepPrepass) {
                     $prepass->restore();

@@ -543,6 +543,7 @@ final class HopRegistry
                     'Check the shared database server against the Laravel ' . $to . ' database floor before you apply this hop.',
                     'Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.',
                     ...$this->inertiaChanges($to)['notes'],
+                    ...($to === '9' ? ['Check app/Http/Middleware/TrustProxies.php after the hop: the stock file is rewritten to the framework middleware, and a customised one is left alone.'] : []),
                 ],
                 links: [sprintf('https://laravel.com/docs/%s.x/upgrade', $to)],
             ));

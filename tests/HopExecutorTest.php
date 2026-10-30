@@ -1697,6 +1697,118 @@ PHP,
         self::assertContains('Removed 1 unused import from 1 file after the Rector pass.', $laravelSteps[0]->messages);
     }
 
+    /** A Laravel 8 example carrying fideloper/proxy and the stock middleware. */
+    private function laravelEightApp(bool $stockMiddleware): string
+    {
+        $dir = $this->copyExample('laravel-blade');
+        file_put_contents($dir . '/composer.json', (string) json_encode([
+            'name' => 'example/laravel-blade',
+            'require' => ['php' => '^8.0', 'laravel/framework' => '^8.0', 'fideloper/proxy' => '^4.4'],
+            'require-dev' => ['phpunit/phpunit' => '^9.0'],
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+        if ($stockMiddleware) {
+            mkdir($dir . '/app/Http/Middleware', 0775, true);
+            file_put_contents($dir . '/app/Http/Middleware/TrustProxies.php', implode("\n", [
+                '<?php',
+                '',
+                'namespace App\Http\Middleware;',
+                '',
+                'use Fideloper\Proxy\TrustProxies as Middleware;',
+                'use Illuminate\Http\Request;',
+                '',
+                'class TrustProxies extends Middleware',
+                '{',
+                '    protected $proxies;',
+                '',
+                '    protected $headers = Request::HEADER_X_FORWARDED_ALL;',
+                '}',
+                '',
+            ]));
+        }
+
+        return $dir;
+    }
+
+    public function test_the_laravel_9_hop_rewrites_the_stock_trust_proxies_middleware(): void
+    {
+        $dir = $this->laravelEightApp(true);
+        [$dir, $plan] = $this->laravelEightPlan($dir);
+        $fake = $this->fake();
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        $content = (string) file_get_contents($dir . '/app/Http/Middleware/TrustProxies.php');
+        self::assertStringContainsString('Illuminate\Http\Middleware\TrustProxies as Middleware', $content);
+        self::assertStringContainsString('Request::HEADER_X_FORWARDED_AWS_ELB', $content);
+        self::assertStringNotContainsString('Fideloper', $content);
+        self::assertStringNotContainsString('HEADER_X_FORWARDED_ALL', $content);
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertArrayNotHasKey('fideloper/proxy', $composer['require']);
+
+        $steps = array_values(array_filter($report->results, static fn(StepResult $r): bool => $r->hopId === 'laravel-8-to-9'));
+        self::assertCount(1, $steps);
+        self::assertSame(StepResult::APPLIED, $steps[0]->status);
+        $files = array_map(static fn(array $f): string => $f['file'], $steps[0]->files);
+        self::assertContains('app/Http/Middleware/TrustProxies.php', $files);
+        self::assertContains('Rewrote app/Http/Middleware/TrustProxies.php to the framework TrustProxies middleware.', $steps[0]->messages);
+    }
+
+    public function test_the_laravel_9_hop_dry_run_reports_the_rewrite_without_writing(): void
+    {
+        $dir = $this->laravelEightApp(true);
+        // A Laravel hop previews through the app's autoloader; without it the
+        // report takes the incomplete branch and omits the change list.
+        mkdir($dir . '/vendor', 0775, true);
+        file_put_contents($dir . '/vendor/autoload.php', "<?php\n");
+        $before = (string) file_get_contents($dir . '/app/Http/Middleware/TrustProxies.php');
+        [$dir, $plan] = $this->laravelEightPlan($dir);
+        $fake = $this->fake();
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions(dryRun: true));
+
+        self::assertSame($before, (string) file_get_contents($dir . '/app/Http/Middleware/TrustProxies.php'));
+        $steps = array_values(array_filter($report->results, static fn(StepResult $r): bool => $r->hopId === 'laravel-8-to-9'));
+        self::assertCount(1, $steps);
+        self::assertSame(StepResult::PREVIEWED, $steps[0]->status);
+        $files = array_map(static fn(array $f): string => $f['file'], $steps[0]->files);
+        self::assertContains('app/Http/Middleware/TrustProxies.php', $files);
+        self::assertContains('Dry run: would rewrite app/Http/Middleware/TrustProxies.php to the framework TrustProxies middleware.', $steps[0]->messages);
+    }
+
+    public function test_the_laravel_9_hop_leaves_a_customised_trust_proxies_alone(): void
+    {
+        $dir = $this->laravelEightApp(false);
+        $custom = implode("\n", [
+            '<?php',
+            '',
+            'namespace App\Http\Middleware;',
+            '',
+            'use App\Http\Middleware\BaseProxy;',
+            'use Illuminate\Http\Request;',
+            '',
+            'class TrustProxies extends BaseProxy',
+            '{',
+            "    protected \$proxies = '10.0.0.0/8';",
+            '',
+            '    protected $headers = Request::HEADER_X_FORWARDED_FOR;',
+            '}',
+            '',
+        ]);
+        mkdir($dir . '/app/Http/Middleware', 0775, true);
+        file_put_contents($dir . '/app/Http/Middleware/TrustProxies.php', $custom);
+        [$dir, $plan] = $this->laravelEightPlan($dir);
+        $fake = $this->fake();
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        self::assertSame($custom, (string) file_get_contents($dir . '/app/Http/Middleware/TrustProxies.php'));
+        $steps = array_values(array_filter($report->results, static fn(StepResult $r): bool => $r->hopId === 'laravel-8-to-9'));
+        self::assertCount(1, $steps);
+        $files = array_map(static fn(array $f): string => $f['file'], $steps[0]->files);
+        self::assertNotContains('app/Http/Middleware/TrustProxies.php', $files);
+        self::assertContains('app/Http/Middleware/TrustProxies.php is not the stock Laravel 8 middleware, so Booster left it alone. Point it at the Illuminate\Http\Middleware\TrustProxies parent and replace Request::HEADER_X_FORWARDED_ALL with the individual HEADER_X_FORWARDED_* constants by hand.', $steps[0]->messages);
+    }
+
     /**
      * Plans the laravel-blade example (Laravel 10 to 13, PHP 8.2 to 8.3) and
      * skips every step but the final Laravel hop, so a run exercises exactly

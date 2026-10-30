@@ -90,6 +90,32 @@ final class PlannerTest extends TestCase
         }
     }
 
+    private const HELMET_NOTE = 'HELMET sets trusted proxies, security headers and session defaults for WSU apps: composer require waynestate/helmet';
+
+    public function test_the_laravel_9_hop_suggests_helmet_when_the_app_has_none(): void
+    {
+        $plan = $this->planWithComposer('laravel-blade', ['require' => ['php' => '^8.0', 'laravel/framework' => '^8.0']], new PlanOptions(fromLaravel: '8'));
+
+        self::assertContains('laravel-8-to-9', $this->ids($plan));
+        self::assertContains(self::HELMET_NOTE, $plan->warnings);
+    }
+
+    public function test_the_helmet_note_stays_quiet_when_the_app_already_requires_helmet(): void
+    {
+        $plan = $this->planWithComposer('laravel-blade', ['require' => ['php' => '^8.0', 'laravel/framework' => '^8.0', 'waynestate/helmet' => '^1.0']], new PlanOptions(fromLaravel: '8'));
+
+        self::assertContains('laravel-8-to-9', $this->ids($plan));
+        self::assertNotContains(self::HELMET_NOTE, $plan->warnings);
+    }
+
+    public function test_a_plan_without_the_laravel_9_hop_says_nothing_about_helmet(): void
+    {
+        $plan = $this->plan('laravel-blade');
+
+        self::assertNotContains('laravel-8-to-9', $this->ids($plan));
+        self::assertNotContains(self::HELMET_NOTE, $plan->warnings);
+    }
+
     public function test_the_lock_floor_warning_plans_from_the_lock_floor(): void
     {
         $dir = $this->tempDir();
