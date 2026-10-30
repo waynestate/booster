@@ -28,7 +28,7 @@ Booster is WELD's upgrade tool. It plans the hops that take a WSU PHP app from t
 to one the version policy still supports, and it runs them one at a time: [Rector](https://getrector.com) rewrites the
 code, Booster raises the constraints in `composer.json`, and the app's own tests must pass on the target PHP before the
 next hop starts. It stands on `rector/rector` and `driftingly/rector-laravel` and adds only the ordering, the cap, the
-gate and a few WSU recipes.
+gate, the advisory scans and a few WSU recipes.
 
 Booster edits your working copy and prints a report. It never commits, pushes or opens a merge request: a person reads
 the diff and merges it.
@@ -41,7 +41,7 @@ WELD is the Wayne State application stack. Booster is its upgrade layer.
 |---|---|
 | WayneUI (project 0) | The interface layer every other part builds on |
 | CREED | The version policy (`policy.json`) Booster reads |
-| PROCTOR | Measures an app against that policy; Booster can run it as part of the gate |
+| PROCTOR | Measures an app against that policy; the gate runs it before the first hop and after the last |
 | Preflight | The CI templates |
 | SESAME | Auth; Booster can swap `wayne-cas` for it |
 | HELMET | The baseline runtime |
@@ -86,8 +86,13 @@ When Booster itself runs in a container, use `--skip-gate` and run the tests you
 
 ## Single-file download
 
-Booster can also be built as a single-file PHAR, so Preflight and apps without Composer access can run it as one
-file. Build it with the script for your OS (both need Docker, and no PHP or Composer on the host):
+Booster also ships as a single-file PHAR, so Preflight and apps without Composer access can run it as one file. Every
+version tag publishes it: the GitLab release carries `booster.phar` as an asset, and the GitHub release at
+github.com/waynestate/booster carries the same file as an attachment. Download it from either release page and run it
+with `php booster.phar`.
+
+You can also build it from any commit, with the script for your OS (both need Docker, and no PHP or Composer on the
+host):
 
 Windows (PowerShell):
 
@@ -101,8 +106,7 @@ Linux / macOS:
 scripts/build-phar.sh
 ```
 
-Each script writes `build/booster.phar` and verifies it by printing Booster's version. The phar is not published
-yet (there is no release step), so build it from a checkout rather than downloading it.
+Each script writes `build/booster.phar` and verifies it by printing Booster's version.
 
 Every command works from the phar. `detect`, `plan`, `hops` and `init` read only what is bundled inside it. `run`
 copies Rector, its `config/rector.php` and `docker/` out of the phar into a temp directory first, because Rector and
@@ -125,21 +129,55 @@ The one-command form for a forced image upgrade:
 booster run --path=../my-app --goal=php-74-to-84
 ```
 
-A plan for a Laravel 10 app on PHP 8.2 looks like this (the order keeps the app on a PHP and Laravel pair Laravel
-supports at every step):
+A plan for the bundled Laravel 10 example app on PHP 8.2 looks like this (the order keeps the app on a PHP and
+Laravel pair Laravel supports at every step):
 
 ```
-1. laravel-10-to-11  [target-image-tests]
-2. laravel-11-to-12  [target-image-tests]
-3. php-82-to-83      [target-image-tests]
-4. laravel-12-to-13  [target-image-tests]
-5. php-83-to-84      [target-image-tests]
-6. php-84-to-85      [target-image-tests]
+$ booster plan --path=examples/laravel-blade --today=2026-10-29
+
+BOOSTER plan for examples/laravel-blade
+  app type: laravel-blade
+  PHP: 8.2 -> 8.5
+  Laravel: 10 -> 13
+  PHPUnit: 10 -> 13
+  policy: waynestate/creed 0.1.3 (today 2026-10-29)
+
+1. phpunit-10-to-11  [target-image-tests]
+   Move PHPUnit 10 tests to PHPUnit 11.
+2. laravel-10-to-11  [target-image-tests]
+   Move a Laravel 10 app to Laravel 11.
+3. laravel-11-to-12  [target-image-tests]
+   Move a Laravel 11 app to Laravel 12.
+4. php-82-to-83  [target-image-tests]
+   Move PHP 8.2 code to PHP 8.3.
+   Removed between PHP 8.2 and PHP 8.3: none found.
+5. phpunit-11-to-12  [target-image-tests]
+   Move PHPUnit 11 tests to PHPUnit 12.
+6. laravel-12-to-13  [target-image-tests]
+   Move a Laravel 12 app to Laravel 13.
+7. php-83-to-84  [target-image-tests]
+   Move PHP 8.3 code to PHP 8.4.
+   Removed between PHP 8.3 and PHP 8.4: none found.
+8. phpunit-12-to-13  [target-image-tests]
+   Move PHPUnit 12 tests to PHPUnit 13.
+9. php-84-to-85  [target-image-tests]
+   Move PHP 8.4 code to PHP 8.5.
+   Removed between PHP 8.4 and PHP 8.5: none found.
+
+Will break on PHP 8.3: no findings.
+
+PHPStan on PHP 8.5: 5 findings.
+   app/Models/Post.php:7 [class.notFound] Class App\Models\Post extends unknown class Illuminate\Database\Eloquent\Model.
+   app/Models/Post.php:9 [missingType.property] Property App\Models\Post::$casts has no type specified.
+   tests/PostTest.php:18 [property.onlyWritten] Property App\Tests\PostTest::$repository is never read, only written.
+   tests/PostTest.php:27 [staticMethod.deprecated] Call to deprecated method isType() of class PHPUnit\Framework\Assert:
+https://github.com/sebastianbergmann/phpunit/issues/6052
+   tests/PostTest.php:33 [method.alreadyNarrowedType] Call to method PHPUnit\Framework\Assert::assertNotNull() with PHPUnit\Framework\MockObject\Rule\AnyInvokedCount will always evaluate to true.
 ```
 
 <div align="center">
-  <img src="docs/readme/record.svg" width="100%" alt="Booster's immunization record for the Laravel 10 example app: after a short countdown, a Gate passed stamp lands on each hop in turn, laravel-10-to-11, laravel-11-to-12, php-82-to-83, laravel-12-to-13, php-83-to-84 and php-84-to-85, ending in RESULT: PASS.">
-  <br><sub>The plan above, written up the way your doctor would: one stamp per hop, one hop at a time.</sub>
+  <img src="docs/readme/record.svg" width="100%" alt="Booster's immunization record for the Laravel 10 example app: after a short countdown, a Gate passed stamp lands on each Laravel and PHP hop in turn, laravel-10-to-11, laravel-11-to-12, php-82-to-83, laravel-12-to-13, php-83-to-84 and php-84-to-85, ending in RESULT: PASS.">
+  <br><sub>The plan's Laravel and PHP hops, written up the way your doctor would: one stamp per hop, one hop at a time.</sub>
 </div>
 
 <details>
@@ -156,9 +194,9 @@ supports at every step):
 
 | Command | What it does |
 |---|---|
-| `booster detect` | Reads `composer.json` and `package.json`; prints the app type, PHP, Laravel, PHPUnit, Vue and Node versions |
-| `booster plan` | Prints the ordered hops, the warnings and an advisory PHPCompatibility scan of the first PHP hop's target. Changes nothing. |
-| `booster scan` | Advisory PHPCompatibility scan: what will break on `--php`. Exits 0 even with findings |
+| `booster detect` | Reads `composer.json` and `package.json`; prints the app type, PHP, Laravel, PHPUnit, Vue, Node and Boost |
+| `booster plan` | Prints the ordered hops, the warnings, a removals line per PHP hop, an advisory PHPCompatibility scan of the first PHP hop's target and a PHPStan scan at the destination PHP. Changes nothing. |
+| `booster scan` | Advisory scans of one PHP version: PHPCompatibility by default, `--removals` for removed functions, `--phpstan` for static analysis. Exits 0 even with findings |
 | `booster run` | Runs the plan. `--dry-run` previews every hop |
 | `booster hops` | Lists every hop Booster knows |
 | `booster init` | Writes the coding-tab playbooks to `.agents/skills`; `--check` exits 1 when they are stale |
@@ -169,7 +207,7 @@ Options shared by `plan` and `run`:
 |---|---|
 | `--path` | The app (default `.`) |
 | `--format` | `text` (default) or `json` |
-| `--policy` | CREED's `policy.json`. Default: `BOOSTER_POLICY`, then the bundled snapshot |
+| `--policy` | CREED's `policy.json`. Default: `BOOSTER_POLICY`, then the copy in the `waynestate/creed` package |
 | `--today` | Override today's date (`YYYY-MM-DD`) so runs are repeatable |
 | `--goal` | Shorthand such as `php-74-to-84` (sets `--from-php` and `--to-php`) |
 | `--from-php`, `--from-laravel` | Say what the app runs on when the manifest does not |
@@ -181,7 +219,7 @@ Options for `plan`:
 
 | Option | Meaning |
 |---|---|
-| `--no-scan` | Skip the advisory PHPCompatibility scan |
+| `--no-scan` | Skip the advisory scans (PHPCompatibility and PHPStan) |
 
 Options for `scan`:
 
@@ -189,6 +227,8 @@ Options for `scan`:
 |---|---|
 | `--path` | The app (default `.`) |
 | `--php` | Required. The PHP version to ask about (`major.minor`, one Booster knows) |
+| `--removals` | List uses of functions and constructs removed in PHP up to `--php`, instead of the PHPCompatibility scan |
+| `--phpstan` | Also run the PHPStan scan (Pinstripe preset) at the same PHP version |
 | `--format` | `text` (default) or `json` |
 
 Options for `run`:
@@ -197,21 +237,24 @@ Options for `run`:
 |---|---|
 | `--dry-run` | Show the diffs; change nothing; skip git, the baseline and the gate. A Laravel hop without `vendor/` is marked incomplete |
 | `--max-changes` | Stop a hop that would change more than this many files (default 50) |
-| `--skip-gate` | Do not run the tests in the target image (skips the baseline too) |
+| `--memory-limit` | Memory limit for the Rector process (for example `2G`), or `-1` for no limit (default `2G`) |
+| `--skip-gate` | Do not run the tests in the target image after each hop, or the PROCTOR check at the end (skips the baseline too) |
 | `--allow-failing-baseline` | Continue when the baseline fails; later gate failures are labelled as pre-existing |
 | `--allow-dirty` | Run even when the working copy has uncommitted changes |
 | `--test-command` | What runs the app's tests in the image (default `composer test`, else `vendor/bin/phpunit`) |
-| `--proctor-command` | An extra command run after the tests, for example a PROCTOR check |
+| `--proctor-command` | An extra command run in the image after the tests, for example a PROCTOR check |
+| `--proctor-advisory` | Report the PROCTOR result but do not fail the run on it |
 
-Exit codes: `0` pass, `1` the baseline failed or a hop was capped, errored or failed its gate, `2` bad usage (bad
-option, unreadable policy, broken `composer.json`, a target the policy does not support).
+Exit codes: `0` pass, `1` the baseline failed, a hop was capped, errored or failed its gate, or the PROCTOR check
+found new findings, `2` bad usage (bad option, unreadable policy, broken `composer.json`, a target the policy does
+not support).
 
 ### The PHPCompatibility scan
 
 `plan` ends with an advisory scan: PHP_CodeSniffer runs the PHPCompatibility standard over the app and asks what will
 break on the PHP version the first PHP hop lands on. The findings are hints for the person doing the upgrade, never a
 gate: they do not change the exit code, and a scan that cannot run (missing tooling, a crash) is reported as "could
-not run" while the plan still prints in full. `--no-scan` skips it.
+not run" while the plan still prints in full. `--no-scan` skips both advisory scans.
 
 The scan is optional. Booster looks for a PHP_CodeSniffer that carries the PHPCompatibility standard, trying the app's
 own `vendor/bin/phpcs`, then Booster's `vendor/bin/phpcs`, then `phpcs` on the PATH. When none of them has the
@@ -237,6 +280,25 @@ The scan ignores `vendor/`, `node_modules/` and `storage/`, because those hold t
 not the app's. It reads the app only and changes nothing. `booster scan --path=../my-app --php=8.0` runs the same scan
 on its own, for any PHP version Booster knows, and exits 0 even when it finds a wall of removed functions.
 
+### The PHPStan scan
+
+`plan` ends with a second advisory scan: PHPStan runs over the app at the destination PHP version, using Pinstripe's
+`base.neon` preset. The findings are hints for the person doing the upgrade, never a gate: they do not change the
+exit code, and a scan that cannot run is reported with the fix that enables it, while the plan still prints in full.
+`--no-scan` skips it.
+
+The scan is optional. Booster looks for a PHPStan binary, trying the app's own `vendor/bin/phpstan`, then Booster's
+`vendor/bin/phpstan`, then `phpstan` on the PATH, and for the preset it tries the app's vendor tree and Booster's.
+When either is missing, the report names the fix:
+
+```
+composer require --dev phpstan/phpstan waynestate/pinstripe
+```
+
+It ignores `vendor/`, `node_modules/` and `storage/`, reads the app only and changes nothing. `booster scan
+--path=../my-app --php=8.5 --phpstan` runs the same scan on its own, for any PHP version Booster knows, and exits 0
+even when it finds a wall of missing types.
+
 ### The baseline
 
 Before the first hop, `run` runs the app's own tests on the PHP the app is on now, in the same `booster-target:<php>`
@@ -247,14 +309,22 @@ suite was red before any change, so a later red gate is not proof of a bad hop. 
 - A red baseline stops the run before the first hop, with a non-zero exit. `--allow-failing-baseline` lets it go on;
   each later gate failure is then labelled "the baseline was already failing" in the text and JSON output.
 - `--skip-gate` and `--dry-run` skip the baseline (reported as `skipped`), so a dry run never starts Docker.
+- A Mix app's `public/mix-manifest.json` is a build artifact, not committed source: a fresh clone has no manifest, so
+  the suite can be red before any hop. Build the assets before the baseline (the app's usual `npm ci && npm run
+  build`), or pass `--allow-failing-baseline` knowing why.
 
 ### What a hop does
 
+On PHP hops a pre-pass runs first: PHP 4 era `$a = &new Foo();` becomes a plain assignment, because PHP 7 and newer
+refuse to compile the old spelling and Rector would never get a parse tree. The report lists the rewrites per file
+under `Pre-pass fixes:`.
+
 1. Rector runs as a dry run. If it reports errors, or wants to change more files than `--max-changes`, the run stops
-   before anything is written.
+   before anything is written. An empty Rector report usually means the process ran out of memory, and the message
+   points at `--memory-limit`.
 2. Rector runs for real, with only that hop's rules.
 3. `composer.json` is edited: the `php` or `laravel/framework` constraint is raised, and `config.platform.php` moves
-    with it. Booster never runs `composer update`.
+   with it when the app already pins it. Booster never runs `composer update` and never creates the key.
 4. The gate runs the app's tests inside `booster-target:<php>`, a container built from `docker/Dockerfile` on the PHP
    the hop moves to. A red gate stops the run and leaves the changes in place so you can read them
    (`git checkout .` undoes them).
@@ -267,26 +337,37 @@ with the number of unique files and a reminder that nothing was applied. A Larav
 cannot see the framework's classes, so its preview is marked incomplete and the report says to run `composer install`
 first.
 
-Some hops are playbooks only (`vue-2-to-3`): Rector does not read Vue, so Booster lists the steps and the official
-guide, and a person does the work. Two hops edit manifests instead of code. `node-pin-24` sets `engines.node` in
-`package.json` and writes `.nvmrc`, then the app's usual gate applies. `mix-to-vite` converts a simple
-`webpack.mix.js` to Vite (below) and asks for a build gate, which runs `npm ci` and `npm run build` in the `node:26`
-container before the app's tests.
+Three hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`,
+then the app's usual gate applies. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (below) and asks for a
+build gate, which runs `npm ci` and `npm run build` in the `node:26` container before the app's tests.
+`tailwind-3-to-4` runs the official `@tailwindcss/upgrade` tool in the Node container, then pins `tailwindcss` to
+`^4.1`, adds the matching Vite or PostCSS plugin, and removes `autoprefixer` and `postcss-import`, which Tailwind 4
+folds in; plugins listed in `tailwind.config.js` and `@apply` inside Vue SFC `<style>` blocks stay manual work, and
+the hop says so.
+
+Vue 2 to Vue 3 is staged. `vue-26-to-27` moves the front end to the last Vue 2 release, which carries the Vue 3
+reactivity API; `vue-27-to-compat` switches to the `@vue/compat` build; `vue-compat-codemod` runs the
+`vue-upgrade-tool` codemod and keeps every manual item it lists. `vue-2-to-3` is the playbook that stands in for all
+three: skipping it skips them, and a person finishes the job, because Rector does not read Vue.
 
 ### Hops Booster knows
 
-PHP one minor at a time from 5.6 to 8.5, Laravel one major at a time from 8 to 13 and PHPUnit one major at a time from
-9 to 13, each list read from `data/versions.json` and trimmed to the majors whose Rector ruleset is installed
-([Hop data](#hop-data)); `cas-to-sesame` (a stub recipe that renames the `wayne-cas` classes to SESAME's compatibility
-classes and swaps the Composer requirement); `node-pin-24` (planned for any app with a `package.json` that does not
-already floor Node at the hop data's target, 26 today: sets `engines.node` to `>=26` and writes `.nvmrc`, ahead of the
-front-end hops); `mix-to-vite` (planned
-when the app has a `webpack.mix.js` and the plan lands on Laravel 9 or newer, after `node-pin-24`: writes
-`vite.config.js`, swaps `laravel-mix` for `vite` and `laravel-vite-plugin` in `package.json`, renames `MIX_` keys to
-`VITE_` in `.env.example`, rewrites Blade `mix()` script and link tags into one `@vite([...])` line per layout when
-every referenced asset maps to a Mix entry, and deletes `webpack.mix.js`; the simple shape only: `mix.js`, `.vue()`,
-`.sass()`, `.postCss()` and `.version()`, anything else is refused by name, a Vue 2 front end must take `vue-2-to-3`
-first, and `withoutMix()` calls are listed for a manual rename to `withoutVite()`); and `vue-2-to-3` (playbook).
+Thirty-two hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
+major at a time from 9 to 13, each list read from `data/versions.json` and trimmed to the majors whose Rector ruleset
+is installed ([Hop data](#hop-data)). Then the recipes: `cas-to-sesame` (renames the `wayne-cas` classes to SESAME's
+compatibility classes and swaps the Composer requirement; planned with `--sesame`, and left out with a warning when
+the plan ends below PHP 8.3, which SESAME needs); `node-pin-24` (planned for any app with a `package.json` that does
+not already floor Node at the hop data's target, 26 today: sets `engines.node` to `>=26` and writes `.nvmrc`, ahead
+of the front-end hops); `mix-to-vite` (planned when the app has a `webpack.mix.js` and the plan lands on Laravel 9 or
+newer, after `node-pin-24`: writes `vite.config.js`, swaps `laravel-mix` for `vite` and `laravel-vite-plugin` in
+`package.json`, renames `MIX_` keys to `VITE_` in `.env.example`, rewrites Blade `mix()` script and link tags into one
+`@vite([...])` line per layout when every referenced asset maps to a Mix entry, and deletes `webpack.mix.js`; the
+simple shape only: `mix.js`, `.vue()`, `.sass()`, `.postCss()` and `.version()`, anything else is refused by name, a
+Vue 2 front end must take `vue-2-to-3` first, and `withoutMix()` calls are listed for a manual rename to
+`withoutVite()`); `tailwind-3-to-4` (planned when `package.json` carries `tailwindcss` below 4, after `node-pin-24`
+and `mix-to-vite`: runs the official `@tailwindcss/upgrade` tool, pins `tailwindcss` to `^4.1`, adds the matching
+Vite or PostCSS plugin and removes `autoprefixer` and `postcss-import`); and the Vue 2 to Vue 3 stage,
+`vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod`, with the `vue-2-to-3` playbook standing in for all three.
 `booster hops` prints them all.
 
 Booster plans only what the policy supports as a target. Moving to PHP 8.1 is refused because 8.1 is past security
@@ -296,11 +377,11 @@ support; passing through it on the way to a newer version is fine.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `BOOSTER_POLICY` | Path to CREED's `policy.json` | the generated copy in `src/Creed/policy.json` |
+| `BOOSTER_POLICY` | Path to CREED's `policy.json` | the copy in the `waynestate/creed` package |
 
-The copy in `src/Creed/` (reader, `policy.json` and manifest) is generated from CREED by its `bin/export.php`, not
-written by hand: point `CREED_PATH` at a CREED checkout and run `composer creed-copy:check` to verify the copy has
-not drifted (it exits non-zero on a hand edit or a newer CREED).
+Booster reads the policy straight from the `waynestate/creed` package in its own `vendor/`, so there is no copy to
+drift: `composer update waynestate/creed` is the whole refresh. `--policy` and `BOOSTER_POLICY` still override it for
+one run.
 
 `.env.example` holds the placeholder. Booster reads no secrets, makes no network calls of its own and talks to no
 Citadel host. Everything it prints from an app (file names, diffs) has control characters stripped.
@@ -314,13 +395,18 @@ rector-laravel needs Laravel's classes to recognise a model or a controller. For
 own `vendor/autoload.php` when it exists, so run `composer install` in the app first. PHP hops never load the app's
 autoloader. An app with no `vendor/` still gets a plan and the hops that do not need Laravel's classes.
 
+For an Inertia/Vue app, each Laravel hop also raises the Inertia constraints the app already carries:
+`inertiajs/inertia-laravel` and `@inertiajs/vue3` move to the constraint the hop data pairs with the target major
+(`^2.0` for Laravel 11 and newer). Booster never adds a package the app does not have, and below Laravel 11 it pins
+nothing and says so, because the hop data carries no constraint there.
+
 ## Hop data
 
 `data/versions.json` holds the version facts Booster plans against: the PHP, Laravel and PHPUnit chains, the PHP range
-each Laravel major supports, the PHPUnit floor each Laravel major ships, and the Node floor the `node-pin-24` hop
-writes. The file ships inside the PHAR. A new major appears in the file as soon as its feed says so; Booster offers a
-hop for it only once Rector ships a ruleset for it, and a plan toward a major without one stops there with a warning
-instead of failing.
+each Laravel major supports, the PHPUnit floor each Laravel major ships, the Node floor the `node-pin-24` hop writes,
+and the fixed Tailwind pin and Inertia constraint tables the front-end hops use. The file ships inside the PHAR. A new
+major appears in the file as soon as its feed says so; Booster offers a hop for it only once Rector ships a ruleset
+for it, and a plan toward a major without one stops there with a warning instead of failing.
 
 `bin/refresh-hop-data.php` rewrites the file from the public feeds (Packagist for PHPUnit and Laravel, endoflife.date
 for Laravel's supported PHP ranges, npm for the Vite packages) plus CREED's policy for what counts as supported:
@@ -335,8 +421,10 @@ php bin/refresh-hop-data.php --offline tests/fixtures/hop-feeds --today 2026-10-
 The refresh is deterministic for a given set of feeds and date, and it never touches the recipes: writing a playbook
 for a new hop stays human work. `composer ci` ends with the offline `--check`: it validates the file's shape against
 the bundled policy, then recomputes it from the frozen feeds in `tests/fixtures/hop-feeds` as of the file's
-`generated_on` date, so the check itself needs no network. A scheduled pipeline runs the refresh against the live
-feeds and fails when a feed moved while the file slept; then someone runs the refresh and commits the result.
+`generated_on` date, so the check itself needs no network. A scheduled pipeline runs the hop data robot,
+`bin/hop-data-bot.php`, against the live feeds; when a feed moved while the file slept, the robot opens (or updates)
+a merge request on Booster itself with the new file, and a person merges it. [MAINTAINING.md](MAINTAINING.md) covers
+the token the robot needs.
 
 ## Checks
 
@@ -346,8 +434,9 @@ Maintainers: how to build, test and release this project, and where its data com
 composer ci
 ```
 
-runs `composer validate --strict`, PHPUnit, Pint, PHPStan (Pinstripe's raw preset, still inlined; `waynestate/pinstripe`
-is on Packagist now, so it can become a dev requirement), `composer audit`, the hop data check and the agent-ready check. Nothing needs PHP on the host:
+runs `composer validate --strict`, PHPUnit, Pint, PHPStan (Pinstripe's raw preset, inlined; `waynestate/pinstripe` is
+a dev requirement and supplies the preset the advisory scan uses), `composer audit`, the hop data check and the
+agent-ready check. Nothing needs PHP on the host:
 
 ```
 docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install --no-interaction && composer ci"
@@ -360,10 +449,13 @@ docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install
 
 Proof runs against real Wayne State applications are on a private site, [proof.apps.wayne.edu/booster](https://proof.apps.wayne.edu/booster/), behind a Wayne State employee sign-in.
 
+Proven how: the first full run with the gate on took a Laravel 12 app from PHP 8.2 to 8.4 in two hops, each gated by
+the app's 197-test suite, and it is written up in [research/booster-e2e-gate.md](research/booster-e2e-gate.md).
+
 ## Status
 
-Version 0.1. See [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) for what a person must answer and what is not built yet, and
-[BEST_PRACTICES.md](BEST_PRACTICES.md) for the rules Booster follows.
+Version 1.0. See [CHANGELOG.md](CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) for what stays
+open, and [BEST_PRACTICES.md](BEST_PRACTICES.md) for the rules Booster follows.
 
 ## Licence
 
