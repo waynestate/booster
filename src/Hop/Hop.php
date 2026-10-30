@@ -18,7 +18,11 @@ final readonly class Hop
      * @param list<string>          $composerRemove packages to drop from require
      * @param list<string>          $notes         what Rector cannot do; the person reviewing the diff reads these
      * @param list<string>          $links         official migration notes
-     * @param array<string, string> $npmSet      package.json dot-path to value, for example "engines.node" to ">=24"
+     * @param array<string, string> $npmSet          package.json dot-path to value, for example "engines.node" to ">=24"
+     * @param array<string, string> $npmSetIfPresent same as npmSet, but only when the package is already listed
+     * @param list<string>          $npmRemove       packages to drop from dependencies and devDependencies
+     * @param bool                  $pinNode         also write .nvmrc with the hop's target version
+     * @param list<string>          $aliasOf         hop ids this manual hop stands in for
      */
     public function __construct(
         public string $id,
@@ -35,6 +39,10 @@ final readonly class Hop
         public bool $extraReview = false,
         public array $npmSet = [],
         public bool $buildGate = false,
+        public array $npmSetIfPresent = [],
+        public array $npmRemove = [],
+        public bool $pinNode = false,
+        public array $aliasOf = [],
     ) {}
 
     /**
@@ -55,7 +63,7 @@ final readonly class Hop
      */
     public function toArray(): array
     {
-        return [
+        $array = [
             'id' => $this->id,
             'kind' => $this->kind->value,
             'from' => $this->from,
@@ -66,5 +74,10 @@ final readonly class Hop
             'notes' => $this->notes,
             'links' => $this->links,
         ];
+        if ($this->aliasOf !== []) {
+            $array['alias_of'] = $this->aliasOf;
+        }
+
+        return $array;
     }
 }
