@@ -236,7 +236,8 @@ final class RemovalsScanTest extends TestCase
         [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $app, '--php' => '8.0', '--removals' => true]);
 
         self::assertSame(0, $exit);
-        self::assertStringContainsString('Removed between PHP 5.6 and PHP 8.0: 2 hits (advisory).', $out);
+        // The range starts at the chain floor, which follows data/versions.json (5.5 now).
+        self::assertStringContainsString('Removed between PHP 5.5 and PHP 8.0: 2 hits (advisory).', $out);
         self::assertStringContainsString('src/legacy.php:2 mysql_* functions (the mysql extension) -> mysqli or PDO', $out);
         self::assertStringContainsString('src/legacy.php:3 each() function -> foreach', $out);
     }
@@ -250,7 +251,8 @@ final class RemovalsScanTest extends TestCase
         $data = json_decode($out, true);
 
         self::assertSame(0, $exit);
-        self::assertSame('5.6', $data['removals']['from']);
+        // "from" is the chain floor from data/versions.json (5.5 now), not a fixed value.
+        self::assertSame('5.5', $data['removals']['from']);
         self::assertSame('7.0', $data['removals']['to']);
         self::assertSame(1, $data['removals']['total']);
         self::assertFalse($data['removals']['truncated']);
