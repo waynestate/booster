@@ -44,12 +44,20 @@ tag for how Booster holds each rule today.
   bounded `^2.8` and rector-laravel `^2.7`.
 - **Use maintained sets before writing rules.** `Enforced`: PHP and Laravel hops use the official per-version sets. The
   only Booster-owned rule set is the `wayne-cas` rename.
+- **Give Rector room to breathe.** `Checked`: the Rector process runs under `--memory-limit` (default `2G`, `-1`
+  for no limit); an empty or invalid Rector report names the flag, because a killed process is the usual cause.
+- **Fix what the parser will not even read.** `Enforced`: PHP hops run a pre-pass that rewrites PHP 4 era
+  `$a = &new Foo();` to a plain assignment before Rector starts, because PHP 7 and newer refuse to compile the old
+  spelling. The report counts the rewrites per file, and they count toward the cap.
 
 ## Find what Rector cannot fix
 
-- **Static analysis against the target version** and **`composer audit` after dependency changes.** `Documented`:
-   hop notes name what Rector cannot do (for example `mysql_*` removal, implicit nullable parameters). `Not yet`: Booster
-   does not run PHPStan or `composer audit` inside the app for you; pass them with `--proctor-command`.
+- **PHPStan against the destination version is advisory only.** `Enforced`: `plan` ends with a PHPStan scan of the
+  app at its target PHP (Pinstripe's `base.neon` preset), and `booster scan --phpstan` runs it alone. It never
+  changes the exit code, and a missing PHPStan or preset is reported with the command that enables it.
+- **`composer audit` after dependency changes.** `Documented`: hop notes name what Rector cannot do (for example
+  `mysql_*` removal, implicit nullable parameters). `Not yet`: Booster does not run `composer audit` inside the app
+  for you; pass it with `--proctor-command`.
 - **PHPCompatibility is advisory only.** `Enforced`: `plan` and `booster scan` run it as an advisory scan; it never changes the exit code and a scan that cannot run is reported, not failed.
 
 ## Safe edits
@@ -69,5 +77,5 @@ tag for how Booster holds each rule today.
 
 ## Not yet
 
-Rector pilot measurements on real apps; the Vue 2 to Vue 3 hop beyond a playbook; Laravel Boost-aware upgrade prompts;
-merge-request automation with bot branches and opt-out (0.1 deliberately has none). See `OPEN_QUESTIONS.md`.
+Rector pilot measurements on real apps. Merge-request automation on app code is a closed decision, not a gap:
+Booster never commits, pushes or opens a merge request. See `OPEN_QUESTIONS.md`.

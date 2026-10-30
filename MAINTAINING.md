@@ -6,8 +6,8 @@ must land. Rockets need fuel, and this one runs on fresh version data and workin
 
 ## What Booster is and what it depends on
 
-- `waynestate/booster` on Packagist, with the CLI `bin/booster`. An optional single-file phar (`build/booster.phar`)
-  is built locally and not published yet.
+- `waynestate/booster` on Packagist, with the CLI `bin/booster`. A single-file phar (`build/booster.phar`) ships
+  with every version tag, as a GitLab release asset and a GitHub release attachment.
 - Runtime dependencies: `rector/rector`, `driftingly/rector-laravel`, `symfony/console`, `symfony/process`,
   `composer/semver`, plus the stack packages `waynestate/proctor` (the check gate) and `waynestate/creed` (the
   version policy). Box (for the phar) lives in `tools/box/`, outside the main lock file.
@@ -36,14 +36,30 @@ With only Docker:
 docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install --no-interaction && composer ci"
 ```
 
-`composer ci` runs `composer validate --strict`, PHPUnit, Pint, PHPStan and `composer audit`. The phar scripts
-install Box in `tools/box`, build from a clean copy with `--no-dev`, and finish with `php build/booster.phar --version`.
+`composer ci` runs `composer validate --strict`, PHPUnit, Pint, PHPStan, `composer audit`, the hop data check and
+the agent-ready check. The phar scripts install Box in `tools/box`, build from a clean copy with `--no-dev`, and
+finish with `php build/booster.phar --version`.
 
 ## CI
 
 - **GitLab:** Preflight's `php-test` (PHP 8.3, 8.4, 8.5) and `composer-audit` components, plus a `composer-ci` job.
 - **GitHub:** `.github/workflows/ci.yml` calls Preflight's reusable workflow with `composer ci`.
 - Green means `composer ci` passed on all three PHP versions on both.
+
+## PHAR release
+
+Every version tag builds and publishes the phar on both remotes, from one recipe: `scripts/build-phar.sh` in
+no-Docker mode (`BOOSTER_PHAR_NO_DOCKER=1`), because the runners may have no Docker daemon and the Composer image
+already ships PHP and Composer.
+
+- **GitLab:** the `phar` job builds `build/booster.phar` and keeps it as an artifact forever; the `release` job
+  then publishes a GitLab release for the tag with the phar attached.
+- **GitHub:** the mirror carries the tag to `.github/workflows/release-phar.yml`, which builds the same phar and
+  attaches it to the GitHub release, creating the release if the mirror did not.
+
+The script verifies the phar by printing Booster's version and prints its SHA-256 checksum in the job log. Building
+locally still works on any commit: `.\scripts\build-phar.ps1` or `scripts/build-phar.sh` (Docker only, no PHP or
+Composer on the host).
 
 ## Updating the CREED policy
 
@@ -55,6 +71,9 @@ composer update waynestate/creed
 
 Then `composer ci`, and commit with the CREED release in the message. When a new Laravel or PHP line appears in
 CREED, check whether Booster needs a new hop for it.
+
+The constraint is `^0.1`, which covers only 0.1.x releases. When CREED crosses a minor, the bump is a person's
+job: edit `composer.json`, run the update, commit.
 
 ## Hop data (the scheduled refresh)
 
