@@ -2,6 +2,24 @@
 
 All notable changes to Booster are recorded here. The format follows Keep a Changelog.
 
+## [Unreleased]
+
+### Changed
+
+- The gate's target image carries the extension set Citadel's apps run with: intl, ldap, soap, zip, gd, pdo_mysql,
+  mysqli, bcmath, pcntl, exif, redis, imagick and oci8 (before: zip, pdo_mysql, mysqli and bcmath). The extensions
+  come from mlocati/php-extension-installer, pinned to 2.13.1 by digest; it also downloads Oracle Instant Client for
+  oci8, so the first build takes a few minutes.
+- Target image tags are stamped with a short hash of `docker/Dockerfile` (`booster-target:<php>-<stamp>`), so an
+  edited recipe rebuilds the image instead of reusing a stale tag.
+
+### Added
+
+- `--image` for `run`: run the gate in a Docker image of your own instead of building `booster-target`. The image
+  needs `php` and `composer` on `PATH`; Booster uses it when it is present locally and pulls it otherwise.
+- `scripts/check-target-image.sh` and `scripts/check-target-image.ps1`: build the target image for each PHP version
+  and verify its extension list.
+
 ## [1.1.0] - 2026-10-30
 
 ### Changed
