@@ -51,21 +51,25 @@ phar:
       - build/booster.phar
     expire_in: never
 
+# release-cli is deprecated by GitLab and has no build for non-amd64 runners,
+# so this calls the Releases API with curl from a multi-arch image pinned by
+# its manifest list digest (the runner is not amd64).
 release:
   image:
-    name: registry.gitlab.com/gitlab-org/release-cli:latest
+    name: curlimages/curl:8.17.0@sha256:935d9100e9ba842cdb060de42472c7ca90cfe9a7c96e4dacb55e79e560b3ff40
     entrypoint: ['']
   needs:
     - phar
   rules:
     - if: '$CI_COMMIT_TAG'
   script:
-    - echo "Publishing the GitLab release for $CI_COMMIT_TAG"
-  release:
-    tag_name: '$CI_COMMIT_TAG'
-    name: 'Booster $CI_COMMIT_TAG'
-    description: 'Booster $CI_COMMIT_TAG as a single-file PHAR.'
-    assets:
-      links:
-        - name: 'booster.phar'
-          url: '$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/raw/build/booster.phar?job=phar'
+    - |
+      set -eu
+      echo "Publishing the GitLab release for $CI_COMMIT_TAG"
+      asset="$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/raw/build/booster.phar?job=phar"
+      body=$(printf '{"tag_name":"%s","name":"Booster %s","description":"Booster %s as a single-file PHAR.","assets":{"links":[{"name":"booster.phar","url":"%s","link_type":"package"}]}}' "$CI_COMMIT_TAG" "$CI_COMMIT_TAG" "$CI_COMMIT_TAG" "$asset")
+      curl --silent --show-error --fail-with-body \
+        --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+        --header "Content-Type: application/json" \
+        --data "$body" \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
