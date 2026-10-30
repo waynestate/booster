@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Run;
 
+use Closure;
+
 final readonly class RunOptions
 {
     public function __construct(
@@ -11,7 +13,12 @@ final readonly class RunOptions
         public bool $skipGate = false,
         public bool $allowDirty = false,
         public bool $allowFailingBaseline = false,
-        public int $maxChanges = 50,
+        /** Hard limit on files changed per hop: null = not given (the review threshold decides), 0 = no limit. */
+        public ?int $maxChanges = null,
+        /** A hop that changes more files than this asks first when it can, and stops otherwise. */
+        public int $reviewThreshold = 200,
+        /** Asks the person before an over-threshold hop is applied. Gets the file count and the per-rule summary lines; true applies the hop. */
+        public ?Closure $confirm = null,
         public ?string $testCommand = null,
         public ?string $proctorCommand = null,
         public string $memoryLimit = RectorRunner::DEFAULT_MEMORY_LIMIT,

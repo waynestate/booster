@@ -502,8 +502,9 @@ final class CliTest extends TestCase
         self::assertStringContainsString('+new', $out);
     }
 
-    public function test_run_exits_1_when_a_hop_is_capped(): void
+    public function test_run_dry_run_over_an_explicit_max_changes_is_still_previewed(): void
     {
+        // A dry run is never capped, even over an explicit --max-changes.
         $files = array_fill(0, 3, ['file' => '/x/a.php', 'diff' => 'd']);
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, (string) json_encode(['file_diffs' => $files]), ''));
 
@@ -511,8 +512,32 @@ final class CliTest extends TestCase
             'command' => 'run', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--dry-run' => true, '--max-changes' => '2', '--goal' => 'php-74-to-84',
         ], $fake);
 
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('PREVIEWED', $out);
+        self::assertStringNotContainsString('CAPPED', $out);
+    }
+
+    public function test_run_exits_1_when_a_hop_is_capped_by_an_explicit_max_changes(): void
+    {
+        $files = array_fill(0, 3, ['file' => '/x/a.php', 'diff' => 'd']);
+        $fake = new FakeProcessRunner(static function (array $command) use ($files): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => $files]), '');
+        });
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--max-changes' => '2', '--goal' => 'php-74-to-84',
+        ], $fake);
+
         self::assertSame(1, $exit);
         self::assertStringContainsString('CAPPED', $out);
+        self::assertStringContainsString('--max-changes is 2', $out);
     }
 
     public function test_dry_run_reports_unique_files_and_a_closing_line(): void

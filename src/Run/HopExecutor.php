@@ -23,10 +23,11 @@ use Waynestate\Booster\Scan\RemovalsScan;
 use Waynestate\Booster\ToolError;
 
 /**
- * Walks a plan. For each step: preview with Rector, stop if the diff is bigger
- * than the cap, apply, move the CAS config and model traits on the SESAME hop,
- * edit composer.json, then run the gate before the next step. It edits the
- * working copy only: no commits, no branches, no pushes.
+ * Walks a plan. For each step: preview with Rector, ask or stop when the diff
+ * is over the review threshold (or the --max-changes hard limit), apply, move
+ * the CAS config and model traits on the SESAME hop, edit composer.json, then
+ * run the gate before the next step. It edits the working copy only: no
+ * commits, no branches, no pushes.
  */
 final class HopExecutor
 {
@@ -283,14 +284,30 @@ final class HopExecutor
                     return new StepResult($step->number, $hop->id, StepResult::ERROR, [...self::prepassFiles($prepass), ...$preview->files], ['Rector reported errors; nothing was changed.', ...self::refusals($stopErrors), ...$notes], false, $prepass?->files() ?? []);
                 }
                 $wanted = $preview->changedCount() + ($prepass?->changedCount() ?? 0);
-                if ($wanted > $options->maxChanges) {
+                // The per-rule breakdown only makes sense for the hops whose changes are all Rector's.
+                $rules = $hop->kind === HopKind::Php || $hop->kind === HopKind::Phpunit ? $preview->rules() : [];
+                // A --max-changes of 0 lifts the limit entirely; only a positive number caps.
+                $overExplicitCap = $options->maxChanges !== null && $options->maxChanges > 0 && $wanted > $options->maxChanges;
+                $overThreshold = $options->maxChanges === null && $wanted > $options->reviewThreshold;
+                if (!$options->dryRun && $overExplicitCap) {
                     return new StepResult($step->number, $hop->id, StepResult::CAPPED, [...self::prepassFiles($prepass), ...$preview->files], [sprintf(
-                        'This hop wants to change %d files (%d from the pre-pass, %d from Rector) and the cap is %d. Nothing was changed. Review with --dry-run, then raise --max-changes or use --skip to split the work.',
+                        'This hop wants to change %d files and --max-changes is %d. Nothing was changed.',
                         $wanted,
-                        $prepass?->changedCount() ?? 0,
-                        $preview->changedCount(),
                         $options->maxChanges,
-                    ), ...$notes], false, $prepass?->files() ?? []);
+                    ), ...$notes], false, $prepass?->files() ?? [], $rules);
+                }
+                if (!$options->dryRun && $overThreshold) {
+                    $summary = self::summaryLines($prepass, $preview);
+                    $apply = $options->confirm !== null && ($options->confirm)($wanted, $summary);
+                    if (!$apply) {
+                        // When the prompt already showed the summary, do not print it twice.
+                        return new StepResult($step->number, $hop->id, StepResult::CAPPED, [...self::prepassFiles($prepass), ...$preview->files], [sprintf(
+                            'This hop wants to change %d files, over the review threshold of %d. Nothing was changed. Read the per-rule summary, then run again with --max-changes=%d to apply it, or --max-changes=0 for no limit.',
+                            $wanted,
+                            $options->reviewThreshold,
+                            $wanted,
+                        ), ...($options->confirm === null ? $summary : []), ...$notes], false, $prepass?->files() ?? [], $rules);
+                    }
                 }
                 if ($options->dryRun) {
                     // A Laravel hop previews through the app's own autoloader; without vendor/ Rector
@@ -299,15 +316,20 @@ final class HopExecutor
                     $migration = $hop->kind === HopKind::Sesame ? $this->casMigration->migrate($path, true) : null;
                     [$inertiaChanges, $inertiaFiles] = $this->inertiaChangesFor($hop, $step, $plan, true);
                     $files = [...self::prepassFiles($prepass), ...$preview->files, ...($migration->files ?? []), ...$inertiaFiles];
+                    $threshold = $overThreshold ? [sprintf(
+                        'Over the review threshold: this hop changes %d files (threshold %d). Read the per-rule summary below.',
+                        $wanted,
+                        $options->reviewThreshold,
+                    ), ...self::summaryLines($prepass, $preview)] : [];
                     if ($incomplete) {
-                        $messages = [sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$inertiaChanges, ...$hop->notes, ...$notes];
+                        $messages = [...$threshold, sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$inertiaChanges, ...$hop->notes, ...$notes];
                     } elseif ($files === []) {
-                        $messages = ['Dry run: nothing was changed.', ...($migration->manual ?? []), ...$hop->notes, ...$notes];
+                        $messages = [...$threshold, 'Dry run: nothing was changed.', ...($migration->manual ?? []), ...$hop->notes, ...$notes];
                     } else {
-                        $messages = [...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$hop->notes, ...$notes];
+                        $messages = [...$threshold, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$hop->notes, ...$notes];
                     }
 
-                    return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $files, $messages, $incomplete, $prepass?->files() ?? []);
+                    return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $files, $messages, $incomplete, $prepass?->files() ?? [], $rules);
                 }
 
                 $keepPrepass = true;
@@ -374,6 +396,40 @@ final class HopExecutor
             'file' => $fix['file'],
             'diff' => sprintf('pre-pass: %d new-by-reference rewrite%s', $fix['rewrites'], $fix['rewrites'] === 1 ? '' : 's'),
         ], $prepass->files());
+    }
+
+    /**
+     * The per-rule summary for an over-threshold hop: the pre-pass total first
+     * when it changed files, then one line per rule, biggest first with ties
+     * broken by name. At most 15 rules are listed; the rest collapse into one
+     * line, so a hop with hundreds of rules still fits on the screen.
+     *
+     * @return list<string>
+     */
+    private static function summaryLines(?PrepassResult $prepass, RectorResult $preview): array
+    {
+        $lines = [];
+        $prepassCount = $prepass?->changedCount() ?? 0;
+        if ($prepassCount > 0) {
+            $lines[] = sprintf('  new-by-reference pre-pass: %d files', $prepassCount);
+        }
+        $items = [];
+        foreach ($preview->rules() as $name => $count) {
+            $items[] = [$count, $name];
+        }
+        usort($items, static fn(array $a, array $b): int => $b[0] <=> $a[0] ?: strcmp($a[1], $b[1]));
+        $shown = 0;
+        foreach ($items as [$count, $name]) {
+            if ($shown === 15) {
+                $lines[] = sprintf('  and %d more rules', count($items) - 15);
+
+                break;
+            }
+            $lines[] = sprintf('  %s: %d files', $name, $count);
+            $shown++;
+        }
+
+        return $lines;
     }
 
     /**
