@@ -56,7 +56,7 @@ final class PackageCompat
 
     /**
      * The packages the app requires directly, require before require-dev,
-     * minus the ones BOOSTER plans itself: PHP, extensions, Laravel, its
+     * minus the ones Booster plans itself: PHP, extensions, Laravel, its
      * illuminate components and PHPUnit.
      *
      * @param array<string, mixed> $composer
@@ -344,7 +344,7 @@ final class PackageCompat
      * Packages that require illuminate/* components rather than
      * laravel/framework give us several constraints at once. The loosest one
      * is the fairest guess at the Laravel ceiling: it is the constraint that
-     * allows the most of the majors BOOSTER plans.
+     * allows the most of the majors Booster plans.
      *
      * @param array<string, mixed> $require
      */
@@ -379,7 +379,7 @@ final class PackageCompat
     }
 
     /**
-     * The Laravel versions the caps probe against: every major BOOSTER plans,
+     * The Laravel versions the caps probe against: every major Booster plans,
      * at its floor and its ceiling.
      *
      * @return list<string>
@@ -400,14 +400,14 @@ final class PackageCompat
         $parts = [];
         if ($laravelConstraint !== null) {
             $cap = $this->laravelCap($laravelConstraint);
-            $parts[] = $cap !== null ? sprintf('Laravel up to %d', $cap) : 'no Laravel version BOOSTER plans';
+            $parts[] = $cap !== null ? sprintf('Laravel up to %d', $cap) : 'no Laravel version Booster plans';
         }
         if ($phpConstraint !== null) {
             $cap = $this->phpCap($phpConstraint);
-            $parts[] = $cap !== null ? sprintf('PHP up to %s', $cap) : 'no PHP version BOOSTER plans';
+            $parts[] = $cap !== null ? sprintf('PHP up to %s', $cap) : 'no PHP version Booster plans';
         }
         if ($parts === []) {
-            return 'every Laravel and PHP version BOOSTER plans';
+            return 'every Laravel and PHP version Booster plans';
         }
 
         return count($parts) === 1 ? $parts[0] : $parts[0] . ' (or ' . $parts[1] . ')';
