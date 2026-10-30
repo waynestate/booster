@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Plan;
 
 use DateTimeImmutable;
-use Waynestate\Booster\Creed\State;
 use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Policy\Policy;
 use Waynestate\Booster\Policy\PolicyException;
 use Waynestate\Booster\Project\Project;
 use Waynestate\Booster\ToolError;
+use Waynestate\Creed\State;
 
 /**
  * Orders the hops. The rules, all from the best-practices guide:

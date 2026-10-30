@@ -19,7 +19,7 @@ final class PharFilesTest extends TestCase
 
         self::assertSame($root . '/config/rector.php', PharFiles::path('config/rector.php'));
         self::assertFileExists(PharFiles::path('config/rector.php'));
-        self::assertFileExists(PharFiles::path('src/Creed/policy.json'));
+        self::assertFileExists(PharFiles::path('vendor/waynestate/creed/policy/policy.json'));
         self::assertDirectoryExists(PharFiles::path('docker'));
     }
 

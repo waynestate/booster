@@ -19,7 +19,8 @@
         "rector/rector": "^2.8",
         "symfony/console": "^7.1",
         "symfony/process": "^7.1",
-        "waynestate/proctor": "^0.2"
+        "waynestate/proctor": "^0.2",
+        "waynestate/creed": "^0.1"
     },
     "require-dev": {
         "laravel/pint": "^1.32",
@@ -50,7 +51,6 @@
         "lint": "pint --test",
         "fix": "pint",
         "analyse": "phpstan analyse --memory-limit=1G",
-        "creed-copy:check": "php \"$CREED_PATH/bin/export.php\" --check --namespace='Waynestate\\Booster\\Creed' --to=src/Creed",
         "ci": [
             "@composer validate --strict",
             "phpunit",
@@ -65,7 +65,6 @@
     },
     "scripts-descriptions": {
         "ci": "Run every CI check: manifest, tests, style, static analysis, audit, hop data freshness, agent-ready files",
-        "creed-copy:check": "Verify src/Creed still matches a fresh export from the CREED checkout in $CREED_PATH",
         "site:agent-ready": "Rewrite the Markdown twins, llms.txt, llms-full.txt, robots.txt and sitemap.xml in site/ (Squire's agent-ready kit).",
         "site:agent-ready-check": "Fail when the agent-ready files are stale, a page lacks its Markdown link, a prompt drifts from the docs, or the kit was edited here."
     },

@@ -7,9 +7,9 @@ namespace Waynestate\Booster\Refresh;
 use Composer\Semver\VersionParser;
 use DateTimeImmutable;
 use UnexpectedValueException;
-use Waynestate\Booster\Creed\State;
 use Waynestate\Booster\Policy\Policy;
 use Waynestate\Booster\ToolError;
+use Waynestate\Creed\State;
 
 /**
  * Recomputes data/versions.json from the public feeds and CREED's version
