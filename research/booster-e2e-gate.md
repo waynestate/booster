@@ -5,7 +5,7 @@ Branch: `dl/bst-e2e-gate`. Mode: unattended delegated worker.
 
 ## Verdict
 
-Boosters first full end-to-end run with the gate ON passed. A public scratch
+Booster's first full end-to-end run with the gate ON passed. A public scratch
 app (Laravel 12, PHP 8.2, PHPUnit 11, 197 tests) moved from PHP 8.2 to PHP 8.4
 in two hops, and each hop proved its target by running the app's own test suite
 inside a `booster-target:<php>` container. Before that, the same pipeline
