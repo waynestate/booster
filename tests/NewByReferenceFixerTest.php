@@ -155,6 +155,32 @@ final class NewByReferenceFixerTest extends TestCase
         self::assertSame($snippet, (string) file_get_contents($dir . '/src/plain.txt'));
     }
 
+    public function test_fix_tree_never_touches_ide_helper_files(): void
+    {
+        $dir = $this->tempDir();
+        $snippet = "<?php \$a = &new Foo();\n";
+        foreach (['app/Models', 'src'] as $sub) {
+            mkdir($dir . '/' . $sub, 0775, true);
+        }
+        foreach ([
+            '_ide_helper.php' => $snippet,
+            '_ide_helper_models.php' => $snippet,
+            '.phpstorm.meta.php' => $snippet,
+            'app/Models/_ide_helper.php' => $snippet,
+            'app/Models/.phpstorm.meta.php' => $snippet,
+            'src/App.php' => $snippet,
+        ] as $relative => $content) {
+            file_put_contents($dir . '/' . $relative, $content);
+        }
+
+        $result = $this->fixer()->fixTree($dir, true);
+
+        self::assertSame(['src/App.php'], array_column($result->files(), 'file'));
+        foreach (['_ide_helper.php', '_ide_helper_models.php', '.phpstorm.meta.php', 'app/Models/_ide_helper.php', 'app/Models/.phpstorm.meta.php'] as $relative) {
+            self::assertSame($snippet, (string) file_get_contents($dir . '/' . $relative));
+        }
+    }
+
     public function test_fix_tree_without_write_only_reports(): void
     {
         $dir = $this->tempDir();
