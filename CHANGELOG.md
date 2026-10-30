@@ -38,7 +38,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - The hop data robot: `bin/hop-data-bot.php` runs in the scheduled pipeline and opens (or updates) a merge request on
   Booster when the refresh changes `data/versions.json`; a person reviews and merges.
 - `waynestate/proctor ^0.2` as a runtime requirement.
-- mix-to-vite accepts if (mix.inProduction()) { mix.version(); } and drops it with a note; its refusal text lists the accepted calls.
+- mix-to-vite accepts if (mix.inProduction()) { mix.version(); } and drops it with a note; its refusal text lists
+  the accepted calls.
 - A failed baseline whose output mentions a Mix or Vite manifest now names the missing build artifact.
 
 ### Changed
@@ -51,7 +52,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - The deploy layer's Squire kit is refreshed to 0.3.4 (release options can live in `./.env.squire`, which is now
   git-ignored).
 - The scan skip message and the README say how to approve the PHPCompatibility installer plugin.
-- Bound targets (--to-php and the rest) leave Node and Vue hops out unless --with-node is passed; the plan says so.
+- Bound targets (--to-php and the rest) leave Node and Vue hops out unless --with-node is passed; the plan says
+  so.
 
 ### Removed
 
@@ -140,8 +142,9 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
   newer: it writes `vite.config.js`, swaps `laravel-mix` for `vite` and `laravel-vite-plugin` in `package.json` (plus
   `@vitejs/plugin-vue` when the Mix file compiled components), renames `MIX_` keys to `VITE_` in `.env.example`,
   rewrites Blade `mix()` script and link tags into one `@vite([...])` line per layout when every referenced asset maps
-   to a Mix entry, and deletes `webpack.mix.js`. Only the simple shape converts: `mix.js`, `.vue()`, `.sass()`, `.postCss()`, `.version()` and `if (mix.inProduction()) { mix.version(); }` (dropped with a note, since Vite hashes production assets);
-  anything else is refused by name, as is a Vue 2 front end (run `vue-2-to-3` first).
+  to a Mix entry, and deletes `webpack.mix.js`. Only the simple shape converts: `mix.js`, `.vue()`, `.sass()`,
+  `.postCss()`, `.version()` and `if (mix.inProduction()) { mix.version(); }` (dropped with a note, since Vite
+  hashes production assets); anything else is refused by name, as is a Vue 2 front end (run `vue-2-to-3` first).
   Unmapped references, bare `mix()` calls and `withoutMix()` sites are left alone and listed as manual notes. The gate
   runs `npm ci`, `npm run build` and a `public/build/manifest.json` check in the `node:24` container, then the app's
   tests.
