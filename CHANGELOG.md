@@ -1,14 +1,65 @@
 # Changelog
 
-All notable changes to BOOSTER are recorded here. The format follows Keep a Changelog.
+All notable changes to Booster are recorded here. The format follows Keep a Changelog.
 
-## [Unreleased]
+## [1.0.0] (not yet released)
+
+### Added
+
+- The PROCTOR policy gate: a baseline before the first hop and a final check after the last, so only findings new
+  against the baseline block the run. The report groups New, Already present and Fixed; `--proctor-advisory` makes it
+  report-only; the JSON report carries a `proctor` object with `status`, `blocking`, `new`, `already_present`, `fixed`
+  and `baseline`.
+- The PHPStan advisory scan at the destination PHP, using Pinstripe's `base.neon` preset: `plan` ends with it and
+  `booster scan --phpstan` runs it alone. Findings never change the exit code; a scan that cannot run is reported with
+  the command that enables it.
+- The removals advisory: `data/removals.json` lists the functions and constructs removed in each PHP version,
+  `booster scan --removals` lists uses up to `--php`, and each PHP hop in `plan` and `run` prints what was removed
+  between its two versions. The scan is token-level and reads the app before the hop rewrites it.
+- A pre-pass on PHP hops: PHP 4 era `$a = &new Foo();` becomes a plain assignment before Rector, because modern PHP
+  refuses to compile the old spelling. The rewrites are listed per file under `Pre-pass fixes:`.
+- `--memory-limit` for the Rector process (default `2G`, `-1` for no limit); an empty or invalid Rector report points
+  at the flag.
+- Hops for the oldest apps: `php-55-to-56`, `laravel-5.8-to-6`, `laravel-6-to-7` and `laravel-7-to-8`. The hop list is
+  now 32.
+- `cas-to-sesame` is a real migration, not a stub: it renames the `WSU\WayneCas\` classes to SESAME's compatibility
+  namespace, swaps the Composer requirement for `waynestate/sesame ^0.2`, writes `config/sesame.php` from
+  `config/wayne-cas.php` and rewrites models that use `WayneCasable` as a trait. Duo two-factor stays manual work.
+- Vue 2 to Vue 3 as staged hops: `vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod` (the official
+  `vue-upgrade-tool`). The `vue-2-to-3` playbook stands in for all three; skipping it skips them.
+- The `tailwind-3-to-4` hop: the official `@tailwindcss/upgrade` tool, then `tailwindcss` pinned to `^4.1`, the
+  matching Vite or PostCSS plugin added, and `autoprefixer` and `postcss-import` removed.
+- Inertia support in the Laravel hops: an app that carries `inertiajs/inertia-laravel` and `@inertiajs/vue3` gets both
+  constraints raised toward the target major. Booster never adds a package the app does not have.
+- Laravel Boost: `detect` and `plan` report apps that carry `laravel/boost`, and every hop playbook has a Boost
+  section.
+- The PHAR release: every version tag publishes `booster.phar` as a GitLab release asset and a GitHub release
+  attachment. The build prints a SHA-256 checksum, and `scripts/build-phar.sh` has a no-Docker mode for CI.
+- The hop data robot: `bin/hop-data-bot.php` runs in the scheduled pipeline and opens (or updates) a merge request on
+  Booster when the refresh changes `data/versions.json`; a person reviews and merges.
+- `waynestate/proctor ^0.2` as a runtime requirement.
 
 ### Changed
 
-- Changed: the scan skip message and the README say how to approve the PHPCompatibility installer plugin.
-- Changed: the deploy layer's Squire kit is refreshed to 0.3.3 (release options can now live in ./.env.squire).
-- Changed: the deploy layer's Squire kit is refreshed to 0.3.4 (the local .env.squire file is now git-ignored).
+- The version policy is read straight from the `waynestate/creed` package (`^0.1`) in Booster's own `vendor/`, and the
+  plan names it as `waynestate/creed <version>`. There is no bundled copy to refresh.
+- `--skip-gate` also skips the PROCTOR check at the end.
+- Exit code 1 now covers new PROCTOR findings.
+- The Preflight components and the GitHub reusable workflow pin the `0.1.2` tag instead of a commit SHA.
+- The deploy layer's Squire kit is refreshed to 0.3.4 (release options can live in `./.env.squire`, which is now
+  git-ignored).
+- The scan skip message and the README say how to approve the PHPCompatibility installer plugin.
+
+### Removed
+
+- The generated copy of CREED under `src/Creed/` (reader, `policy.json`, manifest) and the `composer creed-copy:check`
+  script: the policy comes from the `waynestate/creed` package.
+
+### Fixed
+
+- Invalid UTF-8 in a Rector report is repaired instead of stopping the run; the report notes the repair.
+- Rector parse errors keep their line numbers.
+- `vue-compat-codemod` keeps unrecognised output lines whole and cuts long output on a character boundary.
 
 ## [0.1.3] - 2026-10-29
 
