@@ -14,20 +14,23 @@ final readonly class ScanResult
 {
     /**
      * @param list<Finding> $findings
+     * @param list<string> $hints
      */
     private function __construct(
         public bool $ok,
         public string $testVersion,
         public ?string $error,
         public array $findings,
+        public array $hints = [],
     ) {}
 
     /**
      * @param list<Finding> $findings
+     * @param list<string> $hints
      */
-    public static function ok(string $testVersion, array $findings): self
+    public static function ok(string $testVersion, array $findings, array $hints = []): self
     {
-        return new self(true, $testVersion, null, $findings);
+        return new self(true, $testVersion, null, $findings, $hints);
     }
 
     public static function error(string $testVersion, string $error): self
@@ -55,6 +58,7 @@ final readonly class ScanResult
             'errors' => $this->errorCount(),
             'warnings' => $this->warningCount(),
             'findings' => array_map(static fn(Finding $finding): array => $finding->toArray(), $this->findings),
+            'hints' => $this->hints,
         ];
     }
 }
