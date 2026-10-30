@@ -139,4 +139,50 @@ final class RectorRunnerTest extends TestCase
             'src/B.php: Something went wrong on line 5',
         ], $result->errors);
     }
+
+    public function test_parse_counts_files_per_rule(): void
+    {
+        // Two files touched by three rules in total; one rule touches both files.
+        $json = json_encode([
+            'file_diffs' => [
+                [
+                    'file' => '/srv/acme-app/src/A.php',
+                    'diff' => '+a',
+                    'applied_rectors' => [
+                        'Rector\Php\CodeQuality\Rector\Assign\NoTrailingCommaInSinglelineListRector',
+                        'Rector\Php\TypeDeclaration\Rector\FunctionLike\AddReturnTypeDeclarationRector',
+                    ],
+                ],
+                [
+                    'file' => '/srv/acme-app/src/B.php',
+                    'diff' => '+b',
+                    'applied_rectors' => [
+                        'Rector\Php\TypeDeclaration\Rector\FunctionLike\AddReturnTypeDeclarationRector',
+                        'Rector\Renaming\Rector\Name\RenameClassRector',
+                    ],
+                ],
+            ],
+            'errors' => [],
+        ]);
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, $json, ''));
+        $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), '/srv/acme-app', true, '8.0');
+
+        self::assertSame(2, $result->changedCount());
+        self::assertSame([
+            'NoTrailingCommaInSinglelineListRector' => 1,
+            'AddReturnTypeDeclarationRector' => 2,
+            'RenameClassRector' => 1,
+        ], $result->rules());
+    }
+
+    public function test_parse_without_applied_rectors_records_no_rules(): void
+    {
+        $json = '{"file_diffs": [{"file": "/srv/acme-app/src/A.php", "diff": "+a"}], "errors": []}';
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, $json, ''));
+        $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), '/srv/acme-app', true, '8.0');
+
+        self::assertSame(1, $result->changedCount());
+        self::assertSame([], $result->rules());
+        self::assertSame([], $result->errors);
+    }
 }

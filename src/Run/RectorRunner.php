@@ -196,6 +196,7 @@ final class RectorRunner
         }
 
         $files = [];
+        $rules = [];
         $diffs = is_array($data['file_diffs'] ?? null) ? $data['file_diffs'] : [];
         foreach ($diffs as $entry) {
             if (!is_array($entry) || !is_string($entry['file'] ?? null)) {
@@ -208,6 +209,21 @@ final class RectorRunner
                 $file = substr($file, strlen($prefix));
             }
             $files[] = ['file' => $file, 'diff' => is_string($entry['diff'] ?? null) ? $entry['diff'] : ''];
+
+            // applied_rectors lists the fully qualified rule class names that touched this
+            // file. Missing or malformed means nothing was recorded for it, not an error.
+            $applied = is_array($entry['applied_rectors'] ?? null) ? array_values($entry['applied_rectors']) : [];
+            foreach (array_unique($applied) as $class) {
+                if (!is_string($class) || $class === '') {
+                    continue;
+                }
+                $short = strrchr($class, '\\');
+                $short = $short === false ? $class : substr($short, 1);
+                if ($short === '') {
+                    continue;
+                }
+                $rules[$short] = ($rules[$short] ?? 0) + 1;
+            }
         }
 
         $errors = [];
@@ -242,6 +258,6 @@ final class RectorRunner
             array_unshift($errors, $note);
         }
 
-        return new RectorResult($files, $errors);
+        return new RectorResult($files, $errors, $rules);
     }
 }
