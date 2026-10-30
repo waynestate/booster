@@ -299,17 +299,35 @@ final class PackageCompat
 
     /**
      * A step blocks when the package's newest release cannot be installed at
-     * the step's destination: the Laravel major probed at its floor, the PHP
-     * minor probed at its ceiling.
+     * the step's destination. The destination major or minor is probed as a
+     * whole (any X.y.z of it), so a constraint that allows any version of the
+     * destination passes, even when it floors above the range's start:
+     * "^10.1" still allows plenty of Laravel 10, and ">=8.2.5" still allows
+     * plenty of PHP 8.2.
      */
     private function stepBlocks(PlanStep $step, ?string $phpConstraint, ?string $laravelConstraint): bool
     {
         if ($step->laravelAfter !== null && $laravelConstraint !== null
-            && !$this->satisfies(sprintf('%s.0.0', $step->laravelAfter), $laravelConstraint)) {
+            && !$this->intersects(sprintf('^%s.0', $step->laravelAfter), $laravelConstraint)) {
             return true;
         }
 
-        return $phpConstraint !== null && !$this->satisfies($step->phpAfter . '.99', $phpConstraint);
+        return $phpConstraint !== null && !$this->intersects($step->phpAfter . '.*', $phpConstraint);
+    }
+
+    /**
+     * Whether any version exists that satisfies both constraints. An
+     * unparseable constraint cannot prove a block, so it lets the step through.
+     */
+    private function intersects(string $range, string $constraint): bool
+    {
+        try {
+            $parser = new VersionParser();
+
+            return $parser->parseConstraints($constraint)->matches($parser->parseConstraints($range));
+        } catch (\Throwable) {
+            return true;
+        }
     }
 
     /** An unparseable constraint cannot prove a block, so it lets the step through. */

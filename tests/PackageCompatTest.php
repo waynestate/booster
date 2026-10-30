@@ -7,6 +7,7 @@ namespace Waynestate\Booster\Tests;
 use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanOptions;
+use Waynestate\Booster\Plan\PlanStep;
 use Waynestate\Booster\Plan\Planner;
 use Waynestate\Booster\Project\ProjectDetector;
 
@@ -59,6 +60,35 @@ final class PackageCompatTest extends TestCase
         }
 
         return new FixturePackageFetcher($map);
+    }
+
+    /**
+     * A one-version p2 document in Packagist's real list format, built inside
+     * the test so constraint math can be checked without a fixture file.
+     *
+     * @param array<string, mixed> $require
+     */
+    private function document(string $name, string $version, array $require): array
+    {
+        return [
+            'minified' => 'composer/2.0',
+            'packages' => [
+                $name => [
+                    [
+                        'name' => $name,
+                        'version' => $version,
+                        'type' => 'library',
+                        'require' => $require,
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    /** @return list<string> */
+    private function stepIds(Plan $plan): array
+    {
+        return array_map(static fn(PlanStep $step): string => $step->hop->id, $plan->steps);
     }
 
     public function test_a_package_capped_below_the_target_blocks_the_first_hop_it_cannot_reach(): void
@@ -141,6 +171,65 @@ final class PackageCompatTest extends TestCase
             $plan->warnings,
         );
         self::assertContains('fzaninotto/faker is abandoned with no replacement.', $plan->warnings);
+    }
+
+    public function test_a_constraint_flooring_above_the_major_start_does_not_block_that_major(): void
+    {
+        $fetcher = $this->fetcher([
+            'acme/ten-point-one' => $this->document('acme/ten-point-one', '1.0.0', ['laravel/framework' => '^10.1']),
+        ]);
+        $plan = $this->planWith(
+            ['require' => ['acme/ten-point-one' => '^1.0']],
+            $fetcher,
+            new PlanOptions(fromPhp: '8.1', fromLaravel: '9'),
+        );
+
+        // The plan does contain the hop into Laravel 10 ...
+        self::assertContains('laravel-9-to-10', $this->stepIds($plan));
+        // ... and ^10.1 allows plenty of 10.x releases, so it does not block
+        // that hop: the first one the package cannot reach is the hop into 11.
+        self::assertSame('laravel-10-to-11', $plan->packageChecks[0]->blocks);
+    }
+
+    public function test_a_package_capped_at_nine_blocks_the_hop_into_ten(): void
+    {
+        $fetcher = $this->fetcher(['fideloper/proxy' => 'fideloper-proxy.json']);
+        $plan = $this->planWith(
+            ['require' => ['fideloper/proxy' => '^4.4']],
+            $fetcher,
+            new PlanOptions(fromPhp: '8.1', fromLaravel: '9'),
+        );
+
+        // The app sits on Laravel 9, which the package still supports, but its
+        // ceiling range ends at ^9.0, so the hop into 10 is the first it
+        // blocks.
+        self::assertContains('laravel-9-to-10', $this->stepIds($plan));
+        $check = $plan->packageChecks[0];
+        self::assertSame('laravel-9-to-10', $check->blocks);
+        self::assertContains(
+            'fideloper/proxy 4.4.2 supports Laravel up to 9 (or PHP up to 9), so it blocks laravel-9-to-10. Replace or upgrade it first.',
+            $plan->warnings,
+        );
+    }
+
+    public function test_a_php_constraint_with_a_patch_floor_does_not_block_the_minor(): void
+    {
+        $fetcher = $this->fetcher([
+            'acme/patch-floor' => $this->document('acme/patch-floor', '1.0.0', ['php' => '>=8.2.5']),
+        ]);
+        $plan = $this->planWith(
+            ['require' => ['acme/patch-floor' => '^1.0']],
+            $fetcher,
+            new PlanOptions(fromPhp: '8.1', fromLaravel: '9'),
+        );
+
+        // The plan does contain the hop into PHP 8.2 ...
+        self::assertContains('php-81-to-82', $this->stepIds($plan));
+        // ... and >=8.2.5 allows plenty of 8.2.x releases, so the hop into 8.2
+        // is not the one the package blocks. The first block is the very first
+        // step, because the app's starting PHP 8.1 is already below the floor.
+        self::assertNotSame('php-81-to-82', $plan->packageChecks[0]->blocks);
+        self::assertSame('laravel-9-to-10', $plan->packageChecks[0]->blocks);
     }
 
     public function test_a_package_behind_a_vcs_repository_is_not_fetched_and_is_labelled(): void
