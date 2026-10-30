@@ -89,6 +89,9 @@ final class HopExecutor
             static fn(string $pair): string => substr($pair, 0, (int) strpos($pair, '=')),
             $options->testEnv,
         );
+        // The composer.lock fingerprint before any hop, so the run can tell
+        // whether the upgrade changed it and write the Citadel install script.
+        $lockBefore = $options->dryRun ? null : $this->lockFingerprint($path);
 
         $baseline = $this->runBaseline($plan, $path, $options);
         if ($baseline->failed() && !$options->allowFailingBaseline) {
@@ -134,8 +137,14 @@ final class HopExecutor
         // --only) cannot prove the app at that target, so the PROCTOR gate
         // reports instead of blocking.
         $advisory = $options->proctorAdvisory || $plan->stopsEarly;
+        // When the upgrade changed composer.lock and the app deploys on Citadel,
+        // write the once-only install script so existing deployments pick up the
+        // new vendor/ first. A dry run changes no lock, so it writes none.
+        $deployScript = $options->dryRun
+            ? null
+            : (new CitadelDeployScript())->writeIfLockChanged($path, $lockBefore, (new \DateTimeImmutable('now'))->format('YmdHi'));
 
-        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys);
+        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys, deployScript: $deployScript);
     }
 
     /**
@@ -1929,6 +1938,22 @@ final class HopExecutor
         }
 
         return 'Undo with: git checkout . && git clean -fd -- ' . implode(' ', $created) . ' (inside the app).';
+    }
+
+    /**
+     * The composer.lock fingerprint (its md5, or null when the file is absent),
+     * so the run can tell whether the upgrade changed the lock at all.
+     */
+    private function lockFingerprint(string $path): ?string
+    {
+        $lock = $path . '/composer.lock';
+        if (!is_file($lock)) {
+            return null;
+        }
+        $hash = md5_file($lock);
+
+        // A lock we cannot read counts as absent, so no change is reported.
+        return $hash === false ? null : $hash;
     }
 
     /** @return list<string> the app's untracked paths from one git status */
