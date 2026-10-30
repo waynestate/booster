@@ -44,10 +44,29 @@ final class TargetImageRunnerTest extends TestCase
             '',
             '',
         ));
-        (new TargetImageRunner($fake, self::DOCKER_DIR))->ensureImage('8.5');
+        (new TargetImageRunner($fake, self::DOCKER_DIR))->ensureImage('8.4');
 
         $build = $fake->calls[1]['command'];
-        self::assertSame(['docker', 'build', '--build-arg', 'PHP_VERSION=8.5', '-t', 'booster-target:8.5-' . $this->stamp(), self::DOCKER_DIR], $build);
+        self::assertSame(
+            ['docker', 'build', '--build-arg', 'PHP_VERSION=8.4', '--build-arg', 'COMPOSER_VERSION=2.10.3', '-t', 'booster-target:8.4-' . $this->stamp(), self::DOCKER_DIR],
+            $build,
+        );
+    }
+
+    public function test_php_below_7_2_builds_with_composer_2_2(): void
+    {
+        $fake = new FakeProcessRunner(static fn(array $command): ProcessResult => new ProcessResult(
+            in_array('inspect', $command, true) ? 1 : 0,
+            '',
+            '',
+        ));
+        (new TargetImageRunner($fake, self::DOCKER_DIR))->ensureImage('7.1');
+
+        $build = $fake->calls[1]['command'];
+        self::assertSame(
+            ['docker', 'build', '--build-arg', 'PHP_VERSION=7.1', '--build-arg', 'COMPOSER_VERSION=2.2', '-t', 'booster-target:7.1-' . $this->stamp(), self::DOCKER_DIR],
+            $build,
+        );
     }
 
     public function test_the_tag_carries_the_recipe_stamp(): void

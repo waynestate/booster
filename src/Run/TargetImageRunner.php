@@ -20,6 +20,12 @@ final class TargetImageRunner
 {
     public const IMAGE_PREFIX = 'booster-target:';
 
+    /** Composer 2.3 and later require PHP 7.2.5, so PHP below 7.2 builds get the 2.2 LTS line. */
+    public const COMPOSER_VERSION_LEGACY = '2.2';
+
+    /** The recipe default, and what every PHP 7.2 and up build gets. */
+    public const COMPOSER_VERSION_CURRENT = '2.10.3';
+
     /** True once a --image image has been found locally or pulled, so the check runs once per run. */
     private bool $customImageReady = false;
 
@@ -84,8 +90,9 @@ final class TargetImageRunner
             return;
         }
 
+        $composer = version_compare($php, '7.2', '<') ? self::COMPOSER_VERSION_LEGACY : self::COMPOSER_VERSION_CURRENT;
         $dir = $this->dockerDir ?? PharFiles::path('docker');
-        $build = $this->processes->run([$this->docker, 'build', '--build-arg', 'PHP_VERSION=' . $php, '-t', $tag, $dir], null, [], 1800);
+        $build = $this->processes->run([$this->docker, 'build', '--build-arg', 'PHP_VERSION=' . $php, '--build-arg', 'COMPOSER_VERSION=' . $composer, '-t', $tag, $dir], null, [], 1800);
         if (!$build->successful()) {
             throw new ToolError(sprintf("Could not build %s.\n%s", $tag, trim($build->stderr)));
         }
