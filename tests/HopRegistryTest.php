@@ -65,7 +65,7 @@ final class HopRegistryTest extends PhpUnitTestCase
         try {
             $registry = new HopRegistry($file);
 
-            self::assertSame(['8', '9', '10', '11', '12', '13', '14'], $registry->laravelChain());
+            self::assertSame(['5.8', '6', '7', '8', '9', '10', '11', '12', '13', '14'], $registry->laravelChain());
             self::assertTrue($registry->has('laravel-12-to-13'));
             self::assertFalse($registry->has('laravel-13-to-14'), 'rector-laravel ships no LARAVEL_140 set yet.');
         } finally {
@@ -98,18 +98,32 @@ final class HopRegistryTest extends PhpUnitTestCase
 
         self::assertTrue($registry->laravelSupportsPhp('12', '8.5'));
         self::assertFalse($registry->laravelSupportsPhp('13', '8.2'));
-        self::assertFalse($registry->laravelSupportsPhp('7', '8.0'));
+        self::assertTrue($registry->laravelSupportsPhp('7', '8.0'));
+        self::assertFalse($registry->laravelSupportsPhp('7', '8.1'));
     }
 
     public function test_neighbours(): void
     {
         $registry = new HopRegistry();
 
+        self::assertSame('5.6', $registry->nextPhp('5.5'));
         self::assertSame('8.0', $registry->nextPhp('7.4'));
         self::assertNull($registry->nextPhp('8.5'));
         self::assertNull($registry->nextPhp('4.0'));
+        self::assertSame('6', $registry->nextLaravel('5.8'));
         self::assertSame('13', $registry->nextLaravel('12'));
         self::assertNull($registry->nextLaravel('13'));
+    }
+
+    public function test_the_laravel_58_floor_hop_uses_the_laravel_60_set(): void
+    {
+        $hop = (new HopRegistry())->get('laravel-5.8-to-6');
+
+        self::assertSame(HopKind::Laravel, $hop->kind);
+        self::assertSame('5.8', $hop->from);
+        self::assertSame('6', $hop->to);
+        self::assertSame(['RectorLaravel\Set\LaravelSetList::LARAVEL_60'], $hop->rectorSets);
+        self::assertSame(['laravel/framework' => '^6.0'], $hop->composerSet);
     }
 
     public function test_phpunit_hop_id(): void
@@ -187,9 +201,16 @@ final class HopRegistryTest extends PhpUnitTestCase
     }
 
     #[DataProvider('laravelPhpunitFloors')]
-    public function test_every_laravel_phpunit_floor_is_a_major_in_the_chain(string $laravel, string $floor): void
+    public function test_every_laravel_phpunit_floor_is_in_the_chain_or_below_its_floor(string $laravel, string $floor): void
     {
-        self::assertContains($floor, (new HopRegistry())->phpunitChain(), sprintf('Laravel %s ships PHPUnit %s, which is not in the chain.', $laravel, $floor));
+        // Old Laravel majors ship older PHPUnit than the chain plans: those
+        // floors sit below the chain's floor instead of inside it.
+        $chain = (new HopRegistry())->phpunitChain();
+
+        self::assertTrue(
+            in_array($floor, $chain, true) || version_compare($floor, $chain[0], '<'),
+            sprintf('Laravel %s ships PHPUnit %s, which is neither in the chain nor below its floor.', $laravel, $floor),
+        );
     }
 
     public function test_unknown_hop_is_a_tool_error(): void

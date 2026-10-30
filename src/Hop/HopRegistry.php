@@ -373,7 +373,7 @@ final class HopRegistry
             if ($to === null) {
                 break;
             }
-            if (!defined('RectorLaravel\Set\LaravelSetList::LARAVEL_' . $to . '0')) {
+            if (!defined('RectorLaravel\Set\LaravelSetList::LARAVEL_' . self::laravelSetSuffix($to))) {
                 // rector-laravel has no ruleset for this major yet, so there is no hop to offer.
                 continue;
             }
@@ -383,7 +383,7 @@ final class HopRegistry
                 from: $from,
                 to: $to,
                 summary: sprintf('Move a Laravel %s app to Laravel %s.', $from, $to),
-                rectorSets: ['RectorLaravel\Set\LaravelSetList::LARAVEL_' . $to . '0'],
+                rectorSets: ['RectorLaravel\Set\LaravelSetList::LARAVEL_' . self::laravelSetSuffix($to)],
                 composerSet: ['laravel/framework' => '^' . $to . '.0'],
                 notes: [
                     'Check the shared database server against the Laravel ' . $to . ' database floor before you apply this hop.',
@@ -392,6 +392,18 @@ final class HopRegistry
                 links: [sprintf('https://laravel.com/docs/%s.x/upgrade', $to)],
             ));
         }
+    }
+
+    /**
+     * The suffix of rector-laravel's set constant for a Laravel major: "13"
+     * becomes "130" and "5.8" becomes "58", because the constants are named
+     * LARAVEL_130 and LARAVEL_58.
+     */
+    private static function laravelSetSuffix(string $major): string
+    {
+        $suffix = str_replace('.', '', $major);
+
+        return str_contains($major, '.') ? $suffix : $suffix . '0';
     }
 
     private function addPhpunitHops(): void

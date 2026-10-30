@@ -270,7 +270,7 @@ final class CliTest extends TestCase
 
         [, $json] = $this->booster(['command' => 'hops', '--format' => 'json']);
         $hops = json_decode($json, true)['hops'];
-        self::assertCount(24, $hops);
+        self::assertCount(28, $hops);
         $pin = null;
         foreach ($hops as $hop) {
             if ($hop['id'] === 'node-pin-24') {
