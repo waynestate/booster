@@ -270,7 +270,7 @@ final class Planner
 
         $packageChecks = [];
         if ($this->packages !== null && !$options->noPackageCheck) {
-            $report = (new PackageCompat($this->packages))->check($project, $steps);
+            $report = (new PackageCompat($this->packages, $this->registry))->check($project, $steps);
             $warnings = [...$warnings, ...$report->warnings()];
             $packageChecks = $report->checks;
         }

@@ -20,8 +20,8 @@ use Waynestate\Booster\Project\ProjectDetector;
  * The four public fixtures are real Packagist p2 captures (trimmed to their
  * newest versions): fideloper/proxy caps at Laravel 9, laravelcollective/
  * remote caps at Laravel 8 and is abandoned, fzaninotto/faker is abandoned
- * with no replacement and needs PHP 7 or lower, beyondcode/laravel-dump-
- * server requires only illuminate components and caps at Laravel 12.
+ * with no replacement and caps at PHP 7.x, beyondcode/laravel-dump-server
+ * requires only illuminate components and caps at Laravel 12.
  */
 final class PackageCompatTest extends TestCase
 {
@@ -103,12 +103,13 @@ final class PackageCompatTest extends TestCase
         self::assertSame('4.4.2', $check->newest);
         // The app sits on Laravel 10, already past the package's ceiling of 9,
         // so its newest release cannot follow the plan at all: the very first
-        // hop is the one it blocks.
+        // hop is the one it blocks. Its PHP constraint has no ceiling, so the
+        // warning names the Laravel cap alone.
         self::assertSame('phpunit-10-to-11', $check->blocks);
         self::assertFalse($check->abandoned);
         self::assertTrue($check->checked);
         self::assertContains(
-            'fideloper/proxy 4.4.2 supports Laravel up to 9 (or PHP up to 9), so it blocks phpunit-10-to-11. Replace or upgrade it first.',
+            'fideloper/proxy 4.4.2 supports Laravel up to 9, so it blocks phpunit-10-to-11. Replace or upgrade it first.',
             $plan->warnings,
         );
         self::assertSame([
@@ -128,7 +129,7 @@ final class PackageCompatTest extends TestCase
         // one its newest release cannot reach.
         self::assertSame('laravel-12-to-13', $check->blocks);
         self::assertContains(
-            'beyondcode/laravel-dump-server 2.1.0 supports Laravel up to 12 (or PHP up to 9), so it blocks laravel-12-to-13. Replace or upgrade it first.',
+            'beyondcode/laravel-dump-server 2.1.0 supports Laravel up to 12, so it blocks laravel-12-to-13. Replace or upgrade it first.',
             $plan->warnings,
         );
     }
@@ -147,7 +148,7 @@ final class PackageCompatTest extends TestCase
         self::assertTrue($check->abandoned);
         self::assertSame('spatie/ssh', $check->replacement);
         self::assertContains(
-            'laravelcollective/remote v6.2.1 supports Laravel up to 8 (or PHP up to 9), so it blocks phpunit-10-to-11. Replace or upgrade it first.',
+            'laravelcollective/remote v6.2.1 supports Laravel up to 8, so it blocks phpunit-10-to-11. Replace or upgrade it first.',
             $plan->warnings,
         );
         self::assertContains('laravelcollective/remote is abandoned (use spatie/ssh instead).', $plan->warnings);
@@ -157,17 +158,22 @@ final class PackageCompatTest extends TestCase
     public function test_an_abandoned_package_without_a_replacement_says_so(): void
     {
         $fetcher = $this->fetcher(['fzaninotto/faker' => 'fzaninotto-faker.json']);
-        $plan = $this->planWith(['require-dev' => ['fzaninotto/faker' => '^1.9']], $fetcher);
+        $plan = $this->planWith(
+            ['require-dev' => ['fzaninotto/faker' => '^1.9']],
+            $fetcher,
+            new PlanOptions(fromPhp: '7.4', fromLaravel: '8'),
+        );
 
         $check = $plan->packageChecks[0];
         self::assertSame('v1.9.2', $check->newest);
-        // It cannot run on any PHP Booster plans, so it blocks the very first
-        // hop of the plan.
-        self::assertSame('phpunit-10-to-11', $check->blocks);
+        // Its PHP constraint caps at 7.x, so the first hop off PHP 7.4 is the
+        // one it blocks, and the warning names the highest real minor it
+        // allows.
+        self::assertSame('php-74-to-80', $check->blocks);
         self::assertTrue($check->abandoned);
         self::assertNull($check->replacement);
         self::assertContains(
-            'fzaninotto/faker v1.9.2 supports PHP up to 7, so it blocks phpunit-10-to-11. Replace or upgrade it first.',
+            'fzaninotto/faker v1.9.2 supports PHP up to 7.4, so it blocks php-74-to-80. Replace or upgrade it first.',
             $plan->warnings,
         );
         self::assertContains('fzaninotto/faker is abandoned with no replacement.', $plan->warnings);
@@ -207,7 +213,7 @@ final class PackageCompatTest extends TestCase
         $check = $plan->packageChecks[0];
         self::assertSame('laravel-9-to-10', $check->blocks);
         self::assertContains(
-            'fideloper/proxy 4.4.2 supports Laravel up to 9 (or PHP up to 9), so it blocks laravel-9-to-10. Replace or upgrade it first.',
+            'fideloper/proxy 4.4.2 supports Laravel up to 9, so it blocks laravel-9-to-10. Replace or upgrade it first.',
             $plan->warnings,
         );
     }
@@ -228,8 +234,37 @@ final class PackageCompatTest extends TestCase
         // ... and >=8.2.5 allows plenty of 8.2.x releases, so the hop into 8.2
         // is not the one the package blocks. The first block is the very first
         // step, because the app's starting PHP 8.1 is already below the floor.
+        // A constraint with no upper bound has no cap to name, so the warning
+        // names its floor instead.
         self::assertNotSame('php-81-to-82', $plan->packageChecks[0]->blocks);
         self::assertSame('laravel-9-to-10', $plan->packageChecks[0]->blocks);
+        self::assertContains(
+            'acme/patch-floor 1.0.0 needs PHP 8.2.5 or newer, so it blocks laravel-9-to-10. Replace or upgrade it first.',
+            $plan->warnings,
+        );
+    }
+
+    public function test_a_package_capped_on_both_dimensions_names_both(): void
+    {
+        $fetcher = $this->fetcher([
+            'acme/both-caps' => $this->document('acme/both-caps', '1.0.0', [
+                'php' => '^7.4',
+                'laravel/framework' => '^9.0',
+            ]),
+        ]);
+        $plan = $this->planWith(
+            ['require' => ['acme/both-caps' => '^1.0']],
+            $fetcher,
+            new PlanOptions(fromPhp: '8.1', fromLaravel: '9'),
+        );
+
+        // The first hop moves Laravel while PHP stays at 8.1, so it fails on
+        // both dimensions at once, and the warning names both caps.
+        self::assertSame('laravel-9-to-10', $plan->packageChecks[0]->blocks);
+        self::assertContains(
+            'acme/both-caps 1.0.0 supports Laravel up to 9 and PHP up to 7.4, so it blocks laravel-9-to-10. Replace or upgrade it first.',
+            $plan->warnings,
+        );
     }
 
     public function test_a_package_behind_a_vcs_repository_is_not_fetched_and_is_labelled(): void

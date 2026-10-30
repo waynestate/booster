@@ -6,6 +6,7 @@ namespace Waynestate\Booster\Plan;
 
 use Composer\Semver\Semver;
 use Composer\Semver\VersionParser;
+use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Project\Project;
 
 /**
@@ -21,7 +22,13 @@ final class PackageCompat
 {
     private const PACKAGIST = 'https://repo.packagist.org/p2/';
 
-    public function __construct(private readonly PackageFetcher $fetcher) {}
+    /** A version far beyond anything Booster plans, used to test for an open-ended constraint. */
+    private const OPEN_ENDED_PROBE = '99.99.99';
+
+    public function __construct(
+        private readonly PackageFetcher $fetcher,
+        private readonly HopRegistry $registry,
+    ) {}
 
     /**
      * @param list<PlanStep> $steps the plan after skips, in run order
@@ -132,8 +139,10 @@ final class PackageCompat
         $replacement = is_string($abandoned) && $abandoned !== '' ? $abandoned : null;
 
         $blocks = null;
+        $failed = [];
         foreach ($steps as $step) {
-            if ($this->stepBlocks($step, $phpConstraint, $laravelConstraint)) {
+            $failed = $this->stepFailures($step, $phpConstraint, $laravelConstraint);
+            if ($failed !== []) {
                 $blocks = $step->hop->id;
                 break;
             }
@@ -142,10 +151,10 @@ final class PackageCompat
         $blockWarning = null;
         if ($blocks !== null) {
             $blockWarning = sprintf(
-                '%s %s supports %s, so it blocks %s. Replace or upgrade it first.',
+                '%s %s %s, so it blocks %s. Replace or upgrade it first.',
                 $name,
                 $newest,
-                $this->supportPhrase($phpConstraint, $laravelConstraint),
+                $this->supportPhrase($failed, $phpConstraint, $laravelConstraint),
                 $blocks,
             );
         }
@@ -298,21 +307,29 @@ final class PackageCompat
     }
 
     /**
-     * A step blocks when the package's newest release cannot be installed at
-     * the step's destination. The destination major or minor is probed as a
-     * whole (any X.y.z of it), so a constraint that allows any version of the
+     * Which dimensions the step's destination violates: 'laravel' when the
+     * package's newest release cannot be installed at the step's Laravel
+     * target, 'php' when it cannot be installed at the step's PHP. Empty when
+     * the step passes. The destination major or minor is probed as a whole
+     * (any X.y.z of it), so a constraint that allows any version of the
      * destination passes, even when it floors above the range's start:
      * "^10.1" still allows plenty of Laravel 10, and ">=8.2.5" still allows
      * plenty of PHP 8.2.
+     *
+     * @return list<'laravel'|'php'>
      */
-    private function stepBlocks(PlanStep $step, ?string $phpConstraint, ?string $laravelConstraint): bool
+    private function stepFailures(PlanStep $step, ?string $phpConstraint, ?string $laravelConstraint): array
     {
+        $failed = [];
         if ($step->laravelAfter !== null && $laravelConstraint !== null
             && !$this->intersects(sprintf('^%s.0', $step->laravelAfter), $laravelConstraint)) {
-            return true;
+            $failed[] = 'laravel';
+        }
+        if ($phpConstraint !== null && !$this->intersects($step->phpAfter . '.*', $phpConstraint)) {
+            $failed[] = 'php';
         }
 
-        return $phpConstraint !== null && !$this->intersects($step->phpAfter . '.*', $phpConstraint);
+        return $failed;
     }
 
     /**
@@ -395,42 +412,97 @@ final class PackageCompat
         return $probes;
     }
 
-    private function supportPhrase(?string $phpConstraint, ?string $laravelConstraint): string
+    /**
+     * What the package's newest release supports, naming only the dimensions
+     * the blocking step fails on. A cap is printed only when the constraint
+     * really has one; a constraint with no upper bound names its floor
+     * instead.
+     *
+     * @param list<'laravel'|'php'> $failed
+     */
+    private function supportPhrase(array $failed, ?string $phpConstraint, ?string $laravelConstraint): string
     {
         $parts = [];
-        if ($laravelConstraint !== null) {
-            $cap = $this->laravelCap($laravelConstraint);
-            $parts[] = $cap !== null ? sprintf('Laravel up to %d', $cap) : 'no Laravel version Booster plans';
+        foreach ($failed as $dimension) {
+            if ($dimension === 'laravel' && $laravelConstraint !== null) {
+                $parts[] = $this->dimensionPhrase('Laravel', $laravelConstraint, $this->laravelCap($laravelConstraint));
+            } elseif ($dimension === 'php' && $phpConstraint !== null) {
+                $parts[] = $this->dimensionPhrase('PHP', $phpConstraint, $this->phpCap($phpConstraint));
+            }
         }
-        if ($phpConstraint !== null) {
-            $cap = $this->phpCap($phpConstraint);
-            $parts[] = $cap !== null ? sprintf('PHP up to %s', $cap) : 'no PHP version Booster plans';
+        if (count($parts) === 1) {
+            return $parts[0];
         }
-        if ($parts === []) {
-            return 'every Laravel and PHP version Booster plans';
+        if (str_starts_with($parts[0], 'supports') && str_starts_with($parts[1], 'supports')) {
+            return 'supports ' . substr($parts[0], strlen('supports ')) . ' and ' . substr($parts[1], strlen('supports '));
         }
 
-        return count($parts) === 1 ? $parts[0] : $parts[0] . ' (or ' . $parts[1] . ')';
+        return $parts[0] . '; ' . $parts[1];
     }
 
-    private function laravelCap(string $constraint): ?int
+    /**
+     * One dimension of the phrase. A constraint with a real upper bound names
+     * the newest version Booster plans that it allows ("supports X up to N");
+     * one without names its floor ("needs X F or newer").
+     */
+    private function dimensionPhrase(string $component, string $constraint, ?string $cap): string
     {
-        for ($major = 15; $major >= 5; $major--) {
-            if ($this->satisfies($major . '.99.99', $constraint)) {
-                return $major;
+        if ($this->hasUpperBound($constraint)) {
+            return $cap !== null
+                ? sprintf('supports %s up to %s', $component, $cap)
+                : sprintf('supports no %s version Booster plans', $component);
+        }
+
+        return sprintf('needs %s %s or newer', $component, $this->floorOf($constraint));
+    }
+
+    /**
+     * Whether the constraint has a real upper bound. One that still allows a
+     * version far beyond anything Booster plans is open-ended, so the phrase
+     * names its floor instead of a cap. (The parsed branch bounds cannot be
+     * trusted for this: composer/semver merges caret unions into branches
+     * whose individual bounds do not reflect the union's.)
+     */
+    private function hasUpperBound(string $constraint): bool
+    {
+        return !$this->satisfies(self::OPEN_ENDED_PROBE, $constraint);
+    }
+
+    /** The constraint's lower bound, trimmed for display: "8.2.5.0-dev" becomes "8.2.5". */
+    private function floorOf(string $constraint): string
+    {
+        $lower = (new VersionParser())->parseConstraints($constraint)->getLowerBound()->getVersion();
+        $lower = (string) preg_replace('/-dev$/', '', $lower);
+
+        return (string) preg_replace('/(\.0)+$/', '', $lower);
+    }
+
+    /**
+     * The newest Laravel version Booster plans that the constraint allows, or
+     * null when it allows none. Probed the same way steps are judged: any
+     * X.y.z of the destination major.
+     */
+    private function laravelCap(string $constraint): ?string
+    {
+        foreach (array_reverse($this->registry->laravelChain()) as $version) {
+            if ($this->intersects(sprintf('^%d.0', (int) $version), $constraint)) {
+                return $version;
             }
         }
 
         return null;
     }
 
+    /**
+     * The newest PHP version Booster knows that the constraint allows, or
+     * null when it allows none: the highest minor allowed, as a real version
+     * (a constraint capping at 7.x reads "7.4", not "7").
+     */
     private function phpCap(string $constraint): ?string
     {
-        foreach ([9, 8, 7] as $major) {
-            for ($minor = 99; $minor >= 0; $minor--) {
-                if ($this->satisfies(sprintf('%d.%d.99', $major, $minor), $constraint)) {
-                    return $minor === 99 ? (string) $major : sprintf('%d.%d', $major, $minor);
-                }
+        foreach (array_reverse($this->registry->phpChain()) as $version) {
+            if ($this->satisfies($version, $constraint)) {
+                return $version;
             }
         }
 

@@ -311,8 +311,13 @@ The answer is advisory, like the scans: a package that cannot follow the plan do
 warning that names the package, the hop it blocks, and what to do about it:
 
 ```
-acme/legacy-auth 2.3.0 supports Laravel up to 10 (or PHP up to 8.3), so it blocks laravel-10-to-11. Replace or upgrade it first.
+acme/legacy-auth 2.3.0 supports Laravel up to 10 and PHP up to 8.3, so it blocks laravel-10-to-11. Replace or upgrade it first.
 ```
+
+The warning names only the dimensions the blocked hop fails on: a Laravel ceiling alone, a PHP ceiling alone, or both
+together. A ceiling is printed as the newest version Booster plans that the constraint allows (a PHP constraint capping
+at 7.x reads "7.4", not "7"), and a constraint with no upper bound has no ceiling to name, so the warning names its
+floor instead (`needs PHP 8.2 or newer`).
 
 A package whose newest release requires several `illuminate/*` components is judged by the loosest of those
 constraints, the one that allows the most Laravel versions. Abandoned packages get their own warning (`acme/old is
