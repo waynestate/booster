@@ -19,14 +19,24 @@ final readonly class RectorResult
     /**
      * @param list<array{file: string, diff: string}> $files  files that changed, relative to the app
      * @param list<string>                            $errors Rector's own errors (parse failures and the like)
+     * @param array<string, int>                      $rules  short rule name to number of files the rule changed
      */
     public function __construct(
         public array $files,
         public array $errors,
+        public array $rules = [],
     ) {}
 
     public function changedCount(): int
     {
         return count($this->files);
+    }
+
+    /**
+     * @return array<string, int> short rule name to number of files the rule changed
+     */
+    public function rules(): array
+    {
+        return $this->rules;
     }
 }

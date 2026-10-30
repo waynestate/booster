@@ -146,7 +146,7 @@
       start: { php: "8.2", lara: "10" },
       doses: bladeDoses,
       heldAt: 1,
-      result: '<span class="result result--fail">RESULT: FAIL</span> Exit 1. Dose 2 wanted to change more files than <code>--max-changes</code> (50) and stopped before writing. Dose 1’s changes wait in your working copy for review.'
+      result: '<span class="result result--fail">RESULT: FAIL</span> Exit 1. Dose 2 would have changed 201 files, over the review threshold of 200, and stopped before writing. Dose 1’s changes wait in your working copy for review.'
     }
   };
 
@@ -162,7 +162,7 @@
 
   function stampHtml(kind, d) {
     if (kind === "held") {
-      return '<span class="stamp stamp--held"><span class="stamp__top">Held</span><span class="stamp__mid">Over cap</span><span class="stamp__date">' + today + "</span></span>";
+      return '<span class="stamp stamp--held"><span class="stamp__top">Held</span><span class="stamp__mid">Over threshold</span><span class="stamp__date">' + today + "</span></span>";
     }
     if (kind === "none") {
       return '<span class="stamp stamp--none"><span class="stamp__top">Not</span><span class="stamp__mid">given</span><span class="stamp__date">&nbsp;</span></span>';
@@ -255,7 +255,7 @@
     }
 
     function finalMessage(sc) {
-      if (sc.heldAt !== undefined) return "Run stopped at dose " + (sc.heldAt + 1) + ": over the file cap. Result: fail, exit 1.";
+      if (sc.heldAt !== undefined) return "Run stopped at dose " + (sc.heldAt + 1) + ": over the review threshold. Result: fail, exit 1.";
       var end = sc.doses[sc.doses.length - 1];
       return "All " + sc.doses.length + " doses stamped. " + sc.title + " is now on " + pairText(end) + ". Result: pass.";
     }

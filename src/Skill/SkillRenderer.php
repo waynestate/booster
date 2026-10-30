@@ -70,7 +70,7 @@ final class SkillRenderer
         $review = $hop->extraReview ? "This is the riskiest PHP hop. Ask for extra tests before you apply it.\n\n" : '';
         $how = $hop->isManual()
             ? "Booster has no automatic change for this hop. Follow the official guide below, then run the tests.\n"
-            : "1. `booster run --path=<app> --dry-run` and read every diff.\n2. `booster run --path=<app>` applies the plan and stops at the first failing gate.\n3. If a hop is capped, split the work with `--skip`; do not raise `--max-changes` blindly.\n";
+            : "1. `booster run --path=<app> --dry-run` and read every diff.\n2. `booster run --path=<app>` applies the plan and stops at the first failing gate.\n3. If a hop is over the review threshold (200 files), read its per-rule summary, then apply it with `--max-changes=N`. Use `--skip` to leave a rule out.\n";
         $boost = $this->boostSection($hop);
 
         return <<<MD

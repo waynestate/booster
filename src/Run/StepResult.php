@@ -26,10 +26,11 @@ final readonly class StepResult
     public const NOTHING_TO_DO = 'nothing-to-do';
 
     /**
-     * @param list<array{file: string, diff: string}>   $files
-     * @param list<string>                              $messages
-     * @param bool                                      $incomplete true when a dry-run preview could not see the whole app (a Laravel hop without vendor/)
-     * @param list<array{file: string, rewrites: int}>  $prepass files the new-by-reference pre-pass rewrote before Rector ran
+     * @param list<array{file: string, diff: string}>  $files
+     * @param list<string>                             $messages
+     * @param bool                                     $incomplete true when a dry-run preview could not see the whole app (a Laravel hop without vendor/)
+     * @param list<array{file: string, rewrites: int}> $prepass files the new-by-reference pre-pass rewrote before Rector ran
+     * @param array<string, int>                       $rules short rule name to number of files the rule changed; set on capped and previewed PHP and PHPUnit steps
      */
     public function __construct(
         public int $step,
@@ -39,6 +40,7 @@ final readonly class StepResult
         public array $messages = [],
         public bool $incomplete = false,
         public array $prepass = [],
+        public array $rules = [],
     ) {}
 
     public function failed(): bool
@@ -62,6 +64,9 @@ final readonly class StepResult
         ];
         if ($this->prepass !== []) {
             $data['prepass_fixes'] = $this->prepass;
+        }
+        if ($this->rules !== []) {
+            $data['rules'] = $this->rules;
         }
 
         return $data;

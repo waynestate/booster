@@ -34,8 +34,8 @@ tag for how Booster holds each rule today.
 
 - **Dry-run first and read the diff.** `Enforced`: every hop previews before it writes; `--dry-run` previews without
   writing.
-- **Cap the first change.** `Enforced`: a hop that would change more than `--max-changes` files stops before it
-  writes.
+- **Review big hops.** `Enforced`: a hop that would change more than 200 files stops before it writes; an interactive
+  run shows the per-rule summary and asks first, and `--max-changes` sets a hard limit instead of the threshold.
 - **Set the PHP target on purpose.** `Enforced`: Booster hands Rector the hop's PHP version, because Rector otherwise
   reads the old constraint in `composer.json` and silently skips the new rules.
 - **Run Rector from its own toolchain.** `Enforced`: Rector and rector-laravel come from Booster's `vendor/`, never
@@ -48,7 +48,7 @@ tag for how Booster holds each rule today.
   for no limit); an empty or invalid Rector report names the flag, because a killed process is the usual cause.
 - **Fix what the parser will not even read.** `Enforced`: PHP hops run a pre-pass that rewrites PHP 4 era
   `$a = &new Foo();` to a plain assignment before Rector starts, because PHP 7 and newer refuse to compile the old
-  spelling. The report counts the rewrites per file, and they count toward the cap.
+  spelling. The report counts the rewrites per file, and they count toward the review threshold.
 
 ## Find what Rector cannot fix
 

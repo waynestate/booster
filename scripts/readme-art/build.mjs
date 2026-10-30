@@ -154,16 +154,16 @@ async function buildCast() {
 /* ---------------------------------------------------------------- 2. badges */
 
 // Facts are read, never typed: php and the licence from composer.json, and
-// the per-hop file cap from RunOptions. A badge that lies is a dose that
+// the review threshold from RunOptions. A badge that lies is a dose that
 // didn't take.
 function buildBadges() {
   console.log("badges:");
   const composer = JSON.parse(read("composer.json"));
-  const cap = read("src/Run/RunOptions.php").match(/public int \$maxChanges = (\d+)/)?.[1];
+  const threshold = read("src/Run/RunOptions.php").match(/public int \$reviewThreshold = (\d+)/)?.[1];
   const defs = [
     { key: "php", label: "php", message: composer.require?.php },
     { key: "license", label: "licence", message: composer.license },
-    { key: "cap", label: "cap per hop", message: cap && `${cap} files` },
+    { key: "threshold", label: "review threshold", message: threshold && `${threshold} files` },
   ];
   for (const d of defs) {
     if (!d.message) fail(`no fact to badge for "${d.key}"`);

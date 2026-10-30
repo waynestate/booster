@@ -13,15 +13,19 @@ final class CliTest extends TestCase
 {
     /**
      * @param array<string, mixed> $input
+     * @param list<string>         $inputs answers fed to an interactive run, one per prompt
      *
      * @return array{int, string}
      */
-    private function booster(array $input, ?FakeProcessRunner $fake = null): array
+    private function booster(array $input, ?FakeProcessRunner $fake = null, bool $interactive = false, array $inputs = []): array
     {
         $app = new BoosterApplication($fake);
         $app->setAutoExit(false);
         $tester = new ApplicationTester($app);
-        $exit = $tester->run($input, ['capture_stderr_separately' => true]);
+        if ($inputs !== []) {
+            $tester->setInputs($inputs);
+        }
+        $exit = $tester->run($input, ['capture_stderr_separately' => true, 'interactive' => $interactive]);
 
         return [$exit, $tester->getDisplay() . $tester->getErrorOutput()];
     }
@@ -61,6 +65,34 @@ final class CliTest extends TestCase
     private function phpstanReport(array $files): array
     {
         return ['totals' => ['errors' => 1, 'file_errors' => 1], 'files' => $files, 'errors' => []];
+    }
+
+    /** A FakeProcessRunner whose Rector preview changes 201 files, so a hop is over the review threshold. */
+    private function thresholdFake(): FakeProcessRunner
+    {
+        return new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git' || $command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            if (($command[2] ?? '') === 'check') {
+                return new ProcessResult(0, '{"result":"pass","findings":[]}', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => self::bigFileDiffs(201)]), '');
+        });
+    }
+
+    /**
+     * @return list<array{file: string, diff: string}>
+     */
+    private static function bigFileDiffs(int $count): array
+    {
+        $files = [];
+        for ($i = 0; $i < $count; $i++) {
+            $files[] = ['file' => sprintf('/x/src/F%03d.php', $i), 'diff' => 'd'];
+        }
+
+        return $files;
     }
 
     public function test_plan_prints_the_hops_in_order(): void
@@ -502,8 +534,9 @@ final class CliTest extends TestCase
         self::assertStringContainsString('+new', $out);
     }
 
-    public function test_run_exits_1_when_a_hop_is_capped(): void
+    public function test_run_dry_run_over_an_explicit_max_changes_is_still_previewed(): void
     {
+        // A dry run is never capped, even over an explicit --max-changes.
         $files = array_fill(0, 3, ['file' => '/x/a.php', 'diff' => 'd']);
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, (string) json_encode(['file_diffs' => $files]), ''));
 
@@ -511,8 +544,79 @@ final class CliTest extends TestCase
             'command' => 'run', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--dry-run' => true, '--max-changes' => '2', '--goal' => 'php-74-to-84',
         ], $fake);
 
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('PREVIEWED', $out);
+        self::assertStringNotContainsString('CAPPED', $out);
+    }
+
+    public function test_run_exits_1_when_a_hop_is_capped_by_an_explicit_max_changes(): void
+    {
+        $files = array_fill(0, 3, ['file' => '/x/a.php', 'diff' => 'd']);
+        $fake = new FakeProcessRunner(static function (array $command) use ($files): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => $files]), '');
+        });
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--max-changes' => '2', '--goal' => 'php-74-to-84',
+        ], $fake);
+
         self::assertSame(1, $exit);
         self::assertStringContainsString('CAPPED', $out);
+        self::assertStringContainsString('--max-changes is 2', $out);
+    }
+
+    public function test_run_exits_1_when_a_hop_is_over_the_review_threshold_and_not_interactive(): void
+    {
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--goal' => 'php-83-to-84',
+        ], $this->thresholdFake());
+
+        self::assertSame(1, $exit);
+        self::assertStringContainsString('CAPPED', $out);
+        self::assertStringContainsString('over the review threshold of 200', $out);
+        self::assertStringContainsString('--max-changes=201', $out);
+        self::assertStringNotContainsString('Apply this hop?', $out);
+    }
+
+    public function test_run_asks_before_an_over_threshold_hop_and_stops_when_the_person_says_no(): void
+    {
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--goal' => 'php-83-to-84',
+        ], $this->thresholdFake(), true, ['no']);
+
+        self::assertSame(1, $exit);
+        self::assertStringContainsString('Apply this hop?', $out);
+        self::assertStringContainsString('CAPPED', $out);
+    }
+
+    public function test_run_applies_an_over_threshold_hop_when_the_person_says_yes(): void
+    {
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--goal' => 'php-83-to-84',
+        ], $this->thresholdFake(), true, ['yes']);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Apply this hop?', $out);
+        self::assertStringContainsString('APPLIED', $out);
+    }
+
+    public function test_run_json_over_the_threshold_stops_without_prompting(): void
+    {
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--format' => 'json', '--goal' => 'php-83-to-84',
+        ], $this->thresholdFake(), true, ['yes']);
+
+        self::assertSame(1, $exit);
+        self::assertStringNotContainsString('Apply this hop?', $out);
+        $data = json_decode($out, true);
+        self::assertSame('capped', $data['results'][0]['status']);
     }
 
     public function test_dry_run_reports_unique_files_and_a_closing_line(): void

@@ -331,18 +331,203 @@ final class HopExecutorTest extends TestCase
         self::assertSame([], array_filter($fake->calls, static fn(array $c): bool => $c['command'][0] === 'git'));
     }
 
-    public function test_a_diff_over_the_cap_stops_the_run_before_anything_is_applied(): void
+    public function test_a_diff_over_an_explicit_max_changes_stops_the_run_before_anything_is_applied(): void
     {
         $fake = $this->fake(changedPerHop: 4);
         $report = $this->execute($fake, new RunOptions(maxChanges: 3));
 
         self::assertSame(['capped', 'not-run'], $this->statuses($report));
+        self::assertStringContainsString('This hop wants to change 4 files and --max-changes is 3. Nothing was changed.', implode(' ', $report->results[0]->messages));
         self::assertTrue($report->failed());
         foreach ($fake->calls as $call) {
             if (in_array('process', $call['command'], true)) {
                 self::assertContains('--dry-run', $call['command']);
             }
         }
+    }
+
+    public function test_the_review_threshold_defaults_to_two_hundred_files(): void
+    {
+        $options = new RunOptions();
+
+        self::assertSame(200, $options->reviewThreshold);
+        self::assertNull($options->maxChanges);
+        self::assertNull($options->confirm);
+    }
+
+    public function test_an_explicit_max_changes_of_zero_is_no_limit_and_no_prompt(): void
+    {
+        $fake = $this->fake(changedPerHop: 4);
+        $report = $this->execute($fake, new RunOptions(maxChanges: 0));
+
+        self::assertSame(['applied', 'applied'], $this->statuses($report));
+    }
+
+    public function test_a_hop_over_the_threshold_stops_when_not_interactive(): void
+    {
+        $fake = $this->fake(changedPerHop: 4);
+        $report = $this->execute($fake, new RunOptions(reviewThreshold: 3));
+
+        self::assertSame(['capped', 'not-run'], $this->statuses($report));
+        self::assertStringContainsString('This hop wants to change 4 files, over the review threshold of 3. Nothing was changed. Read the per-rule summary, then run again with --max-changes=4 to apply it, or --max-changes=0 for no limit.', implode(' ', $report->results[0]->messages));
+        self::assertTrue($report->failed());
+        foreach ($fake->calls as $call) {
+            if (in_array('process', $call['command'], true)) {
+                self::assertContains('--dry-run', $call['command']);
+            }
+        }
+    }
+
+    public function test_a_hop_over_the_threshold_applies_when_the_person_confirms(): void
+    {
+        $fake = $this->fake(changedPerHop: 4);
+        $asked = [];
+        $report = $this->execute($fake, new RunOptions(reviewThreshold: 3, confirm: static function (int $count, array $summary) use (&$asked): bool {
+            $asked[] = [$count, $summary];
+
+            return true;
+        }));
+
+        self::assertSame(['applied', 'applied'], $this->statuses($report));
+        // Both hops are over the threshold, so both ask.
+        self::assertCount(2, $asked);
+        self::assertSame(4, $asked[0][0]);
+    }
+
+    public function test_a_hop_over_the_threshold_stops_when_the_person_declines(): void
+    {
+        $fake = $this->fake(changedPerHop: 4);
+        $asked = 0;
+        $report = $this->execute($fake, new RunOptions(reviewThreshold: 3, confirm: static function () use (&$asked): bool {
+            $asked++;
+
+            return false;
+        }));
+
+        self::assertSame(['capped', 'not-run'], $this->statuses($report));
+        self::assertSame(1, $asked);
+        self::assertStringContainsString('This hop wants to change 4 files, over the review threshold of 3.', implode(' ', $report->results[0]->messages));
+    }
+
+    public function test_a_dry_run_over_the_threshold_is_previewed_with_the_note_and_summary(): void
+    {
+        $fake = $this->fakeWithRules(4);
+        $report = $this->execute($fake, new RunOptions(dryRun: true, reviewThreshold: 3));
+
+        self::assertSame(['previewed', 'previewed'], $this->statuses($report));
+        self::assertFalse($report->failed());
+        $messages = $report->results[0]->messages;
+        $noteIndex = array_search('Over the review threshold: this hop changes 4 files (threshold 3). Read the per-rule summary below.', $messages, true);
+        self::assertIsInt($noteIndex);
+        self::assertSame([
+            '  RuleAlpha: 4 files',
+            '  RuleBeta: 4 files',
+            '  RuleDelta: 2 files',
+            '  RuleGamma: 2 files',
+        ], array_slice($messages, $noteIndex + 1, 4));
+    }
+
+    public function test_the_per_rule_summary_lists_fifteen_rules_and_collapses_the_rest(): void
+    {
+        $rules = [];
+        for ($i = 0; $i < 17; $i++) {
+            $rules[] = sprintf('Rector\\Demo\\Rule%02d', $i);
+        }
+        $fake = new FakeProcessRunner(static function (array $command) use ($rules): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            $files = [];
+            foreach ($rules as $i => $rule) {
+                $files[] = ['file' => "/tmp/x/src/F{$i}.php", 'diff' => '+x', 'applied_rectors' => [$rule]];
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => $files, 'errors' => []]), '');
+        });
+        $report = $this->execute($fake, new RunOptions(dryRun: true, reviewThreshold: 3));
+
+        $messages = $report->results[0]->messages;
+        $noteIndex = array_search('Over the review threshold: this hop changes 17 files (threshold 3). Read the per-rule summary below.', $messages, true);
+        self::assertIsInt($noteIndex);
+        $summary = array_slice($messages, $noteIndex + 1, 16);
+        self::assertSame('  Rule00: 1 files', $summary[0]);
+        self::assertSame('  Rule14: 1 files', $summary[14]);
+        self::assertSame('  and 2 more rules', $summary[15]);
+    }
+
+    public function test_the_per_rule_summary_starts_with_the_pre_pass_total(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        $legacy = $dir . '/src/Legacy.php';
+        $original = "<?php\n\nclass Legacy\n{\n    public function make()\n    {\n        \$a = &new Self();\n\n        return \$a;\n    }\n}\n";
+        file_put_contents($legacy, $original);
+        $fake = $this->fakeWithRules(4);
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions(dryRun: true, reviewThreshold: 3));
+
+        $messages = $report->results[0]->messages;
+        $noteIndex = array_search('Over the review threshold: this hop changes 5 files (threshold 3). Read the per-rule summary below.', $messages, true);
+        self::assertIsInt($noteIndex);
+        self::assertSame('  new-by-reference pre-pass: 1 files', $messages[$noteIndex + 1]);
+    }
+
+    public function test_a_capped_php_step_carries_its_rule_counts_in_the_json_report(): void
+    {
+        $fake = $this->fakeWithRules(4);
+        $report = $this->execute($fake, new RunOptions(reviewThreshold: 3));
+
+        self::assertSame(['capped', 'not-run'], $this->statuses($report));
+        $array = $report->toArray();
+        self::assertSame([
+            'RuleAlpha' => 4,
+            'RuleBeta' => 4,
+            'RuleGamma' => 2,
+            'RuleDelta' => 2,
+        ], $array['results'][0]['rules']);
+    }
+
+    public function test_the_json_report_omits_rules_when_there_are_none(): void
+    {
+        $report = $this->execute($this->fake(), new RunOptions(dryRun: true));
+
+        $array = $report->toArray();
+        self::assertArrayNotHasKey('rules', $array['results'][0]);
+    }
+
+    /**
+     * Like fake(), but every file diff names the rules that touched it, so the
+     * per-rule summary has something to count. Four files give Alpha 4, Beta 4,
+     * Gamma 2 and Delta 2.
+     */
+    private function fakeWithRules(int $changedPerHop = 4): FakeProcessRunner
+    {
+        return new FakeProcessRunner(static function (array $command) use ($changedPerHop): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            $files = [];
+            for ($i = 0; $i < $changedPerHop; $i++) {
+                $files[] = [
+                    'file' => "/tmp/x/src/F{$i}.php",
+                    'diff' => "--- a\n+++ b",
+                    'applied_rectors' => [
+                        'Rector\Demo\RuleAlpha',
+                        'Rector\Demo\RuleBeta',
+                        $i % 2 === 0 ? 'Rector\Demo\RuleGamma' : 'Rector\Demo\RuleDelta',
+                    ],
+                ];
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => $files, 'errors' => []]), '');
+        });
     }
 
     public function test_a_failing_gate_stops_the_run_and_keeps_the_changes(): void
@@ -770,7 +955,7 @@ final class HopExecutorTest extends TestCase
             ->execute($plan, new RunOptions(maxChanges: 1));
 
         self::assertSame(['capped', 'not-run'], $this->statuses($report));
-        self::assertStringContainsString('(1 from the pre-pass, 1 from Rector)', implode(' ', $report->results[0]->messages));
+        self::assertStringContainsString('This hop wants to change 2 files and --max-changes is 1. Nothing was changed.', implode(' ', $report->results[0]->messages));
         self::assertSame($original, (string) file_get_contents($legacy));
     }
 

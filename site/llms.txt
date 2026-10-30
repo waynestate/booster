@@ -18,8 +18,8 @@ On Citadel it is served by the raw-PHP deploy layer in [`deploy/`](https://githu
 Booster is WELD's upgrade tool. It plans the hops that take a WSU PHP app from the PHP or Laravel version it runs now
 to one the version policy still supports, and it runs them one at a time: [Rector](https://getrector.com) rewrites the
 code, Booster raises the constraints in `composer.json`, and the app's own tests must pass on the target PHP before the
-next hop starts. It stands on `rector/rector` and `driftingly/rector-laravel` and adds only the ordering, the cap, the
-gate, the advisory scans and a few WSU recipes.
+next hop starts. It stands on `rector/rector` and `driftingly/rector-laravel` and adds only the ordering, the review
+threshold, the gate, the advisory scans and a few WSU recipes.
 
 Booster edits your working copy and prints a report. It never commits to, pushes or opens a merge request on your app (the only merge requests it opens are its own hop-data refresh on Booster itself): a person reads
 the diff and merges it.

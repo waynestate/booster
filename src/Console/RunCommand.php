@@ -7,6 +7,7 @@ namespace Waynestate\Booster\Console;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
 use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Report\JsonWriter;
 use Waynestate\Booster\Report\TextWriter;
@@ -33,7 +34,7 @@ final class RunCommand extends BaseCommand
         $this->addAppOptions();
         $this
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Show the diffs Rector would make and change nothing.')
-            ->addOption('max-changes', null, InputOption::VALUE_REQUIRED, 'Stop a hop that would change more than this many files.', '50')
+            ->addOption('max-changes', null, InputOption::VALUE_REQUIRED, 'Hard limit on files changed per hop, with no prompt (0 = no limit). Without it, a hop over 200 files asks first, or stops when not interactive.', null)
             ->addOption('memory-limit', null, InputOption::VALUE_REQUIRED, 'Memory limit for the Rector process (for example 2G), or -1 for no limit.', RectorRunner::DEFAULT_MEMORY_LIMIT)
             ->addOption('skip-gate', null, InputOption::VALUE_NONE, 'Do not run the tests in the target image after each hop, or the PROCTOR check at the end.')
             ->addOption('allow-failing-baseline', null, InputOption::VALUE_NONE, 'Continue even when the baseline (the app\'s tests on its current PHP) fails; later gate failures are labelled as pre-existing.')
@@ -47,9 +48,13 @@ final class RunCommand extends BaseCommand
     {
         $format = $this->format($input);
 
-        $cap = (string) $input->getOption('max-changes');
-        if (preg_match('/^\d+$/', $cap) !== 1) {
-            throw new ToolError(sprintf('Invalid --max-changes value "%s". Expected a whole number.', $cap));
+        $capRaw = $input->getOption('max-changes');
+        $cap = null;
+        if ($capRaw !== null) {
+            if (preg_match('/^\d+$/', (string) $capRaw) !== 1) {
+                throw new ToolError(sprintf('Invalid --max-changes value "%s". Expected a whole number.', $capRaw));
+            }
+            $cap = (int) $capRaw;
         }
 
         $memoryLimit = $this->stringOption($input, 'memory-limit') ?? RectorRunner::DEFAULT_MEMORY_LIMIT;
@@ -66,12 +71,26 @@ final class RunCommand extends BaseCommand
             $registry,
             new ProctorRunner($this->processes),
         );
+        // The prompt only makes sense where a person is watching: text output on an interactive terminal. JSON and
+        // --no-interaction runs stop at the threshold instead of asking nobody.
+        $confirm = null;
+        if ($format === 'text' && $input->isInteractive()) {
+            $confirm = static function (int $count, array $summary) use ($input, $output): bool {
+                foreach ($summary as $line) {
+                    $output->writeln($line, OutputInterface::OUTPUT_RAW);
+                }
+
+                return (new SymfonyStyle($input, $output))->confirm('Apply this hop?', false);
+            };
+        }
+
         $report = $executor->execute($plan, new RunOptions(
             dryRun: (bool) $input->getOption('dry-run'),
             skipGate: (bool) $input->getOption('skip-gate'),
             allowDirty: (bool) $input->getOption('allow-dirty'),
             allowFailingBaseline: (bool) $input->getOption('allow-failing-baseline'),
-            maxChanges: (int) $cap,
+            maxChanges: $cap,
+            confirm: $confirm,
             testCommand: $this->stringOption($input, 'test-command'),
             proctorCommand: $this->stringOption($input, 'proctor-command'),
             memoryLimit: $memoryLimit,
