@@ -30,7 +30,7 @@ final class TailwindUpgradeTest extends TestCase
     public function test_the_planner_offers_tailwind_after_node_pin(): void
     {
         $dir = $this->app();
-        $plan = $this->planner()->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '13'), $this->today());
+        $plan = $this->planner()->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '13', withNode: true), $this->today());
 
         self::assertSame([HopRegistry::laravelHopId('12', '13'), HopRegistry::NODE_PIN_ID, HopRegistry::TAILWIND_ID], $this->ids($plan));
     }
@@ -39,7 +39,7 @@ final class TailwindUpgradeTest extends TestCase
     {
         $dir = $this->app();
         $this->setTailwind($dir, '^4.0');
-        $plan = $this->planner()->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '13'), $this->today());
+        $plan = $this->planner()->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '13', withNode: true), $this->today());
 
         self::assertSame([HopRegistry::laravelHopId('12', '13'), HopRegistry::NODE_PIN_ID], $this->ids($plan));
     }
