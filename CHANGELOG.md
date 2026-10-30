@@ -2,13 +2,18 @@
 
 All notable changes to Booster are recorded here. The format follows Keep a Changelog.
 
-## [Unreleased]
+## [1.1.0] - 2026-10-30
 
 ### Changed
 
 - The 50-file cap per hop becomes a 200-file review threshold: an interactive run shows the per-rule summary and asks
   before applying a bigger hop, while non-interactive and JSON runs stop at the threshold. `--max-changes` is now an
   explicit hard limit that never prompts, and `0` lifts the limit entirely.
+
+### Fixed
+
+- The GitLab release job runs on any runner architecture: it calls the Releases API with curl from a multi-arch image
+  instead of the deprecated release-cli.
 
 ## [1.0.0] - 2026-10-30
 
