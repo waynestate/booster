@@ -188,8 +188,8 @@ final class Planner
             $warnings[] = 'The app uses wayne-cas. Add --sesame to plan the swap to SESAME.';
         }
 
-        if ($project->vueMajor === '2') {
-            $steps[] = $this->step(++$n, $this->registry->get('vue-2-to-3'), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+        foreach ($this->vueHopIds($project) as $id) {
+            $steps[] = $this->step(++$n, $this->registry->get($id), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
         }
 
         $steps = $this->withoutSkipped($steps, $options->skip);
@@ -209,20 +209,46 @@ final class Planner
      */
     private function withoutSkipped(array $steps, array $skip): array
     {
+        $skipped = [];
         foreach ($skip as $id) {
             if (!$this->registry->has($id)) {
                 throw new ToolError(sprintf('Cannot skip unknown hop "%s".', $id));
+            }
+            $skipped[$id] = true;
+            foreach ($this->registry->get($id)->aliasOf as $aliased) {
+                $skipped[$aliased] = true;
             }
         }
 
         $kept = [];
         foreach ($steps as $step) {
-            if (!in_array($step->hop->id, $skip, true)) {
+            if (!isset($skipped[$step->hop->id])) {
                 $kept[] = new PlanStep(count($kept) + 1, $step->hop, $step->phpBefore, $step->phpAfter, $step->laravelBefore, $step->laravelAfter, $step->phpunitBefore, $step->phpunitAfter, $step->gates);
             }
         }
 
         return $kept;
+    }
+
+    /**
+     * The Vue hops a Vue 2 app still needs, in run order: the 2.6 to 2.7 step
+     * when the app sits below 2.7, then the compat build that lands on Vue 3.
+     * The manual playbook (vue-2-to-3) is never planned; it stands in for both
+     * and skipping it skips them.
+     *
+     * @return list<string>
+     */
+    private function vueHopIds(Project $project): array
+    {
+        if ($project->vueMajor !== '2') {
+            return [];
+        }
+        $ids = [HopRegistry::VUE_27_TO_COMPAT_ID];
+        if (version_compare($project->vueMinor ?? '2.0', '2.7', '<')) {
+            array_unshift($ids, HopRegistry::VUE_26_TO_27_ID);
+        }
+
+        return $ids;
     }
 
     private function step(int $n, \Waynestate\Booster\Hop\Hop $hop, string $phpBefore, string $phpAfter, ?string $lBefore, ?string $lAfter, ?string $puBefore, ?string $puAfter): PlanStep

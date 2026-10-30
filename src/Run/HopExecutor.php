@@ -240,16 +240,20 @@ final class HopExecutor
     {
         $hop = $step->hop;
         if ($options->dryRun) {
+            $phrases = self::nodeChangePhrases($hop);
+
             return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [], [
-                sprintf('Dry run: would set %s in package.json and write .nvmrc with %s.', implode(', ', self::npmSetPhrases($hop->npmSet)), $hop->to),
+                $phrases === [] ? 'Dry run: would edit package.json.' : 'Dry run: would ' . self::joinPhrases($phrases) . '.',
                 ...$hop->notes,
             ]);
         }
 
         [$changes, $files] = $this->applyNodeChanges($hop, $path);
         if ($changes === []) {
+            $phrases = self::nodeAlreadyPhrases($hop);
+
             return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
-                'Nothing to do: package.json already sets ' . implode(' and ', self::npmSetPhrases($hop->npmSet)) . ' and .nvmrc already pins ' . $hop->to . ', so the gate was skipped.',
+                $phrases === [] ? 'Nothing to do: package.json already matches the hop, so the gate was skipped.' : 'Nothing to do: ' . self::joinPhrases($phrases) . ', so the gate was skipped.',
                 ...$hop->notes,
             ]);
         }
@@ -717,16 +721,40 @@ final class HopExecutor
                     $edited = true;
                 }
             }
+            foreach ($hop->npmSetIfPresent as $key => $value) {
+                [$section, $name] = self::splitDependencyKey($key);
+                if ($section === null || !array_key_exists($name, $package[$section] ?? [])) {
+                    continue;
+                }
+                if (self::getNested($package, $key) !== $value) {
+                    $package = self::setNested($package, $key, $value);
+                    $changes[] = 'package.json: ' . $key . ' to ' . $value;
+                    $files[] = ['file' => 'package.json', 'diff' => $key . ' to ' . $value];
+                    $edited = true;
+                }
+            }
+            foreach ($hop->npmRemove as $name) {
+                foreach (['dependencies', 'devDependencies'] as $section) {
+                    if (is_array($package[$section] ?? null) && array_key_exists($name, $package[$section])) {
+                        unset($package[$section][$name]);
+                        $changes[] = 'package.json: removed ' . $name . ' from ' . $section;
+                        $files[] = ['file' => 'package.json', 'diff' => 'removed ' . $name . ' from ' . $section];
+                        $edited = true;
+                    }
+                }
+            }
             if ($edited) {
                 file_put_contents($packageFile, json_encode($package, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
             }
         }
 
-        $nvmrc = $path . '/.nvmrc';
-        if (!is_file($nvmrc) || trim((string) file_get_contents($nvmrc)) !== $hop->to) {
-            file_put_contents($nvmrc, $hop->to . "\n");
-            $changes[] = '.nvmrc: ' . $hop->to;
-            $files[] = ['file' => '.nvmrc', 'diff' => 'pins ' . $hop->to];
+        if ($hop->pinNode) {
+            $nvmrc = $path . '/.nvmrc';
+            if (!is_file($nvmrc) || trim((string) file_get_contents($nvmrc)) !== $hop->to) {
+                file_put_contents($nvmrc, $hop->to . "\n");
+                $changes[] = '.nvmrc: ' . $hop->to;
+                $files[] = ['file' => '.nvmrc', 'diff' => 'pins ' . $hop->to];
+            }
         }
 
         return [$changes, $files];
@@ -755,18 +783,106 @@ final class HopExecutor
     }
 
     /**
-     * @param array<string, string> $npmSet
+     * What a node hop will change, in the order it changes it: set values,
+     * set-if-present values, removals, then the .nvmrc pin.
      *
      * @return list<string>
      */
-    private static function npmSetPhrases(array $npmSet): array
+    private static function nodeChangePhrases(Hop $hop): array
     {
         $phrases = [];
-        foreach ($npmSet as $key => $value) {
-            $phrases[] = $key . ' to ' . $value;
+        foreach ($hop->npmSet as $key => $value) {
+            $phrases[] = 'set ' . self::npmName($key) . ' to ' . $value . ' in package.json';
+        }
+        foreach ($hop->npmSetIfPresent as $key => $value) {
+            $phrases[] = 'set ' . self::npmName($key) . ' to ' . $value . ' in package.json if it is listed';
+        }
+        foreach ($hop->npmRemove as $name) {
+            $phrases[] = 'remove ' . $name . ' from package.json';
+        }
+        if ($hop->pinNode) {
+            $phrases[] = 'write .nvmrc with ' . $hop->to;
         }
 
         return $phrases;
+    }
+
+    /**
+     * Why a node hop has nothing left to do: the set values already match,
+     * the removed packages are absent, and the .nvmrc already pins.
+     *
+     * @return list<string>
+     */
+    private static function nodeAlreadyPhrases(Hop $hop): array
+    {
+        $phrases = [];
+        if ($hop->npmSet !== []) {
+            $parts = [];
+            foreach ($hop->npmSet as $key => $value) {
+                $parts[] = self::npmName($key) . ' to ' . $value;
+            }
+            $phrases[] = 'package.json already sets ' . implode(', ', $parts);
+        }
+        if ($hop->npmRemove !== []) {
+            $phrases[] = 'package.json does not list ' . implode(', ', $hop->npmRemove);
+        }
+        if ($hop->pinNode) {
+            $phrases[] = '.nvmrc already pins ' . $hop->to;
+        }
+
+        return $phrases;
+    }
+
+    /**
+     * Join human phrases with commas and a final "and", the way a person
+     * would read them out loud.
+     *
+     * @param list<string> $phrases
+     */
+    private static function joinPhrases(array $phrases): string
+    {
+        $count = count($phrases);
+        if ($count === 0) {
+            return '';
+        }
+        if ($count === 1) {
+            return $phrases[0];
+        }
+        if ($count === 2) {
+            return $phrases[0] . ' and ' . $phrases[1];
+        }
+
+        return implode(', ', array_slice($phrases, 0, -1)) . ' and ' . $phrases[$count - 1];
+    }
+
+    /**
+     * The package name behind a dot-path: "dependencies.vue" is "vue", while
+     * "engines.node" stays "engines.node".
+     */
+    private static function npmName(string $key): string
+    {
+        [, $name] = self::splitDependencyKey($key);
+
+        return $name;
+    }
+
+    /**
+     * Split a dependency dot-path into its section and package name. A path
+     * that is not a dependencies or devDependencies entry comes back with a
+     * null section and the whole key as the name.
+     *
+     * @return array{0: ?string, 1: string}
+     */
+    private static function splitDependencyKey(string $key): array
+    {
+        foreach (['dependencies', 'devDependencies'] as $section) {
+            $prefix = $section . '.';
+            if (str_starts_with($key, $prefix)) {
+                return [$section, substr($key, strlen($prefix))];
+            }
+        }
+
+        return [null, $key];
     }
 
     /**

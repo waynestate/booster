@@ -27,6 +27,7 @@ final readonly class Project
         public bool $hasPackageJson = false,
         public ?string $nodeMajor = null,
         public bool $hasMixFile = false,
+        public ?string $vueMinor = null,
     ) {}
 
     /**

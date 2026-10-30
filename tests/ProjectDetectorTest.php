@@ -50,6 +50,21 @@ final class ProjectDetectorTest extends TestCase
         self::assertNull($plain->nodeMajor);
     }
 
+    public function test_the_vue_minor_comes_from_the_constraint(): void
+    {
+        $spa = (new ProjectDetector())->detect($this->example('vue-spa'));
+        self::assertSame('2', $spa->vueMajor);
+        self::assertSame('2.7', $spa->vueMinor);
+
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/package.json', '{"dependencies":{"vue":"^2.6.14"}}');
+        self::assertSame('2.6', (new ProjectDetector())->detect($dir)->vueMinor);
+
+        $bare = $this->tempDir();
+        file_put_contents($bare . '/package.json', '{"dependencies":{"vue":"^2"}}');
+        self::assertSame('2.0', (new ProjectDetector())->detect($bare)->vueMinor);
+    }
+
     public function test_wayne_cas_is_flagged(): void
     {
         $project = (new ProjectDetector())->detect($this->example('laravel-wayne-cas'));

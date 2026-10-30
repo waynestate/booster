@@ -21,6 +21,15 @@ final class HopRegistry
     /** The Mix to Vite hop. The package versions it installs live in the data file. */
     public const MIX_TO_VITE_ID = 'mix-to-vite';
 
+    /** The staged hop that moves a Vue 2.6 front end onto Vue 2.7. */
+    public const VUE_26_TO_27_ID = 'vue-26-to-27';
+
+    /** The staged hop that moves a Vue 2.7 front end onto Vue 3 through @vue/compat. */
+    public const VUE_27_TO_COMPAT_ID = 'vue-27-to-compat';
+
+    /** The manual playbook that stands in for the two staged Vue hops. */
+    public const VUE_2_TO_3_ID = 'vue-2-to-3';
+
     /** The lowest Laravel major whose upgrade guide ships Vite as the front-end tool. */
     public const VITE_LARAVEL_FLOOR = '9';
 
@@ -40,6 +49,12 @@ final class HopRegistry
     private readonly string $laravelVitePluginVersion;
 
     private readonly string $vuePluginVersion;
+
+    private readonly string $vue27Version;
+
+    private readonly string $vueCompatVersion;
+
+    private readonly string $vueLoaderCompatVersion;
 
     /** @var array<string, string> */
     private readonly array $phpunitPhp;
@@ -63,6 +78,9 @@ final class HopRegistry
         $this->viteVersion = self::scalar($data, 'vite_version');
         $this->laravelVitePluginVersion = self::scalar($data, 'laravel_vite_plugin_version');
         $this->vuePluginVersion = self::scalar($data, 'vue_plugin_version');
+        $this->vue27Version = self::scalar($data, 'vue_27');
+        $this->vueCompatVersion = self::scalar($data, 'vue_compat');
+        $this->vueLoaderCompatVersion = self::scalar($data, 'vue_loader_compat');
         $this->phpunitPhp = self::stringTable($data, 'phpunit_php');
         $this->laravelPhpunit = self::stringTable($data, 'laravel_phpunit');
         $this->laravelPhp = self::rangeTable($data, 'laravel_php');
@@ -73,7 +91,9 @@ final class HopRegistry
         $this->add($this->sesameHop());
         $this->add($this->nodePinHop());
         $this->add($this->mixToViteHop());
-        $this->add($this->vueHop());
+        foreach ($this->vueHops() as $hop) {
+            $this->add($hop);
+        }
     }
 
     public static function phpHopId(string $from, string $to): string
@@ -145,6 +165,21 @@ final class HopRegistry
     public function vuePluginVersion(): string
     {
         return $this->vuePluginVersion;
+    }
+
+    public function vue27Version(): string
+    {
+        return $this->vue27Version;
+    }
+
+    public function vueCompatVersion(): string
+    {
+        return $this->vueCompatVersion;
+    }
+
+    public function vueLoaderCompatVersion(): string
+    {
+        return $this->vueLoaderCompatVersion;
     }
 
     /**
@@ -453,6 +488,7 @@ final class HopRegistry
             to: $target,
             summary: sprintf('Pin the app to Node %s: set engines.node in package.json and write .nvmrc.', $target),
             npmSet: ['engines.node' => '>=' . $target],
+            pinNode: true,
             notes: [
                 sprintf('The pin is a floor, not a ceiling: engines.node ">=%s" still allows newer Node majors.', $target),
                 sprintf('Later front-end hops run in the same node:%s container, so this hop comes before them.', $target),
@@ -485,15 +521,80 @@ final class HopRegistry
         );
     }
 
-    private function vueHop(): Hop
+    /**
+     * The Vue 2 to 3 hops in run order: the 2.6 to 2.7 step, the compat build
+     * that lands on Vue 3, and the manual playbook that stands in for both.
+     * The planner picks the steps an app still needs; the playbook stays so a
+     * person can follow the whole move by hand.
+     *
+     * @return list<Hop>
+     */
+    public function vueHops(): array
+    {
+        return [
+            $this->vue26To27Hop(),
+            $this->vue27ToCompatHop(),
+            $this->vue2To3Hop(),
+        ];
+    }
+
+    private function vue26To27Hop(): Hop
     {
         return new Hop(
-            id: 'vue-2-to-3',
+            id: self::VUE_26_TO_27_ID,
+            kind: HopKind::Node,
+            from: '2.6',
+            to: '2.7',
+            summary: 'Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API.',
+            npmSet: ['dependencies.vue' => $this->vue27Version],
+            npmRemove: ['vue-template-compiler'],
+            buildGate: true,
+            notes: [
+                'Vue 2.7 ships the Vue 3 reactivity API under the Vue 2 syntax, so this is the safe first step and the rest of the code keeps working.',
+                'vue-class-component and vue-property-decorator need their 2.7-compatible releases; check package.json after the hop.',
+                'Vuex 3 and Vue Router 3 keep working on 2.7; move them only in the next hop.',
+                'Drop vue-template-compiler: Vue 2.7 uses the compiler bundled with the vue package.',
+            ],
+            links: ['https://v2.vuejs.org/v2/guide/migration-vue-2-7.html'],
+        );
+    }
+
+    private function vue27ToCompatHop(): Hop
+    {
+        return new Hop(
+            id: self::VUE_27_TO_COMPAT_ID,
+            kind: HopKind::Node,
+            from: '2.7',
+            to: '3',
+            summary: 'Move a Vue 2.7 front end to Vue 3 through the @vue/compat build.',
+            npmSet: [
+                'dependencies.vue' => $this->vueCompatVersion,
+                'dependencies.@vue/compat' => $this->vueCompatVersion,
+                'devDependencies.@vue/compiler-sfc' => $this->vueCompatVersion,
+            ],
+            npmSetIfPresent: ['devDependencies.vue-loader' => $this->vueLoaderCompatVersion],
+            npmRemove: ['vue-template-compiler'],
+            buildGate: true,
+            notes: [
+                'Point the bundler at @vue/compat instead of vue (an alias in webpack or resolve.alias in Vite) and start with compat MODE 2 so the build warns instead of breaking.',
+                'Fix every migration warning the build prints, then switch MODE to 3 to turn compat off, and remove @vue/compat from package.json.',
+                'Move Vuex to Pinia and Vue Router 3 to 4 by hand; the compat build does not rewrite your store or routes.',
+            ],
+            links: ['https://v3-migration.vuejs.org/'],
+        );
+    }
+
+    private function vue2To3Hop(): Hop
+    {
+        return new Hop(
+            id: self::VUE_2_TO_3_ID,
             kind: HopKind::Vue,
             from: '2',
             to: '3',
             summary: 'Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue).',
+            aliasOf: [self::VUE_26_TO_27_ID, self::VUE_27_TO_COMPAT_ID],
             notes: [
+                'Booster stages this move as two Node hops, vue-26-to-27 and vue-27-to-compat; this playbook covers the manual work between and around them.',
                 'Run the official Vue 3 migration build first, then fix each warning it prints.',
                 'Vue 2 reached end of life on 2023-12-31; the policy lists it as past its grace window.',
                 'Moving to Vue 3 usually means moving Vuex to Pinia and Vue Router 3 to 4.',

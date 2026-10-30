@@ -41,6 +41,7 @@ final class ProjectDetector
         $vueConstraint = $deps['vue'] ?? null;
         $hasVue = array_key_exists('vue', $deps);
         $vue = is_string($vueConstraint) ? $this->lowerBound($vueConstraint, 1) : null;
+        $vueMinor = is_string($vueConstraint) ? $this->lowerBound($vueConstraint, 2) : null;
 
         $engines = $this->section($package, 'engines');
         $nodeConstraint = $engines['node'] ?? null;
@@ -75,6 +76,7 @@ final class ProjectDetector
             hasPackageJson: $package !== [],
             nodeMajor: $node,
             hasMixFile: is_file($path . '/webpack.mix.js'),
+            vueMinor: $vueMinor,
         );
     }
 
