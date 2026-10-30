@@ -30,7 +30,7 @@ code, Booster raises the constraints in `composer.json`, and the app's own tests
 next hop starts. It stands on `rector/rector` and `driftingly/rector-laravel` and adds only the ordering, the cap, the
 gate, the advisory scans and a few WSU recipes.
 
-Booster edits your working copy and prints a report. It never commits, pushes or opens a merge request: a person reads
+Booster edits your working copy and prints a report. It never commits to, pushes or opens a merge request on your app (the only merge requests it opens are its own hop-data refresh on Booster itself): a person reads
 the diff and merges it.
 
 ## Where it fits in WELD

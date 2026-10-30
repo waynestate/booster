@@ -78,4 +78,4 @@ tag for how Booster holds each rule today.
 ## Not yet
 
 Rector pilot measurements on real apps. Merge-request automation on app code is a closed decision, not a gap:
-Booster never commits, pushes or opens a merge request. See `OPEN_QUESTIONS.md`.
+Booster never commits to or pushes an app, and opens no merge request on app code (its own hop-data refresh opens one on Booster itself, and a person merges it). See `OPEN_QUESTIONS.md`.
