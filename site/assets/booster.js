@@ -83,24 +83,26 @@
   }
 
   var bladeDoses = [
+    dose("phpunit-10-to-11", "Move PHPUnit 10 tests to PHPUnit 11.", "8.2", "10"),
     dose("laravel-10-to-11", "Move a Laravel 10 app to Laravel 11.", "8.2", "11"),
     dose("laravel-11-to-12", "Move a Laravel 11 app to Laravel 12.", "8.2", "12"),
     dose("php-82-to-83", "Move PHP 8.2 code to PHP 8.3.", "8.3", "12"),
+    dose("phpunit-11-to-12", "Move PHPUnit 11 tests to PHPUnit 12.", "8.3", "12"),
     dose("laravel-12-to-13", "Move a Laravel 12 app to Laravel 13.", "8.3", "13"),
     dose("php-83-to-84", "Move PHP 8.3 code to PHP 8.4.", "8.4", "13"),
+    dose("phpunit-12-to-13", "Move PHPUnit 12 tests to PHPUnit 13.", "8.4", "13"),
     dose("php-84-to-85", "Move PHP 8.4 code to PHP 8.5.", "8.5", "13")
   ];
 
   var PASS = '<span class="result result--pass">RESULT: PASS</span> Review with <code>git diff</code>, run your own checks, then commit. BOOSTER never commits or pushes.';
 
   /* Next booster due: when the last version in the course leaves security
-     support, from the bundled CREED snapshot (Laravel 13: 2028-03-17,
-     PHP 8.5: 2029-12-31). */
+     support, from CREED's policy (Laravel 13: 2028-03-17, PHP 8.5: 2029-12-31). */
   var SCENARIOS = {
     blade: {
       title: "examples/laravel-blade",
       type: "laravel-blade",
-      course: "PHP 8.2 → 8.5 · Laravel 10 → 13",
+      course: "PHP 8.2 → 8.5 · Laravel 10 → 13 · PHPUnit 10 → 13",
       due: "17 Mar 2028",
       start: { php: "8.2", lara: "10" },
       doses: bladeDoses,
@@ -132,7 +134,7 @@
         dose("laravel-12-to-13", "Move a Laravel 12 app to Laravel 13.", "8.3", "13"),
         dose("php-83-to-84", "Move PHP 8.3 code to PHP 8.4.", "8.4", "13"),
         dose("php-84-to-85", "Move PHP 8.4 code to PHP 8.5.", "8.5", "13"),
-        dose("cas-to-sesame", "Swap the wayne-cas package for SESAME using its compatibility classes.", "8.5", "13", { flag: "Stub recipe", mid: "SESAME" })
+        dose("cas-to-sesame", "Swap the wayne-cas package for SESAME using its compatibility classes.", "8.5", "13", { mid: "SESAME" })
       ],
       result: PASS
     },
