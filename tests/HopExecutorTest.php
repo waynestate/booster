@@ -1678,6 +1678,26 @@ PHP,
         return [$dir, $plan];
     }
 
+    /**
+     * Plans the example as a Laravel 8 app (the test rewrites its composer.json
+     * to ^8.0) and skips every step but the first Laravel hop, so a run
+     * exercises exactly one gate whose constraint is ^9.0: the same constraint
+     * Packagist refused in the live evidence behind the dev-fallback tests.
+     */
+    private function laravelEightPlan(string $dir): array
+    {
+        $project = (new ProjectDetector())->detect($dir);
+        self::assertSame('8', $project->laravelMajor);
+        $planner = new Planner($this->policy(), new HopRegistry());
+        $options = new PlanOptions(fromPhp: '8.0', toPhp: '8.5', fromLaravel: '8', toLaravel: '13');
+        $full = $planner->plan($project, $options, $this->today());
+        self::assertSame('laravel-8-to-9', $full->steps[0]->hop->id);
+        $skip = array_values(array_diff(array_map(static fn(PlanStep $s): string => $s->hop->id, $full->steps), ['laravel-8-to-9']));
+        $plan = $planner->plan($project, new PlanOptions(fromPhp: '8.0', toPhp: '8.5', fromLaravel: '8', toLaravel: '13', skip: $skip), $this->today());
+
+        return [$dir, $plan];
+    }
+
     public function test_a_laravel_hop_updates_the_lock_in_the_gate(): void
     {
         [$dir, $plan] = $this->laravelPlan($this->copyExample('laravel-blade'));
@@ -1872,6 +1892,123 @@ PHP,
         self::assertStringContainsString('Gate failed: composer update -W laravel/framework failed (exit 4)', $all);
         self::assertStringContainsString('Nothing matches your requirements.', $all);
         self::assertStringContainsString('This step changed composer.json and composer.lock.', $all);
+        // The unblock stays in composer.json for PROCTOR to report.
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertArrayHasKey('laravel/framework', $composer['config']['policy']['advisories']['ignore']);
+    }
+
+    public function test_a_laravel_hop_that_locks_a_dev_branch_unblocks_and_retries(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        file_put_contents($dir . '/composer.json', (string) json_encode([
+            'name' => 'example/laravel-blade',
+            'require' => ['php' => '^8.0', 'laravel/framework' => '^8.0'],
+            'require-dev' => ['phpunit/phpunit' => '^9.0'],
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+        [$dir, $plan] = $this->laravelEightPlan($dir);
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use ($dir, &$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $script = $command[count($command) - 1];
+                $dockerRuns++;
+                if ($dockerRuns === 2 && str_contains($script, 'composer update -W')) {
+                    // Live evidence, 2026-10-30: with dev stability allowed, Composer locked
+                    // the branch instead of refusing, and the install phase still passed.
+                    file_put_contents($dir . '/composer.lock', (string) json_encode(['packages' => [[
+                        'name' => 'laravel/framework',
+                        'version' => '9.x-dev',
+                        'source' => ['reference' => '06605f514a3aba20bdab972cb49a2a3cf0f21532'],
+                    ]]]));
+                }
+                if ($dockerRuns === 3 && str_contains($script, 'composer update -W')) {
+                    // With the unblock in place, the tagged release loads.
+                    file_put_contents($dir . '/composer.lock', (string) json_encode(['packages' => [['name' => 'laravel/framework', 'version' => 'v9.52.16']]]));
+                }
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Models/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        $runs = $this->dockerRuns($fake);
+        self::assertCount(3, $runs);
+        $scripts = array_map(static fn(array $run): string => $run['command'][count($run['command']) - 1], $runs);
+        self::assertStringContainsString('composer install --no-interaction --no-progress --prefer-dist', $scripts[0]);
+        self::assertStringContainsString('composer update -W --no-interaction --no-progress laravel/framework', $scripts[1]);
+        self::assertStringContainsString('composer update -W --no-interaction --no-progress laravel/framework', $scripts[2]);
+        // The temporary unblock is scoped to the package and the hop's constraint.
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        $ignore = $composer['config']['policy']['advisories']['ignore']['laravel/framework'];
+        self::assertIsArray($ignore);
+        $rule = $ignore[0];
+        self::assertSame('^9.0', $rule['constraint']);
+        self::assertTrue($rule['on-block']);
+        self::assertFalse($rule['on-audit']);
+        self::assertStringContainsString('BOOSTER temporary unblock', $rule['reason']);
+        self::assertStringContainsString('branch version', $rule['reason']);
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('Composer locked laravel/framework to 9.x-dev although the hop asks for ^9.0', $all);
+        self::assertStringContainsString('Added a temporary advisory unblock to composer.json', $all);
+        self::assertStringContainsString('laravel/framework now resolves to the tagged release v9.52.16.', $all);
+        self::assertStringContainsString('Gate passed: tests are green on PHP 8.0.', $all);
+        $lock = json_decode((string) file_get_contents($dir . '/composer.lock'), true);
+        self::assertSame('v9.52.16', $lock['packages'][0]['version']);
+    }
+
+    public function test_a_laravel_hop_whose_dev_fallback_survives_the_unblock_fails_the_install_phase(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        file_put_contents($dir . '/composer.json', (string) json_encode([
+            'name' => 'example/laravel-blade',
+            'require' => ['php' => '^8.0', 'laravel/framework' => '^8.0'],
+            'require-dev' => ['phpunit/phpunit' => '^9.0'],
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+        [$dir, $plan] = $this->laravelEightPlan($dir);
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use ($dir, &$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $script = $command[count($command) - 1];
+                $dockerRuns++;
+                if (($dockerRuns === 2 || $dockerRuns === 3) && str_contains($script, 'composer update -W')) {
+                    // The unblock did not bring the tags back: the branch stays locked.
+                    file_put_contents($dir . '/composer.lock', (string) json_encode(['packages' => [['name' => 'laravel/framework', 'version' => '9.x-dev']]]));
+                }
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Models/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
+        // Baseline, the gate that locked the branch, and exactly one retry: never a loop.
+        self::assertSame(3, $dockerRuns);
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('Composer locked laravel/framework to 9.x-dev although the hop asks for ^9.0', $all);
+        self::assertStringContainsString('Gate failed: composer update -W laravel/framework still resolves laravel/framework to 9.x-dev after the unblock; the tagged releases are not loadable.', $all);
+        self::assertStringContainsString('This step changed composer.json and composer.lock.', $all);
+        // The failure is reported as the lock phase, never as the tests exiting.
+        self::assertStringNotContainsString('exited', $all);
         // The unblock stays in composer.json for PROCTOR to report.
         $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
         self::assertArrayHasKey('laravel/framework', $composer['config']['policy']['advisories']['ignore']);

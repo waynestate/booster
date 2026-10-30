@@ -87,13 +87,21 @@ final class ComposerEditor
             throw new ToolError(sprintf('"%s" is not valid JSON.', $file));
         }
 
-        $rule = [
-            'constraint' => $constraint,
-            'reason' => sprintf(
+        // Without named IDs the refusal was the quiet kind: Composer locked a
+        // branch version instead of failing, so the reason says that.
+        $reason = $advisoryIds === []
+            ? sprintf(
+                'BOOSTER temporary unblock: Packagist advisories block the tagged releases of %s needed for the upgrade, so the lock fell back to a branch version. Remove this entry once the app is off them.',
+                $package,
+            )
+            : sprintf(
                 'BOOSTER temporary unblock: Packagist advisories %s block the tagged releases of %s needed for the upgrade. Remove this entry once the app is off them.',
                 implode(', ', $advisoryIds),
                 $package,
-            ),
+            );
+        $rule = [
+            'constraint' => $constraint,
+            'reason' => $reason,
             'on-block' => true,
             'on-audit' => false,
         ];

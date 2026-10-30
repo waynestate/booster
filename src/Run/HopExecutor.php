@@ -593,7 +593,11 @@ final class HopExecutor
      * Runs the step's gate. When Composer 2.10's policy blocking refuses the
      * tagged releases the lock update needs, it writes the temporary advisory
      * unblock into composer.json and runs the same gate once more: one retry,
-     * never a loop.
+     * never a loop. The same unblock answers the quiet variant of the same
+     * refusal: with dev stability allowed, Composer does not fail the install
+     * phase at all, it locks the branch instead, so the refreshed lock is read
+     * back and a branch version behind a tagged range is treated like the
+     * block.
      */
     private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): GateReport
     {
@@ -622,6 +626,46 @@ final class HopExecutor
                 $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update);
                 $outcome = TargetImageRunner::gateOutcome($result);
                 $unblock[] = 'The gate was retried with the unblock in place. Remove the entry from composer.json once the app is off the blocked versions; PROCTOR reports it until then.';
+            }
+        }
+        if ($update !== [] && $outcome->phase === GateOutcome::PHASE_TESTS) {
+            $dev = self::devFallback($step, $path);
+            if ($dev !== null) {
+                $unblock[] = sprintf(
+                    'Composer locked %s to %s although the hop asks for %s: the tagged releases were refused for security advisories.',
+                    $dev['package'],
+                    $dev['version'],
+                    $dev['constraint'],
+                );
+                try {
+                    $unblock = [...$unblock, ...$this->composer->advisoryUnblock($path, $dev['package'], $dev['constraint'], [])];
+                } catch (ToolError $e) {
+                    $unblock[] = 'Could not write the advisory unblock: ' . $e->getMessage();
+                }
+                // The ignore is in composer.json now, so the same command may
+                // load the tagged releases.
+                $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update);
+                $outcome = TargetImageRunner::gateOutcome($result);
+                $still = self::devFallback($step, $path);
+                if ($still !== null) {
+                    // The unblock did not bring the tags back: fail where the
+                    // lock was written, naming what the lock still carries.
+                    $messages = [sprintf(
+                        'Gate failed: composer update -W %s still resolves %s to %s after the unblock; the tagged releases are not loadable.',
+                        implode(' ', $update),
+                        $still['package'],
+                        $still['version'],
+                    )];
+                    $messages[] = 'This step changed composer.json and composer.lock.';
+                    $messages[] = $this->undoHint($path);
+
+                    return new GateReport(false, [...$unblock, ...$messages]);
+                }
+                $unblock[] = sprintf(
+                    '%s now resolves to the tagged release %s.',
+                    $dev['package'],
+                    self::lockedVersions($path)[$dev['package']] ?? 'a tag',
+                );
             }
         }
         if ($outcome->successful()) {
@@ -674,6 +718,60 @@ final class HopExecutor
         }
 
         return ['package' => $m[1], 'constraint' => $m[2], 'ids' => $ids[1]];
+    }
+
+    /**
+     * The package-to-version map of the app's lock file, across packages and
+     * packages-dev (PHPUnit lives in the dev section). Empty when the lock is
+     * missing or unreadable.
+     *
+     * @return array<string, string>
+     */
+    private static function lockedVersions(string $path): array
+    {
+        $lockFile = rtrim($path, '/\\') . '/composer.lock';
+        if (!is_file($lockFile)) {
+            return [];
+        }
+        $lock = json_decode((string) file_get_contents($lockFile), true);
+        if (!is_array($lock)) {
+            return [];
+        }
+        $locked = [];
+        foreach (['packages', 'packages-dev'] as $section) {
+            foreach ((array) ($lock[$section] ?? []) as $package) {
+                if (is_array($package) && isset($package['name'], $package['version'])) {
+                    $locked[(string) $package['name']] = (string) $package['version'];
+                }
+            }
+        }
+
+        return $locked;
+    }
+
+    /**
+     * A silent dev fallback out of the refreshed lock: a package the hop set
+     * to a tagged range that Composer locked to a branch version anyway,
+     * because every tagged release matching the range was refused for security
+     * advisories and dev stability was allowed. Null when every hop-set
+     * package resolved to a tag (or is absent from the lock).
+     *
+     * @return array{package: string, constraint: string, version: string}|null
+     */
+    private static function devFallback(PlanStep $step, string $path): ?array
+    {
+        $locked = self::lockedVersions($path);
+        foreach ($step->hop->composerSet as $package => $constraint) {
+            if (str_contains($constraint, '-dev') || str_starts_with($constraint, 'dev-')) {
+                continue; // The hop asked for a branch; a dev lock is what it wanted.
+            }
+            $version = $locked[$package] ?? null;
+            if ($version !== null && (str_ends_with($version, '-dev') || str_starts_with($version, 'dev-'))) {
+                return ['package' => $package, 'constraint' => $constraint, 'version' => $version];
+            }
+        }
+
+        return null;
     }
 
     /**
