@@ -646,6 +646,97 @@ final class PlannerTest extends TestCase
         $this->plan('raw-php', new PlanOptions(skip: ['php-99-to-100']));
     }
 
+    public function test_until_cuts_the_plan_after_the_named_step(): void
+    {
+        $plan = $this->plan('raw-php', new PlanOptions(until: 'php-81-to-82'));
+
+        self::assertSame(['php-74-to-80', 'php-80-to-81', 'php-81-to-82'], $this->ids($plan));
+        self::assertSame('8.2', $plan->targetPhp);
+        self::assertSame(3, $plan->steps[2]->number);
+    }
+
+    public function test_until_on_the_last_step_keeps_the_whole_plan(): void
+    {
+        $full = $this->plan('raw-php');
+        $cut = $this->plan('raw-php', new PlanOptions(until: 'php-84-to-85'));
+
+        self::assertSame($this->ids($full), $this->ids($cut));
+        self::assertSame('8.5', $cut->targetPhp);
+    }
+
+    public function test_until_cuts_a_laravel_plan_midway_and_moves_the_targets(): void
+    {
+        $plan = $this->plan('laravel-blade', new PlanOptions(until: 'laravel-11-to-12'));
+
+        self::assertSame(['phpunit-10-to-11', 'laravel-10-to-11', 'laravel-11-to-12'], $this->ids($plan));
+        self::assertSame('8.2', $plan->targetPhp);
+        self::assertSame('12', $plan->targetLaravel);
+        self::assertSame('11', $plan->targetPhpunit);
+    }
+
+    public function test_until_with_an_id_not_in_the_plan_is_an_error_listing_the_steps(): void
+    {
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('--until "php-99-to-100" is not a step in the plan. The plan\'s step ids are: php-74-to-80, php-80-to-81, php-81-to-82, php-82-to-83, php-83-to-84, php-84-to-85.');
+        $this->plan('raw-php', new PlanOptions(until: 'php-99-to-100'));
+    }
+
+    public function test_until_on_an_empty_plan_is_an_error(): void
+    {
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('--until "php-84-to-85" is not a step in the plan. The plan has no steps.');
+        $this->plan('raw-php', new PlanOptions(fromPhp: '8.5', toPhp: '8.5', until: 'php-84-to-85'));
+    }
+
+    public function test_only_keeps_just_the_first_step(): void
+    {
+        $plan = $this->plan('raw-php', new PlanOptions(only: 'php-74-to-80'));
+
+        self::assertSame(['php-74-to-80'], $this->ids($plan));
+        self::assertSame(1, $plan->steps[0]->number);
+        self::assertSame('8.0', $plan->targetPhp);
+    }
+
+    public function test_only_a_later_step_is_refused_naming_what_the_app_is_on(): void
+    {
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('--only "php-80-to-81": it starts from PHP 8.0, but the app is on PHP 7.4.');
+        $this->plan('raw-php', new PlanOptions(only: 'php-80-to-81'));
+    }
+
+    public function test_only_refuses_a_laravel_hop_the_app_is_not_ready_for(): void
+    {
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('--only "laravel-12-to-13": it starts from PHP 8.3 and Laravel 12 and PHPUnit 12, but the app is on PHP 8.2 and Laravel 10 and PHPUnit 10.');
+        $this->plan('laravel-blade', new PlanOptions(only: 'laravel-12-to-13'));
+    }
+
+    public function test_only_runs_a_single_laravel_hop_when_the_app_sits_on_it(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        $file = $dir . '/composer.json';
+        $data = json_decode((string) file_get_contents($file), true);
+        self::assertIsArray($data);
+        $data['require']['php'] = '^8.3';
+        unset($data['require-dev']['phpunit/phpunit']);
+        file_put_contents($file, (string) json_encode($data));
+
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(only: 'laravel-10-to-11'), $this->today());
+
+        self::assertSame(['laravel-10-to-11'], $this->ids($plan));
+        self::assertSame('8.3', $plan->targetPhp);
+        self::assertSame('11', $plan->targetLaravel);
+        self::assertNull($plan->targetPhpunit);
+    }
+
+    public function test_only_and_until_together_are_refused(): void
+    {
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('Pass either --until or --only, not both.');
+        $this->plan('raw-php', new PlanOptions(until: 'php-80-to-81', only: 'php-74-to-80'));
+    }
+
     public function test_the_plan_follows_the_policy_date(): void
     {
         $project = (new ProjectDetector())->detect($this->example('raw-php'));
