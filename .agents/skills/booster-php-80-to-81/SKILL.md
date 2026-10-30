@@ -13,6 +13,15 @@ Move PHP 8.0 code to PHP 8.1.
 2. `booster run --path=<app>` applies the plan and stops at the first failing gate.
 3. If a hop is capped, split the work with `--skip`; do not raise `--max-changes` blindly.
 
+Only if the app has Laravel Boost (`booster detect` says so):
+
+- Use `search-docs` for removed or deprecated functions in PHP 8.1 and check each one against the files Booster changed.
+- Use `tinker` to load a changed class and confirm it still loads.
+- Use `application-info` to confirm the reported versions after the hop.
+- Run `last-error` and `read-log-entries` after the tests.
+
+Boost is read-only help. Booster's gate stays the authority: never skip a gate because Boost says so.
+
 What Rector cannot do (check these by hand):
 
 - mysqli now throws on errors by default; PDO on MySQL returns native int and float types; htmlspecialchars() now escapes single quotes.
