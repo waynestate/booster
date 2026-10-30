@@ -62,18 +62,29 @@ final class TargetImageRunner
     }
 
     /**
-     * The shell command run inside the container: install, then test. The two
+     * The shell command run inside the container: Composer, then test. The two
      * phases report separately: each writes its output to a log file, and on
      * failure the script prints the last 30 lines of that phase's log plus
      * marker lines (BOOSTER_GATE_PHASE, BOOSTER_GATE_EXIT) that
      * gateOutcome() reads back. A stale lock (Composer exit 4) is therefore
-     * reported as an install failure, never as the test command exiting 4.
+     * reported as a Composer failure, never as the test command exiting 4.
+     *
+     * With $updatePackages the Composer phase is `composer update -W` for
+     * those packages instead of a plain install: Laravel and PHPUnit hops
+     * raise a package requirement in composer.json, so a plain install would
+     * hold the old lock (or fail on its stale content hash). The app is
+     * mounted at /app, so the refreshed lock lands in the app itself.
+     *
+     * @param list<string> $updatePackages
      */
-    public static function containerScript(string $testCommand, ?string $extraCommand): string
+    public static function containerScript(string $testCommand, ?string $extraCommand, array $updatePackages = []): string
     {
+        $composerPhase = $updatePackages === []
+            ? 'composer install --no-interaction --no-progress --prefer-dist'
+            : sprintf('composer update -W --no-interaction --no-progress %s', implode(' ', $updatePackages));
         $lines = [
             'install_log=/tmp/booster-gate-install.log',
-            'composer install --no-interaction --no-progress --prefer-dist >"$install_log" 2>&1',
+            $composerPhase . ' >"$install_log" 2>&1',
             'install_exit=$?',
             'if [ "$install_exit" -ne 0 ]; then',
             '  tail -n 30 "$install_log"',
@@ -164,7 +175,10 @@ final class TargetImageRunner
         }
     }
 
-    public function run(string $appPath, string $php, string $testCommand, ?string $extraCommand = null, ?GateImage $image = null): ProcessResult
+    /**
+     * @param list<string> $updatePackages see containerScript()
+     */
+    public function run(string $appPath, string $php, string $testCommand, ?string $extraCommand = null, ?GateImage $image = null, array $updatePackages = []): ProcessResult
     {
         $version = $this->processes->run([$this->docker, 'version', '--format', '{{.Server.Version}}'], null, [], 30);
         if (!$version->successful()) {
@@ -185,7 +199,7 @@ final class TargetImageRunner
         $gid = function_exists('posix_getgid') ? posix_getgid() : null;
 
         return $this->processes->run(
-            $this->runCommand($appPath, $php, self::containerScript($testCommand, $extraCommand), $uid, $gid, $resolved),
+            $this->runCommand($appPath, $php, self::containerScript($testCommand, $extraCommand, $updatePackages), $uid, $gid, $resolved),
             null,
             [],
             3600,

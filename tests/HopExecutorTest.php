@@ -1654,4 +1654,117 @@ PHP,
         self::assertCount(1, $laravelSteps);
         self::assertContains('Removed 1 unused import from 1 file after the Rector pass.', $laravelSteps[0]->messages);
     }
+
+    /**
+     * Plans the laravel-blade example (Laravel 10 to 13, PHP 8.2 to 8.3) and
+     * skips every step but the final Laravel hop, so a run exercises exactly
+     * one gate. The intermediate hops are skipped by id read from the full
+     * plan, so the test does not hard-code hop id spellings.
+     */
+    private function laravelPlan(string $dir): array
+    {
+        $project = (new ProjectDetector())->detect($dir);
+        $planner = new Planner($this->policy(), new HopRegistry());
+        $options = new PlanOptions(fromPhp: '8.2', toPhp: '8.3', fromLaravel: '10', toLaravel: '13');
+        $full = $planner->plan($project, $options, $this->today());
+        $laravelIds = array_values(array_map(
+            static fn(PlanStep $s): string => $s->hop->id,
+            array_filter($full->steps, static fn(PlanStep $s): bool => $s->hop->kind === HopKind::Laravel),
+        ));
+        self::assertSame(['laravel-10-to-11', 'laravel-11-to-12', 'laravel-12-to-13'], $laravelIds);
+        $skip = array_values(array_diff(array_map(static fn(PlanStep $s): string => $s->hop->id, $full->steps), [end($laravelIds)]));
+        $plan = $planner->plan($project, new PlanOptions(fromPhp: '8.2', toPhp: '8.3', fromLaravel: '10', toLaravel: '13', skip: $skip), $this->today());
+
+        return [$dir, $plan];
+    }
+
+    public function test_a_laravel_hop_updates_the_lock_in_the_gate(): void
+    {
+        [$dir, $plan] = $this->laravelPlan($this->copyExample('laravel-blade'));
+        self::assertSame(['laravel-12-to-13'], array_map(static fn(PlanStep $s): string => $s->hop->id, $plan->steps));
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use ($dir, &$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $script = $command[count($command) - 1];
+                $dockerRuns++;
+                if (str_contains($script, 'composer update -W')) {
+                    // Simulate the container writing the refreshed lock through the mount.
+                    file_put_contents($dir . '/composer.lock', json_encode(['packages' => ['laravel/framework' => ['version' => 'v13.39.0']]]));
+                }
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Models/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        $runs = $this->dockerRuns($fake);
+        self::assertCount(2, $runs);
+        $scripts = array_map(static fn(array $run): string => $run['command'][count($run['command']) - 1], $runs);
+        self::assertStringContainsString('composer install --no-interaction --no-progress --prefer-dist', $scripts[0]);
+        self::assertStringContainsString('composer update -W --no-interaction --no-progress laravel/framework', $scripts[1]);
+        self::assertStringNotContainsString('composer install', $scripts[1]);
+        // The refreshed lock lands in the app itself.
+        self::assertFileExists($dir . '/composer.lock');
+        $lock = json_decode((string) file_get_contents($dir . '/composer.lock'), true);
+        self::assertSame('v13.39.0', $lock['packages']['laravel/framework']['version']);
+        self::assertStringContainsString('The gate refreshed composer.lock (composer update -W laravel/framework).', implode(' ', $report->results[0]->messages));
+    }
+
+    public function test_a_laravel_dry_run_says_what_it_would_update_and_runs_nothing(): void
+    {
+        [$dir, $plan] = $this->laravelPlan($this->copyExample('laravel-blade'));
+        $fake = $this->fake();
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions(dryRun: true));
+
+        self::assertSame([], $this->dockerRuns($fake));
+        self::assertSame(StepResult::PREVIEWED, $report->results[0]->status);
+        self::assertStringContainsString('would run: composer update -W laravel/framework', implode(' ', $report->results[0]->messages));
+        self::assertFileDoesNotExist($dir . '/composer.lock');
+    }
+
+    public function test_a_failed_lock_update_fails_the_step_in_the_composer_phase(): void
+    {
+        [, $plan] = $this->laravelPlan($this->copyExample('laravel-blade'));
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use (&$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $dockerRuns++;
+                if ($dockerRuns === 1) {
+                    return new ProcessResult(0, '', '');
+                }
+
+                return new ProcessResult(4, "Problem 1 of 1\n- The lock file is not up to date.\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4", '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => '/srv/app/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('Gate failed: composer update -W laravel/framework failed (exit 4)', $all);
+        self::assertStringContainsString('This step changed composer.json and composer.lock.', $all);
+        self::assertStringContainsString('Undo with:', $all);
+        self::assertStringNotContainsString('"vendor/bin/phpunit" exited', $all);
+    }
 }

@@ -331,12 +331,15 @@ final class HopExecutor
                         $wanted,
                         $options->reviewThreshold,
                     ), ...self::summaryLines($prepass, $preview)] : [];
+                    // A real run's gate refreshes the lock for these hops; say so now.
+                    $update = $this->lockUpdatePackages($step);
+                    $wouldRun = $update === [] ? [] : [sprintf('would run: composer update -W %s', implode(' ', $update))];
                     if ($incomplete) {
-                        $messages = [...$threshold, sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$inertiaChanges, ...$hop->notes, ...$notes];
+                        $messages = [...$threshold, ...$wouldRun, sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$inertiaChanges, ...$hop->notes, ...$notes];
                     } elseif ($files === []) {
-                        $messages = [...$threshold, 'Dry run: nothing was changed.', ...($migration->manual ?? []), ...$hop->notes, ...$notes];
+                        $messages = [...$threshold, ...$wouldRun, 'Dry run: nothing was changed.', ...($migration->manual ?? []), ...$hop->notes, ...$notes];
                     } else {
-                        $messages = [...$threshold, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$hop->notes, ...$notes];
+                        $messages = [...$threshold, ...$wouldRun, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$hop->notes, ...$notes];
                     }
 
                     return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $files, $messages, $incomplete, $prepass?->files() ?? [], $rules);
@@ -402,6 +405,10 @@ final class HopExecutor
                         return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$gate, ...$notes], false, $prepass?->files() ?? []);
                     }
                     $messages[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
+                    $update = $this->lockUpdatePackages($step);
+                    if ($update !== []) {
+                        $messages[] = sprintf('The gate refreshed composer.lock (composer update -W %s).', implode(' ', $update));
+                    }
                 } else {
                     $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
                 }
@@ -561,28 +568,56 @@ final class HopExecutor
     }
 
     /**
+     * The packages the gate must refresh in the lock for this step. Laravel
+     * and PHPUnit hops raise a package requirement in composer.json, so a
+     * plain `composer install` would hold the old lock (or fail on its stale
+     * content hash); the gate instead runs `composer update -W` for those
+     * packages, and because the app is mounted at /app the refreshed lock
+     * lands in the app itself. PHP hops only move the platform requirement,
+     * which Composer resolves from the lock, so they keep the plain install.
+     *
+     * @return list<string>
+     */
+    private function lockUpdatePackages(PlanStep $step): array
+    {
+        $hop = $step->hop;
+        if ($hop->kind !== HopKind::Laravel && $hop->kind !== HopKind::Phpunit) {
+            return [];
+        }
+
+        return array_keys($hop->composerSet);
+    }
+
+    /**
      * @return list<string>|null failure messages, or null when the gate passed
      */
     private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): ?array
     {
         $php = $step->phpAfter ?? '';
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
-        $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage);
+        $update = $this->lockUpdatePackages($step);
+        $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update);
         $outcome = TargetImageRunner::gateOutcome($result);
         if ($outcome->successful()) {
             return null;
         }
 
-        // An install failure is never reported as the test command exiting N:
-        // the tests never ran, so only the Composer phase is named.
-        $what = $outcome->phase === GateOutcome::PHASE_INSTALL
-            ? sprintf('composer install failed (exit %d)', $outcome->exitCode)
-            : sprintf('"%s" exited %d', $test, $outcome->exitCode);
+        // A Composer-phase failure is never reported as the test command
+        // exiting N: the tests never ran, so only the Composer phase is named.
+        $what = match (true) {
+            $outcome->phase !== GateOutcome::PHASE_INSTALL => sprintf('"%s" exited %d', $test, $outcome->exitCode),
+            $update === [] => sprintf('composer install failed (exit %d)', $outcome->exitCode),
+            default => sprintf('composer update -W %s failed (exit %d)', implode(' ', $update), $outcome->exitCode),
+        };
         $messages = [
             sprintf('Gate failed: %s on PHP %s. The working copy keeps the changes so you can read them.', $what, $php),
             ...$outcome->output,
-            $this->undoHint($path),
         ];
+        if ($update !== []) {
+            // Both files are named so the undo line below reads as covering both.
+            $messages[] = 'This step changed composer.json and composer.lock.';
+        }
+        $messages[] = $this->undoHint($path);
         if ($baseline->status === BaselineResult::FAILED) {
             $messages[] = 'The baseline was already failing, so this gate failure may predate the upgrade.';
         } elseif ($baseline->status === BaselineResult::INSTALL_FAILED) {
