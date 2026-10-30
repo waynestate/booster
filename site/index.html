@@ -579,7 +579,7 @@ Read first:
 Task:
 1. Clone Booster into its own folder beside the app with `git clone https://github.com/waynestate/booster.git`, then run `composer install` in it. Booster needs PHP 8.3 or newer; the app does not. No PHP on the machine: use the Docker lines from the README.
 2. Run bin/booster detect --path=../my-app (on Windows PowerShell, php bin\booster with ..\my-app) and say which of the five stack shapes the app is and which versions it runs.
-3. Run bin/booster plan --path=../my-app and give me the ordered hops, the warnings and the PHPCompatibility findings.
+3. Run bin/booster plan --path=../my-app and give me the ordered hops, the warnings, what will break on each hop's target PHP, and the PHPStan findings for the final target.
 4. Say which hops are Rector, which edit manifests and which are playbooks a person works through.
 
 Constraints:
@@ -610,7 +610,7 @@ Read first:
 Task:
 1. With Booster cloned beside the app, run bin/booster detect --path=../my-app and confirm the shape is raw-php.
 2. Run bin/booster plan --path=../my-app. Expect PHP hops only, one minor at a time.
-3. Run bin/booster scan --path=../my-app --php=X.Y for the first hop's target and list what will break.
+3. Run bin/booster scan --path=../my-app --php=X.Y for the first hop's target and list what will break; add --removals for removed functions and --phpstan for static analysis.
 4. Run bin/booster run --path=../my-app --dry-run and summarise the diffs per hop.
 5. Only when I say so: bin/booster run --path=../my-app. It needs a clean git working copy and a Docker daemon for the gate, which runs `composer test` (or vendor/bin/phpunit) in the target PHP image.
 
@@ -628,7 +628,7 @@ Output: the plan, the scan findings, the dry-run summary per hop, then your ques
             <div>
               <p class="ar-prompt__kicker">Order B-3 · Raw PHP with a Vue SPA</p>
               <h3 class="ar-prompt__title" id="prompt-raw-php-vue-title">Upgrade a raw PHP app with a Vue front end</h3>
-              <p class="ar-prompt__desc">Plans the PHP hops and the Node pin, and lists the Vue 2 to 3 steps for a person to work through.</p>
+              <p class="ar-prompt__desc">Plans the PHP hops and the Node pin, and stages the Vue 2 to 3 move: the compat build, then the codemod, with a person doing the Vue work.</p>
             </div>
           </header>
           <pre class="ar-prompt__text"><code>You are a coding agent upgrading a raw PHP app with a Vue single-page front end at Wayne State University with Booster, the upgrade tool of WELD, the Wayne State application stack.
@@ -640,9 +640,9 @@ Read first:
 
 Task:
 1. With Booster cloned beside the app, run bin/booster detect --path=../my-app and confirm the shape is raw-php-vue, with the Vue and Node versions.
-2. Run bin/booster plan --path=../my-app and sort the hops: PHP hops (Rector), node-pin-24 (sets engines.node and writes .nvmrc), and vue-2-to-3 if the app is on Vue 2.
+2. Run bin/booster plan --path=../my-app and sort the hops: PHP hops (Rector), node-pin-24 (pins Node 26 in package.json and writes .nvmrc), and the staged Vue hops if the app is on Vue 2: vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
 3. Run bin/booster run --path=../my-app --dry-run and summarise the diffs.
-4. For vue-2-to-3, list the playbook steps for this app. Rector does not read Vue, so Booster changes nothing there: a person does that work.
+4. For the Vue hops, list the playbook steps for this app: the compat build, then the codemod, keeping every manual item the codemod lists. Rector does not read Vue, so Booster changes nothing there: a person does that work.
 
 Constraints:
 - Plan and dry run only, until I say so. Never commit or push.
@@ -670,7 +670,7 @@ Read first:
 Task:
 1. Run `composer install` in the app first: rector-laravel needs Laravel's classes, and a Laravel hop without vendor is only a partial preview.
 2. With Booster cloned beside the app, run bin/booster plan --path=../my-app and explain the order: it keeps the app on a PHP and Laravel pair Laravel supports at every step.
-3. If composer.json requires wayne-cas, run the plan again with --sesame and say what the cas-to-sesame hop renames. It is a stub recipe today, so list what is left for a person.
+3. If composer.json requires wayne-cas, run the plan again with --sesame and say what the cas-to-sesame hop renames. Only the two-factor sign-in stays manual; list that for a person.
 4. Run bin/booster run --path=../my-app --dry-run and summarise the diffs per hop.
 
 Constraints:
@@ -693,13 +693,13 @@ Output: the plan with the reason for its order, the SESAME notes if any, the dry
           <pre class="ar-prompt__text"><code>You are a coding agent upgrading a Laravel app with Blade views and Vue islands at Wayne State University with Booster, the upgrade tool of WELD, the Wayne State application stack.
 
 Read first:
-- https://booster.apps.wayne.edu/llms.txt, then the README in llms-full.txt beside it: Hops Booster knows (node-pin-24, mix-to-vite, vue-2-to-3) and Laravel hops and vendor.
+- https://booster.apps.wayne.edu/llms.txt, then the README in llms-full.txt beside it: Hops Booster knows (node-pin-24, mix-to-vite, vue-26-to-27, vue-27-to-compat, vue-compat-codemod) and Laravel hops and vendor.
 - ADVISOR, the stack's MCP server, if it is connected: upgrade_path for this app, policy_lookup for Laravel and Node, and list_stack_rules with permutation laravel-blade-vue. If it is not connected, say so and work from the pages.
 - package.json, its lock file, and webpack.mix.js if there is one.
 
 Task:
 1. Run `composer install` in the app, then, with Booster cloned beside it, bin/booster plan --path=../my-app.
-2. If the plan has mix-to-vite, say whether this webpack.mix.js is the simple shape Booster converts (mix.js, .vue(), .sass(), .postCss(), .version()) or which call it will refuse by name. A Vue 2 front end takes vue-2-to-3 first.
+2. If the plan has mix-to-vite, say whether this webpack.mix.js is the simple shape Booster converts (mix.js, .vue(), .sass(), .postCss(), .version(), and if (mix.inProduction()) { mix.version(); }) or which call it will refuse by name. A Vue 2 front end takes the staged Vue hops first: vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
 3. Run bin/booster run --path=../my-app --dry-run and summarise the diffs, Blade layouts included.
 4. List any withoutMix() calls for me to rename to withoutVite() by hand.
 
@@ -729,7 +729,7 @@ Read first:
 
 Task:
 1. Run `composer install` in the app, then, with Booster cloned beside it, bin/booster detect --path=../my-app and bin/booster plan --path=../my-app.
-2. Sort the hops: Laravel and PHP (Rector), node-pin-24, and vue-2-to-3 if the app is on Vue 2 (a playbook, not a code change).
+2. Sort the hops: Laravel and PHP (Rector), node-pin-24, and the staged Vue hops if the app is on Vue 2 (playbooks, not code changes): vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
 3. For each Laravel hop, list what to check by hand on the Inertia side: Booster has no Inertia checks per Laravel hop yet.
 4. Run bin/booster run --path=../my-app --dry-run and summarise the diffs per hop.
 
@@ -777,12 +777,12 @@ Output: the plan sorted by kind, the Inertia checks per Laravel hop, the dry-run
       </div>
       <ul class="team">
         <li class="member"><span class="member__mark member__mark--tile"><img src="assets/marks/wayneui.svg" width="40" height="40" alt=""></span><span class="member__name"><a class="part-link" href="https://wayneui.apps.wayne.edu/">WayneUI</a></span><span class="member__role">The interface layer under everything, this page included.</span></li>
-        <li class="member"><span class="member__mark"><img src="assets/marks/creed.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://creed.apps.wayne.edu/">CREED</a></span><span class="member__role">Writes the version policy Booster reads.</span></li>
-        <li class="member"><span class="member__mark"><img src="assets/marks/proctor.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://proctor.apps.wayne.edu/">PROCTOR</a></span><span class="member__role">Checks an app against that policy. Booster can run it in the gate with <code>--proctor-command</code>.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/creed.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://creed.apps.wayne.edu/">CREED</a></span><span class="member__role">Writes the version policy Booster reads from the waynestate/creed package.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/proctor.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://proctor.apps.wayne.edu/">PROCTOR</a></span><span class="member__role">Measures an app against that policy; the gate runs it after the last hop, and <code>--proctor-command</code> overrides the check.</span></li>
         <li class="member"><span class="member__mark"><img src="assets/marks/preflight.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://preflight.apps.wayne.edu/">Preflight</a></span><span class="member__role">The CI templates Booster's own checks run on.</span></li>
         <li class="member"><span class="member__mark"><img src="assets/marks/sesame.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://sesame.apps.wayne.edu/">SESAME</a></span><span class="member__role">Sign-in; <code>--sesame</code> moves wayne-cas apps to it.</span></li>
         <li class="member"><span class="member__mark"><img src="assets/marks/helmet.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://helmet.apps.wayne.edu/">HELMET</a></span><span class="member__role">Security headers and session hardening.</span></li>
-        <li class="member"><span class="member__mark"><img src="assets/marks/pinstripe.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://pinstripe.apps.wayne.edu/">Pinstripe</a></span><span class="member__role">The code style. Booster's PHPStan config is a copy of its raw preset.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/pinstripe.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://pinstripe.apps.wayne.edu/">Pinstripe</a></span><span class="member__role">The coding standard. Booster's PHPStan advisory scan runs against its raw preset.</span></li>
         <li class="member"><span class="member__mark"><img src="assets/marks/sourdough.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://sourdough.apps.wayne.edu/">Sourdough</a></span><span class="member__role">Starts new raw PHP apps on current versions.</span></li>
         <li class="member"><span class="member__mark"><img src="assets/marks/weld.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://weld.apps.wayne.edu/">WELD</a></span><span class="member__role">The Laravel and Vue starter, with the stack already installed.</span></li>
         <li class="member member--self"><span class="member__mark"><img src="brand/booster-avatar-256.png" width="56" height="56" alt=""></span><span class="member__name">Booster</span><span class="member__role">Moves apps forward, one dose at a time.</span><span class="member__here">You are here</span></li>
@@ -798,16 +798,16 @@ Output: the plan sorted by kind, the Inertia checks per Laravel hop, the dry-run
   <section class="section section--next" aria-labelledby="next-title">
     <div class="wsu-container next">
       <div>
-        <p class="label"><span class="label__dot" aria-hidden="true"></span>Version 0.1</p>
+        <p class="label"><span class="label__dot" aria-hidden="true"></span>Version 1.0</p>
         <h2 id="next-title">Not yet given.</h2>
-        <p>The example apps prove the plumbing. We haven't measured how much Rector fixes on real apps yet, and the Docker gate hasn't run on a real app. Still to come, from <a href="https://github.com/waynestate/booster/blob/main/OPEN_QUESTIONS.md">OPEN_QUESTIONS.md</a>:</p>
+        <p>The five example apps prove the plumbing end to end, and the gate now ends with PROCTOR checking the result against CREED's policy. What 1.0 leaves open, from <a href="https://github.com/waynestate/booster/blob/main/OPEN_QUESTIONS.md">OPEN_QUESTIONS.md</a>:</p>
       </div>
       <ul class="schedule">
-        <li><span class="chip chip--soon">Coming soon</span> <span>A published PHAR, so Booster is one file you download (you can build it from a checkout today)</span></li>
-        <li><span class="chip chip--soon">Coming soon</span> <span><code>booster mcp</code>, a read-only tool server</span></li>
-        <li><span class="chip chip--soon">Coming soon</span> <span>Target-version PHPStan as an advisory scan (the PHPCompatibility scan is built)</span></li>
-        <li><span class="chip chip--soon">Coming soon</span> <span>Vue 2 to 3 beyond a playbook, and Inertia checks per Laravel hop</span></li>
-        <li><span class="chip chip--soon">Coming soon</span> <span>A full wayne-cas migration (today's recipe is a stub)</span></li>
+        <li><span class="chip chip--soon">Not yet</span> <span>Custom WSU Rector rules beyond the CAS rename, and Rector pilot numbers on real apps</span></li>
+        <li><span class="chip chip--soon">Not yet</span> <span>A cas-to-sesame run against a real app; Duo two-factor stays manual work</span></li>
+        <li><span class="chip chip--soon">Decided</span> <span>No <code>booster mcp</code>: ADVISOR is the stack's read-only MCP server</span></li>
+        <li><span class="chip chip--soon">Decided</span> <span>No merge-request automation on app code; a person reads the diff and merges it</span></li>
+        <li><span class="chip chip--soon">Open</span> <span>The shared MySQL 5.6 database floor (question 8); the hop notes tell the reviewer to check it</span></li>
       </ul>
     </div>
   </section>
