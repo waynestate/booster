@@ -2,7 +2,7 @@
 
 All notable changes to Booster are recorded here. The format follows Keep a Changelog.
 
-## [1.0.0] (not yet released)
+## [1.0.0] - 2026-10-30
 
 ### Added
 
