@@ -240,6 +240,7 @@ Options for `run`:
 | `--max-changes` | Hard limit on files changed per hop, with no prompt (`0` lifts the limit). Without it, a hop over the review threshold of 200 files asks first when interactive, or stops |
 | `--memory-limit` | Memory limit for the Rector process (for example `2G`), or `-1` for no limit (default `2G`) |
 | `--skip-gate` | Do not run the tests in the target image after each hop, or the PROCTOR check at the end (skips the baseline too) |
+| `--image` | Run the gate in this Docker image instead of building `booster-target` (it needs `php` and `composer` on `PATH`) |
 | `--allow-failing-baseline` | Continue when the baseline fails; later gate failures are labelled as pre-existing |
 | `--allow-dirty` | Run even when the working copy has uncommitted changes |
 | `--test-command` | What runs the app's tests in the image (default `composer test`, else `vendor/bin/phpunit`) |
@@ -327,11 +328,15 @@ under `Pre-pass fixes:`.
 2. Rector runs for real, with only that hop's rules.
 3. `composer.json` is edited: the `php` or `laravel/framework` constraint is raised, and `config.platform.php` moves
    with it when the app already pins it. Booster never runs `composer update` and never creates the key.
-4. The gate runs the app's tests inside `booster-target:<php>`, a container built from `docker/Dockerfile` on the PHP
-   the hop moves to. A red gate stops the run and leaves the changes in place so you can read them
-   (`git checkout .` undoes them). To check the image itself, `scripts/check-target-image.sh` (or its Windows twin
-   `check-target-image.ps1`) builds it for each PHP version and verifies its extension list; it needs Docker and a
-   few minutes per version, so it is not part of `composer ci`.
+4. The gate runs the app's tests inside `booster-target:<php>-<stamp>`, a container built from `docker/Dockerfile`
+   on the PHP the hop moves to. The stamp is a short hash of the recipe, so an edited `docker/Dockerfile` rebuilds
+   the image instead of reusing a stale one. The image carries the extension set Citadel's apps run with: intl,
+   ldap, soap, zip, gd, pdo_mysql, mysqli, bcmath, pcntl, exif, redis, imagick and oci8. The first build downloads
+   Oracle Instant Client for oci8, so it takes a few minutes; later hops reuse the image. Pass `--image` to run the
+   gate in your own image instead (it needs `php` and `composer` on `PATH`). A red gate stops the run and leaves the
+   changes in place so you can read them (`git checkout .` undoes them). To check the image itself,
+   `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and
+   verifies its extension list; it needs Docker and a few minutes per version, so it is not part of `composer ci`.
 
 `run` refuses to start on a working copy that is not under git or has uncommitted changes, so the upgrade diff stands
 alone. `--dry-run` has no such limit.
