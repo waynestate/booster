@@ -58,6 +58,7 @@ abstract class BaseCommand extends Command
             ->addOption('from-laravel', null, InputOption::VALUE_REQUIRED, 'The Laravel major the app runs on.')
             ->addOption('to-laravel', null, InputOption::VALUE_REQUIRED, 'Target Laravel major (default: the newest the policy supports).')
             ->addOption('to-phpunit', null, InputOption::VALUE_REQUIRED, 'Target PHPUnit major (default: the newest that runs on the target PHP).')
+            ->addOption('with-node', null, InputOption::VALUE_NONE, 'Include the Node front-end hops (Node pin, Mix to Vite, Tailwind, Vue) even when you passed a target version')
             ->addOption('sesame', null, InputOption::VALUE_NONE, 'Include the wayne-cas to SESAME swap.')
             ->addOption('skip', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hop id to leave out (repeatable).');
     }
@@ -111,6 +112,7 @@ abstract class BaseCommand extends Command
             toLaravel: $this->stringOption($input, 'to-laravel'),
             toPhpunit: $this->stringOption($input, 'to-phpunit'),
             sesame: (bool) $input->getOption('sesame'),
+            withNode: (bool) $input->getOption('with-node'),
             skip: is_array($skip) ? array_values(array_map('strval', $skip)) : [],
         );
 
