@@ -701,6 +701,42 @@ final class HopExecutorTest extends TestCase
         self::assertArrayNotHasKey('prepass_fixes', $report->toArray()['results'][1]);
     }
 
+    public function test_the_removals_advisory_describes_the_app_before_the_hop(): void
+    {
+        // The simulated Rector apply deletes the legacy file, like a rule that
+        // drops dead code. An advisory that still names the removed function
+        // must therefore have been scanned before the rewrite touched the tree.
+        $dir = $this->copyExample('raw-php');
+        $removed = $dir . '/src/Removed.php';
+        file_put_contents($removed, "<?php\n\n\$f = create_function('\$x', 'return \$x * 2;');\n\nreturn \$f(2);\n");
+        $fake = new FakeProcessRunner(static function (array $command, array $env) use ($dir): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            if (!in_array('--dry-run', $command, true)) {
+                unlink($dir . '/src/Removed.php');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $env['BOOSTER_APP_PATH'] . '/src/Removed.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        // The planner would refuse 8.0 as a target (past security support),
+        // but the hop is exactly what a PHP 7.4 app needs, so the step is
+        // built by hand, like the manual-hop tests do.
+        $step = new PlanStep(1, (new HopRegistry())->get('php-74-to-80'), '7.4', '8.0', null, null, null, null, [Planner::GATE_TESTS]);
+        $plan = new Plan((new ProjectDetector())->detect($dir), self::TODAY, 'test', '8.0', null, null, [$step], []);
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions(skipGate: true));
+
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        self::assertFileDoesNotExist($removed);
+        $messages = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('Removed between PHP 7.4 and PHP 8.0: 1 hit (advisory).', $messages);
+        self::assertStringContainsString('src/Removed.php:3 create_function() function -> anonymous functions', $messages);
+    }
+
     public function test_a_dry_run_restores_the_prepass_bytes_and_lists_the_fixes(): void
     {
         $dir = $this->copyExample('raw-php');
