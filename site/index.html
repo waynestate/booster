@@ -153,7 +153,7 @@
             <p class="alt__label">Now on</p>
             <p class="alt__value"><span class="alt__k">PHP</span> <span data-alt-php>8.5</span></p>
             <p class="alt__value" data-alt-lara-row><span class="alt__k">Laravel</span> <span data-alt-lara>13</span></p>
-            <div class="alt__track" style="--steps:6; --lvl:6" data-alt-track>
+            <div class="alt__track" style="--steps:9; --lvl:9" data-alt-track>
               <span class="alt__fill"></span>
               <img class="alt__rocket" src="brand/booster-avatar-256.png" width="40" height="40" alt="">
             </div>
@@ -168,8 +168,8 @@
               </div>
               <dl class="card__fields">
                 <div><dt>App type</dt><dd data-card-type>laravel-blade</dd></div>
-                <div><dt>Course</dt><dd data-card-course>PHP 8.2 → 8.5 · Laravel 10 → 13</dd></div>
-                <div><dt>Policy</dt><dd>CREED snapshot</dd></div>
+                <div><dt>Course</dt><dd data-card-course>PHP 8.2 → 8.5 · Laravel 10 → 13 · PHPUnit 10 → 13</dd></div>
+                <div><dt>Policy</dt><dd>waynestate/creed 0.1.3</dd></div>
                 <div><dt>Next booster due</dt><dd data-card-due>17 Mar 2028</dd></div>
               </dl>
             </header>
@@ -180,41 +180,62 @@
             <ol class="doses" data-doses>
               <li class="dose">
                 <span class="dose__no">01</span>
+                <span class="dose__hop"><code>phpunit-10-to-11</code><span class="dose__sum">Move PHPUnit 10 tests to PHPUnit 11.</span></span>
+                <span class="dose__pair">PHP 8.2 · Laravel 10</span>
+                <span class="dose__gate">booster-target:8.2</span>
+                <span class="stamp"><span class="stamp__top">Gate passed</span><span class="stamp__mid">PHP 8.2</span><span class="stamp__date" data-date>28 Oct 2026</span></span>
+              </li>
+              <li class="dose">
+                <span class="dose__no">02</span>
                 <span class="dose__hop"><code>laravel-10-to-11</code><span class="dose__sum">Move a Laravel 10 app to Laravel 11.</span></span>
                 <span class="dose__pair">PHP 8.2 · Laravel 11</span>
                 <span class="dose__gate">booster-target:8.2</span>
                 <span class="stamp"><span class="stamp__top">Gate passed</span><span class="stamp__mid">PHP 8.2</span><span class="stamp__date" data-date>28 Oct 2026</span></span>
               </li>
               <li class="dose">
-                <span class="dose__no">02</span>
+                <span class="dose__no">03</span>
                 <span class="dose__hop"><code>laravel-11-to-12</code><span class="dose__sum">Move a Laravel 11 app to Laravel 12.</span></span>
                 <span class="dose__pair">PHP 8.2 · Laravel 12</span>
                 <span class="dose__gate">booster-target:8.2</span>
                 <span class="stamp"><span class="stamp__top">Gate passed</span><span class="stamp__mid">PHP 8.2</span><span class="stamp__date" data-date>28 Oct 2026</span></span>
               </li>
               <li class="dose">
-                <span class="dose__no">03</span>
+                <span class="dose__no">04</span>
                 <span class="dose__hop"><code>php-82-to-83</code><span class="dose__sum">Move PHP 8.2 code to PHP 8.3.</span></span>
                 <span class="dose__pair">PHP 8.3 · Laravel 12</span>
                 <span class="dose__gate">booster-target:8.3</span>
                 <span class="stamp"><span class="stamp__top">Gate passed</span><span class="stamp__mid">PHP 8.3</span><span class="stamp__date" data-date>28 Oct 2026</span></span>
               </li>
               <li class="dose">
-                <span class="dose__no">04</span>
+                <span class="dose__no">05</span>
+                <span class="dose__hop"><code>phpunit-11-to-12</code><span class="dose__sum">Move PHPUnit 11 tests to PHPUnit 12.</span></span>
+                <span class="dose__pair">PHP 8.3 · Laravel 12</span>
+                <span class="dose__gate">booster-target:8.3</span>
+                <span class="stamp"><span class="stamp__top">Gate passed</span><span class="stamp__mid">PHP 8.3</span><span class="stamp__date" data-date>28 Oct 2026</span></span>
+              </li>
+              <li class="dose">
+                <span class="dose__no">06</span>
                 <span class="dose__hop"><code>laravel-12-to-13</code><span class="dose__sum">Move a Laravel 12 app to Laravel 13.</span></span>
                 <span class="dose__pair">PHP 8.3 · Laravel 13</span>
                 <span class="dose__gate">booster-target:8.3</span>
                 <span class="stamp"><span class="stamp__top">Gate passed</span><span class="stamp__mid">PHP 8.3</span><span class="stamp__date" data-date>28 Oct 2026</span></span>
               </li>
               <li class="dose">
-                <span class="dose__no">05</span>
+                <span class="dose__no">07</span>
                 <span class="dose__hop"><code>php-83-to-84</code><span class="dose__sum">Move PHP 8.3 code to PHP 8.4.</span></span>
                 <span class="dose__pair">PHP 8.4 · Laravel 13</span>
                 <span class="dose__gate">booster-target:8.4</span>
                 <span class="stamp"><span class="stamp__top">Gate passed</span><span class="stamp__mid">PHP 8.4</span><span class="stamp__date" data-date>28 Oct 2026</span></span>
               </li>
               <li class="dose">
-                <span class="dose__no">06</span>
+                <span class="dose__no">08</span>
+                <span class="dose__hop"><code>phpunit-12-to-13</code><span class="dose__sum">Move PHPUnit 12 tests to PHPUnit 13.</span></span>
+                <span class="dose__pair">PHP 8.4 · Laravel 13</span>
+                <span class="dose__gate">booster-target:8.4</span>
+                <span class="stamp"><span class="stamp__top">Gate passed</span><span class="stamp__mid">PHP 8.4</span><span class="stamp__date" data-date>28 Oct 2026</span></span>
+              </li>
+              <li class="dose">
+                <span class="dose__no">09</span>
                 <span class="dose__hop"><code>php-84-to-85</code><span class="dose__sum">Move PHP 8.4 code to PHP 8.5.</span></span>
                 <span class="dose__pair">PHP 8.5 · Laravel 13</span>
                 <span class="dose__gate">booster-target:8.5</span>
@@ -249,7 +270,7 @@ Php 8.1 is past security support; pick a version the policy still supports.
         <p class="pairs__legend">
           <span><span class="key key--ok" aria-hidden="true"></span>supported pair</span>
           <span><span class="key key--no" aria-hidden="true"></span>not a pair Laravel supports</span>
-          <span><span class="key key--path" aria-hidden="true"></span>the six doses for Laravel 10 on PHP 8.2</span>
+          <span><span class="key key--path" aria-hidden="true"></span>the Laravel and PHP hops for Laravel 10 on PHP 8.2</span>
         </p>
       </div>
 
