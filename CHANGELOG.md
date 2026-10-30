@@ -2,7 +2,7 @@
 
 All notable changes to Booster are recorded here. The format follows Keep a Changelog.
 
-## [Unreleased]
+## [1.3.0] - 2026-10-30
 
 Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, Laravel 5.8 and 8, CAS, oci8).
 
