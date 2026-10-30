@@ -318,13 +318,17 @@ final class TextWriter
                 sprintf('Baseline: FAIL on PHP %s (exit %d).', $php, $baseline->exitCode ?? -1),
                 "The app's tests fail before any change; fix them or pass --allow-failing-baseline.",
             ],
+            BaselineResult::INSTALL_FAILED => [
+                sprintf('Baseline: composer install failed (exit %d) on PHP %s.', $baseline->exitCode ?? -1, $php),
+                "The app's tests never ran, so their state is unknown; fix the app's composer.json and composer.lock, or pass --allow-failing-baseline.",
+            ],
             BaselineResult::SKIPPED => ['Baseline: SKIPPED (no gate in this run).'],
             default => [sprintf('Baseline: %s.', $baseline->status)],
         };
         if ($baseline->warning !== null) {
             $lines[] = $baseline->warning;
         }
-        if ($baseline->status === BaselineResult::FAILED) {
+        if (in_array($baseline->status, [BaselineResult::FAILED, BaselineResult::INSTALL_FAILED], true)) {
             $joined = implode("\n", $baseline->output);
             if (preg_match('/mix-manifest\.json|Vite manifest not found|public\/build\/manifest\.json/i', $joined) === 1) {
                 $lines[] = 'The output names a missing build artifact (a Mix or Vite manifest): build the front-end assets first (for example npm ci && npm run build), or pass --allow-failing-baseline.';

@@ -86,12 +86,15 @@ final class HopExecutor
 
         $baseline = $this->runBaseline($plan, $path, $options);
         if ($baseline->failed() && !$options->allowFailingBaseline) {
-            // The suite is red before Booster touches anything, so a later red gate would be
-            // unprovable. Stop before the first hop and say so plainly.
+            // The suite is red (or never ran) before Booster touches anything, so a later red
+            // gate would be unprovable. Stop before the first hop and say so plainly.
+            $reason = $baseline->status === BaselineResult::INSTALL_FAILED
+                ? sprintf('composer install failed (exit %d) before the app\'s tests ran. Fix the app\'s composer.json and composer.lock, or pass --allow-failing-baseline.', $baseline->exitCode ?? -1)
+                : "the app's tests fail before any change. Fix them or pass --allow-failing-baseline.";
             $results = [];
             foreach ($plan->steps as $step) {
                 $results[] = new StepResult($step->number, $step->hop->id, StepResult::NOT_RUN, [], [
-                    'Not run because the baseline failed: the app\'s tests fail before any change. Fix them or pass --allow-failing-baseline.',
+                    'Not run because the baseline failed: ' . $reason,
                 ]);
             }
 
@@ -193,15 +196,14 @@ final class HopExecutor
 
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
         $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage);
-        $output = self::lastLines($result->stdout . "\n" . $result->stderr, 20);
+        $outcome = TargetImageRunner::gateOutcome($result);
+        $status = match (true) {
+            $outcome->successful() => BaselineResult::PASSED,
+            $outcome->phase === GateOutcome::PHASE_INSTALL => BaselineResult::INSTALL_FAILED,
+            default => BaselineResult::FAILED,
+        };
 
-        return new BaselineResult(
-            $result->successful() ? BaselineResult::PASSED : BaselineResult::FAILED,
-            $php,
-            $result->exitCode,
-            $output,
-            $warning,
-        );
+        return new BaselineResult($status, $php, $outcome->exitCode, $outcome->output, $warning);
     }
 
     /**
@@ -215,27 +217,6 @@ final class HopExecutor
         }
 
         return $plan->steps[0]->phpBefore ?? $plan->project->phpVersion;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private static function lastLines(string $text, int $count): array
-    {
-        $text = trim($text);
-        if ($text === '') {
-            return [];
-        }
-        $lines = explode("\n", $text);
-        if (count($lines) <= $count) {
-            return $lines;
-        }
-        $kept = [];
-        foreach (array_slice($lines, -$count) as $line) {
-            $kept[] = $line;
-        }
-
-        return $kept;
     }
 
     /**
@@ -587,17 +568,25 @@ final class HopExecutor
         $php = $step->phpAfter ?? '';
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
         $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage);
-        if ($result->successful()) {
+        $outcome = TargetImageRunner::gateOutcome($result);
+        if ($outcome->successful()) {
             return null;
         }
 
+        // An install failure is never reported as the test command exiting N:
+        // the tests never ran, so only the Composer phase is named.
+        $what = $outcome->phase === GateOutcome::PHASE_INSTALL
+            ? sprintf('composer install failed (exit %d)', $outcome->exitCode)
+            : sprintf('"%s" exited %d', $test, $outcome->exitCode);
         $messages = [
-            sprintf('Gate failed: "%s" exited %d on PHP %s. The working copy keeps the changes so you can read them.', $test, $result->exitCode, $php),
-            trim($result->stdout . "\n" . $result->stderr),
+            sprintf('Gate failed: %s on PHP %s. The working copy keeps the changes so you can read them.', $what, $php),
+            ...$outcome->output,
             $this->undoHint($path),
         ];
-        if ($baseline->failed()) {
+        if ($baseline->status === BaselineResult::FAILED) {
             $messages[] = 'The baseline was already failing, so this gate failure may predate the upgrade.';
+        } elseif ($baseline->status === BaselineResult::INSTALL_FAILED) {
+            $messages[] = 'No baseline to compare against: the baseline\'s composer install failed, so this gate failure cannot be attributed.';
         }
 
         return $messages;

@@ -42,14 +42,16 @@ final class HopExecutorTest extends TestCase
      * @param int            $proctorExit          PROCTOR's exit code (0 pass, 1 fail, 2 tripped); -1 leaves PROCTOR unanswered
      * @param int            $proctorBaselineExit  exit code of the first PROCTOR call (the baseline); -1 answers it like the rest
      * @param string|null    $gitStatusStart       what the first git status prints (the start-of-run read); null answers it like the rest
+     * @param string|null    $baselineStdout       stdout of a failing baseline run; null answers 'FAILURES!' (the tests phase)
+     * @param string|null    $gateStdout           stdout of a failing gate run; null answers 'FAILURES!' (the tests phase)
      */
-    private function fake(int $changedPerHop = 1, string $gitStatus = '', int $gateExit = 0, array $rectorErrors = [], int $baselineExit = 0, int $proctorExit = -1, int $proctorBaselineExit = -1, ?string $gitStatusStart = null): FakeProcessRunner
+    private function fake(int $changedPerHop = 1, string $gitStatus = '', int $gateExit = 0, array $rectorErrors = [], int $baselineExit = 0, int $proctorExit = -1, int $proctorBaselineExit = -1, ?string $gitStatusStart = null, ?string $baselineStdout = null, ?string $gateStdout = null): FakeProcessRunner
     {
         $dockerRuns = 0;
         $proctorRuns = 0;
         $gitRuns = 0;
 
-        return new FakeProcessRunner(static function (array $command) use ($changedPerHop, $gitStatus, $gateExit, $rectorErrors, $baselineExit, $proctorExit, $proctorBaselineExit, $gitStatusStart, &$dockerRuns, &$proctorRuns, &$gitRuns): ProcessResult {
+        return new FakeProcessRunner(static function (array $command) use ($changedPerHop, $gitStatus, $gateExit, $rectorErrors, $baselineExit, $proctorExit, $proctorBaselineExit, $gitStatusStart, $baselineStdout, $gateStdout, &$dockerRuns, &$proctorRuns, &$gitRuns): ProcessResult {
             if ($command[0] === 'git') {
                 $first = $gitRuns === 0;
                 $gitRuns++;
@@ -63,9 +65,10 @@ final class HopExecutorTest extends TestCase
                 }
                 // The first docker run is the baseline; the rest are the per-hop gates.
                 $exit = $dockerRuns === 0 ? $baselineExit : $gateExit;
+                $stdout = $exit !== 0 ? ($dockerRuns === 0 ? ($baselineStdout ?? 'FAILURES!') : ($gateStdout ?? 'FAILURES!')) : '';
                 $dockerRuns++;
 
-                return new ProcessResult($exit, $exit !== 0 ? 'FAILURES!' : '', '');
+                return new ProcessResult($exit, $stdout, '');
             }
             if (self::isProctorCommand($command)) {
                 // The first PROCTOR call is the baseline on the starting PHP; the last is the final gate.
@@ -225,6 +228,41 @@ final class HopExecutorTest extends TestCase
         self::assertStringContainsString('baseline was already failing', implode(' ', $report->results[0]->messages));
     }
 
+    public function test_a_baseline_whose_install_failed_is_not_reported_as_test_failures(): void
+    {
+        $fake = $this->fake(baselineExit: 4, baselineStdout: "Problem 1 of 1\n- The lock file is not up to date with the latest changes in composer.json.\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4");
+        $report = $this->execute($fake, new RunOptions());
+
+        self::assertSame('install-failed', $report->baseline->status);
+        self::assertSame(4, $report->baseline->exitCode);
+        self::assertSame(['not-run', 'not-run'], $this->statuses($report));
+        self::assertTrue($report->failed());
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('composer install failed (exit 4)', $all);
+        self::assertStringNotContainsString("the app's tests fail", $all);
+        $text = (new TextWriter())->run($report);
+        self::assertStringContainsString('Baseline: composer install failed (exit 4)', $text);
+        self::assertStringContainsString('The lock file is not up to date', $text);
+        self::assertStringNotContainsString("The app's tests fail before any change", $text);
+    }
+
+    public function test_an_install_failed_baseline_gives_the_gate_no_baseline_to_compare(): void
+    {
+        $fake = $this->fake(
+            baselineExit: 4,
+            gateExit: 1,
+            baselineStdout: "Your composer.json requires php ^8.3 but your system has 8.1.\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4",
+            gateStdout: 'FAILURES!',
+        );
+        $report = $this->execute($fake, new RunOptions(allowFailingBaseline: true));
+
+        self::assertSame('install-failed', $report->baseline->status);
+        self::assertSame(['gate-failed', 'not-run'], $this->statuses($report));
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('No baseline to compare against', $all);
+        self::assertStringNotContainsString('baseline was already failing', $all);
+    }
+
     public function test_skip_gate_reports_a_skipped_baseline(): void
     {
         $fake = $this->fake();
@@ -245,8 +283,10 @@ final class HopExecutorTest extends TestCase
         self::assertSame(0, $array['baseline']['exit_code']);
     }
 
-    public function test_the_baseline_keeps_only_the_last_twenty_lines(): void
+    public function test_the_baseline_keeps_the_tail_the_container_reports(): void
     {
+        // Tailing happens inside the container (see TargetImageRunnerTest); the host
+        // keeps whatever tail the container printed, with the marker lines removed.
         $lines = '';
         for ($i = 1; $i <= 30; $i++) {
             $lines .= "line {$i}\n";
@@ -261,16 +301,19 @@ final class HopExecutorTest extends TestCase
                     return new ProcessResult(0, '', '');
                 }
 
-                return new ProcessResult(1, $lines, '');
+                return new ProcessResult(1, $lines . "BOOSTER_GATE_PHASE=tests\nBOOSTER_GATE_EXIT=1\n", '');
             }
 
             return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
         });
         $report = $this->execute($fake, new RunOptions(allowFailingBaseline: true));
 
-        self::assertCount(20, $report->baseline->output);
-        self::assertSame('line 11', $report->baseline->output[0]);
-        self::assertSame('line 30', $report->baseline->output[19]);
+        self::assertCount(30, $report->baseline->output);
+        self::assertSame('line 1', $report->baseline->output[0]);
+        self::assertSame('line 30', $report->baseline->output[29]);
+        foreach ($report->baseline->output as $line) {
+            self::assertStringStartsNotWith('BOOSTER_GATE_', $line);
+        }
     }
 
     public function test_rector_is_asked_for_a_preview_before_it_applies(): void
@@ -838,7 +881,7 @@ final class HopExecutorTest extends TestCase
             ->execute($plan, new RunOptions());
 
         $run = array_values(array_filter($fake->calls, static fn(array $c): bool => ($c['command'][1] ?? '') === 'run'))[0]['command'];
-        self::assertStringContainsString('&& composer test', $run[count($run) - 1]);
+        self::assertStringContainsString('composer test >"$tests_log" 2>&1', $run[count($run) - 1]);
     }
 
     public function test_rector_json_paths_become_relative_to_the_app(): void

@@ -62,13 +62,74 @@ final class TargetImageRunner
     }
 
     /**
-     * The shell command run inside the container: install, then test.
+     * The shell command run inside the container: install, then test. The two
+     * phases report separately: each writes its output to a log file, and on
+     * failure the script prints the last 30 lines of that phase's log plus
+     * marker lines (BOOSTER_GATE_PHASE, BOOSTER_GATE_EXIT) that
+     * gateOutcome() reads back. A stale lock (Composer exit 4) is therefore
+     * reported as an install failure, never as the test command exiting 4.
      */
     public static function containerScript(string $testCommand, ?string $extraCommand): string
     {
-        $script = 'composer install --no-interaction --no-progress --prefer-dist && ' . $testCommand;
+        $lines = [
+            'install_log=/tmp/booster-gate-install.log',
+            'composer install --no-interaction --no-progress --prefer-dist >"$install_log" 2>&1',
+            'install_exit=$?',
+            'if [ "$install_exit" -ne 0 ]; then',
+            '  tail -n 30 "$install_log"',
+            '  echo "BOOSTER_GATE_PHASE=install"',
+            '  echo "BOOSTER_GATE_EXIT=$install_exit"',
+            '  exit "$install_exit"',
+            'fi',
+            'tests_log=/tmp/booster-gate-tests.log',
+            $testCommand . ' >"$tests_log" 2>&1',
+            'test_exit=$?',
+        ];
+        if ($extraCommand !== null && $extraCommand !== '') {
+            $lines[] = 'if [ "$test_exit" -eq 0 ]; then';
+            $lines[] = $extraCommand . ' >>"$tests_log" 2>&1';
+            $lines[] = 'extra_exit=$?';
+            $lines[] = 'if [ "$extra_exit" -ne 0 ]; then test_exit=$extra_exit; fi';
+            $lines[] = 'fi';
+        }
+        $lines[] = 'if [ "$test_exit" -ne 0 ]; then';
+        $lines[] = '  tail -n 30 "$tests_log"';
+        $lines[] = '  echo "BOOSTER_GATE_PHASE=tests"';
+        $lines[] = '  echo "BOOSTER_GATE_EXIT=$test_exit"';
+        $lines[] = '  exit "$test_exit"';
+        $lines[] = 'fi';
+        $lines[] = 'echo "BOOSTER_GATE_PHASE=tests"';
+        $lines[] = 'exit 0';
 
-        return $extraCommand !== null && $extraCommand !== '' ? $script . ' && ' . $extraCommand : $script;
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Reads the phase markers out of one gate run's output. A run whose output
+     * carries no markers (a custom image that ignores the script) is read as
+     * the tests phase with the process's own exit code.
+     */
+    public static function gateOutcome(ProcessResult $result): GateOutcome
+    {
+        $phase = GateOutcome::PHASE_TESTS;
+        $exitCode = $result->exitCode;
+        $output = [];
+        foreach (explode("\n", trim($result->stdout . "\n" . $result->stderr)) as $line) {
+            if (preg_match('/^BOOSTER_GATE_PHASE=(\S+)$/', $line, $m) === 1) {
+                $phase = $m[1];
+                continue;
+            }
+            if (preg_match('/^BOOSTER_GATE_EXIT=(-?\d+)$/', $line, $m) === 1) {
+                $exitCode = (int) $m[1];
+                continue;
+            }
+            $output[] = $line;
+        }
+        while ($output !== [] && end($output) === '') {
+            array_pop($output);
+        }
+
+        return new GateOutcome($phase, $exitCode, $output);
     }
 
     /**
