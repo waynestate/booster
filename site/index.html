@@ -72,7 +72,7 @@
         <p class="hero__blurb">A booster shot keeps your immunity current. This one keeps your PHP current, and it stings less. Booster works out the hops from the PHP or Laravel version your app runs today to one CREED still supports, and runs them one at a time. <a href="https://getrector.com">Rector</a> rewrites the code and Booster raises the constraints in <code>composer.json</code>. Your tests have to pass on the new PHP before the next hop starts.</p>
         <ul class="hero__facts">
           <li><strong>One hop</strong> per dose</li>
-          <li><strong>50 files</strong> cap per hop</li>
+          <li><strong>200 files</strong> review threshold per hop</li>
           <li><strong>0</strong> commits made for you</li>
         </ul>
         <p class="hero__cta">
@@ -326,8 +326,8 @@ PHP 8.1 is past security support; pick a version the policy still supports.
       <ol class="sequence">
         <li class="seq">
           <span class="seq__t">T−4</span>
-          <h3>Dry run and cap</h3>
-          <p>Rector previews the hop. If it reports errors, or wants to change more files than <code>--max-changes</code> (50 by default), the run stops before anything is written.</p>
+          <h3>Dry run and review</h3>
+          <p>Rector previews the hop. If it reports errors, the run stops before anything is written. So does a hop over the review threshold of 200 files: an interactive run shows the per-rule summary and asks first, and <code>--max-changes</code> sets a hard limit instead.</p>
         </li>
         <li class="seq">
           <span class="seq__t">T−3</span>
@@ -616,7 +616,7 @@ Task:
 
 Constraints:
 - One hop at a time; a red gate stops the run and leaves the changes for me to read (`git checkout .` undoes them). Never commit or push.
-- Do not raise --max-changes past 50, or use --skip-gate, without asking me.
+- If a hop is over the review threshold, show me its per-rule summary before applying it. Do not use --max-changes=0 or --skip-gate without asking me.
 - Ask me before you guess: a red baseline, a capped hop, or a target the policy refuses.
 
 Output: the plan, the scan findings, the dry-run summary per hop, then your questions.</code></pre>

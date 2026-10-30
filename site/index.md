@@ -15,7 +15,7 @@ Boosts your versions.
 A booster shot keeps your immunity current. This one keeps your PHP current, and it stings less. Booster works out the hops from the PHP or Laravel version your app runs today to one CREED still supports, and runs them one at a time. [Rector](https://getrector.com) rewrites the code and Booster raises the constraints in `composer.json`. Your tests have to pass on the new PHP before the next hop starts.
 
 - **One hop** per dose
-- **50 files** cap per hop
+- **200 files** review threshold per hop
 - **0** commits made for you
 
 [Watch a plan launch](https://booster.apps.wayne.edu/#record) [Install](https://booster.apps.wayne.edu/#install)
@@ -78,8 +78,8 @@ Inside one dose
 ## Four steps before the next stage fires.
 
 1. T−4
-   ### Dry run and cap
-   Rector previews the hop. If it reports errors, or wants to change more files than `--max-changes` (50 by default), the run stops before anything is written.
+   ### Dry run and review
+   Rector previews the hop. If it reports errors, the run stops before anything is written. So does a hop over the review threshold of 200 files: an interactive run shows the per-rule summary and asks first, and `--max-changes` sets a hard limit instead.
 2. T−3
    ### Rector for real
    Rector runs with only that hop's rules, from Booster's own `vendor/`. That's how an app on PHP 7.4 gets rewritten by a Rector running on 8.3 or newer.
@@ -227,7 +227,7 @@ Task:
 
 Constraints:
 - One hop at a time; a red gate stops the run and leaves the changes for me to read (`git checkout .` undoes them). Never commit or push.
-- Do not raise --max-changes past 50, or use --skip-gate, without asking me.
+- If a hop is over the review threshold, show me its per-rule summary before applying it. Do not use --max-changes=0 or --skip-gate without asking me.
 - Ask me before you guess: a red baseline, a capped hop, or a target the policy refuses.
 
 Output: the plan, the scan findings, the dry-run summary per hop, then your questions.

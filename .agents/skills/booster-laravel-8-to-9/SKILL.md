@@ -11,7 +11,7 @@ Move a Laravel 8 app to Laravel 9.
 
 1. `booster run --path=<app> --dry-run` and read every diff.
 2. `booster run --path=<app>` applies the plan and stops at the first failing gate.
-3. If a hop is capped, split the work with `--skip`; do not raise `--max-changes` blindly.
+3. If a hop is over the review threshold (200 files), read its per-rule summary, then apply it with `--max-changes=N`. Use `--skip` to leave a rule out.
 
 Only if the app has Laravel Boost (`booster detect` says so):
 

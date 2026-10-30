@@ -8,7 +8,7 @@ A static page: plain HTML, CSS and a little vanilla JS, no build step. Serve `si
   coral only as a signal (countdown, a held dose, EOL)
 - base: WayneUI 2.0.8, copied into `assets/wayne-ui/` from its static path; `assets/booster.css` overrides the look
 - magic: the record card. Pick an example app, press Run the plan: a countdown, then each hop is stamped as its gate
-  passes while the version climbs. "A capped hop" shows a dose held at the file cap. The plans are real
+  passes while the version climbs. "A capped hop" shows a dose held at the review threshold. The plans are real
   `booster plan` output for the apps in `examples/`
 - reduced motion: no countdowns or lift-offs; the page loads with every dose already stamped
 - marks: `brand/` is Booster's ChatGPT mark (never redrawn); `assets/marks/` holds the other stack parts' marks and

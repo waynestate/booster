@@ -7,7 +7,7 @@
 <p>
   <img src="docs/readme/badges/php.svg" alt="php ^8.3">
   <img src="docs/readme/badges/license.svg" alt="licence MIT">
-  <img src="docs/readme/badges/cap.svg" alt="cap per hop: 50 files">
+  <img src="docs/readme/badges/threshold.svg" alt="review threshold: 200 files">
   <a href="https://github.com/waynestate/booster/actions/workflows/ci.yml"><img src="https://github.com/waynestate/booster/actions/workflows/ci.yml/badge.svg" alt="GitHub CI"></a>
 </p>
 
@@ -27,8 +27,8 @@ On Citadel it is served by the raw-PHP deploy layer in [`deploy/`](deploy/): a S
 Booster is WELD's upgrade tool. It plans the hops that take a WSU PHP app from the PHP or Laravel version it runs now
 to one the version policy still supports, and it runs them one at a time: [Rector](https://getrector.com) rewrites the
 code, Booster raises the constraints in `composer.json`, and the app's own tests must pass on the target PHP before the
-next hop starts. It stands on `rector/rector` and `driftingly/rector-laravel` and adds only the ordering, the cap, the
-gate, the advisory scans and a few WSU recipes.
+next hop starts. It stands on `rector/rector` and `driftingly/rector-laravel` and adds only the ordering, the review
+threshold, the gate, the advisory scans and a few WSU recipes.
 
 Booster edits your working copy and prints a report. It never commits to, pushes or opens a merge request on your app (the only merge requests it opens are its own hop-data refresh on Booster itself): a person reads
 the diff and merges it.
@@ -237,7 +237,7 @@ Options for `run`:
 | Option | Meaning |
 |---|---|
 | `--dry-run` | Show the diffs; change nothing; skip git, the baseline and the gate. A Laravel hop without `vendor/` is marked incomplete |
-| `--max-changes` | Stop a hop that would change more than this many files (default 50) |
+| `--max-changes` | Hard limit on files changed per hop, with no prompt (`0` lifts the limit). Without it, a hop over the review threshold of 200 files asks first when interactive, or stops |
 | `--memory-limit` | Memory limit for the Rector process (for example `2G`), or `-1` for no limit (default `2G`) |
 | `--skip-gate` | Do not run the tests in the target image after each hop, or the PROCTOR check at the end (skips the baseline too) |
 | `--allow-failing-baseline` | Continue when the baseline fails; later gate failures are labelled as pre-existing |
@@ -320,9 +320,10 @@ On PHP hops a pre-pass runs first: PHP 4 era `$a = &new Foo();` becomes a plain 
 refuse to compile the old spelling and Rector would never get a parse tree. The report lists the rewrites per file
 under `Pre-pass fixes:`.
 
-1. Rector runs as a dry run. If it reports errors, or wants to change more files than `--max-changes`, the run stops
-   before anything is written. An empty Rector report usually means the process ran out of memory, and the message
-   points at `--memory-limit`.
+1. Rector runs as a dry run. If it reports errors, the run stops before anything is written. So does a hop that would
+   change more than 200 files, unless an interactive run confirms it after showing the per-rule summary; an explicit
+   `--max-changes` is a hard limit that never asks. An empty Rector report usually means the process ran out of memory,
+   and the message points at `--memory-limit`.
 2. Rector runs for real, with only that hop's rules.
 3. `composer.json` is edited: the `php` or `laravel/framework` constraint is raised, and `config.platform.php` moves
    with it when the app already pins it. Booster never runs `composer update` and never creates the key.
