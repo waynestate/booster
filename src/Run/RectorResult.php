@@ -10,6 +10,13 @@ namespace Waynestate\Booster\Run;
 final readonly class RectorResult
 {
     /**
+     * Prefix of the informational error added when Rector's JSON report contained
+     * invalid UTF-8 that Booster repaired with JSON_INVALID_UTF8_SUBSTITUTE. It is a
+     * note, not a failure: HopExecutor must not stop the run because of it.
+     */
+    public const REPAIRED_UTF8_NOTE = 'Rector output contained invalid UTF-8 and was repaired';
+
+    /**
      * @param list<array{file: string, diff: string}> $files  files that changed, relative to the app
      * @param list<string>                            $errors Rector's own errors (parse failures and the like)
      */

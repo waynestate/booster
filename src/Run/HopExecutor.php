@@ -31,6 +31,7 @@ final class HopExecutor
         private readonly ProcessRunner $processes,
         private readonly ?NodeRunner $node = null,
         private readonly ?HopRegistry $registry = null,
+        private readonly ?ProctorRunner $proctor = null,
         private readonly CasMigration $casMigration = new CasMigration(),
     ) {}
 
@@ -78,7 +79,35 @@ final class HopExecutor
             }
         }
 
-        return new RunReport($plan, $options->dryRun, $baseline, $results);
+        $proctor = $this->runProctorGate($plan, $path, $options, $results);
+
+        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $options->proctorAdvisory);
+    }
+
+    /**
+     * The PROCTOR gate: once every step finished without failing, measure the
+     * upgraded app against the CREED policy on the final PHP. Skipped for dry
+     * runs, when the gate is skipped, when the plan has no steps, or when a
+     * step left the run unfinished.
+     *
+     * @param list<StepResult> $results
+     */
+    private function runProctorGate(Plan $plan, string $path, RunOptions $options, array $results): ?ProctorResult
+    {
+        if ($options->dryRun || $options->skipGate || $plan->steps === [] || $this->proctor === null) {
+            return null;
+        }
+        foreach ($results as $result) {
+            if ($result->failed() || $result->status === StepResult::NOT_RUN) {
+                return null;
+            }
+        }
+        $php = $plan->targetPhp ?? $this->startingPhp($plan);
+        if ($php === null) {
+            return null;
+        }
+
+        return $this->proctor->run($path, $php, $plan->policyOrigin, $plan->today);
     }
 
     /**
@@ -154,16 +183,17 @@ final class HopExecutor
             }
 
             $phpunitTarget = $hop->kind === HopKind::Phpunit ? $hop->to : null;
-            $preview = $this->rector->run($hop, $path, true, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget);
-            if ($preview->errors !== []) {
-                return new StepResult($step->number, $hop->id, StepResult::ERROR, $preview->files, ['Rector reported errors; nothing was changed.', ...$preview->errors]);
+            $preview = $this->rector->run($hop, $path, true, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget, $options->memoryLimit);
+            [$stopErrors, $notes] = self::splitRepairedNotes($preview->errors);
+            if ($stopErrors !== []) {
+                return new StepResult($step->number, $hop->id, StepResult::ERROR, $preview->files, ['Rector reported errors; nothing was changed.', ...$stopErrors, ...$notes]);
             }
             if ($preview->changedCount() > $options->maxChanges) {
                 return new StepResult($step->number, $hop->id, StepResult::CAPPED, $preview->files, [sprintf(
                     'Rector wants to change %d files and the cap is %d. Nothing was changed. Review with --dry-run, then raise --max-changes or use --skip to split the work.',
                     $preview->changedCount(),
                     $options->maxChanges,
-                )]);
+                ), ...$notes]);
             }
             if ($options->dryRun) {
                 // A Laravel hop previews through the app's own autoloader; without vendor/ Rector
@@ -172,20 +202,26 @@ final class HopExecutor
                 $migration = $hop->kind === HopKind::Sesame ? $this->casMigration->migrate($path, true) : null;
                 $files = [...$preview->files, ...($migration->files ?? [])];
                 if ($incomplete) {
-                    $messages = [sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$hop->notes];
+                    $messages = [sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$hop->notes, ...$notes];
                 } elseif ($files === []) {
-                    $messages = ['Dry run: nothing was changed.', ...($migration->manual ?? []), ...$hop->notes];
+                    $messages = ['Dry run: nothing was changed.', ...($migration->manual ?? []), ...$hop->notes, ...$notes];
                 } else {
-                    $messages = [...($migration->changes ?? []), ...($migration->manual ?? []), ...$hop->notes];
+                    $messages = [...($migration->changes ?? []), ...($migration->manual ?? []), ...$hop->notes, ...$notes];
                 }
 
                 return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $files, $messages, $incomplete);
             }
 
-            $applied = $this->rector->run($hop, $path, false, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget);
+            $applied = $this->rector->run($hop, $path, false, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget, $options->memoryLimit);
             $messages = $this->composer->apply($hop, $path);
-            if ($applied->errors !== []) {
-                return new StepResult($step->number, $hop->id, StepResult::ERROR, $applied->files, ['Rector reported errors while applying.', ...$applied->errors]);
+            [$appliedErrors, $appliedNotes] = self::splitRepairedNotes($applied->errors);
+            foreach ($appliedNotes as $note) {
+                if (!in_array($note, $notes, true)) {
+                    $notes[] = $note;
+                }
+            }
+            if ($appliedErrors !== []) {
+                return new StepResult($step->number, $hop->id, StepResult::ERROR, $applied->files, ['Rector reported errors while applying.', ...$appliedErrors, ...$notes]);
             }
             // The CAS config and model traits move only after Rector succeeded,
             // because they assume the class renames are in place.
@@ -197,23 +233,48 @@ final class HopExecutor
                     'Nothing to do: Rector changed no files and composer.json already allows the target, so the gate was skipped.',
                     ...($migration->manual ?? []),
                     ...$hop->notes,
+                    ...$notes,
                 ]);
             }
 
             if (!$options->skipGate) {
                 $gate = $this->runGate($step, $path, $options, $baseline);
                 if ($gate !== null) {
-                    return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...($migration->manual ?? []), ...$gate]);
+                    return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...($migration->manual ?? []), ...$gate, ...$notes]);
                 }
                 $messages[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
             } else {
                 $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
             }
 
-            return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$messages, ...($migration->changes ?? []), ...($migration->manual ?? []), ...$hop->notes]);
+            return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$messages, ...($migration->changes ?? []), ...($migration->manual ?? []), ...$hop->notes, ...$notes]);
         } catch (ToolError $e) {
             return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [$e->getMessage()]);
         }
+    }
+
+    /**
+     * Splits Rector errors into the ones that must stop the run and the
+     * informational notes (the UTF-8 repair note). A note never stops a run;
+     * it is shown in the step's messages wherever the step ends.
+     *
+     * @param list<string> $errors
+     *
+     * @return array{0: list<string>, 1: list<string>} stopping errors, then notes
+     */
+    private static function splitRepairedNotes(array $errors): array
+    {
+        $stopping = [];
+        $notes = [];
+        foreach ($errors as $error) {
+            if (str_starts_with($error, RectorResult::REPAIRED_UTF8_NOTE)) {
+                $notes[] = $error;
+            } else {
+                $stopping[] = $error;
+            }
+        }
+
+        return [$stopping, $notes];
     }
 
     /**
