@@ -277,7 +277,7 @@ final class PlannerTest extends TestCase
         $data['dependencies']['vue'] = $constraint;
         file_put_contents($file, (string) json_encode($data));
         $project = (new ProjectDetector())->detect($dir);
-        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.3', toPhp: '8.3'), $this->today());
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.3', toPhp: '8.3', withNode: true), $this->today());
         $vueIds = array_values(array_filter($this->ids($plan), static fn(string $i): bool => str_starts_with($i, 'vue-')));
 
         self::assertSame([HopRegistry::VUE_26_TO_27_ID, HopRegistry::VUE_27_TO_COMPAT_ID, HopRegistry::VUE_COMPAT_CODEMOD_ID], $vueIds);
@@ -432,9 +432,51 @@ final class PlannerTest extends TestCase
 
     public function test_an_app_already_at_the_php_target_still_gets_the_node_pin(): void
     {
-        $plan = $this->plan('laravel-inertia-vue', new PlanOptions(fromPhp: '8.5', toPhp: '8.5', fromLaravel: '13', toLaravel: '13'));
+        $plan = $this->plan('laravel-inertia-vue', new PlanOptions(fromPhp: '8.5', toPhp: '8.5', fromLaravel: '13', toLaravel: '13', withNode: true));
 
         self::assertSame([HopRegistry::NODE_PIN_ID], $this->ids($plan));
+    }
+
+    public function test_bound_targets_leave_out_the_node_hops_with_a_warning(): void
+    {
+        $plan = $this->plan('vue-spa', new PlanOptions(fromPhp: '8.3', toPhp: '8.3'));
+        $ids = $this->ids($plan);
+
+        self::assertNotContains(HopRegistry::NODE_PIN_ID, $ids);
+        self::assertNotContains(HopRegistry::VUE_27_TO_COMPAT_ID, $ids);
+        self::assertNotContains(HopRegistry::VUE_COMPAT_CODEMOD_ID, $ids);
+        self::assertSame([
+            'PHP 8.3 only gets security fixes now; a newer version is a better place to stop.',
+            'Node front-end hops were left out because you passed a target version: node-pin-24, vue-27-to-compat, vue-compat-codemod. Add --with-node to include them.',
+            'Nothing to do: the app is already at the target.',
+        ], $plan->warnings);
+    }
+
+    public function test_with_node_brings_the_node_hops_back(): void
+    {
+        $plan = $this->plan('vue-spa', new PlanOptions(fromPhp: '8.3', toPhp: '8.3', withNode: true));
+
+        self::assertSame([HopRegistry::NODE_PIN_ID, HopRegistry::VUE_27_TO_COMPAT_ID, HopRegistry::VUE_COMPAT_CODEMOD_ID], $this->ids($plan));
+        self::assertSame(['PHP 8.3 only gets security fixes now; a newer version is a better place to stop.'], $plan->warnings);
+    }
+
+    public function test_no_bound_flags_keep_the_node_hops(): void
+    {
+        $plan = $this->plan('vue-spa');
+        $ids = $this->ids($plan);
+
+        self::assertContains(HopRegistry::NODE_PIN_ID, $ids);
+        self::assertContains(HopRegistry::VUE_27_TO_COMPAT_ID, $ids);
+        self::assertContains(HopRegistry::VUE_COMPAT_CODEMOD_ID, $ids);
+        self::assertSame([], array_filter($plan->warnings, static fn(string $w): bool => str_contains($w, '--with-node')));
+    }
+
+    public function test_bound_targets_on_an_app_without_a_front_end_earn_no_node_warning(): void
+    {
+        $plan = $this->plan('raw-php', new PlanOptions(toPhp: '8.4'));
+
+        self::assertSame(['php-74-to-80', 'php-80-to-81', 'php-81-to-82', 'php-82-to-83', 'php-83-to-84'], $this->ids($plan));
+        self::assertSame([], array_filter($plan->warnings, static fn(string $w): bool => str_contains($w, '--with-node')));
     }
 
     public function test_an_unknown_php_floor_asks_for_from_php(): void

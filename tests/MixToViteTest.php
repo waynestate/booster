@@ -30,7 +30,7 @@ final class MixToViteTest extends TestCase
     {
         $dir = $this->tempDir();
         $this->makeApp($dir);
-        $plan = $this->planner()->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '12'), $this->today());
+        $plan = $this->planner()->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '12', withNode: true), $this->today());
 
         self::assertSame([HopRegistry::laravelHopId('11', '12'), HopRegistry::NODE_PIN_ID, HopRegistry::MIX_TO_VITE_ID], $this->ids($plan));
     }
@@ -40,7 +40,7 @@ final class MixToViteTest extends TestCase
         $dir = $this->tempDir();
         $this->makeApp($dir);
         unlink($dir . '/webpack.mix.js');
-        $plan = $this->planner()->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '12'), $this->today());
+        $plan = $this->planner()->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '12', withNode: true), $this->today());
 
         self::assertSame([HopRegistry::laravelHopId('11', '12'), HopRegistry::NODE_PIN_ID], $this->ids($plan));
     }
@@ -51,7 +51,7 @@ final class MixToViteTest extends TestCase
         // has climbed to Laravel 9 or newer; here it lands on 12.
         $dir = $this->tempDir();
         $this->makeApp($dir, '^8.1', '^8.0');
-        $plan = $this->planner()->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.1', toPhp: '8.3', toLaravel: '12'), $this->today());
+        $plan = $this->planner()->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.1', toPhp: '8.3', toLaravel: '12', withNode: true), $this->today());
 
         self::assertSame([
             HopRegistry::laravelHopId('8', '9'),
@@ -63,6 +63,17 @@ final class MixToViteTest extends TestCase
             HopRegistry::NODE_PIN_ID,
             HopRegistry::MIX_TO_VITE_ID,
         ], $this->ids($plan));
+    }
+
+    public function test_mix_to_vite_never_appears_without_a_package_json(): void
+    {
+        // Even with --with-node, an app without a package.json has no front end to move.
+        $dir = $this->tempDir();
+        $this->makeApp($dir);
+        unlink($dir . '/package.json');
+        $plan = $this->planner()->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '12', withNode: true), $this->today());
+
+        self::assertSame([HopRegistry::laravelHopId('11', '12')], $this->ids($plan));
     }
 
     public function test_a_simple_mix_file_is_converted_to_vite(): void

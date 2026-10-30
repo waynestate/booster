@@ -428,7 +428,7 @@ final class HopExecutorTest extends TestCase
     {
         $dir = $this->copyExample('vue-spa');
         $project = (new ProjectDetector())->detect($dir);
-        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.3', toPhp: '8.3'), $this->today());
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.3', toPhp: '8.3', withNode: true), $this->today());
         $fake = $this->fake();
         $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake, new NodeRunner($fake)))
             ->execute($plan, new RunOptions(skipGate: true));
@@ -446,7 +446,7 @@ final class HopExecutorTest extends TestCase
     {
         $dir = $this->copyExample('vue-spa');
         $registry = new HopRegistry();
-        $plan = (new Planner($this->policy(), $registry))->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3'), $this->today());
+        $plan = (new Planner($this->policy(), $registry))->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3', withNode: true), $this->today());
         $fake = $this->fake();
         $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake, new NodeRunner($fake)))
             ->execute($plan, new RunOptions(skipGate: true));
@@ -469,7 +469,7 @@ final class HopExecutorTest extends TestCase
         $dir = $this->copyExample('vue-spa');
         $before = file_get_contents($dir . '/package.json');
         $project = (new ProjectDetector())->detect($dir);
-        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.3', toPhp: '8.3'), $this->today());
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.3', toPhp: '8.3', withNode: true), $this->today());
         $fake = $this->fake();
         $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake, new NodeRunner($fake)))
             ->execute($plan, new RunOptions(dryRun: true));

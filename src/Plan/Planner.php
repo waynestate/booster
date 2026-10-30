@@ -169,16 +169,19 @@ final class Planner
             break;
         }
 
-        if ($this->needsNodePin($project)) {
-            $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::NODE_PIN_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
-        }
-
-        if ($this->needsMixToVite($project, $laravel)) {
-            $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::MIX_TO_VITE_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
-        }
-
-        if ($this->needsTailwind($project)) {
-            $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::TAILWIND_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+        $frontEndHops = $this->frontEndHopIds($project, $laravel);
+        $vueHops = $this->vueHopIds($project);
+        $nodeHops = array_merge($frontEndHops, $vueHops);
+        $nodeLeftOut = $nodeHops !== [] && $this->targetsBound($options) && !$options->withNode;
+        if ($nodeLeftOut) {
+            $warnings[] = sprintf(
+                'Node front-end hops were left out because you passed a target version: %s. Add --with-node to include them.',
+                implode(', ', $nodeHops),
+            );
+        } else {
+            foreach ($frontEndHops as $id) {
+                $steps[] = $this->step(++$n, $this->registry->get($id), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+            }
         }
 
         if ($options->sesame) {
@@ -193,8 +196,10 @@ final class Planner
             $warnings[] = 'The app uses wayne-cas. Add --sesame to plan the swap to SESAME.';
         }
 
-        foreach ($this->vueHopIds($project) as $id) {
-            $steps[] = $this->step(++$n, $this->registry->get($id), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+        if (!$nodeLeftOut) {
+            foreach ($vueHops as $id) {
+                $steps[] = $this->step(++$n, $this->registry->get($id), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+            }
         }
 
         $steps = $this->withoutSkipped($steps, $options->skip);
@@ -246,7 +251,7 @@ final class Planner
      */
     private function vueHopIds(Project $project): array
     {
-        if ($project->vueMajor !== '2') {
+        if (!$project->hasPackageJson || $project->vueMajor !== '2') {
             return [];
         }
         $ids = [HopRegistry::VUE_27_TO_COMPAT_ID, HopRegistry::VUE_COMPAT_CODEMOD_ID];
@@ -331,7 +336,7 @@ final class Planner
      */
     private function needsMixToVite(Project $project, ?string $laravel): bool
     {
-        if (!$project->hasMixFile || $laravel === null) {
+        if (!$project->hasPackageJson || !$project->hasMixFile || $laravel === null) {
             return false;
         }
 
@@ -367,6 +372,38 @@ final class Planner
         }
 
         return false;
+    }
+
+    /**
+     * The Node front-end hops that land before the SESAME swap, in run order:
+     * the Node pin, Mix to Vite, Tailwind.
+     *
+     * @return list<string>
+     */
+    private function frontEndHopIds(Project $project, ?string $laravel): array
+    {
+        $ids = [];
+        if ($this->needsNodePin($project)) {
+            $ids[] = HopRegistry::NODE_PIN_ID;
+        }
+        if ($this->needsMixToVite($project, $laravel)) {
+            $ids[] = HopRegistry::MIX_TO_VITE_ID;
+        }
+        if ($this->needsTailwind($project)) {
+            $ids[] = HopRegistry::TAILWIND_ID;
+        }
+
+        return $ids;
+    }
+
+    /** True when the caller pinned at least one starting or target version. */
+    private function targetsBound(PlanOptions $options): bool
+    {
+        return $options->fromPhp !== null
+            || $options->toPhp !== null
+            || $options->fromLaravel !== null
+            || $options->toLaravel !== null
+            || $options->toPhpunit !== null;
     }
 
     /** The app has a package.json without an engines.node floor at or above the pin target. */

@@ -20,6 +20,7 @@ final readonly class PlanOptions
         public ?string $toLaravel = null,
         public ?string $toPhpunit = null,
         public bool $sesame = false,
+        public bool $withNode = false,
         public array $skip = [],
     ) {}
 }
