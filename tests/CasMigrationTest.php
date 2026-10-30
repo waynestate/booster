@@ -74,6 +74,74 @@ final class CasMigrationTest extends TestCase
         self::assertSame($expected, (string) file_get_contents($dir . '/app/User.php'));
     }
 
+    public function test_the_report_names_the_added_interface_and_trait(): void
+    {
+        $dir = $this->tempDir();
+        mkdir($dir . '/app', 0775, true);
+        file_put_contents($dir . '/app/User.php', <<<'PHP'
+        <?php
+
+        namespace App;
+
+        use WSU\WayneCas\WayneCasable;
+
+        class User
+        {
+            use WayneCasable;
+        }
+        PHP . "\n");
+        $result = $this->migrate($dir);
+
+        self::assertSame(
+            'app/User.php: rewritten to implements WayneCasable plus use ReadOnlyAttributes.',
+            $result->changes[0],
+        );
+        self::assertSame(
+            ['file' => 'app/User.php', 'diff' => 'implements WayneCasable plus use ReadOnlyAttributes'],
+            $result->files[0],
+        );
+    }
+
+    public function test_the_report_names_a_trait_rename_when_the_interface_already_exists(): void
+    {
+        $dir = $this->tempDir();
+        mkdir($dir . '/app', 0775, true);
+        file_put_contents($dir . '/app/User.php', <<<'PHP'
+        <?php
+
+        namespace App;
+
+        use WSU\WayneCas\WayneCasable;
+
+        class User implements WayneCasable
+        {
+            use WayneCasable;
+        }
+        PHP . "\n");
+        $dry = $this->migrate($dir, true);
+
+        self::assertSame(
+            'Dry run: would rewrite app/User.php: WayneCasable trait renamed to \Waynestate\Sesame\WayneCas\WayneCasable.',
+            $dry->changes[0],
+        );
+        self::assertSame(
+            ['file' => 'app/User.php', 'diff' => 'WayneCasable trait renamed to \Waynestate\Sesame\WayneCas\WayneCasable'],
+            $dry->files[0],
+        );
+
+        $result = $this->migrate($dir);
+        $model = (string) file_get_contents($dir . '/app/User.php');
+        self::assertStringContainsString('use Waynestate\\Sesame\\WayneCas\\WayneCasable;', $model);
+        self::assertStringNotContainsString('WSU\\WayneCas', $model);
+        self::assertSame(1, substr_count($model, 'implements WayneCasable'));
+        self::assertStringContainsString('    use ReadOnlyAttributes;', $model);
+        self::assertStringNotContainsString('use WayneCasable;', $model);
+        self::assertSame(
+            'app/User.php: WayneCasable trait renamed to \Waynestate\Sesame\WayneCas\WayneCasable.',
+            $result->changes[0],
+        );
+    }
+
     public function test_duo_is_listed_as_manual_when_use2fa_is_on(): void
     {
         $dir = $this->copyExample('laravel-wayne-cas');
@@ -96,7 +164,12 @@ final class CasMigrationTest extends TestCase
         self::assertFileDoesNotExist($dir . '/config/sesame.php');
         self::assertCount(2, $result->changes);
         self::assertStringStartsWith('Dry run: would write config/sesame.php', $result->changes[0]);
-        self::assertStringStartsWith('Dry run: would rewrite app/User.php', $result->changes[1]);
+        // The example model already uses ReadOnlyAttributes, so its diff is a
+        // trait rename, not an added interface plus trait.
+        self::assertSame(
+            'Dry run: would rewrite app/User.php: WayneCasable trait renamed to \Waynestate\Sesame\WayneCas\WayneCasable.',
+            $result->changes[1],
+        );
     }
 
     public function test_a_missing_old_config_is_a_manual_note(): void

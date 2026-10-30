@@ -48,15 +48,23 @@ final class CasMigration
         }
 
         foreach ($this->modelFiles($appPath) as $relative => $absolute) {
-            $rewritten = $this->rewriteModel((string) file_get_contents($absolute), $relative, $manual);
-            if ($rewritten === null) {
+            $rewrite = $this->rewriteModel((string) file_get_contents($absolute), $relative, $manual);
+            if ($rewrite === null) {
                 continue;
             }
             if (!$dryRun) {
-                file_put_contents($absolute, $rewritten);
+                file_put_contents($absolute, $rewrite['content']);
             }
-            $changes[] = ($dryRun ? 'Dry run: would rewrite ' : '') . $relative . ': rewritten to implements ' . self::INTERFACE . ' plus use ' . self::READ_ONLY_TRAIT . '.';
-            $files[] = ['file' => $relative, 'diff' => 'implements ' . self::INTERFACE . ' plus use ' . self::READ_ONLY_TRAIT];
+            // The report must match the diff: name the added interface and trait
+            // only when both were added, otherwise the change is a trait rename.
+            if ($rewrite['added_interface'] && $rewrite['added_trait']) {
+                $changes[] = ($dryRun ? 'Dry run: would rewrite ' : '') . $relative . ': rewritten to implements ' . self::INTERFACE . ' plus use ' . self::READ_ONLY_TRAIT . '.';
+                $files[] = ['file' => $relative, 'diff' => 'implements ' . self::INTERFACE . ' plus use ' . self::READ_ONLY_TRAIT];
+            } else {
+                $renamedTo = '\\' . self::NEW_NAMESPACE . '\\' . self::INTERFACE;
+                $changes[] = ($dryRun ? 'Dry run: would rewrite ' : '') . $relative . ': ' . self::INTERFACE . ' trait renamed to ' . $renamedTo . '.';
+                $files[] = ['file' => $relative, 'diff' => self::INTERFACE . ' trait renamed to ' . $renamedTo];
+            }
         }
 
         return new CasMigrationResult($changes, $files, $manual);
@@ -178,13 +186,15 @@ final class CasMigration
 
     /**
      * Rewrites a model that uses WayneCasable as a trait into one that
-     * implements it and uses ReadOnlyAttributes. Returns the new content, or
-     * null when there is nothing to do or the shape is not safe, in which
-     * case a manual note is added.
+     * implements it and uses ReadOnlyAttributes. Returns the new content with
+     * flags for what the diff actually adds, or null when there is nothing to
+     * do or the shape is not safe, in which case a manual note is added.
      *
      * @param list<string> $manual
+     *
+     * @return array{content: string, added_interface: bool, added_trait: bool}|null
      */
-    private function rewriteModel(string $content, string $relative, array &$manual): ?string
+    private function rewriteModel(string $content, string $relative, array &$manual): ?array
     {
         $region = $this->classRegion($content);
         if ($region === null) {
@@ -251,6 +261,7 @@ final class CasMigration
         // The class declaration gains the interface when it lacks one. The
         // whitespace between the declaration and the opening brace is kept.
         $newDecl = $decl;
+        $addedInterface = false;
         if (preg_match('/\bimplements\b(.+)$/s', $decl, $m, PREG_OFFSET_CAPTURE) === 1) {
             $listText = $m[1][0];
             $separator = strlen($listText) - strlen(ltrim($listText, " \t\n"));
@@ -267,13 +278,16 @@ final class CasMigration
                 $items[] = self::INTERFACE;
                 $tail = self::trailingWhitespace($listText);
                 $newDecl = substr($decl, 0, $m[1][1] + $separator) . implode(', ', $items) . $tail;
+                $addedInterface = true;
             }
         } else {
             $tail = self::trailingWhitespace($decl);
             $newDecl = rtrim($decl) . ' implements ' . self::INTERFACE . $tail;
+            $addedInterface = true;
         }
 
         // Trait lines lose the interface and gain ReadOnlyAttributes once.
+        $addedTrait = !$roAlreadyUsed;
         usort($targets, static fn(array $a, array $b): int => $b[0] <=> $a[0]);
         foreach ($targets as [$offset, $indent, $items]) {
             $kept = array_values(array_filter($items, static fn(string $item): bool => $item !== self::INTERFACE));
@@ -293,7 +307,7 @@ final class CasMigration
             }
         }
 
-        return $head . $newDecl . $body;
+        return ['content' => $head . $newDecl . $body, 'added_interface' => $addedInterface, 'added_trait' => $addedTrait];
     }
 
     /**
