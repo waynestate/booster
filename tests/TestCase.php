@@ -54,9 +54,9 @@ abstract class TestCase extends PhpUnitTestCase
 
     protected function policy(): Policy
     {
-        // Tests run against a frozen copy of the bundled policy so they do not
-        // change when the bundled snapshot is refreshed. The bundled copy itself
-        // is smoke-tested in PolicyTest.
+        // Tests run against a frozen copy of the CREED policy so they do not
+        // change when the waynestate/creed package is updated. The installed
+        // package policy itself is smoke-tested in PolicyTest.
         return PolicyLocator::locate(self::POLICY_FIXTURE, null);
     }
 

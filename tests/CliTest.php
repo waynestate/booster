@@ -6,6 +6,7 @@ namespace Waynestate\Booster\Tests;
 
 use Symfony\Component\Console\Tester\ApplicationTester;
 use Waynestate\Booster\Console\BoosterApplication;
+use Waynestate\Booster\Policy\PolicyLocator;
 use Waynestate\Booster\Run\ProcessResult;
 
 final class CliTest extends TestCase
@@ -81,15 +82,15 @@ final class CliTest extends TestCase
         self::assertSame(0, $exit);
         self::assertSame('laravel-blade', $data['project']['app_type']);
         self::assertSame('phpunit-10-to-11', $data['steps'][0]['hop']['id']);
-        self::assertSame('bundled snapshot', $data['policy']);
+        self::assertSame(PolicyLocator::defaultOrigin(), $data['policy']);
         self::assertSame('ok', $data['php_compat']['status']);
         self::assertSame('8.3', $data['php_compat']['test_version']);
     }
 
-    public function test_the_policy_option_replaces_the_bundled_copy(): void
+    public function test_the_policy_option_replaces_the_creed_package_policy(): void
     {
         $policy = $this->tempDir() . '/policy.json';
-        $json = json_decode((string) file_get_contents(dirname(__DIR__) . '/src/Creed/policy.json'), true);
+        $json = json_decode((string) file_get_contents(PolicyLocator::defaultPath()), true);
         $json['components']['php']['versions']['8.5']['security_until'] = '2020-01-01';
         $json['components']['php']['versions']['8.5']['active_until'] = '2020-01-01';
         file_put_contents($policy, json_encode($json));

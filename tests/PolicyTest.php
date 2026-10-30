@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Tests;
 
 use DateTimeImmutable;
-use Waynestate\Booster\Creed\State;
 use Waynestate\Booster\Policy\PolicyException;
 use Waynestate\Booster\Policy\PolicyLocator;
+use Waynestate\Creed\State;
 
 final class PolicyTest extends TestCase
 {
@@ -69,22 +69,24 @@ final class PolicyTest extends TestCase
         $this->policy()->supported('cobol', $this->today());
     }
 
-    public function test_locator_prefers_option_then_env_then_bundled(): void
+    public function test_locator_prefers_option_then_env_then_creed_package(): void
     {
-        $bundled = PolicyLocator::locate(null, null);
-        self::assertSame('bundled snapshot', $bundled->origin());
+        $default = PolicyLocator::locate(null, null);
+        self::assertSame(PolicyLocator::defaultOrigin(), $default->origin());
+        self::assertStringStartsWith(PolicyLocator::CREED_PACKAGE, $default->origin());
 
         $file = $this->tempDir() . '/p.json';
-        copy(PolicyLocator::bundledPath(), $file);
+        copy(PolicyLocator::defaultPath(), $file);
         self::assertSame($file, PolicyLocator::locate($file, '/nonexistent.json')->origin());
         self::assertSame($file, PolicyLocator::locate(null, $file)->origin());
     }
 
-    public function test_the_bundled_policy_still_loads_and_lists_supported_versions(): void
+    public function test_the_default_policy_comes_from_the_installed_creed_package(): void
     {
+        self::assertFileExists(PolicyLocator::defaultPath());
         $p = PolicyLocator::locate(null, null);
 
-        self::assertSame('bundled snapshot', $p->origin());
+        self::assertSame(PolicyLocator::defaultOrigin(), $p->origin());
         self::assertNotSame([], $p->supported('php', $this->today()));
         self::assertNotSame([], $p->supported('laravel', $this->today()));
     }
@@ -118,7 +120,7 @@ final class PolicyTest extends TestCase
         }
     }
 
-    public function test_a_fixture_policy_is_read_through_the_creed_copy(): void
+    public function test_a_fixture_policy_is_read_by_the_creed_reader(): void
     {
         $file = __DIR__ . '/fixtures/policy.json';
         $p = PolicyLocator::locate($file, null);

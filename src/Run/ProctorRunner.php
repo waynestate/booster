@@ -6,6 +6,7 @@ namespace Waynestate\Booster\Run;
 
 use Composer\InstalledVersions;
 use Waynestate\Booster\Packaging\PharFiles;
+use Waynestate\Booster\Policy\PolicyLocator;
 use Waynestate\Booster\ToolError;
 
 /**
@@ -30,7 +31,7 @@ final class ProctorRunner
      *
      * @param string $appPath      where the app lives
      * @param string $phpTarget    the PHP version the app now runs on (major.minor)
-     * @param string $policyOrigin the plan's policy origin: a path, or "bundled snapshot"
+     * @param string $policyOrigin the plan's policy origin: a path, or the waynestate/creed package label
      * @param string $today        the date the plan was made (YYYY-MM-DD), so the gate checks the same policy state the planner used
      */
     public function run(string $appPath, string $phpTarget, string $policyOrigin, string $today): ProctorResult
@@ -80,12 +81,15 @@ final class ProctorRunner
     }
 
     /**
-     * The policy file for PROCTOR: the user's path as-is, or the bundled copy
-     * as a real filesystem path (a phar:// path would not do).
+     * The policy file for PROCTOR: the user's path as-is, or the
+     * waynestate/creed package file as a real filesystem path (a phar:// path
+     * would not do).
      */
     private static function policyFile(string $origin): string
     {
-        return $origin === 'bundled snapshot' ? PharFiles::path('src/Creed/policy.json') : $origin;
+        return str_starts_with($origin, PolicyLocator::CREED_PACKAGE)
+            ? PharFiles::path(PolicyLocator::CREED_POLICY_PATH)
+            : $origin;
     }
 
     /** PROCTOR wants X.Y.Z; Booster plans in major.minor. */

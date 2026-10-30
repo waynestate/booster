@@ -37,7 +37,7 @@ Usage: php bin/refresh-hop-data.php [options]
 Recomputes data/versions.json from the public feeds and CREED's version policy.
 
   --offline <dir>   Read the feeds from <dir> (frozen copies) instead of fetching them
-  --policy <path>   Use this policy.json instead of the bundled snapshot (BOOSTER_POLICY also works)
+  --policy <path>   Use this policy.json instead of the one from the waynestate/creed package (BOOSTER_POLICY also works)
   --today <date>    Date to judge the policy against, YYYY-MM-DD (default: the real today)
   --dry-run         Print what would change; do not write the file
   --check           Offline CI check: validate the file's shape and compare it with the
