@@ -27,6 +27,7 @@ final readonly class Plan
         public array $steps,
         public array $warnings,
         public array $packageChecks = [],
+        public bool $stopsEarly = false,
     ) {}
 
     /**
@@ -44,6 +45,7 @@ final readonly class Plan
             'steps' => array_map(static fn(PlanStep $s): array => $s->toArray(), $this->steps),
             'warnings' => $this->warnings,
             'package_checks' => array_map(static fn(PackageCheck $c): array => $c->toArray(), $this->packageChecks),
+            'stops_early' => $this->stopsEarly,
         ];
     }
 }

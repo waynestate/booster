@@ -454,11 +454,32 @@ final class PlannerTest extends TestCase
         self::assertCount(1, array_keys($ids, 'cas-to-sesame'));
     }
 
-    public function test_an_eol_target_is_refused(): void
+    public function test_an_eol_target_plans_with_a_warning_and_stops_early(): void
     {
-        $this->expectException(ToolError::class);
-        $this->expectExceptionMessage('past security support');
-        $this->plan('raw-php', new PlanOptions(toPhp: '8.1'));
+        $plan = $this->plan('raw-php', new PlanOptions(toPhp: '8.1'));
+
+        self::assertSame(['php-74-to-80', 'php-80-to-81'], $this->ids($plan));
+        self::assertSame('8.1', $plan->targetPhp);
+        self::assertTrue($plan->stopsEarly);
+        self::assertContains(
+            'PHP 8.1 is past security support since 2025-12-31. Use it only as a stop on the way up.',
+            $plan->warnings,
+        );
+    }
+
+    public function test_an_eol_laravel_target_plans_with_a_warning_and_stops_early(): void
+    {
+        // Laravel 10 does not run on the default target PHP 8.5, so the plan
+        // also stops its PHP hops where Laravel 10 still runs.
+        $plan = $this->plan('laravel-blade', new PlanOptions(toPhp: '8.3', toLaravel: '10'));
+
+        self::assertSame('8.3', $plan->targetPhp);
+        self::assertSame('10', $plan->targetLaravel);
+        self::assertTrue($plan->stopsEarly);
+        self::assertContains(
+            'Laravel 10 is past security support since 2025-02-04. Use it only as a stop on the way up.',
+            $plan->warnings,
+        );
     }
 
     public function test_a_security_only_target_is_allowed_with_a_warning(): void
@@ -527,8 +548,11 @@ final class PlannerTest extends TestCase
 
     public function test_going_backwards_is_refused(): void
     {
+        // A target below the app's current PHP is refused, whatever its
+        // support state, so use two versions the policy still supports.
         $this->expectException(ToolError::class);
-        $this->plan('raw-php', new PlanOptions(toPhp: '7.4'));
+        $this->expectExceptionMessage('Target PHP 8.3 is older than the current PHP 8.4.');
+        $this->plan('raw-php', new PlanOptions(fromPhp: '8.4', toPhp: '8.3'));
     }
 
     public function test_unknown_php_versions_are_refused(): void
@@ -653,6 +677,7 @@ final class PlannerTest extends TestCase
         self::assertSame(['php-74-to-80', 'php-80-to-81', 'php-81-to-82'], $this->ids($plan));
         self::assertSame('8.2', $plan->targetPhp);
         self::assertSame(3, $plan->steps[2]->number);
+        self::assertTrue($plan->stopsEarly);
     }
 
     public function test_until_on_the_last_step_keeps_the_whole_plan(): void
@@ -662,6 +687,8 @@ final class PlannerTest extends TestCase
 
         self::assertSame($this->ids($full), $this->ids($cut));
         self::assertSame('8.5', $cut->targetPhp);
+        // The cut lands on the final target, so the run does not stop early.
+        self::assertFalse($cut->stopsEarly);
     }
 
     public function test_until_cuts_a_laravel_plan_midway_and_moves_the_targets(): void
@@ -695,6 +722,7 @@ final class PlannerTest extends TestCase
         self::assertSame(['php-74-to-80'], $this->ids($plan));
         self::assertSame(1, $plan->steps[0]->number);
         self::assertSame('8.0', $plan->targetPhp);
+        self::assertTrue($plan->stopsEarly);
     }
 
     public function test_only_a_later_step_is_refused_naming_what_the_app_is_on(): void
@@ -728,6 +756,17 @@ final class PlannerTest extends TestCase
         self::assertSame('8.3', $plan->targetPhp);
         self::assertSame('11', $plan->targetLaravel);
         self::assertNull($plan->targetPhpunit);
+        // --only cut the plan down from its full length, so the run stops early.
+        self::assertTrue($plan->stopsEarly);
+    }
+
+    public function test_only_of_the_whole_plan_does_not_stop_early(): void
+    {
+        $plan = $this->plan('raw-php', new PlanOptions(fromPhp: '8.4', only: 'php-84-to-85'));
+
+        self::assertSame(['php-84-to-85'], $this->ids($plan));
+        // The full plan is the one step --only keeps, so nothing was cut.
+        self::assertFalse($plan->stopsEarly);
     }
 
     public function test_only_and_until_together_are_refused(): void
@@ -742,8 +781,15 @@ final class PlannerTest extends TestCase
         $project = (new ProjectDetector())->detect($this->example('raw-php'));
         $planner = new Planner($this->policy(), new HopRegistry());
 
-        // In 2030 PHP 8.3 is EOL, so asking for it is refused.
-        $this->expectException(ToolError::class);
-        $planner->plan($project, new PlanOptions(toPhp: '8.3'), new \DateTimeImmutable('2030-01-01'));
+        // In 2030 PHP 8.3 is past security support, so asking for it plans a
+        // stop on the way up with a warning instead of refusing.
+        $plan = $planner->plan($project, new PlanOptions(toPhp: '8.3'), new \DateTimeImmutable('2030-01-01'));
+
+        self::assertSame('8.3', $plan->targetPhp);
+        self::assertTrue($plan->stopsEarly);
+        self::assertContains(
+            'PHP 8.3 is past security support since 2027-12-31. Use it only as a stop on the way up.',
+            $plan->warnings,
+        );
     }
 }

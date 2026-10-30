@@ -239,7 +239,11 @@ final class TextWriter
         }
         $comparison = $report->proctorComparison;
         $php = $proctor->php ?? '?';
-        $advisory = $report->proctorAdvisory ? ' Advisory only (--proctor-advisory), so this does not fail the run.' : '';
+        $advisory = match (true) {
+            !$report->proctorAdvisory => '',
+            $report->plan->stopsEarly => ' PROCTOR advisory: this run stops before the final target.',
+            default => ' Advisory only (--proctor-advisory), so this does not fail the run.',
+        };
         $lines = [];
         switch ($proctor->status) {
             case ProctorResult::PASSED:

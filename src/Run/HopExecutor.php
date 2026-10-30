@@ -122,8 +122,12 @@ final class HopExecutor
 
         $proctor = $this->runProctorGate($plan, $path, $options, $results);
         $comparison = $proctor === null ? null : ProctorComparison::compare($proctorBaseline, $proctor);
+        // A run that stops before the final target (an EOL stop, --until or
+        // --only) cannot prove the app at that target, so the PROCTOR gate
+        // reports instead of blocking.
+        $advisory = $options->proctorAdvisory || $plan->stopsEarly;
 
-        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $options->proctorAdvisory, $comparison);
+        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison);
     }
 
     /**

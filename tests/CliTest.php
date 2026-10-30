@@ -470,7 +470,7 @@ final class CliTest extends TestCase
             ['--format' => 'xml'],
             ['--today' => 'yesterday'],
             ['--goal' => 'nonsense'],
-            ['--to-php' => '8.1'],
+            ['--to-php' => '9.9'],
         ] as $bad) {
             [$exit] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, ...$bad]);
             self::assertSame(2, $exit, json_encode($bad));
