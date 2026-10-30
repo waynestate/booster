@@ -16,6 +16,8 @@ use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanStep;
 use Waynestate\Booster\Prepass\NewByReferenceFixer;
 use Waynestate\Booster\Prepass\PrepassResult;
+use Waynestate\Booster\Project\AppType;
+use Waynestate\Booster\Refresh\HopDataRefresher;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Scan\RemovalsScan;
 use Waynestate\Booster\ToolError;
@@ -258,14 +260,12 @@ final class HopExecutor
 
         try {
             if ($hop->kind === HopKind::Node) {
-                if ($hop->id === HopRegistry::MIX_TO_VITE_ID) {
-                    return $this->runMixHop($step, $path, $plan, $options, $baseline);
-                }
-                if ($hop->id === HopRegistry::VUE_COMPAT_CODEMOD_ID) {
-                    return $this->runVueCompatCodemodHop($step, $path, $options);
-                }
-
-                return $this->runNodeHop($step, $path, $options, $baseline);
+                return match ($hop->id) {
+                    HopRegistry::MIX_TO_VITE_ID => $this->runMixHop($step, $path, $plan, $options, $baseline),
+                    HopRegistry::TAILWIND_ID => $this->runTailwindHop($step, $path, $options, $baseline),
+                    HopRegistry::VUE_COMPAT_CODEMOD_ID => $this->runVueCompatCodemodHop($step, $path, $options),
+                    default => $this->runNodeHop($step, $path, $options, $baseline),
+                };
             }
 
             // PHP hops get the new-by-reference pre-pass first: modern PHP refuses to compile
@@ -296,13 +296,14 @@ final class HopExecutor
                     // cannot see the app's classes, so the diff is a lower bound, not the whole change.
                     $incomplete = $hop->kind === HopKind::Laravel && !is_file($path . '/vendor/autoload.php');
                     $migration = $hop->kind === HopKind::Sesame ? $this->casMigration->migrate($path, true) : null;
-                    $files = [...self::prepassFiles($prepass), ...$preview->files, ...($migration->files ?? [])];
+                    [$inertiaChanges, $inertiaFiles] = $this->inertiaChangesFor($hop, $step, $plan, true);
+                    $files = [...self::prepassFiles($prepass), ...$preview->files, ...($migration->files ?? []), ...$inertiaFiles];
                     if ($incomplete) {
-                        $messages = [sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$hop->notes, ...$notes];
+                        $messages = [sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$inertiaChanges, ...$hop->notes, ...$notes];
                     } elseif ($files === []) {
                         $messages = ['Dry run: nothing was changed.', ...($migration->manual ?? []), ...$hop->notes, ...$notes];
                     } else {
-                        $messages = [...($migration->changes ?? []), ...($migration->manual ?? []), ...$hop->notes, ...$notes];
+                        $messages = [...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$hop->notes, ...$notes];
                     }
 
                     return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $files, $messages, $incomplete, $prepass?->files() ?? []);
@@ -323,8 +324,9 @@ final class HopExecutor
                 // The CAS config and model traits move only after Rector succeeded,
                 // because they assume the class renames are in place.
                 $migration = $hop->kind === HopKind::Sesame ? $this->casMigration->migrate($path, false) : null;
-                $files = [...self::prepassFiles($prepass), ...$applied->files, ...($migration->files ?? [])];
-                if (($prepass?->changedCount() ?? 0) === 0 && $applied->changedCount() === 0 && $messages === [] && ($migration->changes ?? []) === []) {
+                [$inertiaChanges, $inertiaFiles] = $this->inertiaChangesFor($hop, $step, $plan, false);
+                $files = [...self::prepassFiles($prepass), ...$applied->files, ...($migration->files ?? []), ...$inertiaFiles];
+                if (($prepass?->changedCount() ?? 0) === 0 && $applied->changedCount() === 0 && $messages === [] && ($migration->changes ?? []) === [] && $inertiaChanges === []) {
                     // Nothing changed, so there is nothing for the gate to prove; skip it.
                     return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
                         'Nothing to do: Rector changed no files and composer.json already allows the target, so the gate was skipped.',
@@ -337,14 +339,14 @@ final class HopExecutor
                 if (!$options->skipGate) {
                     $gate = $this->runGate($step, $path, $options, $baseline);
                     if ($gate !== null) {
-                        return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...($migration->manual ?? []), ...$gate, ...$notes], false, $prepass?->files() ?? []);
+                        return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$gate, ...$notes], false, $prepass?->files() ?? []);
                     }
                     $messages[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
                 } else {
                     $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
                 }
 
-                return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$messages, ...($migration->changes ?? []), ...($migration->manual ?? []), ...$hop->notes, ...$notes], false, $prepass?->files() ?? []);
+                return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$messages, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$hop->notes, ...$notes], false, $prepass?->files() ?? []);
             } finally {
                 if ($prepass !== null && !$keepPrepass) {
                     $prepass->restore();
@@ -737,6 +739,55 @@ final class HopExecutor
         $scripts = is_array($package) ? ($package['scripts'] ?? null) : null;
 
         return is_array($scripts) && array_key_exists('test', $scripts);
+    }
+
+    /**
+     * The Tailwind 3 to 4 hop. It runs the official @tailwindcss/upgrade tool
+     * in the Node container, then normalizes package.json itself: the tool
+     * rewrites the CSS and the config, BOOSTER owns the dependency pins.
+     */
+    private function runTailwindHop(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): StepResult
+    {
+        $hop = $step->hop;
+        if ($this->node === null) {
+            throw new ToolError('The Tailwind hop needs a Node runner, but this BOOSTER has none configured.');
+        }
+        $toolVersion = $this->registry()->tailwindUpgradeVersion();
+        if ($options->dryRun) {
+            return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [], [
+                sprintf('Dry run: would run npx -y %s in the Node container, then normalize package.json (pin tailwindcss to %s, add the matching Vite or PostCSS plugin, remove autoprefixer and postcss-import).', $toolVersion, $this->registry()->tailwindVersion()),
+                ...$hop->notes,
+            ]);
+        }
+
+        $tool = $this->node->run($path, ['npx', '-y', $toolVersion]);
+        if (!$tool->successful()) {
+            return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [
+                sprintf('The Tailwind upgrade tool failed: "npx -y %s" exited %d. The working copy keeps whatever it wrote, so you can read it.', $toolVersion, $tool->exitCode),
+                trim($tool->stdout . "\n" . $tool->stderr),
+                'Undo with: git checkout . (inside the app).',
+            ]);
+        }
+
+        [$changes, $files] = $this->applyTailwindPackages($path);
+        if ($changes === []) {
+            $changes[] = 'The upgrade tool ran, but package.json already matched the Tailwind 4 pins.';
+        }
+
+        if (!$options->skipGate) {
+            $failure = $this->runBuildGate($path);
+            if ($failure === null) {
+                $failure = $this->runGate($step, $path, $options, $baseline);
+            }
+            if ($failure !== null) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$failure]);
+            }
+            $changes[] = 'Gate passed: npm ci, npm run build and the tests are green.';
+        } else {
+            $changes[] = 'Gate skipped. Run npm ci, npm run build and the tests before the next step.';
+        }
+
+        return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$changes, ...$hop->notes]);
     }
 
     /**
@@ -1147,6 +1198,181 @@ final class HopExecutor
         }
 
         return [$changes, $files];
+    }
+
+    /**
+     * Normalizes package.json for Tailwind 4 after the upgrade tool ran: pin
+     * tailwindcss wherever it sits, add the Vite or PostCSS plugin, remove
+     * autoprefixer and postcss-import, which Tailwind 4 folds in.
+     *
+     * @return array{0: list<string>, 1: list<array{file: string, diff: string}>} what changed and which files
+     */
+    private function applyTailwindPackages(string $path): array
+    {
+        $changes = [];
+        $files = [];
+        $packageFile = $path . '/package.json';
+        $package = json_decode((string) file_get_contents($packageFile), true);
+        if (!is_array($package)) {
+            throw new ToolError(sprintf('package.json is not valid JSON: %s', $packageFile));
+        }
+        $pin = $this->registry()->tailwindVersion();
+        $edited = false;
+        foreach (['dependencies', 'devDependencies'] as $section) {
+            if (!is_array($package[$section] ?? null)) {
+                continue;
+            }
+            if (array_key_exists('tailwindcss', $package[$section]) && $package[$section]['tailwindcss'] !== $pin) {
+                $package[$section]['tailwindcss'] = $pin;
+                $changes[] = 'package.json: ' . $section . ' tailwindcss to ' . $pin . '.';
+                $edited = true;
+            }
+            foreach (['autoprefixer', 'postcss-import'] as $obsolete) {
+                if (array_key_exists($obsolete, $package[$section])) {
+                    unset($package[$section][$obsolete]);
+                    $changes[] = 'package.json: removed ' . $obsolete . ' from ' . $section . ', which Tailwind 4 folds in.';
+                    $edited = true;
+                }
+            }
+        }
+        if (!array_key_exists('tailwindcss', $package['dependencies'] ?? []) && !array_key_exists('tailwindcss', $package['devDependencies'] ?? [])) {
+            $package['devDependencies']['tailwindcss'] = $pin;
+            $changes[] = 'package.json: devDependencies tailwindcss to ' . $pin . '.';
+            $edited = true;
+        }
+        $plugin = $this->usesVite($path) ? '@tailwindcss/vite' : '@tailwindcss/postcss';
+        if (($package['devDependencies'][$plugin] ?? null) !== $pin) {
+            $package['devDependencies'][$plugin] = $pin;
+            $changes[] = 'package.json: devDependencies ' . $plugin . ' to ' . $pin . '.';
+            $edited = true;
+        }
+        if ($edited) {
+            file_put_contents($packageFile, json_encode($package, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+            $files[] = ['file' => 'package.json', 'diff' => 'pinned tailwindcss to ' . $pin . ' and added ' . $plugin];
+        }
+
+        return [$changes, $files];
+    }
+
+    /**
+     * The app builds with Vite: a vite.config.js or vite.config.ts exists, or
+     * package.json depends on vite. Decides which Tailwind 4 plugin to pin.
+     */
+    private function usesVite(string $path): bool
+    {
+        if (is_file($path . '/vite.config.js') || is_file($path . '/vite.config.ts')) {
+            return true;
+        }
+        $package = json_decode((string) file_get_contents($path . '/package.json'), true);
+        if (!is_array($package)) {
+            return false;
+        }
+        foreach (['dependencies', 'devDependencies'] as $section) {
+            if (array_key_exists('vite', $package[$section] ?? [])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The Inertia constraint raises a Laravel hop performs for an Inertia/Vue
+     * app, or empty when the hop or the app does not qualify.
+     *
+     * @return array{0: list<string>, 1: list<array{file: string, diff: string}>}
+     */
+    private function inertiaChangesFor(Hop $hop, PlanStep $step, Plan $plan, bool $dryRun): array
+    {
+        if ($hop->kind !== HopKind::Laravel || $plan->project->type !== AppType::LaravelInertiaVue || $step->laravelAfter === null) {
+            return [[], []];
+        }
+
+        return $this->applyInertiaChanges($plan->project->path, $step->laravelAfter, $dryRun);
+    }
+
+    /**
+     * Raises the Inertia constraints an app already carries toward the ones
+     * its new Laravel major pairs with. Only packages the app has are touched:
+     * a Vue 2 app never gains @inertiajs/vue3, and a fresh add is a human
+     * decision.
+     *
+     * @return array{0: list<string>, 1: list<array{file: string, diff: string}>}
+     */
+    private function applyInertiaChanges(string $path, string $laravelTo, bool $dryRun): array
+    {
+        $wanted = $this->registry()->inertiaChanges($laravelTo);
+        $changes = [];
+        $files = [];
+
+        $composerFile = $path . '/composer.json';
+        if (is_file($composerFile)) {
+            $composer = json_decode((string) file_get_contents($composerFile), true);
+            if (is_array($composer)) {
+                $edited = false;
+                foreach ($wanted['composer'] as $package => $target) {
+                    $current = $composer['require'][$package] ?? null;
+                    if (!is_string($current) || self::atOrAboveFloor($current, $target)) {
+                        continue;
+                    }
+                    if ($dryRun) {
+                        $changes[] = sprintf('Dry run: would set %s to %s in require.', $package, $target);
+                    } else {
+                        $composer['require'][$package] = $target;
+                        $changes[] = sprintf('Set %s to %s in require.', $package, $target);
+                        $edited = true;
+                    }
+                    $files[] = ['file' => 'composer.json', 'diff' => $package . ' to ' . $target];
+                }
+                if ($edited) {
+                    file_put_contents($composerFile, json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+                }
+            }
+        }
+
+        $packageFile = $path . '/package.json';
+        if (is_file($packageFile)) {
+            $package = json_decode((string) file_get_contents($packageFile), true);
+            if (is_array($package)) {
+                $edited = false;
+                foreach ($wanted['npm'] as $name => $target) {
+                    $section = array_key_exists($name, $package['dependencies'] ?? []) ? 'dependencies' : 'devDependencies';
+                    $current = $package[$section][$name] ?? null;
+                    if (!is_string($current) || self::atOrAboveFloor($current, $target)) {
+                        continue;
+                    }
+                    if ($dryRun) {
+                        $changes[] = sprintf('Dry run: would set package.json %s %s to %s.', $section, $name, $target);
+                    } else {
+                        $package[$section][$name] = $target;
+                        $changes[] = sprintf('package.json: %s %s to %s.', $section, $name, $target);
+                        $edited = true;
+                    }
+                    $files[] = ['file' => 'package.json', 'diff' => $name . ' to ' . $target];
+                }
+                if ($edited) {
+                    file_put_contents($packageFile, json_encode($package, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+                }
+            }
+        }
+
+        return [$changes, $files];
+    }
+
+    /**
+     * True when $constraint already floors at or above the floor of $target,
+     * so raising it would only narrow the range. A constraint with no usable
+     * floor ("*" or unparseable) is raised, the way ComposerEditor treats it.
+     */
+    private static function atOrAboveFloor(string $current, string $target): bool
+    {
+        $floor = HopDataRefresher::lowestMajor($current);
+        $targetFloor = HopDataRefresher::lowestMajor($target);
+        if ($floor === null || $targetFloor === null) {
+            return false;
+        }
+
+        return version_compare($floor, $targetFloor, '>=');
     }
 
     /**

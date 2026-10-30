@@ -61,6 +61,38 @@ final class HopDataRefresher
     /** The oldest Laravel majors BOOSTER plans upgrades from, kept ahead of the policy. */
     public const LARAVEL_FLOOR_PREFIX = ['5.8', '6', '7'];
 
+    /** Fixed Tailwind pin BOOSTER uses for the @tailwindcss/upgrade tool; no feed drives it. */
+    public const FIXED_TAILWIND_UPGRADE_VERSION = '^4.1';
+
+    /** Fixed Tailwind pin BOOSTER writes into the app's package.json; no feed drives it. */
+    public const FIXED_TAILWIND_VERSION = '^4.1';
+
+    /** Inertia composer constraint per Laravel major; null means BOOSTER pins nothing there. */
+    public const FIXED_INERTIA_LARAVEL = [
+        '5.8' => null,
+        '6' => null,
+        '7' => null,
+        '8' => null,
+        '9' => null,
+        '10' => null,
+        '11' => '^2.0',
+        '12' => '^2.0',
+        '13' => '^2.0',
+    ];
+
+    /** Inertia npm constraint per Laravel major; null means BOOSTER pins nothing there. */
+    public const FIXED_INERTIA_VUE3 = [
+        '5.8' => null,
+        '6' => null,
+        '7' => null,
+        '8' => null,
+        '9' => null,
+        '10' => null,
+        '11' => '^2.0',
+        '12' => '^2.0',
+        '13' => '^2.0',
+    ];
+
     public function __construct(private readonly Policy $policy) {}
 
     /**
@@ -99,6 +131,8 @@ final class HopDataRefresher
             'vite_version' => $this->distTagCaret($feeds[self::FEED_VITE], $existing, 'vite_version'),
             'laravel_vite_plugin_version' => $this->distTagCaret($feeds[self::FEED_LARAVEL_VITE_PLUGIN], $existing, 'laravel_vite_plugin_version'),
             'vue_plugin_version' => $this->distTagCaret($feeds[self::FEED_VUE_PLUGIN], $existing, 'vue_plugin_version'),
+            'tailwind_upgrade_version' => $this->fixedScalar($existing, 'tailwind_upgrade_version', self::FIXED_TAILWIND_UPGRADE_VERSION),
+            'tailwind_version' => $this->fixedScalar($existing, 'tailwind_version', self::FIXED_TAILWIND_VERSION),
             'vue_27' => $this->keptValue($existing, 'vue_27'),
             'vue_compat' => $this->keptValue($existing, 'vue_compat'),
             'vue_loader_compat' => $this->keptValue($existing, 'vue_loader_compat'),
@@ -106,6 +140,8 @@ final class HopDataRefresher
             'phpunit_php' => $this->phpunitPhp($existing, $phpunitChain, $feeds[self::FEED_PHPUNIT]),
             'laravel_phpunit' => $this->laravelPhpunit($existing, $laravelChain, $feeds[self::FEED_LARAVEL_SKELETON]),
             'laravel_php' => $this->laravelPhp($existing, $laravelChain, $feeds[self::FEED_LARAVEL_FRAMEWORK], $feeds[self::FEED_ENDOFLIFE]),
+            'inertia_laravel' => $this->fixedTable($existing, 'inertia_laravel', $laravelChain, self::FIXED_INERTIA_LARAVEL),
+            'inertia_vue3' => $this->fixedTable($existing, 'inertia_vue3', $laravelChain, self::FIXED_INERTIA_VUE3),
         ];
     }
 
@@ -162,6 +198,8 @@ final class HopDataRefresher
         $this->tableCoverage($problems, $data, 'laravel_php', $laravelChain);
         $this->tableCoverage($problems, $data, 'laravel_phpunit', $laravelChain);
         $this->tableCoverage($problems, $data, 'phpunit_php', $phpunitChain);
+        $this->tableCoverage($problems, $data, 'inertia_laravel', $laravelChain);
+        $this->tableCoverage($problems, $data, 'inertia_vue3', $laravelChain);
 
         return $problems;
     }
@@ -543,6 +581,23 @@ final class HopDataRefresher
     }
 
     /**
+     * A fixed scalar a refresh carries through unchanged: the value on file
+     * wins when it is a non-empty string, otherwise the seed. No feed drives
+     * these keys, so a drift never resets them.
+     *
+     * @param array<string, mixed> $existing
+     */
+    private function fixedScalar(array $existing, string $key, string $seed): string
+    {
+        $current = $existing[$key] ?? null;
+        if (is_string($current) && $current !== '') {
+            return $current;
+        }
+
+        return $seed;
+    }
+
+    /**
      * A recipe pin no feed computes: carried through the refresh unchanged,
      * so the committed file stays the single home of the value.
      *
@@ -579,6 +634,40 @@ final class HopDataRefresher
         }
 
         throw new ToolError(sprintf('No usable "latest" tag for %s and none on file.', $key));
+    }
+
+    /**
+     * A fixed table a refresh carries through per major: the value on file
+     * wins for every major the table already holds (an explicit null counts
+     * as a decision), majors the chain gained fall back to the seed, and a
+     * major in neither lands on null.
+     *
+     * @param array<string, mixed> $existing
+     * @param list<string> $chain
+     * @param array<int|string, string|null> $seed PHP casts numeric string keys to int, so a seed like "6" => null carries an int key; array_key_exists still finds it by its string form
+     *
+     * @return array<string, string|null>
+     */
+    private function fixedTable(array $existing, string $key, array $chain, array $seed): array
+    {
+        $onFile = $existing[$key] ?? [];
+        if (!is_array($onFile)) {
+            throw new ToolError(sprintf('Hop data key "%s" must be a JSON object.', $key));
+        }
+        $table = [];
+        foreach ($this->tableMajors($existing, $key, $chain) as $major) {
+            if (array_key_exists($major, $onFile)) {
+                $value = $onFile[$major];
+                if (!is_string($value) && !is_null($value)) {
+                    throw new ToolError(sprintf('Hop data key "%s" must hold version strings or null.', $key));
+                }
+                $table[$major] = $value;
+                continue;
+            }
+            $table[$major] = array_key_exists($major, $seed) ? $seed[$major] : null;
+        }
+
+        return $table;
     }
 
     /**

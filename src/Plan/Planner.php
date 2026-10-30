@@ -9,6 +9,7 @@ use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Policy\Policy;
 use Waynestate\Booster\Policy\PolicyException;
 use Waynestate\Booster\Project\Project;
+use Waynestate\Booster\Refresh\HopDataRefresher;
 use Waynestate\Booster\ToolError;
 use Waynestate\Creed\State;
 
@@ -176,6 +177,10 @@ final class Planner
             $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::MIX_TO_VITE_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
         }
 
+        if ($this->needsTailwind($project)) {
+            $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::TAILWIND_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+        }
+
         if ($options->sesame) {
             if (!$project->usesWayneCas) {
                 $warnings[] = 'Asked for the SESAME swap, but composer.json does not require cit-web-infra/wayne-cas; skipped.';
@@ -331,6 +336,37 @@ final class Planner
         }
 
         return version_compare($laravel, HopRegistry::VITE_LARAVEL_FLOOR, '>=');
+    }
+
+    /**
+     * The app has tailwindcss in package.json and its constraint floors below
+     * Tailwind 4. Offered after node-pin-24 and mix-to-vite, so the upgrade
+     * tool runs on the pinned Node and sees the Vite config when Mix moved.
+     */
+    private function needsTailwind(Project $project): bool
+    {
+        if (!$project->hasPackageJson) {
+            return false;
+        }
+        $file = $project->path . '/package.json';
+        if (!is_file($file)) {
+            return false;
+        }
+        $package = json_decode((string) file_get_contents($file), true);
+        if (!is_array($package)) {
+            return false;
+        }
+        foreach (['dependencies', 'devDependencies'] as $section) {
+            $constraint = $package[$section]['tailwindcss'] ?? null;
+            if (is_string($constraint)) {
+                $floor = HopDataRefresher::lowestMajor($constraint);
+                if ($floor !== null && version_compare($floor, '4', '<')) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /** The app has a package.json without an engines.node floor at or above the pin target. */

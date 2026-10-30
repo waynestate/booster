@@ -26,6 +26,7 @@ What Rector cannot do (check these by hand):
 
 - Check the shared database server against the Laravel 6 database floor before you apply this hop.
 - Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.
+- Inertia: BOOSTER pins no inertia-laravel or @inertiajs/vue3 constraint for Laravel 6; check the Inertia docs for the versions that support it.
 
 Official notes:
 
