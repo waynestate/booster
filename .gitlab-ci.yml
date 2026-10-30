@@ -21,16 +21,18 @@ composer-ci:
     - composer install --no-interaction --no-progress --prefer-dist
     - composer ci
 
-# Hop data freshness: only in scheduled pipelines, recompute data/versions.json
-# from the live feeds and fail when the committed file would change, so a feed
-# that moved is visible until someone runs the refresh and commits the result.
+# Hop data freshness: only in scheduled pipelines. The hop data robot
+# recomputes data/versions.json from the live feeds and, when it changed,
+# pushes the refresh branch with merge request options so a merge request
+# opens on BOOSTER itself; when nothing changed, it does nothing. A missing
+# BOOSTER_BOT_TOKEN fails the job before it touches anything.
 refresh-hop-data:
   image: composer:2.10.3
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
   script:
     - composer install --no-interaction --no-progress --prefer-dist
-    - php bin/refresh-hop-data.php
+    - php bin/hop-data-bot.php
 
 # PHAR release: on a version tag, build the single-file phar and publish it as
 # a GitLab release asset. One build recipe for both CI systems:

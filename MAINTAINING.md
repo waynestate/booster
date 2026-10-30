@@ -56,6 +56,27 @@ composer update waynestate/creed
 Then `composer ci`, and commit with the CREED release in the message. When a new Laravel or PHP line appears in
 CREED, check whether Booster needs a new hop for it.
 
+## Hop data (the scheduled refresh)
+
+`data/versions.json` is recomputed from the public feeds by `bin/refresh-hop-data.php`. In scheduled GitLab
+pipelines the `refresh-hop-data` job runs the hop data robot, `bin/hop-data-bot.php`:
+
+- Nothing changed: the job does nothing.
+- The file changed: the robot commits `data/versions.json` on the branch `hop-data/refresh` and pushes it with
+  merge request options, so a merge request opens on Booster itself. Its title is
+  `Hop data: refresh versions.json (YYYY-MM-DD)` and its body lists each changed key, old to new. When an open
+  merge request already runs from that branch, the robot updates it instead of opening a second one.
+- A missing environment variable fails the job before it touches anything.
+
+Set this once in the project's CI/CD variables:
+
+| Variable | What it is |
+|---|---|
+| `BOOSTER_BOT_TOKEN` | A project access token with the `write_repository` scope. Job logs never show it: every line the robot prints is masked. |
+
+The robot never merges: a person reviews and merges each merge request, the first one included. To preview a run
+without touching any remote: `php bin/hop-data-bot.php --dry-run`.
+
 ## Adding a hop
 
 - Each hop has a test with a before and after fixture, and refuses inputs it cannot handle safely (for example a Mix
