@@ -1763,6 +1763,23 @@ PHP,
         return [$dir, $plan];
     }
 
+    /** A copy of $plan with its stopsEarly flag set; Plan is readonly. */
+    private function planWithStopsEarly(Plan $plan, bool $stopsEarly): Plan
+    {
+        return new Plan(
+            $plan->project,
+            $plan->today,
+            $plan->policyOrigin,
+            $plan->targetPhp,
+            $plan->targetLaravel,
+            $plan->targetPhpunit,
+            $plan->steps,
+            $plan->warnings,
+            $plan->packageChecks,
+            $stopsEarly,
+        );
+    }
+
     public function test_a_laravel_hop_updates_the_lock_in_the_gate(): void
     {
         [$dir, $plan] = $this->laravelPlan($this->copyExample('laravel-blade'));
@@ -2169,5 +2186,77 @@ PHP,
         self::assertStringContainsString('Gate passed: tests are green on PHP 8.3.', $first);
         $second = implode("\n", $report->results[1]->messages);
         self::assertStringContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.", $second);
+    }
+
+    public function test_a_stopped_early_plan_only_warns_about_a_remaining_unblock(): void
+    {
+        // An earlier run left its unblock behind; this run adds nothing new.
+        $dir = $this->copyExample('laravel-blade');
+        [$dir, $plan] = $this->laravelPlan($dir);
+        (new ComposerEditor())->advisoryUnblock($dir, 'laravel/framework', '^13.0', ['PKSA-2026-0001']);
+        // The plan stops before the real final target (--until, --only or an
+        // EOL target), so its last step is not the final target.
+        $plan = $this->planWithStopsEarly($plan, true);
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use ($dir, &$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $dockerRuns++;
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Models/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        // Baseline and the gate are green, and the leftover unblock is a
+        // warning, not a failure: the run never reaches the final target.
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        self::assertSame(2, $dockerRuns);
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore).", $all);
+        self::assertStringNotContainsString('Booster fails the final target while it is there.', $all);
+        self::assertStringContainsString('Gate passed: tests are green on PHP 8.3.', $all);
+        self::assertStringNotContainsString('Added a temporary advisory unblock to composer.json', $all);
+
+        // The same plan without the early stop climbs to the final target,
+        // and its last step fails while the unblock remains.
+        $dir = $this->copyExample('laravel-blade');
+        [$dir, $plan] = $this->laravelPlan($dir);
+        (new ComposerEditor())->advisoryUnblock($dir, 'laravel/framework', '^13.0', ['PKSA-2026-0001']);
+        self::assertFalse($plan->stopsEarly);
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use ($dir, &$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $dockerRuns++;
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Models/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
+        self::assertSame(2, $dockerRuns);
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.", $all);
+        self::assertStringContainsString('Gate passed: tests are green on PHP 8.3.', $all);
     }
 }
