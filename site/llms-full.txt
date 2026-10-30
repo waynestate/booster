@@ -226,7 +226,7 @@ Options for `run`:
 | `--max-changes` | Hard limit on files changed per hop, with no prompt (`0` lifts the limit). Without it, a hop over the review threshold of 200 files asks first when interactive, or stops |
 | `--memory-limit` | Memory limit for the Rector process (for example `2G`), or `-1` for no limit (default `2G`) |
 | `--skip-gate` | Do not run the tests in the target image after each hop, or the PROCTOR check at the end (skips the baseline too) |
-| `--image` | Run the gate in this Docker image instead of building `booster-target` (it needs `php` and `composer` on `PATH`) |
+| `--image` | Run the gate in this Docker image instead of building `booster-target` (it needs `php` and `composer` on `PATH`): one name, a `{php}` template or a version map (below) |
 | `--allow-failing-baseline` | Continue when the baseline fails; later gate failures are labelled as pre-existing |
 | `--allow-dirty` | Run even when the working copy has uncommitted changes |
 | `--test-command` | What runs the app's tests in the image (default `composer test`, else `vendor/bin/phpunit`) |
@@ -318,11 +318,28 @@ under `Pre-pass fixes:`.
    on the PHP the hop moves to. The stamp is a short hash of the recipe, so an edited `docker/Dockerfile` rebuilds
    the image instead of reusing a stale one. The image carries the extension set Citadel's apps run with: intl,
    ldap, soap, zip, gd, pdo_mysql, mysqli, bcmath, pcntl, exif, redis, imagick and oci8. The first build downloads
-   Oracle Instant Client for oci8, so it takes a few minutes; later hops reuse the image. Pass `--image` to run the
-   gate in your own image instead (it needs `php` and `composer` on `PATH`). A red gate stops the run and leaves the
-   changes in place so you can read them (`git checkout .` undoes them). To check the image itself,
-   `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and
-   verifies its extension list; it needs Docker and a few minutes per version, so it is not part of `composer ci`.
+    Oracle Instant Client for oci8, so it takes a few minutes; later hops reuse the image. Pass `--image` to run the
+    gate in your own image instead (below). A red gate stops the run and leaves the changes in place so you can read
+    them (`git checkout .` undoes them). To check the image itself,
+    `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and
+    verifies its extension list; it needs Docker and a few minutes per version, so it is not part of `composer ci`.
+
+The `--image` value names the image the baseline and every gate run in, and it takes three shapes:
+
+- One name, used for the baseline and every gate: `--image myapp/gate:8.4`.
+- A template whose `{php}` is replaced with the PHP version of that baseline or gate:
+  `--image registry/php-apache:{php}` gates the 8.1 hop on `registry/php-apache:8.1` and the 8.2 hop on
+  `registry/php-apache:8.2`.
+- A map of PHP version to image, for a fleet whose images do not follow one pattern:
+  `--image 8.0=legacy/php:7.4,8.1=registry/php-apache:8.1`. A map without the version a baseline or hop lands on
+  stops the run before the first hop and names the fix; a template never misses.
+
+Booster never builds a `--image` image: it must exist locally or be pullable, and each resolved image is pulled at
+most once per run. On an arm64 Mac, Citadel's published images such as `citadel/php-apache:8.5r3` are amd64 only:
+pass an arm64 build via `--image`, or set `DOCKER_DEFAULT_PLATFORM=linux/amd64` and let Docker emulate.
+`booster-target` itself builds natively on arm64. And the old-PHP images (7.1 through 8.0) point apt at
+archive.debian.org, so they get no security updates: they exist to run the app's tests on the way up, not to serve
+traffic.
 
 `run` refuses to start on a working copy that is not under git or has uncommitted changes, so the upgrade diff stands
 alone. `--dry-run` has no such limit.
