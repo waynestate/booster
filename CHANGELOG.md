@@ -2,6 +2,45 @@
 
 All notable changes to Booster are recorded here. The format follows Keep a Changelog.
 
+## [Unreleased]
+
+Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, Laravel 5.8 and 8, CAS, oci8).
+
+### Changed
+
+- Laravel and PHPUnit hops now update `composer.lock`: the gate runs `composer update -W` for the packages the hop
+  changed, inside the target image, and the new lock is part of the hop's diff. Before, the gate failed at
+  `composer install` (Composer 2.10) or quietly tested the old framework. Dry runs never update anything.
+- A failed `composer install` or `composer update` is reported as a Composer failure with its output, never as
+  "phpunit exited 4", and a baseline whose install failed is no longer reported as failing tests.
+- Plans with `--sesame` swap CAS for SESAME before `laravel-10-to-11`, as soon as the app is on PHP 8.3, because
+  wayne-cas 2.x stops at Laravel 10.
+- Apps on PHPUnit below 9 get a manual `phpunit-to-9-manual` step before the first PHP 8 hop, instead of a warning
+  that skipped every PHPUnit hop.
+- The app's current PHP comes from what `composer.lock` allows when that is newer than the `composer.json` floor;
+  `detect` shows the lock's PHP range and says which package sets it.
+- Rector never edits generated IDE helper files (`_ide_helper*.php`, `.phpstorm.meta.php`).
+- A Laravel hop's dry run against a `vendor/` from an older Laravel says "can't preview yet" instead of ERROR.
+- The undo hint also names the files a failed step created (`git clean -fd -- <paths>`), and only those.
+- The SESAME report says what the swap actually wrote to each model.
+- Laravel hops remove the imports their Rector rules left unused.
+
+### Added
+
+- `plan` checks each direct dependency's newest release (Packagist, and composer-type repositories the app lists)
+  against every planned hop: it names the first hop a package blocks and flags abandoned packages.
+  `--no-package-check` turns it off for offline use.
+- `--until=<hop>` stops the plan after that hop; `--only=<hop>` runs a single hop.
+- When Composer refuses tagged releases for known security advisories (Laravel 9 and 10 fall back to `9.x-dev`
+  without an error on Composer 2.10), Booster adds a temporary, scoped `config.policy.advisories.ignore` entry,
+  says so, and fails the final target while the entry is still there.
+- Target images for PHP 7.1 to 8.0 build again: their Debian releases moved to archive.debian.org, and PHP 7.1 gets
+  Composer 2.2 LTS.
+- `--image` takes a `{php}` template (`registry/php-apache:{php}`) or a per-version map (`8.0=a:1,8.1=b:2`), so a
+  PHP hop can gate on a different image from its baseline. The README covers arm64 Macs.
+- A warning when the app's tests are only Laravel's stock examples, and a README section on a smoke test that works
+  for apps behind CAS.
+
 ## [1.2.0] - 2026-10-30
 
 ### Changed
