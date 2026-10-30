@@ -44,6 +44,14 @@ final class HopExecutor
 
     private ?RemovalsScan $removals = null;
 
+    /**
+     * Untracked paths the app held before the run, so undo hints name only
+     * this run's creations.
+     *
+     * @var list<string>
+     */
+    private array $startingUntracked = [];
+
     private function registry(): HopRegistry
     {
         return $this->registry ?? new HopRegistry();
@@ -70,6 +78,11 @@ final class HopExecutor
         if (!$options->dryRun && !$options->allowDirty) {
             $this->assertCleanGitTree($path);
         }
+        // Files the user already held untracked, so the undo hint never tells
+        // them to delete their own work. A checked clean tree holds none, and a
+        // dry run creates nothing, so only an --allow-dirty real run needs the
+        // status read.
+        $this->startingUntracked = !$options->dryRun && $options->allowDirty ? $this->untrackedPaths($path) : [];
 
         $baseline = $this->runBaseline($plan, $path, $options);
         if ($baseline->failed() && !$options->allowFailingBaseline) {
@@ -1701,22 +1714,34 @@ final class HopExecutor
     /**
      * The undo line for a failed step. "git checkout ." restores changed
      * tracked files; files this run created are untracked and survive that, so
-     * when the working tree holds any they are named for "git clean" too.
+     * when the working tree holds any they are named for "git clean" too. Only
+     * paths absent from the start-of-run status are named, so a user's own
+     * untracked files (--allow-dirty) stay out of the clean list. A directory
+     * untracked at start keeps its single "dir/" entry when it gains files, so
+     * it stays out too: name nothing you cannot prove this run created.
      */
     private function undoHint(string $path): string
     {
-        $status = $this->processes->run(['git', '-C', $path, 'status', '--porcelain'], null, [], 60);
-        $created = [];
-        foreach (explode("\n", trim($status->stdout)) as $line) {
-            if (str_starts_with($line, '?? ') && strlen($line) > 3) {
-                $created[] = trim(substr($line, 3), '"');
-            }
-        }
+        $created = array_values(array_diff($this->untrackedPaths($path), $this->startingUntracked));
         if ($created === []) {
             return 'Undo with: git checkout . (inside the app).';
         }
 
         return 'Undo with: git checkout . && git clean -fd -- ' . implode(' ', $created) . ' (inside the app).';
+    }
+
+    /** @return list<string> the app's untracked paths from one git status */
+    private function untrackedPaths(string $path): array
+    {
+        $status = $this->processes->run(['git', '-C', $path, 'status', '--porcelain'], null, [], 60);
+        $paths = [];
+        foreach (explode("\n", trim($status->stdout)) as $line) {
+            if (str_starts_with($line, '?? ') && strlen($line) > 3) {
+                $paths[] = trim(substr($line, 3), '"');
+            }
+        }
+
+        return $paths;
     }
 
     private function assertCleanGitTree(string $path): void

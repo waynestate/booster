@@ -41,15 +41,20 @@ final class HopExecutorTest extends TestCase
      * @param int            $baselineExit         exit code of the baseline docker run (the first one)
      * @param int            $proctorExit          PROCTOR's exit code (0 pass, 1 fail, 2 tripped); -1 leaves PROCTOR unanswered
      * @param int            $proctorBaselineExit  exit code of the first PROCTOR call (the baseline); -1 answers it like the rest
+     * @param string|null    $gitStatusStart       what the first git status prints (the start-of-run read); null answers it like the rest
      */
-    private function fake(int $changedPerHop = 1, string $gitStatus = '', int $gateExit = 0, array $rectorErrors = [], int $baselineExit = 0, int $proctorExit = -1, int $proctorBaselineExit = -1): FakeProcessRunner
+    private function fake(int $changedPerHop = 1, string $gitStatus = '', int $gateExit = 0, array $rectorErrors = [], int $baselineExit = 0, int $proctorExit = -1, int $proctorBaselineExit = -1, ?string $gitStatusStart = null): FakeProcessRunner
     {
         $dockerRuns = 0;
         $proctorRuns = 0;
+        $gitRuns = 0;
 
-        return new FakeProcessRunner(static function (array $command) use ($changedPerHop, $gitStatus, $gateExit, $rectorErrors, $baselineExit, $proctorExit, $proctorBaselineExit, &$dockerRuns, &$proctorRuns): ProcessResult {
+        return new FakeProcessRunner(static function (array $command) use ($changedPerHop, $gitStatus, $gateExit, $rectorErrors, $baselineExit, $proctorExit, $proctorBaselineExit, $gitStatusStart, &$dockerRuns, &$proctorRuns, &$gitRuns): ProcessResult {
             if ($command[0] === 'git') {
-                return new ProcessResult(0, $gitStatus, '');
+                $first = $gitRuns === 0;
+                $gitRuns++;
+
+                return new ProcessResult(0, $first && $gitStatusStart !== null ? $gitStatusStart : $gitStatus, '');
             }
             if ($command[0] === 'docker') {
                 $isRun = ($command[1] ?? '') === 'run';
@@ -337,7 +342,11 @@ final class HopExecutorTest extends TestCase
         $report = $this->execute($fake, new RunOptions(allowDirty: true, skipGate: true));
 
         self::assertFalse($report->failed());
-        self::assertSame([], array_filter($fake->calls, static fn(array $c): bool => $c['command'][0] === 'git'));
+        // The refusal check is skipped; the one status read is the undo hint's
+        // record of what the user already had untracked.
+        $gitCalls = array_values(array_filter($fake->calls, static fn(array $c): bool => $c['command'][0] === 'git'));
+        self::assertCount(1, $gitCalls);
+        self::assertSame(['status', '--porcelain'], array_slice($gitCalls[0]['command'], 3));
     }
 
     public function test_a_diff_over_an_explicit_max_changes_stops_the_run_before_anything_is_applied(): void
@@ -550,7 +559,7 @@ final class HopExecutorTest extends TestCase
 
     public function test_the_undo_hint_names_files_the_run_created(): void
     {
-        $report = $this->execute($this->fake(gitStatus: "?? src/NewThing.php\n?? generated/\n", gateExit: 1), new RunOptions(allowDirty: true));
+        $report = $this->execute($this->fake(gitStatusStart: '', gitStatus: "?? src/NewThing.php\n?? generated/\n", gateExit: 1), new RunOptions(allowDirty: true));
 
         self::assertSame(['gate-failed', 'not-run'], $this->statuses($report));
         self::assertStringContainsString('Undo with: git checkout . && git clean -fd -- src/NewThing.php generated/ (inside the app).', implode(' ', $report->results[0]->messages));
@@ -559,6 +568,43 @@ final class HopExecutorTest extends TestCase
     public function test_the_undo_hint_stays_plain_when_nothing_was_created(): void
     {
         $report = $this->execute($this->fake(gateExit: 1), new RunOptions());
+        $messages = implode(' ', $report->results[0]->messages);
+
+        self::assertStringContainsString('Undo with: git checkout . (inside the app).', $messages);
+        self::assertStringNotContainsString('git clean', $messages);
+    }
+
+    public function test_the_undo_hint_names_the_file_a_hop_created_from_a_clean_start(): void
+    {
+        $report = $this->execute($this->fake(gitStatusStart: '', gitStatus: "?? config/sesame.php\n", gateExit: 1), new RunOptions());
+
+        self::assertSame(['gate-failed', 'not-run'], $this->statuses($report));
+        self::assertStringContainsString('Undo with: git checkout . && git clean -fd -- config/sesame.php (inside the app).', implode(' ', $report->results[0]->messages));
+    }
+
+    public function test_the_undo_hint_leaves_the_users_own_untracked_files_alone(): void
+    {
+        // notes.txt and generated/ were the user's before the run; only
+        // config/sesame.php is this run's. generated/ gained a file inside but
+        // keeps its one porcelain entry, so it stays out of the clean list.
+        $report = $this->execute(
+            $this->fake(gitStatusStart: "?? notes.txt\n?? generated/\n", gitStatus: "?? notes.txt\n?? generated/\n?? config/sesame.php\n", gateExit: 1),
+            new RunOptions(allowDirty: true),
+        );
+
+        self::assertSame(['gate-failed', 'not-run'], $this->statuses($report));
+        $messages = implode(' ', $report->results[0]->messages);
+        self::assertStringContainsString('Undo with: git checkout . && git clean -fd -- config/sesame.php (inside the app).', $messages);
+        self::assertStringNotContainsString('notes.txt', $messages);
+        self::assertStringNotContainsString('generated/', $messages);
+    }
+
+    public function test_the_undo_hint_stays_plain_when_the_run_created_nothing_new(): void
+    {
+        $report = $this->execute(
+            $this->fake(gitStatusStart: "?? notes.txt\n", gitStatus: "?? notes.txt\n", gateExit: 1),
+            new RunOptions(allowDirty: true),
+        );
         $messages = implode(' ', $report->results[0]->messages);
 
         self::assertStringContainsString('Undo with: git checkout . (inside the app).', $messages);
