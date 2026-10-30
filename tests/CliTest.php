@@ -415,7 +415,8 @@ final class CliTest extends TestCase
 
     public function test_a_failing_proctor_gate_exits_1_and_advisory_keeps_it_zero(): void
     {
-        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+        $proctorCalls = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use (&$proctorCalls): ProcessResult {
             if ($command[0] === 'git') {
                 return new ProcessResult(0, '', '');
             }
@@ -423,7 +424,12 @@ final class CliTest extends TestCase
                 return new ProcessResult(0, '', '');
             }
             if (self::isProctorCommand($command)) {
-                return new ProcessResult(1, self::proctorFixture('fail-report.json'), '');
+                // The odd calls are the baselines on the starting PHP (clean); the even calls are the final gates, which find new failures.
+                $proctorCalls++;
+                $fixture = $proctorCalls % 2 === 1 ? 'pass-report.json' : 'fail-report.json';
+                $exit = $proctorCalls % 2 === 1 ? 0 : 1;
+
+                return new ProcessResult($exit, self::proctorFixture($fixture), '');
             }
 
             return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
@@ -434,6 +440,7 @@ final class CliTest extends TestCase
         ], $fake);
         self::assertSame(1, $exit);
         self::assertStringContainsString('PROCTOR: FAIL', $out);
+        self::assertStringContainsString('New:', $out);
         self::assertStringContainsString('[php-floor]', $out);
         self::assertStringContainsString('RESULT: FAIL', $out);
 
@@ -442,6 +449,33 @@ final class CliTest extends TestCase
         ], $fake);
         self::assertSame(0, $exit);
         self::assertStringContainsString('Advisory only', $out);
+        self::assertStringContainsString('RESULT: PASS', $out);
+    }
+
+    public function test_preexisting_proctor_findings_do_not_fail_the_run(): void
+    {
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            if (self::isProctorCommand($command)) {
+                // Baseline and final gate see the same failing findings: they predate the upgrade.
+                return new ProcessResult(1, self::proctorFixture('fail-report.json'), '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84',
+        ], $fake);
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('PROCTOR: FAIL', $out);
+        self::assertStringContainsString('Already present (not blocking):', $out);
+        self::assertStringNotContainsString('New:', $out);
         self::assertStringContainsString('RESULT: PASS', $out);
     }
 
