@@ -26,9 +26,10 @@ final readonly class StepResult
     public const NOTHING_TO_DO = 'nothing-to-do';
 
     /**
-     * @param list<array{file: string, diff: string}> $files
-     * @param list<string>                            $messages
-     * @param bool                                    $incomplete true when a dry-run preview could not see the whole app (a Laravel hop without vendor/)
+     * @param list<array{file: string, diff: string}>   $files
+     * @param list<string>                              $messages
+     * @param bool                                      $incomplete true when a dry-run preview could not see the whole app (a Laravel hop without vendor/)
+     * @param list<array{file: string, rewrites: int}>  $prepass files the new-by-reference pre-pass rewrote before Rector ran
      */
     public function __construct(
         public int $step,
@@ -37,6 +38,7 @@ final readonly class StepResult
         public array $files = [],
         public array $messages = [],
         public bool $incomplete = false,
+        public array $prepass = [],
     ) {}
 
     public function failed(): bool
@@ -49,7 +51,7 @@ final readonly class StepResult
      */
     public function toArray(): array
     {
-        return [
+        $data = [
             'step' => $this->step,
             'hop' => $this->hopId,
             'status' => $this->status,
@@ -58,5 +60,10 @@ final readonly class StepResult
             'messages' => $this->messages,
             'incomplete' => $this->incomplete,
         ];
+        if ($this->prepass !== []) {
+            $data['prepass_fixes'] = $this->prepass;
+        }
+
+        return $data;
     }
 }
