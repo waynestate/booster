@@ -25,7 +25,10 @@ use Waynestate\Booster\Run\ProcessRunner;
  * A Laravel app that has Larastan gets Pinstripe's laravel.neon (which
  * includes base.neon), so Eloquent models and facades resolve; every other
  * app gets base.neon, and a Laravel app without Larastan hears why its model
- * calls will read as errors.
+ * calls will read as errors. laravel.neon itself only includes base.neon and
+ * leans on the app's phpstan/extension-installer to register Larastan, which
+ * only happens while the app's own PHPStan runs; when that will not happen,
+ * Booster includes Larastan's extension.neon in the generated config itself.
  */
 final class PhpStanScan
 {
@@ -134,7 +137,8 @@ final class PhpStanScan
             return ScanResult::error($testVersion, self::INCOMPLETE_PRESET);
         }
 
-        $neon = $this->writeConfiguration($absolute, $preset, $rules, ((int) $m[1]) * 10000 + ((int) $m[2]) * 100);
+        $larastanExtension = $this->larastanNeon($absolute, $launch['app']);
+        $neon = $this->writeConfiguration($absolute, $preset, $rules, $larastanExtension, ((int) $m[1]) * 10000 + ((int) $m[2]) * 100);
         register_shutdown_function(static function () use ($neon): void {
             if (is_file($neon)) {
                 unlink($neon);
@@ -148,7 +152,7 @@ final class PhpStanScan
         $cwd = is_dir($absolute) ? $absolute : null;
 
         try {
-            $result = $this->processes->run(array_merge($launch, [
+            $result = $this->processes->run(array_merge($launch['launch'], [
                 'analyse',
                 '--error-format=json',
                 '--no-progress',
@@ -169,20 +173,23 @@ final class PhpStanScan
      * Pick the argument prefix that starts a PHPStan, or null when none of the
      * candidates runs. A bare --version probe is enough: unlike phpcs there is
      * no standard registration to check, a PHPStan that starts is a PHPStan
-     * that can analyse.
+     * that can analyse. The result also says whether the copy is the app's
+     * own, because only then is the app's extension-installer active.
      *
-     * @return list<string>|null
+     * @return array{launch: list<string>, app: bool}|null
      */
     private function selectLauncher(string $appPath): ?array
     {
         if ($this->phpstanBinary !== null) {
             // Test seam: trust the injected binary and skip discovery, so tests
-            // can exercise the scan without a real PHPStan installed.
-            return $this->launcher($this->phpstanBinary);
+            // can exercise the scan without a real PHPStan installed. An
+            // injected binary is never the app's own, so the caller cannot
+            // assume the app's extension-installer is active.
+            return ['launch' => $this->launcher($this->phpstanBinary), 'app' => false];
         }
 
         foreach ($this->candidates($appPath) as $candidate) {
-            if ($this->runs($candidate)) {
+            if ($this->runs($candidate['launch'])) {
                 return $candidate;
             }
         }
@@ -192,9 +199,12 @@ final class PhpStanScan
 
     /**
      * The candidate PHPStan launchers, in priority order: the scanned app's
-     * own vendor copy, Booster's vendor copy, then phpstan on the PATH.
+     * own vendor copy, Booster's vendor copy, then phpstan on the PATH. Each
+     * entry names the launch arguments and whether that copy is the app's
+     * own, which decides whether the app's extension-installer is active
+     * while the scan runs.
      *
-     * @return list<list<string>>
+     * @return list<array{launch: list<string>, app: bool}>
      */
     private function candidates(string $appPath): array
     {
@@ -202,15 +212,15 @@ final class PhpStanScan
 
         $appPhpstan = $appPath . '/vendor/bin/phpstan';
         if (is_file($appPhpstan)) {
-            $candidates[] = $this->launcher($appPhpstan);
+            $candidates[] = ['launch' => $this->launcher($appPhpstan), 'app' => true];
         }
 
         $boosterPhpstan = $this->boosterVendorDir() . '/bin/phpstan';
         if (is_file($boosterPhpstan)) {
-            $candidates[] = $this->launcher($boosterPhpstan);
+            $candidates[] = ['launch' => $this->launcher($boosterPhpstan), 'app' => false];
         }
 
-        $candidates[] = ['phpstan'];
+        $candidates[] = ['launch' => ['phpstan'], 'app' => false];
 
         return $candidates;
     }
@@ -340,18 +350,50 @@ final class PhpStanScan
     }
 
     /**
-     * Write the temporary configuration the scan runs with: the rule neons,
-     * then the preset, then the parameters the preset does not carry. The
-     * scanned app goes on the command line, not here, so the CLI stays the
-     * shape users expect.
+     * The app's Larastan extension neon, when the scan must load it itself.
+     * Pinstripe's laravel.neon only includes base.neon and leans on the app's
+     * phpstan/extension-installer to register Larastan, which only happens
+     * while the app's own PHPStan runs. When Booster's PHPStan runs, or the
+     * app has no installer listing Larastan, the neon is included here so
+     * Eloquent models and facades still resolve. When the app's own PHPStan
+     * runs and its installer already lists Larastan, including the neon again
+     * would make PHPStan refuse to start, so it is left to the app.
+     *
+     * @return string|null
+     */
+    private function larastanNeon(string $appPath, bool $appPhpstan): ?string
+    {
+        $extension = $appPath . '/vendor/larastan/larastan/extension.neon';
+        if (!is_file($extension)) {
+            return null;
+        }
+        $installer = $appPath . '/vendor/phpstan/extension-installer/src/GeneratedConfig.php';
+        $installed = is_file($installer) ? (string) file_get_contents($installer) : '';
+        if ($appPhpstan && $installed !== '' && str_contains($installed, 'larastan/larastan')) {
+            return null;
+        }
+
+        return $extension;
+    }
+
+    /**
+     * Write the temporary configuration the scan runs with: the rule neons
+     * and the app's Larastan neon, then the preset, then the parameters the
+     * preset does not carry. The scanned app goes on the command line, not
+     * here, so the CLI stays the shape users expect.
      *
      * @param array{path: string, name: string, fromBooster: bool} $preset
      * @param list<string> $rules
      */
-    private function writeConfiguration(string $appPath, array $preset, array $rules, int $phpVersionId): string
+    private function writeConfiguration(string $appPath, array $preset, array $rules, ?string $larastan, int $phpVersionId): string
     {
         $lines = ['includes:'];
-        foreach (array_merge($rules, [$preset['path']]) as $included) {
+        $includes = $rules;
+        if ($larastan !== null) {
+            $includes[] = $larastan;
+        }
+        $includes[] = $preset['path'];
+        foreach ($includes as $included) {
             $lines[] = '    - ' . $this->neonQuote($included);
         }
         $lines[] = 'parameters:';
