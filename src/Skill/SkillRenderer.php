@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Skill;
 
 use Waynestate\Booster\Hop\Hop;
+use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Hop\HopRegistry;
 
 /**
@@ -70,6 +71,7 @@ final class SkillRenderer
         $how = $hop->isManual()
             ? "Booster has no automatic change for this hop. Follow the official guide below, then run the tests.\n"
             : "1. `booster run --path=<app> --dry-run` and read every diff.\n2. `booster run --path=<app>` applies the plan and stops at the first failing gate.\n3. If a hop is capped, split the work with `--skip`; do not raise `--max-changes` blindly.\n";
+        $boost = $this->boostSection($hop);
 
         return <<<MD
         ---
@@ -84,12 +86,64 @@ final class SkillRenderer
         {$hop->summary}
 
         {$review}{$how}
-        What Rector cannot do (check these by hand):
+        {$boost}What Rector cannot do (check these by hand):
 
         {$notes}
         Official notes:
 
         {$links}
         MD . "\n";
+    }
+
+    /**
+     * The Laravel Boost section of a hop playbook: prompts for apps that carry
+     * laravel/boost. Boost reads the app; it never changes it, and it never
+     * overrides a gate.
+     */
+    private function boostSection(Hop $hop): string
+    {
+        $prompts = match ($hop->kind) {
+            HopKind::Php => [
+                sprintf('Use `search-docs` for removed or deprecated functions in PHP %s and check each one against the files Booster changed.', $hop->to),
+                'Use `tinker` to load a changed class and confirm it still loads.',
+                'Use `application-info` to confirm the reported versions after the hop.',
+                'Run `last-error` and `read-log-entries` after the tests.',
+            ],
+            HopKind::Laravel => [
+                sprintf("Use `search-docs` for the Laravel %s upgrade guide and list every breaking change that touches this app's `list-routes` and `get-config` output.", $hop->to),
+                sprintf('Use `database-schema` to check the tables against the Laravel %s database floor before you apply the hop.', $hop->to),
+                'Use `list-artisan-commands` and `list-routes` before the hop, then compare the output after it.',
+                'Run `last-error` and `read-log-entries` after the tests.',
+            ],
+            HopKind::Phpunit => [
+                sprintf("Use `search-docs` for the PHPUnit %s migration notes and list the changes that touch this app's tests.", $hop->to),
+                "Use `get-config` to read the app's test-related config before you change phpunit.xml.",
+                'Run `last-error` and `read-log-entries` after the tests.',
+            ],
+            HopKind::Sesame => [
+                'Use `get-config` to copy the current wayne-cas settings before the swap.',
+                'Use `list-routes` to note the sign-in and sign-out routes you will re-test.',
+                'Run `last-error` and `read-log-entries` after a test login.',
+            ],
+            HopKind::Vue => [
+                sprintf("Use `search-docs` for the Vue %s migration guide and list the breaking changes that touch this app's components.", $hop->to),
+                'Use `browser-logs` after a page load to catch the Vue warnings the console prints.',
+                'Run `last-error` and `read-log-entries` after the tests.',
+            ],
+            HopKind::Node => [
+                "Use `search-docs` for the Vite front-end docs and check the app's build config against them.",
+                'Use `browser-logs` after a page load to catch front-end errors the change might surface.',
+                'Run `last-error` and `read-log-entries` after the build and the tests.',
+            ],
+        };
+
+        $lines = ["Only if the app has Laravel Boost (`booster detect` says so):", ''];
+        foreach ($prompts as $prompt) {
+            $lines[] = '- ' . $prompt;
+        }
+        $lines[] = '';
+        $lines[] = "Boost is read-only help. Booster's gate stays the authority: never skip a gate because Boost says so.";
+
+        return implode("\n", $lines) . "\n\n";
     }
 }

@@ -39,6 +39,9 @@ final class TextWriter
             $lines[] = sprintf('  PHPUnit: %s -> %s', $p->phpunitMajor ?? 'unknown', $plan->targetPhpunit);
         }
         $lines[] = sprintf('  policy: %s (today %s)', self::clean($plan->policyOrigin), $plan->today);
+        if ($p->hasBoost) {
+            $lines[] = '  Laravel Boost found: the playbooks include Boost prompts.';
+        }
         $lines[] = '';
 
         foreach ($plan->steps as $step) {

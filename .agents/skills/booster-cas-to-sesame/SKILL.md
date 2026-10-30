@@ -13,6 +13,14 @@ Swap the wayne-cas package for SESAME using its compatibility classes.
 2. `booster run --path=<app>` applies the plan and stops at the first failing gate.
 3. If a hop is capped, split the work with `--skip`; do not raise `--max-changes` blindly.
 
+Only if the app has Laravel Boost (`booster detect` says so):
+
+- Use `get-config` to copy the current wayne-cas settings before the swap.
+- Use `list-routes` to note the sign-in and sign-out routes you will re-test.
+- Run `last-error` and `read-log-entries` after a test login.
+
+Boost is read-only help. Booster's gate stays the authority: never skip a gate because Boost says so.
+
 What Rector cannot do (check these by hand):
 
 - Booster writes config/sesame.php from config/wayne-cas.php when the old root is a plain string, and rewrites models that use WayneCasable as a trait to implements WayneCasable plus use ReadOnlyAttributes. The old config/wayne-cas.php stays in place and can be removed once SESAME is verified.

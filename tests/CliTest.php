@@ -289,6 +289,49 @@ final class CliTest extends TestCase
         self::assertStringContainsString('laravel-inertia-vue', $out);
     }
 
+    public function test_detect_shows_boost_yes_or_no(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"php":"^8.3","laravel/framework":"^11.0","laravel/boost":"^1.0"}}');
+
+        [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $dir]);
+        self::assertSame(0, $exit);
+        self::assertMatchesRegularExpression('/^boost\s+yes$/m', $out);
+
+        [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $this->example('raw-php')]);
+        self::assertSame(0, $exit);
+        self::assertMatchesRegularExpression('/^boost\s+no$/m', $out);
+
+        [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $dir, '--format' => 'json']);
+        self::assertSame(0, $exit);
+        self::assertTrue(json_decode($out, true)['boost']);
+    }
+
+    public function test_plan_reports_laravel_boost_only_when_it_is_there(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', json_encode([
+            'require' => ['php' => '^8.3', 'laravel/framework' => '^11.0', 'laravel/boost' => '^1.0'],
+            'require-dev' => ['phpunit/phpunit' => '^11.0'],
+        ]));
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $dir, '--today' => self::TODAY, '--no-scan' => true]);
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Laravel Boost found: the playbooks include Boost prompts.', $out);
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('laravel-blade'), '--today' => self::TODAY, '--no-scan' => true]);
+        self::assertSame(0, $exit);
+        self::assertStringNotContainsString('Laravel Boost found', $out);
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $dir, '--today' => self::TODAY, '--no-scan' => true, '--format' => 'json']);
+        self::assertSame(0, $exit);
+        self::assertTrue(json_decode($out, true)['project']['boost']);
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('laravel-blade'), '--today' => self::TODAY, '--no-scan' => true, '--format' => 'json']);
+        self::assertSame(0, $exit);
+        self::assertFalse(json_decode($out, true)['project']['boost']);
+    }
+
     public function test_run_dry_run_prints_the_rector_diff_and_exits_0(): void
     {
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, (string) json_encode([

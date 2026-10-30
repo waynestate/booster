@@ -13,6 +13,14 @@ Move PHPUnit 10 tests to PHPUnit 11.
 2. `booster run --path=<app>` applies the plan and stops at the first failing gate.
 3. If a hop is capped, split the work with `--skip`; do not raise `--max-changes` blindly.
 
+Only if the app has Laravel Boost (`booster detect` says so):
+
+- Use `search-docs` for the PHPUnit 11 migration notes and list the changes that touch this app's tests.
+- Use `get-config` to read the app's test-related config before you change phpunit.xml.
+- Run `last-error` and `read-log-entries` after the tests.
+
+Boost is read-only help. Booster's gate stays the authority: never skip a gate because Boost says so.
+
 What Rector cannot do (check these by hand):
 
 - Run phpunit --migrate-configuration after this hop; Rector rewrites the test code but not phpunit.xml.
