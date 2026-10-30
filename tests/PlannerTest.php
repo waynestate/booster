@@ -339,6 +339,45 @@ final class PlannerTest extends TestCase
         self::assertStringContainsString('wayne-cas', implode(' ', $plan->warnings));
     }
 
+    public function test_sesame_swap_goes_before_the_laravel_11_hop(): void
+    {
+        $plan = $this->planWithComposer(
+            'laravel-wayne-cas',
+            ['require' => ['php' => '^8.1', 'laravel/framework' => '^9.0']],
+            new PlanOptions(sesame: true, toPhp: '8.4', toLaravel: '12'),
+        );
+
+        // The swap needs PHP 8.3, so the PHP hops reach 8.3 first and the swap
+        // lands right before the hop from Laravel 10 to 11.
+        self::assertSame(
+            ['laravel-9-to-10', 'php-81-to-82', 'php-82-to-83', 'cas-to-sesame', 'laravel-10-to-11', 'laravel-11-to-12', 'php-83-to-84'],
+            $this->ids($plan),
+        );
+    }
+
+    public function test_sesame_swap_still_goes_last_when_the_plan_never_passes_laravel_10(): void
+    {
+        // In the frozen policy Laravel 10 is past security support, so this
+        // test extends its dates: the point is a plan whose Laravel hops stop
+        // at 10, which keeps the old end-of-plan placement for the swap.
+        $policy = $this->policyWith([
+            'laravel' => ['10' => ['active_until' => '2026-12-31', 'security_until' => '2027-12-31']],
+        ]);
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $file = $dir . '/composer.json';
+        $data = json_decode((string) file_get_contents($file), true);
+        self::assertIsArray($data);
+        $data = array_replace_recursive($data, ['require' => ['php' => '^8.3', 'laravel/framework' => '^10.0']]);
+        file_put_contents($file, (string) json_encode($data));
+
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($policy, new HopRegistry()))->plan($project, new PlanOptions(sesame: true, toPhp: '8.3', toLaravel: '10'), $this->today());
+
+        $ids = $this->ids($plan);
+        self::assertSame('cas-to-sesame', $ids[count($ids) - 1]);
+        self::assertCount(1, array_keys($ids, 'cas-to-sesame'));
+    }
+
     public function test_an_eol_target_is_refused(): void
     {
         $this->expectException(ToolError::class);
