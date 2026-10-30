@@ -195,7 +195,7 @@ https://github.com/sebastianbergmann/phpunit/issues/6052
 | Command | What it does |
 |---|---|
 | `booster detect` | Reads `composer.json` and `package.json`; prints the app type, PHP, Laravel, PHPUnit, Vue, Node and Boost |
-| `booster plan` | Prints the ordered hops, the warnings, a removals line per PHP hop, an advisory PHPCompatibility scan of the first PHP hop's target and a PHPStan scan at the destination PHP. Changes nothing. |
+| `booster plan` | Prints the ordered hops, the warnings (including which direct dependencies block which hops), a removals line per PHP hop, an advisory PHPCompatibility scan of the first PHP hop's target and a PHPStan scan at the destination PHP. Changes nothing. |
 | `booster scan` | Advisory scans of one PHP version: PHPCompatibility by default, `--removals` for removed functions, `--phpstan` for static analysis. Exits 0 even with findings |
 | `booster run` | Runs the plan. `--dry-run` previews every hop |
 | `booster hops` | Lists every hop Booster knows |
@@ -214,6 +214,7 @@ Options shared by `plan` and `run`:
 | `--to-php`, `--to-laravel`, `--to-phpunit` | The target. Default: the newest version the policy supports today (PHPUnit: the newest that runs on the target PHP) |
 | `--sesame` | Include the `wayne-cas` to SESAME swap |
 | `--skip` | A hop id to leave out (repeat it) |
+| `--no-package-check` | Skip the Packagist dependency check (for offline use) |
 | `--with-node` | include the Node front-end hops (Node pin, Mix to Vite, Tailwind, Vue) even when you passed a target version. Without it, any of `--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php` or `--from-laravel` leaves those hops out, and the plan prints: "Node front-end hops were left out because you passed a target version: <hop ids>. Add --with-node to include them." |
 
 Options for `plan`:
@@ -300,6 +301,30 @@ composer require --dev phpstan/phpstan waynestate/pinstripe
 It ignores `vendor/`, `node_modules/` and `storage/`, reads the app only and changes nothing. `booster scan
 --path=../my-app --php=8.5 --phpstan` runs the same scan on its own, for any PHP version Booster knows, and exits 0
 even when it finds a wall of missing types.
+
+### The dependency check
+
+Before the hops print, `plan` (and `run`) asks Packagist about each direct third-party dependency in the app's
+`composer.json`: what is its newest stable release, and can that release still be installed at each hop's
+destination? Only plain `require` and `require-dev` entries count; PHP, extensions (`ext-*`, `lib-*`), Laravel
+itself (`laravel/framework`, its `illuminate/*` components) and PHPUnit are Booster's own business, so they are
+skipped.
+
+The answer is advisory, like the scans: a package that cannot follow the plan does not drop the hop. It adds a
+warning that names the package, the hop it blocks, and what to do about it:
+
+```
+acme/legacy-auth 2.3.0 supports Laravel up to 10 (or PHP up to 8.3), so it blocks laravel-10-to-11. Replace or upgrade it first.
+```
+
+A package whose newest release requires several `illuminate/*` components is judged by the loosest of those
+constraints, the one that allows the most Laravel versions. Abandoned packages get their own warning (`acme/old is
+abandoned (use acme/new instead).`). Packages the check cannot reach are reported as `Not checked: <package>
+(offline).` or `(VCS repository).`, and the plan goes on. In JSON output every package lands under
+`package_checks`, with the fields `package`, `newest`, `blocks`, `abandoned` and `checked`.
+
+The check fetches from `repo.packagist.org` and from any composer-type repository the app declares in
+`composer.json`; VCS repositories are never fetched. `--no-package-check` skips the whole check, for offline use.
 
 ### The baseline
 
