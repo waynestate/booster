@@ -149,6 +149,28 @@ final class VueCompatCodemodTest extends TestCase
         self::assertStringNotContainsString('END-MARKER-OF-OUTPUT', implode("\n", $report->results[0]->messages));
     }
 
+    // New test for multibyte UTF-8 handling
+    public function test_multibyte_unrecognised_codemod_output_is_kept_utf8_and_trimmed(): void
+    {
+        $dir = $this->tempDir();
+        $this->makeApp($dir);
+        $prose = str_repeat('€', 2000); // 6000 bytes
+        $fake = $this->fake($dir, $prose);
+        $report = $this->runCodemod($fake, new RunOptions(), $dir);
+
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        $raw = null;
+        foreach ($report->results[0]->messages as $message) {
+            if (str_contains($message, '€')) {
+                $raw = $message;
+                break;
+            }
+        }
+        self::assertIsString($raw);
+        self::assertTrue(mb_check_encoding($raw, 'UTF-8'));
+        self::assertStringEndsWith('...', (string) $raw);
+    }
+
     public function test_a_failing_build_gate_fails_the_step_but_keeps_the_items(): void
     {
         $dir = $this->tempDir();
