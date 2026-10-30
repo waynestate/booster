@@ -96,4 +96,65 @@ final class ComposerEditorTest extends TestCase
         self::assertSame([], (new ComposerEditor())->apply((new HopRegistry())->get('vue-2-to-3'), $dir));
         self::assertSame($before, file_get_contents($dir . '/composer.json'));
     }
+
+    public function test_advisory_unblock_writes_a_scoped_entry(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        $editor = new ComposerEditor();
+
+        $changes = $editor->advisoryUnblock($dir, 'laravel/framework', '^13.0', ['PKSA-2026-0001', 'PKSA-2026-0002']);
+
+        self::assertCount(1, $changes);
+        self::assertStringContainsString('config.policy.advisories.ignore.laravel/framework', $changes[0]);
+        self::assertStringContainsString('^13.0', $changes[0]);
+        $rule = $this->read($dir)['config']['policy']['advisories']['ignore']['laravel/framework'][0];
+        self::assertSame('^13.0', $rule['constraint']);
+        self::assertTrue($rule['on-block']);
+        self::assertFalse($rule['on-audit']);
+        self::assertStringContainsString('BOOSTER temporary unblock', $rule['reason']);
+        self::assertStringContainsString('PKSA-2026-0001, PKSA-2026-0002', $rule['reason']);
+    }
+
+    public function test_advisory_unblock_is_idempotent(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        $editor = new ComposerEditor();
+        $ids = ['PKSA-2026-0001'];
+
+        self::assertCount(1, $editor->advisoryUnblock($dir, 'laravel/framework', '^13.0', $ids));
+        $afterFirst = file_get_contents($dir . '/composer.json');
+        self::assertSame([], $editor->advisoryUnblock($dir, 'laravel/framework', '^13.0', $ids));
+        self::assertSame($afterFirst, file_get_contents($dir . '/composer.json'));
+    }
+
+    public function test_advisory_unblock_preserves_an_existing_map_entry(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        $data = $this->read($dir);
+        $data['config']['policy']['advisories']['ignore'] = ['doctrine/dbal' => 'legacy reason'];
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        (new ComposerEditor())->advisoryUnblock($dir, 'laravel/framework', '^13.0', ['PKSA-2026-0001']);
+
+        $ignore = $this->read($dir)['config']['policy']['advisories']['ignore'];
+        self::assertSame('legacy reason', $ignore['doctrine/dbal']);
+        self::assertCount(1, $ignore['laravel/framework']);
+        self::assertSame('^13.0', $ignore['laravel/framework'][0]['constraint']);
+    }
+
+    public function test_advisory_unblock_normalises_a_plain_list_of_names(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        $data = $this->read($dir);
+        // The other allowed shape: a plain list of package names.
+        $data['config']['policy']['advisories']['ignore'] = ['monolog/monolog'];
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        (new ComposerEditor())->advisoryUnblock($dir, 'laravel/framework', '^13.0', ['PKSA-2026-0001']);
+
+        $ignore = $this->read($dir)['config']['policy']['advisories']['ignore'];
+        self::assertNull($ignore['monolog/monolog']);
+        self::assertCount(1, $ignore['laravel/framework']);
+        self::assertSame('^13.0', $ignore['laravel/framework'][0]['constraint']);
+    }
 }

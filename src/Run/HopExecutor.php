@@ -401,9 +401,10 @@ final class HopExecutor
 
                 if (!$options->skipGate) {
                     $gate = $this->runGate($step, $path, $options, $baseline);
-                    if ($gate !== null) {
-                        return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$gate, ...$notes], false, $prepass?->files() ?? []);
+                    if (!$gate->passed) {
+                        return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...$gate->lines, ...$notes], false, $prepass?->files() ?? []);
                     }
+                    $messages = [...$messages, ...$gate->lines];
                     $messages[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
                     $update = $this->lockUpdatePackages($step);
                     if ($update !== []) {
@@ -589,17 +590,42 @@ final class HopExecutor
     }
 
     /**
-     * @return list<string>|null failure messages, or null when the gate passed
+     * Runs the step's gate. When Composer 2.10's policy blocking refuses the
+     * tagged releases the lock update needs, it writes the temporary advisory
+     * unblock into composer.json and runs the same gate once more: one retry,
+     * never a loop.
      */
-    private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): ?array
+    private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): GateReport
     {
         $php = $step->phpAfter ?? '';
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
         $update = $this->lockUpdatePackages($step);
+        $unblock = [];
         $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update);
         $outcome = TargetImageRunner::gateOutcome($result);
+        if (!$outcome->successful() && $outcome->phase === GateOutcome::PHASE_INSTALL && $update !== []) {
+            $blocked = self::advisoryBlock($outcome->output);
+            if ($blocked !== null) {
+                $unblock = [sprintf(
+                    'Composer refused to load the tagged releases of %s (%s): they are affected by security advisories (%s).',
+                    $blocked['package'],
+                    $blocked['constraint'],
+                    implode(', ', $blocked['ids']),
+                )];
+                try {
+                    $unblock = [...$unblock, ...$this->composer->advisoryUnblock($path, $blocked['package'], $blocked['constraint'], $blocked['ids'])];
+                } catch (ToolError $e) {
+                    $unblock[] = 'Could not write the advisory unblock: ' . $e->getMessage();
+                }
+                // The ignore is in composer.json now, so the same command may
+                // load the blocked releases.
+                $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update);
+                $outcome = TargetImageRunner::gateOutcome($result);
+                $unblock[] = 'The gate was retried with the unblock in place. Remove the entry from composer.json once the app is off the blocked versions; PROCTOR reports it until then.';
+            }
+        }
         if ($outcome->successful()) {
-            return null;
+            return new GateReport(true, $unblock);
         }
 
         // A Composer-phase failure is never reported as the test command
@@ -624,7 +650,30 @@ final class HopExecutor
             $messages[] = 'No baseline to compare against: the baseline\'s composer install failed, so this gate failure cannot be attributed.';
         }
 
-        return $messages;
+        return new GateReport(false, [...$unblock, ...$messages]);
+    }
+
+    /**
+     * Reads Composer 2.10's advisory block out of a failed install phase: the
+     * package whose tagged releases were not loaded, the constraint the root
+     * requires, and the advisory IDs Composer named. Null when the failure is
+     * something else (a stale lock, a platform mismatch, ...).
+     *
+     * @param list<string> $output
+     *
+     * @return array{package: string, constraint: string, ids: list<string>}|null
+     */
+    private static function advisoryBlock(array $output): ?array
+    {
+        $text = implode("\n", $output);
+        if (preg_match('#Root composer\.json requires ([A-Za-z0-9_./~-]+) (\S+), found .*?affected by security advisories \(([^)]*)\)#', $text, $m) !== 1) {
+            return null;
+        }
+        if (preg_match_all('/"([^"]+)"/', $m[3], $ids) === 0 || $ids[1] === []) {
+            return null;
+        }
+
+        return ['package' => $m[1], 'constraint' => $m[2], 'ids' => $ids[1]];
     }
 
     /**
@@ -662,10 +711,10 @@ final class HopExecutor
             $changes[] = 'Build gate passed: npm ci and npm run build are green in the Node container.';
         } elseif (!$options->skipGate) {
             $gate = $this->runGate($step, $path, $options, $baseline);
-            if ($gate !== null) {
-                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate]);
+            if (!$gate->passed) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
             }
-            $changes[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
+            $changes = [...$changes, ...$gate->lines, 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.'];
         } else {
             $changes[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
         }
@@ -738,10 +787,10 @@ final class HopExecutor
             }
             $changes[] = 'Build gate passed: npm ci and npm run build are green in the Node container, and public/build/manifest.json exists.';
             $gate = $this->runGate($step, $path, $options, $baseline);
-            if ($gate !== null) {
-                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate]);
+            if (!$gate->passed) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
             }
-            $changes[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
+            $changes = [...$changes, ...$gate->lines, 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.'];
         } else {
             $changes[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
         }
@@ -960,14 +1009,15 @@ final class HopExecutor
         }
 
         if (!$options->skipGate) {
-            $failure = $this->runBuildGate($path);
-            if ($failure === null) {
-                $failure = $this->runGate($step, $path, $options, $baseline);
+            $buildFailure = $this->runBuildGate($path);
+            if ($buildFailure !== null) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$buildFailure]);
             }
-            if ($failure !== null) {
-                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$failure]);
+            $gate = $this->runGate($step, $path, $options, $baseline);
+            if (!$gate->passed) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
             }
-            $changes[] = 'Gate passed: npm ci, npm run build and the tests are green.';
+            $changes = [...$changes, ...$gate->lines, 'Gate passed: npm ci, npm run build and the tests are green.'];
         } else {
             $changes[] = 'Gate skipped. Run npm ci, npm run build and the tests before the next step.';
         }

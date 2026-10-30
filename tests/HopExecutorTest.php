@@ -1736,7 +1736,7 @@ PHP,
 
     public function test_a_failed_lock_update_fails_the_step_in_the_composer_phase(): void
     {
-        [, $plan] = $this->laravelPlan($this->copyExample('laravel-blade'));
+        [$dir, $plan] = $this->laravelPlan($this->copyExample('laravel-blade'));
 
         $dockerRuns = 0;
         $fake = new FakeProcessRunner(static function (array $command) use (&$dockerRuns): ProcessResult {
@@ -1766,5 +1766,114 @@ PHP,
         self::assertStringContainsString('This step changed composer.json and composer.lock.', $all);
         self::assertStringContainsString('Undo with:', $all);
         self::assertStringNotContainsString('"vendor/bin/phpunit" exited', $all);
+        // A stale lock is not an advisory block: no retry, no unblock written.
+        self::assertSame(2, $dockerRuns);
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertArrayNotHasKey('policy', $composer['config'] ?? []);
+    }
+
+    public function test_a_laravel_hop_blocked_by_advisories_unblocks_and_retries(): void
+    {
+        [$dir, $plan] = $this->laravelPlan($this->copyExample('laravel-blade'));
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use ($dir, &$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $script = $command[count($command) - 1];
+                $dockerRuns++;
+                if ($dockerRuns === 2 && str_contains($script, 'composer update -W')) {
+                    // Composer 2.10's policy blocking refuses the tagged releases.
+                    return new ProcessResult(4, "Composer could not find a solution for your request.\n- Root composer.json requires laravel/framework ^13.0, found laravel/framework[v13.0.0, v13.1.0, v13.2.0] but these were not loaded, because they are affected by security advisories (\"PKSA-2026-0001\", \"PKSA-2026-0002\"). Go to https://packagist.org/security-advisories/ to find advisory details.\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4", '');
+                }
+                if (str_contains($script, 'composer update -W')) {
+                    // The retry, with the unblock in place, refreshes the lock.
+                    file_put_contents($dir . '/composer.lock', json_encode(['packages' => ['laravel/framework' => ['version' => 'v13.39.0']]]));
+                }
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Models/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        $runs = $this->dockerRuns($fake);
+        self::assertCount(3, $runs);
+        $scripts = array_map(static fn(array $run): string => $run['command'][count($run['command']) - 1], $runs);
+        self::assertStringContainsString('composer install --no-interaction --no-progress --prefer-dist', $scripts[0]);
+        self::assertStringContainsString('composer update -W --no-interaction --no-progress laravel/framework', $scripts[1]);
+        self::assertStringContainsString('composer update -W --no-interaction --no-progress laravel/framework', $scripts[2]);
+        // The temporary unblock is scoped to the package and the refused constraint.
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        $ignore = $composer['config']['policy']['advisories']['ignore']['laravel/framework'];
+        self::assertIsArray($ignore);
+        $rule = $ignore[0];
+        self::assertSame('^13.0', $rule['constraint']);
+        self::assertTrue($rule['on-block']);
+        self::assertFalse($rule['on-audit']);
+        self::assertStringContainsString('BOOSTER temporary unblock', $rule['reason']);
+        self::assertStringContainsString('PKSA-2026-0001', $rule['reason']);
+        self::assertStringContainsString('PKSA-2026-0002', $rule['reason']);
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('affected by security advisories (PKSA-2026-0001, PKSA-2026-0002)', $all);
+        self::assertStringContainsString('Added a temporary advisory unblock to composer.json', $all);
+        self::assertStringContainsString('The gate was retried with the unblock in place.', $all);
+        self::assertStringContainsString('Remove the entry from composer.json once the app is off the blocked versions', $all);
+        self::assertStringContainsString('Gate passed: tests are green on PHP 8.3.', $all);
+        self::assertFileExists($dir . '/composer.lock');
+    }
+
+    public function test_an_advisory_unblock_that_still_fails_reports_the_failure(): void
+    {
+        [$dir, $plan] = $this->laravelPlan($this->copyExample('laravel-blade'));
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use (&$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $script = $command[count($command) - 1];
+                $dockerRuns++;
+                if ($dockerRuns === 2 && str_contains($script, 'composer update -W')) {
+                    return new ProcessResult(4, "- Root composer.json requires laravel/framework ^13.0, found laravel/framework[v13.0.0] but these were not loaded, because they are affected by security advisories (\"PKSA-2026-0001\").\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4", '');
+                }
+                if ($dockerRuns === 3) {
+                    // The unblock did not help: the same failure comes back.
+                    return new ProcessResult(4, "Composer could not find a solution for your request.\n- Nothing matches your requirements.\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4", '');
+                }
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => '/srv/app/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
+        // Baseline, the blocked gate, and exactly one retry: never a loop.
+        self::assertSame(3, $dockerRuns);
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('affected by security advisories (PKSA-2026-0001)', $all);
+        self::assertStringContainsString('Added a temporary advisory unblock to composer.json', $all);
+        self::assertStringContainsString('The gate was retried with the unblock in place.', $all);
+        self::assertStringContainsString('Gate failed: composer update -W laravel/framework failed (exit 4)', $all);
+        self::assertStringContainsString('Nothing matches your requirements.', $all);
+        self::assertStringContainsString('This step changed composer.json and composer.lock.', $all);
+        // The unblock stays in composer.json for PROCTOR to report.
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertArrayHasKey('laravel/framework', $composer['config']['policy']['advisories']['ignore']);
     }
 }
