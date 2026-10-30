@@ -628,15 +628,19 @@ final class HopExecutor
             ]);
         }
 
-        [$items, $total] = self::parseCodemodOutput($result);
-        $changes = [sprintf('vue-upgrade-tool@%s ran in the Node container; %d manual item(s) remain.', $version, $total)];
+        [$items, $total, $recognized] = self::parseCodemodOutput($result);
+        $changes = $recognized
+            ? [sprintf('vue-upgrade-tool@%s ran in the Node container; %d manual item(s) remain.', $version, $total)]
+            : ['codemod ran; manual items could not be counted, see the tool output'];
 
         if (!$options->skipGate) {
             $failure = $this->runFrontEndGate($path);
             if ($failure !== null) {
                 return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, [], [...$changes, ...$items, ...$failure]);
             }
-            $changes[] = sprintf('Build gate passed: npm ci and npm run build are green in the Node container, and %d manual item(s) remain from the codemod.', $total);
+            $changes[] = $recognized
+                ? sprintf('Build gate passed: npm ci and npm run build are green in the Node container, and %d manual item(s) remain from the codemod.', $total)
+                : 'Build gate passed: npm ci and npm run build are green in the Node container.';
         } else {
             $changes[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
         }
@@ -665,6 +669,9 @@ final class HopExecutor
         return false;
     }
 
+    /** The raw codemod output kept in hop messages is trimmed to this many bytes. */
+    private const CODEMOD_OUTPUT_CAP = 4000;
+
     /**
      * The codemod output, turned into hop messages. A line that starts with a
      * file path and a colon is one of the tool's manual items and gets a
@@ -673,11 +680,19 @@ final class HopExecutor
      * count as manual items. The messages are capped at 20 lines, the rest
      * counted.
      *
-     * @return array{0: list<string>, 1: int} the capped messages and the manual item count
+     * When the output is non-empty but holds no manual item, its shape is not
+     * recognised: the hop must not fail on that, so the whole output is kept
+     * as one message (trimmed to CODEMOD_OUTPUT_CAP) and flagged uncountable.
+     *
+     * @return array{0: list<string>, 1: int, 2: bool} the capped messages, the manual item count, and whether the output was recognised
      */
     private static function parseCodemodOutput(ProcessResult $result): array
     {
-        $lines = preg_split('/\R/', $result->stdout . "\n" . $result->stderr) ?: [];
+        $raw = trim($result->stdout . "\n" . $result->stderr);
+        if ($raw === '') {
+            return [[], 0, true];
+        }
+        $lines = preg_split('/\R/', $raw) ?: [];
         $items = [];
         $manual = 0;
         foreach ($lines as $line) {
@@ -692,11 +707,18 @@ final class HopExecutor
                 $items[] = $line;
             }
         }
+        if ($manual === 0) {
+            if (strlen($raw) > self::CODEMOD_OUTPUT_CAP) {
+                $raw = substr($raw, 0, self::CODEMOD_OUTPUT_CAP) . '...';
+            }
+
+            return [[$raw], 0, false];
+        }
         if (count($items) > 20) {
             $items = [...array_slice($items, 0, 20), sprintf('and %d more', count($items) - 20)];
         }
 
-        return [$items, $manual];
+        return [$items, $manual, true];
     }
 
     /**

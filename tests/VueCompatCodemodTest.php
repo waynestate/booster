@@ -111,6 +111,44 @@ final class VueCompatCodemodTest extends TestCase
         self::assertContains('vue-upgrade-tool@1.0.37 ran in the Node container; 25 manual item(s) remain.', $messages);
     }
 
+    public function test_unrecognised_codemod_output_is_kept_whole_and_counts_nothing(): void
+    {
+        $dir = $this->tempDir();
+        $this->makeApp($dir);
+        $prose = "The upgrade could not be completed.\nPlease review your components by hand.\nGood luck!";
+        $fake = $this->fake($dir, $prose);
+        $report = $this->runCodemod($fake, new RunOptions(), $dir);
+
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        self::assertFalse($report->failed());
+        $messages = $report->results[0]->messages;
+        self::assertContains('codemod ran; manual items could not be counted, see the tool output', $messages);
+        self::assertContains($prose, $messages);
+        self::assertStringNotContainsString('manual item(s) remain', implode("\n", $messages));
+    }
+
+    public function test_long_unrecognised_codemod_output_is_trimmed_to_the_cap(): void
+    {
+        $dir = $this->tempDir();
+        $this->makeApp($dir);
+        $prose = str_repeat('Chatty line about migrating components. ', 300) . 'END-MARKER-OF-OUTPUT';
+        $fake = $this->fake($dir, $prose);
+        $report = $this->runCodemod($fake, new RunOptions(), $dir);
+
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        $raw = null;
+        foreach ($report->results[0]->messages as $message) {
+            if (str_contains($message, 'Chatty line')) {
+                $raw = $message;
+                break;
+            }
+        }
+        self::assertIsString($raw);
+        self::assertStringEndsWith('...', (string) $raw);
+        self::assertLessThanOrEqual(4003, strlen((string) $raw));
+        self::assertStringNotContainsString('END-MARKER-OF-OUTPUT', implode("\n", $report->results[0]->messages));
+    }
+
     public function test_a_failing_build_gate_fails_the_step_but_keeps_the_items(): void
     {
         $dir = $this->tempDir();
