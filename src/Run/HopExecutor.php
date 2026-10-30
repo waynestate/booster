@@ -63,6 +63,10 @@ final class HopExecutor
         }
 
         $results = [];
+        // Measure the app against the CREED policy on the PHP it is on now, so
+        // the final gate can tell pre-existing findings from ones the upgrade
+        // introduces.
+        $proctorBaseline = $this->runProctorBaseline($plan, $path, $options);
         foreach ($plan->steps as $step) {
             $result = $this->runStep($step, $path, $plan, $options, $baseline);
             $results[] = $result;
@@ -78,8 +82,34 @@ final class HopExecutor
         }
 
         $proctor = $this->runProctorGate($plan, $path, $options, $results);
+        $comparison = $proctor === null ? null : ProctorComparison::compare($proctorBaseline, $proctor);
 
-        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $options->proctorAdvisory);
+        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $options->proctorAdvisory, $comparison);
+    }
+
+    /**
+     * The PROCTOR baseline: measure the app against the CREED policy on the
+     * PHP it is on now, before the first hop, so the final gate can tell
+     * pre-existing findings from ones the upgrade introduces. Skipped for dry
+     * runs, when the gate is skipped, or when the plan has no steps, like the
+     * final run. A tool error is recorded as a tripped baseline so the final
+     * gate falls back to blocking on any failure and says why.
+     */
+    private function runProctorBaseline(Plan $plan, string $path, RunOptions $options): ?ProctorResult
+    {
+        if ($options->dryRun || $options->skipGate || $plan->steps === [] || $this->proctor === null) {
+            return null;
+        }
+        $php = $this->startingPhp($plan);
+        if ($php === null) {
+            return null;
+        }
+
+        try {
+            return $this->proctor->run($path, $php, $plan->policyOrigin, $plan->today);
+        } catch (ToolError $e) {
+            return new ProctorResult(ProctorResult::TRIPPED, 2, $php, [], $e->getMessage());
+        }
     }
 
     /**
