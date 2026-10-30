@@ -709,7 +709,7 @@ final class HopExecutor
         }
         if ($manual === 0) {
             if (strlen($raw) > self::CODEMOD_OUTPUT_CAP) {
-                $raw = substr($raw, 0, self::CODEMOD_OUTPUT_CAP) . '...';
+                $raw = mb_strcut($raw, 0, self::CODEMOD_OUTPUT_CAP, 'UTF-8') . '...';
             }
 
             return [[$raw], 0, false];
