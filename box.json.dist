@@ -5,6 +5,7 @@
     "check-requirements": true,
     "files": [
         "config/rector.php",
+        "data/removals.json",
         "data/versions.json",
         "docker/Dockerfile",
         "src/Creed/policy.json",

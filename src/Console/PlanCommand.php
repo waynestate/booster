@@ -14,6 +14,7 @@ use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\ProcessRunner;
 use Waynestate\Booster\Scan\PhpCompatScan;
 use Waynestate\Booster\Scan\PhpStanScan;
+use Waynestate\Booster\Scan\RemovalsScan;
 
 final class PlanCommand extends BaseCommand
 {
@@ -49,6 +50,20 @@ final class PlanCommand extends BaseCommand
             }
         }
 
+        // The removals scan is cheap (no processes), so it always runs, unlike
+        // the PHPCompatibility scan behind --no-scan.
+        $removalsByStep = [];
+        $removalsJson = [];
+        $removals = new RemovalsScan();
+        foreach ($plan->steps as $step) {
+            if ($step->hop->kind !== HopKind::Php || $step->phpBefore === null || $step->phpAfter === null) {
+                continue;
+            }
+            $result = $removals->scan($plan->project->path, $step->phpBefore, $step->phpAfter);
+            $removalsByStep[$step->number] = $result;
+            $removalsJson[] = ['step' => $step->number, 'hop' => $step->hop->id, ...$result->toArray()];
+        }
+
         if ($format === 'json') {
             $data = $plan->toArray();
             if ($scan !== null) {
@@ -57,10 +72,11 @@ final class PlanCommand extends BaseCommand
             if ($phpstan !== null) {
                 $data['phpstan'] = $phpstan->toArray();
             }
+            $data['removals'] = $removalsJson;
             $text = (new JsonWriter())->write($data);
         } else {
             $writer = new TextWriter();
-            $text = $writer->plan($plan);
+            $text = $writer->plan($plan, $removalsByStep);
             if ($scan !== null) {
                 $text .= "\n\n" . $writer->phpCompat($scan);
             }

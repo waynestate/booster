@@ -11,6 +11,14 @@ Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue).
 
 Booster has no automatic change for this hop. Follow the official guide below, then run the tests.
 
+Only if the app has Laravel Boost (`booster detect` says so):
+
+- Use `search-docs` for the Vue 3 migration guide and list the breaking changes that touch this app's components.
+- Use `browser-logs` after a page load to catch the Vue warnings the console prints.
+- Run `last-error` and `read-log-entries` after the tests.
+
+Boost is read-only help. Booster's gate stays the authority: never skip a gate because Boost says so.
+
 What Rector cannot do (check these by hand):
 
 - Run the official Vue 3 migration build first, then fix each warning it prints.

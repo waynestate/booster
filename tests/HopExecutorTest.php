@@ -15,6 +15,7 @@ use Waynestate\Booster\Plan\PlanOptions;
 use Waynestate\Booster\Plan\PlanStep;
 use Waynestate\Booster\Plan\Planner;
 use Waynestate\Booster\Project\ProjectDetector;
+use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\ComposerEditor;
 use Waynestate\Booster\Run\HopExecutor;
 use Waynestate\Booster\Run\NodeRunner;
@@ -32,18 +33,20 @@ use Waynestate\Booster\ToolError;
 final class HopExecutorTest extends TestCase
 {
     /**
-     * @param int            $changedPerHop files Rector reports per run
-     * @param string         $gitStatus     what `git status --porcelain` prints
-     * @param int            $gateExit      exit code of each hop's gate docker run
+     * @param int            $changedPerHop        files Rector reports per run
+     * @param string         $gitStatus            what `git status --porcelain` prints
+     * @param int            $gateExit             exit code of each hop's gate docker run
      * @param list<string>   $rectorErrors
-     * @param int            $baselineExit  exit code of the baseline docker run (the first one)
-     * @param int            $proctorExit   PROCTOR's exit code (0 pass, 1 fail, 2 tripped); -1 leaves PROCTOR unanswered
+     * @param int            $baselineExit         exit code of the baseline docker run (the first one)
+     * @param int            $proctorExit          PROCTOR's exit code (0 pass, 1 fail, 2 tripped); -1 leaves PROCTOR unanswered
+     * @param int            $proctorBaselineExit  exit code of the first PROCTOR call (the baseline); -1 answers it like the rest
      */
-    private function fake(int $changedPerHop = 1, string $gitStatus = '', int $gateExit = 0, array $rectorErrors = [], int $baselineExit = 0, int $proctorExit = -1): FakeProcessRunner
+    private function fake(int $changedPerHop = 1, string $gitStatus = '', int $gateExit = 0, array $rectorErrors = [], int $baselineExit = 0, int $proctorExit = -1, int $proctorBaselineExit = -1): FakeProcessRunner
     {
         $dockerRuns = 0;
+        $proctorRuns = 0;
 
-        return new FakeProcessRunner(static function (array $command) use ($changedPerHop, $gitStatus, $gateExit, $rectorErrors, $baselineExit, $proctorExit, &$dockerRuns): ProcessResult {
+        return new FakeProcessRunner(static function (array $command) use ($changedPerHop, $gitStatus, $gateExit, $rectorErrors, $baselineExit, $proctorExit, $proctorBaselineExit, &$dockerRuns, &$proctorRuns): ProcessResult {
             if ($command[0] === 'git') {
                 return new ProcessResult(0, $gitStatus, '');
             }
@@ -58,13 +61,18 @@ final class HopExecutorTest extends TestCase
 
                 return new ProcessResult($exit, $exit !== 0 ? 'FAILURES!' : '', '');
             }
-            if ($proctorExit >= 0 && self::isProctorCommand($command)) {
-                if ($proctorExit === 2) {
-                    return new ProcessResult(2, '', 'PROCTOR could not read composer.json');
-                }
-                $fixture = $proctorExit === 0 ? 'pass-report.json' : 'fail-report.json';
+            if (self::isProctorCommand($command)) {
+                // The first PROCTOR call is the baseline on the starting PHP; the last is the final gate.
+                $exit = $proctorRuns === 0 && $proctorBaselineExit >= 0 ? $proctorBaselineExit : $proctorExit;
+                $proctorRuns++;
+                if ($exit >= 0) {
+                    if ($exit === 2) {
+                        return new ProcessResult(2, '', 'PROCTOR could not read composer.json');
+                    }
+                    $fixture = $exit === 0 ? 'pass-report.json' : 'fail-report.json';
 
-                return new ProcessResult($proctorExit, self::proctorFixture($fixture), '');
+                    return new ProcessResult($exit, self::proctorFixture($fixture), '');
+                }
             }
             $files = [];
             for ($i = 0; $i < $changedPerHop; $i++) {
@@ -713,36 +721,100 @@ final class HopExecutorTest extends TestCase
         self::assertNotNull($report->proctor);
         self::assertSame(ProctorResult::PASSED, $report->proctor->status);
         self::assertSame('8.3', $report->proctor->php);
-        self::assertCount(1, $this->proctorRuns($fake));
-        $command = $this->proctorRuns($fake)[0];
-        self::assertContains('--format=json', $command);
-        self::assertContains('--today=2026-10-28', $command);
-        self::assertContains('--php-runtime=8.3.0', $command);
-        self::assertContains('--policy=' . self::POLICY_FIXTURE, $command);
+        // The baseline runs on the starting PHP before the first hop; the final gate on the target.
+        self::assertCount(2, $this->proctorRuns($fake));
+        [$baselineCommand, $finalCommand] = $this->proctorRuns($fake);
+        self::assertContains('--format=json', $baselineCommand);
+        self::assertContains('--today=2026-10-28', $baselineCommand);
+        self::assertContains('--php-runtime=8.1.0', $baselineCommand);
+        self::assertContains('--policy=' . self::POLICY_FIXTURE, $baselineCommand);
+        self::assertContains('--php-runtime=8.3.0', $finalCommand);
     }
 
-    public function test_a_failing_proctor_gate_fails_the_run(): void
+    public function test_preexisting_findings_do_not_fail_the_run(): void
     {
         $fake = $this->fake(proctorExit: 1);
         $report = $this->executeWithProctor($fake, new RunOptions());
 
         self::assertSame(['applied', 'applied'], $this->statuses($report));
-        self::assertTrue($report->failed());
+        self::assertFalse($report->failed());
         self::assertNotNull($report->proctor);
         self::assertSame(ProctorResult::FAILED, $report->proctor->status);
         self::assertCount(2, $report->proctor->failures);
         self::assertSame('php-floor', $report->proctor->failures[0]['check']);
+        self::assertNotNull($report->proctorComparison);
+        self::assertTrue($report->proctorComparison->baselineTaken);
+        self::assertSame([], $report->proctorComparison->new);
+        self::assertCount(2, $report->proctorComparison->alreadyPresent);
+        self::assertFalse($report->proctorComparison->blocking);
+    }
+
+    public function test_new_findings_after_the_hops_fail_the_run(): void
+    {
+        $fake = $this->fake(proctorBaselineExit: 0, proctorExit: 1);
+        $report = $this->executeWithProctor($fake, new RunOptions());
+
+        self::assertTrue($report->failed());
+        self::assertNotNull($report->proctor);
+        self::assertSame(ProctorResult::FAILED, $report->proctor->status);
+        self::assertNotNull($report->proctorComparison);
+        self::assertTrue($report->proctorComparison->baselineTaken);
+        self::assertCount(2, $report->proctorComparison->new);
+        self::assertSame([], $report->proctorComparison->alreadyPresent);
+        self::assertTrue($report->proctorComparison->blocking);
+    }
+
+    public function test_findings_fixed_by_the_upgrade_are_reported_as_fixed(): void
+    {
+        $fake = $this->fake(proctorBaselineExit: 1, proctorExit: 0);
+        $report = $this->executeWithProctor($fake, new RunOptions());
+
+        self::assertFalse($report->failed());
+        self::assertNotNull($report->proctor);
+        self::assertSame(ProctorResult::PASSED, $report->proctor->status);
+        self::assertNotNull($report->proctorComparison);
+        self::assertSame([], $report->proctorComparison->new);
+        self::assertCount(2, $report->proctorComparison->fixed);
+        self::assertTrue($report->proctorComparison->phpFloorFixed());
+    }
+
+    public function test_a_tripped_baseline_falls_back_to_blocking_on_any_fail(): void
+    {
+        $fake = $this->fake(proctorBaselineExit: 2, proctorExit: 1);
+        $report = $this->executeWithProctor($fake, new RunOptions());
+
+        self::assertTrue($report->failed());
+        self::assertNotNull($report->proctorComparison);
+        self::assertFalse($report->proctorComparison->baselineTaken);
+        self::assertStringContainsString('could not read composer.json', (string) $report->proctorComparison->baselineError);
+        self::assertCount(2, $report->proctorComparison->new);
+        self::assertTrue($report->proctorComparison->blocking);
+    }
+
+    public function test_a_tripped_baseline_with_a_clean_final_run_does_not_block(): void
+    {
+        $fake = $this->fake(proctorBaselineExit: 2, proctorExit: 0);
+        $report = $this->executeWithProctor($fake, new RunOptions());
+
+        self::assertFalse($report->failed());
+        self::assertNotNull($report->proctorComparison);
+        self::assertFalse($report->proctorComparison->baselineTaken);
+        self::assertSame([], $report->proctorComparison->new);
+        self::assertFalse($report->proctorComparison->blocking);
     }
 
     public function test_advisory_proctor_does_not_fail_the_run(): void
     {
-        $fake = $this->fake(proctorExit: 1);
+        $fake = $this->fake(proctorBaselineExit: 0, proctorExit: 1);
         $report = $this->executeWithProctor($fake, new RunOptions(proctorAdvisory: true));
 
         self::assertFalse($report->failed());
         self::assertNotNull($report->proctor);
         self::assertSame(ProctorResult::FAILED, $report->proctor->status);
         self::assertTrue($report->proctorAdvisory);
+        // The findings are new against the baseline, so advisory is what keeps the run green.
+        self::assertCount(2, $report->proctorComparison?->new ?? []);
+        self::assertTrue($report->proctorComparison?->blocking ?? false);
     }
 
     public function test_a_tripped_proctor_gate_fails_the_run(): void
@@ -785,8 +857,11 @@ final class HopExecutorTest extends TestCase
 
         self::assertSame(['gate-failed', 'not-run'], $this->statuses($report));
         self::assertTrue($report->failed());
-        self::assertSame([], $this->proctorRuns($fake));
+        // Only the baseline ran; the final gate is skipped when a step failed.
+        self::assertCount(1, $this->proctorRuns($fake));
+        self::assertContains('--php-runtime=8.1.0', $this->proctorRuns($fake)[0]);
         self::assertNull($report->proctor);
+        self::assertNull($report->proctorComparison);
     }
 
     public function test_the_report_array_carries_the_proctor_section(): void
@@ -798,6 +873,58 @@ final class HopExecutorTest extends TestCase
         self::assertSame(1, $array['proctor']['exit_code']);
         self::assertSame('8.3', $array['proctor']['php']);
         self::assertCount(2, $array['proctor']['failures']);
+        self::assertFalse($array['proctor']['blocking']);
+        self::assertSame([], $array['proctor']['new']);
+        self::assertCount(2, $array['proctor']['already_present']);
+        self::assertSame([], $array['proctor']['fixed']);
+        self::assertTrue($array['proctor']['baseline']['taken']);
+        self::assertNull($array['proctor']['baseline']['error']);
         self::assertFalse($array['proctor_advisory']);
+    }
+
+    public function test_the_text_report_lists_new_findings_under_new(): void
+    {
+        $report = $this->executeWithProctor($this->fake(proctorBaselineExit: 0, proctorExit: 1), new RunOptions());
+        $text = (new TextWriter())->run($report);
+
+        self::assertStringContainsString('PROCTOR: FAIL on PHP 8.3 (2 new, 0 already present).', $text);
+        self::assertStringContainsString('New:', $text);
+        self::assertStringContainsString('[php-floor]', $text);
+        self::assertStringNotContainsString('Already present (not blocking):', $text);
+        self::assertStringContainsString('Fix the findings above, then run the upgrade again.', $text);
+        self::assertStringContainsString('RESULT: FAIL', $text);
+    }
+
+    public function test_the_text_report_lists_preexisting_findings_as_not_blocking(): void
+    {
+        $report = $this->executeWithProctor($this->fake(proctorExit: 1), new RunOptions());
+        $text = (new TextWriter())->run($report);
+
+        self::assertStringContainsString('PROCTOR: FAIL on PHP 8.3 (0 new, 2 already present).', $text);
+        self::assertStringContainsString('Already present (not blocking):', $text);
+        self::assertStringNotContainsString('New:', $text);
+        self::assertStringNotContainsString('Fix the findings above', $text);
+        self::assertStringContainsString('RESULT: PASS', $text);
+    }
+
+    public function test_the_text_report_says_php_floor_was_fixed_by_the_upgrade(): void
+    {
+        $report = $this->executeWithProctor($this->fake(proctorBaselineExit: 1, proctorExit: 0), new RunOptions());
+        $text = (new TextWriter())->run($report);
+
+        self::assertStringContainsString('PROCTOR: PASS on PHP 8.3 (the upgraded app meets the policy).', $text);
+        self::assertStringContainsString('Fixed by the upgrade:', $text);
+        self::assertStringContainsString('php-floor: fixed by the upgrade.', $text);
+        self::assertStringContainsString('RESULT: PASS', $text);
+    }
+
+    public function test_the_text_report_says_when_the_baseline_could_not_be_taken(): void
+    {
+        $report = $this->executeWithProctor($this->fake(proctorBaselineExit: 2, proctorExit: 1), new RunOptions());
+        $text = (new TextWriter())->run($report);
+
+        self::assertStringContainsString('PROCTOR baseline could not be taken: the baseline run tripped: PROCTOR could not read composer.json.', $text);
+        self::assertStringContainsString('New:', $text);
+        self::assertStringContainsString('RESULT: FAIL', $text);
     }
 }
