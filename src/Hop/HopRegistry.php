@@ -641,7 +641,7 @@ final class HopRegistry
             summary: 'Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only).',
             buildGate: true,
             notes: [
-                'Booster converts the simple shape only: mix.js, .vue(), .sass(), .postCss() and .version(). Anything else is refused so you follow the manual Vite migration guide.',
+                'Booster converts the simple shape only: mix.js, .vue(), .sass(), .postCss(), .version(), and if (mix.inProduction()) { mix.version(); }, which is dropped with a note because Vite hashes production assets. Anything else is refused by name so you follow the manual Vite migration guide.',
                 'Blade mix() script and link tags become one @vite([...]) line per layout when every referenced asset maps to a Mix entry; unmapped references are listed as manual notes.',
                 'Replace withoutMix() with withoutVite() by hand; Booster lists the files that call it.',
             ],
