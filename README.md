@@ -329,7 +329,9 @@ under `Pre-pass fixes:`.
    with it when the app already pins it. Booster never runs `composer update` and never creates the key.
 4. The gate runs the app's tests inside `booster-target:<php>`, a container built from `docker/Dockerfile` on the PHP
    the hop moves to. A red gate stops the run and leaves the changes in place so you can read them
-   (`git checkout .` undoes them).
+   (`git checkout .` undoes them). To check the image itself, `scripts/check-target-image.sh` (or its Windows twin
+   `check-target-image.ps1`) builds it for each PHP version and verifies its extension list; it needs Docker and a
+   few minutes per version, so it is not part of `composer ci`.
 
 `run` refuses to start on a working copy that is not under git or has uncommitted changes, so the upgrade diff stands
 alone. `--dry-run` has no such limit.
