@@ -11,6 +11,8 @@ final class SkillRendererTest extends TestCase
 {
     private const BOOST_OPEN = 'Only if the app has Laravel Boost (`booster detect` says so):';
 
+    private const ADVISOR_OPEN = 'Optional: ADVISOR gives the agent read-only answers about the WSU stack';
+
     /** @return array<string, string> */
     private function files(): array
     {
@@ -82,5 +84,22 @@ final class SkillRendererTest extends TestCase
     public function test_the_index_stays_clean_of_the_boost_section(): void
     {
         self::assertStringNotContainsString(self::BOOST_OPEN, $this->files()['booster/SKILL.md']);
+    }
+
+    public function test_the_index_carries_the_optional_advisor_pointer(): void
+    {
+        $text = $this->files()['booster/SKILL.md'];
+
+        self::assertStringContainsString(self::ADVISOR_OPEN, $text);
+        self::assertStringContainsString('- `composer require --dev waynestate/advisor`', $text);
+        self::assertStringContainsString('- `php vendor/bin/advisor install --client=claude --write`', $text);
+        self::assertStringContainsString('Booster works without ADVISOR.', $text);
+    }
+
+    public function test_the_hop_playbooks_stay_clean_of_the_advisor_pointer(): void
+    {
+        foreach (array_filter(array_keys($this->files()), static fn(string $path): bool => str_starts_with($path, 'booster-')) as $path) {
+            self::assertStringNotContainsString('waynestate/advisor', $this->files()[$path], $path);
+        }
     }
 }

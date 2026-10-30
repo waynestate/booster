@@ -51,6 +51,13 @@ final class SkillRenderer
         3. For each step, follow the matching playbook below. Never skip a gate.
         4. Stop when the plan is done. A person reviews the diff and merges. Never push.
 
+        Optional: ADVISOR gives the agent read-only answers about the WSU stack (supported versions, CREED rules, which project owns what). Add it to the app when the person wants it:
+
+        - `composer require --dev waynestate/advisor`
+        - `php vendor/bin/advisor install --client=claude --write`
+
+        Booster works without ADVISOR.
+
         Playbooks:
 
         {$list}
