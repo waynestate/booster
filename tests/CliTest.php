@@ -707,6 +707,49 @@ final class CliTest extends TestCase
         self::assertStringContainsString('--allow-failing-baseline', $out);
     }
 
+    public function test_baseline_missing_build_artifact_message(): void
+    {
+        // Baseline fails with manifest missing message
+        $fakeWithManifest = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                return new ProcessResult(1, "Mix manifest not found at: /app/public/mix-manifest.json\nSome other line", '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [$exit1, $out1] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84',
+        ], $fakeWithManifest);
+        self::assertSame(1, $exit1);
+        self::assertStringContainsString('The output names a missing build artifact', $out1);
+
+        // Baseline fails without manifest mention
+        $fakeWithoutManifest = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                return new ProcessResult(1, 'FAILURES!', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [$exit2, $out2] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84',
+        ], $fakeWithoutManifest);
+        self::assertSame(1, $exit2);
+        self::assertStringNotContainsString('The output names a missing build artifact', $out2);
+    }
+
     public function test_hostile_file_names_cannot_inject_terminal_escapes(): void
     {
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, (string) json_encode([

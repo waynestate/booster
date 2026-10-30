@@ -322,6 +322,10 @@ final class TextWriter
             default => [sprintf('Baseline: %s.', $baseline->status)],
         };
         if ($baseline->status === BaselineResult::FAILED) {
+            $joined = implode("\n", $baseline->output);
+            if (preg_match('/mix-manifest\.json|Vite manifest not found|public\/build\/manifest\.json/i', $joined) === 1) {
+                $lines[] = 'The output names a missing build artifact (a Mix or Vite manifest): build the front-end assets first (for example npm ci && npm run build), or pass --allow-failing-baseline.';
+            }
             foreach ($baseline->output as $line) {
                 $lines[] = '   ' . self::clean($line);
             }
