@@ -14,6 +14,8 @@ use Waynestate\Booster\Node\MixBuild;
 use Waynestate\Booster\Node\MixFile;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanStep;
+use Waynestate\Booster\Report\TextWriter;
+use Waynestate\Booster\Scan\RemovalsScan;
 use Waynestate\Booster\ToolError;
 
 /**
@@ -35,9 +37,16 @@ final class HopExecutor
         private readonly CasMigration $casMigration = new CasMigration(),
     ) {}
 
+    private ?RemovalsScan $removals = null;
+
     private function registry(): HopRegistry
     {
         return $this->registry ?? new HopRegistry();
+    }
+
+    private function removalsScanner(): RemovalsScan
+    {
+        return $this->removals ??= new RemovalsScan();
     }
 
     public function execute(Plan $plan, RunOptions $options): RunReport
@@ -168,7 +177,40 @@ final class HopExecutor
         return $kept;
     }
 
+    /**
+     * Runs one step. For PHP hops it first lists what the language removes
+     * between the hop's two versions: an advisory in the step's messages,
+     * never a failure and never a reason to stop.
+     */
     private function runStep(PlanStep $step, string $path, Plan $plan, RunOptions $options, BaselineResult $baseline): StepResult
+    {
+        $result = $this->runStepCore($step, $path, $plan, $options, $baseline);
+        $removals = $this->removalsLines($step, $path);
+        if ($removals === '') {
+            return $result;
+        }
+
+        return new StepResult($step->number, $step->hop->id, $result->status, $result->files, [$removals, ...$result->messages], $result->incomplete);
+    }
+
+    /**
+     * The advisory removals block for a PHP hop, or '' when the hop is not a
+     * PHP hop or the app has no uses of removed functions or constructs.
+     */
+    private function removalsLines(PlanStep $step, string $path): string
+    {
+        if ($step->hop->kind !== HopKind::Php || $step->phpBefore === null || $step->phpAfter === null) {
+            return '';
+        }
+        $result = $this->removalsScanner()->scan($path, $step->phpBefore, $step->phpAfter);
+        if ($result->total === 0) {
+            return '';
+        }
+
+        return implode("\n", (new TextWriter())->removals($result));
+    }
+
+    private function runStepCore(PlanStep $step, string $path, Plan $plan, RunOptions $options, BaselineResult $baseline): StepResult
     {
         $hop = $step->hop;
         if ($hop->isManual()) {

@@ -8,6 +8,7 @@ use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Run\BaselineResult;
 use Waynestate\Booster\Run\ProctorResult;
 use Waynestate\Booster\Run\RunReport;
+use Waynestate\Booster\Scan\RemovalsResult;
 use Waynestate\Booster\Scan\ScanResult;
 
 /**
@@ -20,7 +21,10 @@ final class TextWriter
     /** How many findings the text report shows before it says "and more". */
     private const MAX_FINDINGS = 20;
 
-    public function plan(Plan $plan): string
+    /**
+     * @param array<int, RemovalsResult> $removalsByStep removals result per PHP step number
+     */
+    public function plan(Plan $plan, array $removalsByStep = []): string
     {
         $p = $plan->project;
         $lines = [
@@ -42,6 +46,12 @@ final class TextWriter
             $lines[] = '   ' . $step->hop->summary;
             if ($step->hop->extraReview) {
                 $lines[] = '   Give this hop the most review time.';
+            }
+            $removals = $removalsByStep[$step->number] ?? null;
+            if ($removals instanceof RemovalsResult) {
+                foreach ($this->removals($removals) as $line) {
+                    $lines[] = '   ' . $line;
+                }
             }
         }
         if ($plan->steps === []) {
@@ -89,6 +99,39 @@ final class TextWriter
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * The advisory removals block for one PHP hop: what the language removes
+     * between the hop's two versions, and where the app still uses it.
+     * $maxFindings caps the listed lines; null lists every finding
+     * (booster scan --removals).
+     *
+     * @return list<string>
+     */
+    public function removals(RemovalsResult $result, ?int $maxFindings = self::MAX_FINDINGS): array
+    {
+        if ($result->total === 0) {
+            return [sprintf('Removed between PHP %s and PHP %s: none found.', $result->from, $result->to)];
+        }
+
+        $lines = [sprintf(
+            'Removed between PHP %s and PHP %s: %d hit%s (advisory).',
+            $result->from,
+            $result->to,
+            $result->total,
+            $result->total === 1 ? '' : 's',
+        )];
+        $shown = $maxFindings === null ? $result->findings : array_slice($result->findings, 0, $maxFindings);
+        foreach ($shown as $finding) {
+            $lines[] = sprintf('%s:%d %s -> %s', self::clean($finding->file), $finding->line, self::clean($finding->label), self::clean($finding->replacement));
+        }
+        $hidden = $result->total - count($shown);
+        if ($hidden > 0) {
+            $lines[] = sprintf('(%d more...)', $hidden);
+        }
+
+        return $lines;
     }
 
     public function run(RunReport $report): string
