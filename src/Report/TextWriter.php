@@ -184,7 +184,8 @@ final class TextWriter
 
     /**
      * The PROCTOR gate section: what the policy check said about the upgraded
-     * app, or nothing when the gate did not run.
+     * app, its failing findings split against the baseline measured before the
+     * first hop, or nothing when the gate did not run.
      *
      * @return list<string>
      */
@@ -194,6 +195,7 @@ final class TextWriter
         if ($proctor === null) {
             return [];
         }
+        $comparison = $report->proctorComparison;
         $php = $proctor->php ?? '?';
         $advisory = $report->proctorAdvisory ? ' Advisory only (--proctor-advisory), so this does not fail the run.' : '';
         $lines = [];
@@ -202,13 +204,12 @@ final class TextWriter
                 $lines[] = sprintf('PROCTOR: PASS on PHP %s (the upgraded app meets the policy).', $php);
                 break;
             case ProctorResult::FAILED:
-                $count = count($proctor->failures);
-                $lines[] = sprintf('PROCTOR: FAIL on PHP %s (%d finding%s).%s', $php, $count, $count === 1 ? '' : 's', $advisory);
-                foreach ($proctor->failures as $failure) {
-                    $where = $failure['path'] !== null ? ' (' . self::clean($failure['path']) . ':' . $failure['line'] . ')' : '';
-                    $lines[] = '   [' . $failure['check'] . '] ' . self::clean($failure['message']) . $where;
+                if ($comparison !== null && $comparison->baselineTaken) {
+                    $lines[] = sprintf('PROCTOR: FAIL on PHP %s (%d new, %d already present).%s', $php, count($comparison->new), count($comparison->alreadyPresent), $advisory);
+                } else {
+                    $count = count($proctor->failures);
+                    $lines[] = sprintf('PROCTOR: FAIL on PHP %s (%d finding%s).%s', $php, $count, $count === 1 ? '' : 's', $advisory);
                 }
-                $lines[] = '   Fix the findings above, then run the upgrade again.';
                 break;
             default:
                 $lines[] = sprintf('PROCTOR: TRIPPED on PHP %s (exit %d). The check could not finish.%s', $php, $proctor->exitCode, $advisory);
@@ -220,8 +221,47 @@ final class TextWriter
                 $lines[] = '   Fix the tool error above, then run the upgrade again.';
                 break;
         }
+        if ($comparison !== null) {
+            if (!$comparison->baselineTaken) {
+                $lines[] = '   PROCTOR baseline could not be taken: ' . self::clean((string) $comparison->baselineError) . '. The run blocks on any failure until there is a baseline to compare against.';
+            }
+            if ($comparison->new !== []) {
+                $lines[] = '   New:';
+                foreach ($comparison->new as $failure) {
+                    $lines[] = $this->findingLine($failure);
+                }
+                $lines[] = '   Fix the findings above, then run the upgrade again.';
+            }
+            if ($comparison->alreadyPresent !== []) {
+                $lines[] = '   Already present (not blocking):';
+                foreach ($comparison->alreadyPresent as $failure) {
+                    $lines[] = $this->findingLine($failure);
+                }
+            }
+            if ($comparison->fixed !== []) {
+                $lines[] = '   Fixed by the upgrade:';
+                foreach ($comparison->fixed as $failure) {
+                    $lines[] = $this->findingLine($failure);
+                }
+                if ($comparison->phpFloorFixed()) {
+                    $lines[] = '   php-floor: fixed by the upgrade.';
+                }
+            }
+        }
 
         return $lines;
+    }
+
+    /**
+     * One finding as a report line: check, message and where it was found.
+     *
+     * @param array{check: string, rule: string, message: string, path: ?string, line: int} $failure
+     */
+    private function findingLine(array $failure): string
+    {
+        $where = $failure['path'] !== null ? ' (' . self::clean($failure['path']) . ':' . $failure['line'] . ')' : '';
+
+        return '   [' . $failure['check'] . '] ' . self::clean($failure['message']) . $where;
     }
 
     /**
