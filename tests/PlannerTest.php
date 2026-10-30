@@ -214,22 +214,24 @@ final class PlannerTest extends TestCase
     public function test_the_vue_2_hop_appears_only_for_vue_2_apps(): void
     {
         self::assertContains(HopRegistry::VUE_27_TO_COMPAT_ID, $this->ids($this->plan('vue-spa')));
+        self::assertContains(HopRegistry::VUE_COMPAT_CODEMOD_ID, $this->ids($this->plan('vue-spa')));
         self::assertNotContains(HopRegistry::VUE_26_TO_27_ID, $this->ids($this->plan('laravel-inertia-vue')));
         self::assertNotContains(HopRegistry::VUE_27_TO_COMPAT_ID, $this->ids($this->plan('laravel-inertia-vue')));
+        self::assertNotContains(HopRegistry::VUE_COMPAT_CODEMOD_ID, $this->ids($this->plan('laravel-inertia-vue')));
     }
 
-    public function test_the_compat_hop_is_automated_and_the_playbook_stays_manual(): void
+    public function test_the_staged_hops_are_automated_and_the_playbook_stays_manual(): void
     {
         $plan = $this->plan('vue-spa');
         $last = $plan->steps[count($plan->steps) - 1];
 
-        self::assertSame(HopRegistry::VUE_27_TO_COMPAT_ID, $last->hop->id);
+        self::assertSame(HopRegistry::VUE_COMPAT_CODEMOD_ID, $last->hop->id);
         self::assertFalse($last->hop->isManual());
         self::assertSame([Planner::GATE_TESTS], $last->gates);
 
         $playbook = (new HopRegistry())->get(HopRegistry::VUE_2_TO_3_ID);
         self::assertTrue($playbook->isManual());
-        self::assertSame([HopRegistry::VUE_26_TO_27_ID, HopRegistry::VUE_27_TO_COMPAT_ID], $playbook->aliasOf);
+        self::assertSame([HopRegistry::VUE_26_TO_27_ID, HopRegistry::VUE_27_TO_COMPAT_ID, HopRegistry::VUE_COMPAT_CODEMOD_ID], $playbook->aliasOf);
     }
 
     public function test_apps_with_a_package_json_get_the_node_pin_and_others_do_not(): void
@@ -250,11 +252,11 @@ final class PlannerTest extends TestCase
         self::assertSame(HopRegistry::VUE_27_TO_COMPAT_ID, $ids[$pin + 1]);
     }
 
-    public function test_a_vue_2_7_app_gets_only_the_compat_hop(): void
+    public function test_a_vue_2_7_app_gets_the_compat_and_codemod_hops(): void
     {
         $vueIds = array_values(array_filter($this->ids($this->plan('vue-spa')), static fn(string $i): bool => str_starts_with($i, 'vue-')));
 
-        self::assertSame([HopRegistry::VUE_27_TO_COMPAT_ID], $vueIds);
+        self::assertSame([HopRegistry::VUE_27_TO_COMPAT_ID, HopRegistry::VUE_COMPAT_CODEMOD_ID], $vueIds);
     }
 
     /**
@@ -266,7 +268,7 @@ final class PlannerTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('vueTwoConstraintsBelow27')]
-    public function test_a_vue_2_app_below_2_7_gets_both_staged_hops_in_order(string $constraint): void
+    public function test_a_vue_2_app_below_2_7_gets_all_three_staged_hops_in_order(string $constraint): void
     {
         $dir = $this->copyExample('vue-spa');
         $file = $dir . '/package.json';
@@ -278,7 +280,7 @@ final class PlannerTest extends TestCase
         $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.3', toPhp: '8.3'), $this->today());
         $vueIds = array_values(array_filter($this->ids($plan), static fn(string $i): bool => str_starts_with($i, 'vue-')));
 
-        self::assertSame([HopRegistry::VUE_26_TO_27_ID, HopRegistry::VUE_27_TO_COMPAT_ID], $vueIds);
+        self::assertSame([HopRegistry::VUE_26_TO_27_ID, HopRegistry::VUE_27_TO_COMPAT_ID, HopRegistry::VUE_COMPAT_CODEMOD_ID], $vueIds);
     }
 
     public function test_skipping_the_playbook_skips_the_staged_hops(): void
@@ -288,6 +290,7 @@ final class PlannerTest extends TestCase
 
         self::assertNotContains(HopRegistry::VUE_26_TO_27_ID, $ids);
         self::assertNotContains(HopRegistry::VUE_27_TO_COMPAT_ID, $ids);
+        self::assertNotContains(HopRegistry::VUE_COMPAT_CODEMOD_ID, $ids);
         self::assertContains(HopRegistry::NODE_PIN_ID, $ids);
     }
 
