@@ -174,7 +174,7 @@ final class HopExecutor
         }
 
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
-        $result = $this->gate->run($path, $php, $test, $options->proctorCommand);
+        $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage);
         $output = self::lastLines($result->stdout . "\n" . $result->stderr, 20);
 
         return new BaselineResult(
@@ -507,7 +507,7 @@ final class HopExecutor
     {
         $php = $step->phpAfter ?? '';
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
-        $result = $this->gate->run($path, $php, $test, $options->proctorCommand);
+        $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage);
         if ($result->successful()) {
             return null;
         }

@@ -37,6 +37,7 @@ final class RunCommand extends BaseCommand
             ->addOption('max-changes', null, InputOption::VALUE_REQUIRED, 'Hard limit on files changed per hop, with no prompt (0 = no limit). Without it, a hop over 200 files asks first, or stops when not interactive.', null)
             ->addOption('memory-limit', null, InputOption::VALUE_REQUIRED, 'Memory limit for the Rector process (for example 2G), or -1 for no limit.', RectorRunner::DEFAULT_MEMORY_LIMIT)
             ->addOption('skip-gate', null, InputOption::VALUE_NONE, 'Do not run the tests in the target image after each hop, or the PROCTOR check at the end.')
+            ->addOption('image', null, InputOption::VALUE_REQUIRED, 'Run the gate in this Docker image instead of building booster-target (it needs php and composer on PATH).')
             ->addOption('allow-failing-baseline', null, InputOption::VALUE_NONE, 'Continue even when the baseline (the app\'s tests on its current PHP) fails; later gate failures are labelled as pre-existing.')
             ->addOption('allow-dirty', null, InputOption::VALUE_NONE, 'Run even when the working copy has uncommitted changes.')
             ->addOption('test-command', null, InputOption::VALUE_REQUIRED, 'Command that runs the app tests inside the image (default: composer test, else vendor/bin/phpunit).')
@@ -92,6 +93,7 @@ final class RunCommand extends BaseCommand
             maxChanges: $cap,
             confirm: $confirm,
             testCommand: $this->stringOption($input, 'test-command'),
+            gateImage: $this->stringOption($input, 'image'),
             proctorCommand: $this->stringOption($input, 'proctor-command'),
             memoryLimit: $memoryLimit,
             proctorAdvisory: (bool) $input->getOption('proctor-advisory'),

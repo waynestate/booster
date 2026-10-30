@@ -108,4 +108,46 @@ final class TargetImageRunnerTest extends TestCase
         self::assertContains('--user', $command);
         self::assertContains('1000:1000', $command);
     }
+
+    public function test_the_given_image_is_used_and_nothing_is_built(): void
+    {
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '', ''));
+        $runner = new TargetImageRunner($fake, self::DOCKER_DIR);
+
+        $result = $runner->run('/srv/my app', '8.4', 'composer test', null, 'myapp/gate:8.4');
+
+        self::assertTrue($result->successful());
+        $last = $fake->calls[count($fake->calls) - 1]['command'];
+        self::assertSame(['docker', 'run', '--rm', '-v', '/srv/my app:/app', '-w', '/app'], array_slice($last, 0, 7));
+        self::assertContains('myapp/gate:8.4', $last);
+        self::assertCount(0, $fake->commandsContaining('build'));
+    }
+
+    public function test_a_missing_gate_image_is_pulled_once_before_the_first_hop(): void
+    {
+        $fake = new FakeProcessRunner(static fn(array $command): ProcessResult => new ProcessResult(
+            in_array('inspect', $command, true) ? 1 : 0,
+            '',
+            '',
+        ));
+        $runner = new TargetImageRunner($fake, self::DOCKER_DIR);
+
+        $runner->run('/app', '8.4', 'composer test', null, 'myapp/gate:8.4');
+        $runner->run('/app', '8.5', 'composer test', null, 'myapp/gate:8.4');
+
+        self::assertSame([['docker', 'pull', 'myapp/gate:8.4']], $fake->commandsContaining('pull'));
+    }
+
+    public function test_an_unpullable_gate_image_is_a_tool_error(): void
+    {
+        $fake = new FakeProcessRunner(static fn(array $command): ProcessResult => new ProcessResult(
+            in_array('version', $command, true) ? 0 : 1,
+            '',
+            '',
+        ));
+
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('The gate image myapp/gate:8.4 was not found locally and could not be pulled.');
+        (new TargetImageRunner($fake, self::DOCKER_DIR))->run('/app', '8.4', 'composer test', null, 'myapp/gate:8.4');
+    }
 }

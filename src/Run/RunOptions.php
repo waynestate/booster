@@ -20,6 +20,8 @@ final readonly class RunOptions
         /** Asks the person before an over-threshold hop is applied. Gets the file count and the per-rule summary lines; true applies the hop. */
         public ?Closure $confirm = null,
         public ?string $testCommand = null,
+        /** When set, the gate runs in this image instead of building booster-target. It needs php and composer on PATH. */
+        public ?string $gateImage = null,
         public ?string $proctorCommand = null,
         public string $memoryLimit = RectorRunner::DEFAULT_MEMORY_LIMIT,
         public bool $proctorAdvisory = false,
