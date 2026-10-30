@@ -19,9 +19,9 @@ Booster is WELD's upgrade tool. It plans the hops that take a WSU PHP app from t
 to one the version policy still supports, and it runs them one at a time: [Rector](https://getrector.com) rewrites the
 code, Booster raises the constraints in `composer.json`, and the app's own tests must pass on the target PHP before the
 next hop starts. It stands on `rector/rector` and `driftingly/rector-laravel` and adds only the ordering, the cap, the
-gate and a few WSU recipes.
+gate, the advisory scans and a few WSU recipes.
 
-Booster edits your working copy and prints a report. It never commits, pushes or opens a merge request: a person reads
+Booster edits your working copy and prints a report. It never commits to, pushes or opens a merge request on your app (the only merge requests it opens are its own hop-data refresh on Booster itself): a person reads
 the diff and merges it.
 
 Every page below is Markdown. The HTML pages send the same Markdown to a client that asks for `text/markdown`. Written by Squire's agent-ready kit from the README and the pages; do not edit.
