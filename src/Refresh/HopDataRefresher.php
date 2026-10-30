@@ -40,6 +40,9 @@ final class HopDataRefresher
     /** npm registry document for @vitejs/plugin-vue (dist-tags only). */
     public const FEED_VUE_PLUGIN = 'npm-vitejs-plugin-vue';
 
+    /** npm registry document for vue-upgrade-tool (dist-tags only). */
+    public const FEED_VUE_UPGRADE_TOOL = 'npm-vue-upgrade-tool';
+
     /** @var list<string> every feed refresh() needs, by name */
     public const FEEDS = [
         self::FEED_PHPUNIT,
@@ -49,6 +52,7 @@ final class HopDataRefresher
         self::FEED_VITE,
         self::FEED_LARAVEL_VITE_PLUGIN,
         self::FEED_VUE_PLUGIN,
+        self::FEED_VUE_UPGRADE_TOOL,
     ];
 
     /** The oldest PHP BOOSTER plans upgrades from, kept ahead of the policy. */
@@ -98,6 +102,7 @@ final class HopDataRefresher
             'vue_27' => $this->keptValue($existing, 'vue_27'),
             'vue_compat' => $this->keptValue($existing, 'vue_compat'),
             'vue_loader_compat' => $this->keptValue($existing, 'vue_loader_compat'),
+            'vue_upgrade_tool_version' => $this->distTagExact($feeds[self::FEED_VUE_UPGRADE_TOOL], $existing, 'vue_upgrade_tool_version'),
             'phpunit_php' => $this->phpunitPhp($existing, $phpunitChain, $feeds[self::FEED_PHPUNIT]),
             'laravel_phpunit' => $this->laravelPhpunit($existing, $laravelChain, $feeds[self::FEED_LARAVEL_SKELETON]),
             'laravel_php' => $this->laravelPhp($existing, $laravelChain, $feeds[self::FEED_LARAVEL_FRAMEWORK], $feeds[self::FEED_ENDOFLIFE]),
@@ -259,6 +264,22 @@ final class HopDataRefresher
         }
 
         return '^' . $parts[0] . '.' . $parts[1];
+    }
+
+    /**
+     * An npm dist-tag as the exact version it names ("1.0.37" stays "1.0.37",
+     * "v1.0.37" becomes "1.0.37"), or null when the tag is not a plain
+     * version. The codemod pin runs pinned to one release, so this keeps the
+     * full version instead of a caret range.
+     */
+    public static function exactFromTag(string $tag): ?string
+    {
+        $version = ltrim($tag, 'v');
+        if (preg_match('/^\d+(\.\d+){1,2}$/', $version) !== 1) {
+            return null;
+        }
+
+        return $version;
     }
 
     /**
@@ -535,6 +556,29 @@ final class HopDataRefresher
         }
 
         throw new ToolError(sprintf('Hop data key "%s" must be a non-empty string.', $key));
+    }
+
+    /**
+     * The exact version an npm dist-tag names, for pins that run against one
+     * release ("1.0.37" stays "1.0.37"). Falls back to the value on file when
+     * the feed has no usable tag, like distTagCaret.
+     *
+     * @param array<mixed> $tags the feed's dist-tags map
+     * @param array<string, mixed> $existing
+     */
+    private function distTagExact(array $tags, array $existing, string $key): string
+    {
+        $latest = $tags['latest'] ?? null;
+        $exact = is_string($latest) ? self::exactFromTag($latest) : null;
+        if ($exact !== null) {
+            return $exact;
+        }
+        $current = $existing[$key] ?? null;
+        if (is_string($current) && $current !== '') {
+            return $current;
+        }
+
+        throw new ToolError(sprintf('No usable "latest" tag for %s and none on file.', $key));
     }
 
     /**

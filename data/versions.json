@@ -40,6 +40,7 @@
     "vue_27": "^2.7",
     "vue_compat": "^3.5",
     "vue_loader_compat": "^17.4",
+    "vue_upgrade_tool_version": "1.0.37",
     "phpunit_php": {
         "9": "7.3",
         "10": "8.1",

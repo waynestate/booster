@@ -243,6 +243,7 @@ $files = [
     HopDataRefresher::FEED_VITE => 'npm-vite-dist-tags.json',
     HopDataRefresher::FEED_LARAVEL_VITE_PLUGIN => 'npm-laravel-vite-plugin-dist-tags.json',
     HopDataRefresher::FEED_VUE_PLUGIN => 'npm-vitejs-plugin-vue-dist-tags.json',
+    HopDataRefresher::FEED_VUE_UPGRADE_TOOL => 'npm-vue-upgrade-tool-dist-tags.json',
 ];
 
 if ($options['check']) {
@@ -263,6 +264,7 @@ $urls = [
     HopDataRefresher::FEED_VITE => 'https://registry.npmjs.org/vite',
     HopDataRefresher::FEED_LARAVEL_VITE_PLUGIN => 'https://registry.npmjs.org/laravel-vite-plugin',
     HopDataRefresher::FEED_VUE_PLUGIN => 'https://registry.npmjs.org/@vitejs/plugin-vue',
+    HopDataRefresher::FEED_VUE_UPGRADE_TOOL => 'https://registry.npmjs.org/vue-upgrade-tool',
 ];
 
 $feeds = [];
