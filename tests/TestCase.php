@@ -76,6 +76,22 @@ abstract class TestCase extends PhpUnitTestCase
         });
     }
 
+    /**
+     * A FakeProcessRunner that answers `phpstan --version` with a version line
+     * and every other call with $scan, so the scan's discovery step finds a
+     * runnable PHPStan and then runs the real scan command.
+     */
+    protected function phpstanFake(callable $scan): FakeProcessRunner
+    {
+        return new FakeProcessRunner(static function (array $command) use ($scan): ProcessResult {
+            if (in_array('--version', $command, true)) {
+                return new ProcessResult(0, "PHPStan - PHP Static Analysis Tool 2.3.5\n", '');
+            }
+
+            return $scan();
+        });
+    }
+
     protected function tearDown(): void
     {
         foreach ($this->tempDirs as $dir) {
