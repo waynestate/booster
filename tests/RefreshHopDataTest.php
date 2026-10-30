@@ -92,9 +92,10 @@ final class RefreshHopDataTest extends TestCase
         self::assertSame('2026-10-29', $result['generated_on']);
         self::assertSame('26', $result['node_pin_target']);
         self::assertSame(['10' => '10', '11' => '11', '12' => '11', '13' => '12'], $result['laravel_phpunit']);
-        // Everything else the frozen feeds agree with the file on.
-        self::assertSame($this->oldData()['php'], $result['php']);
-        self::assertSame($this->oldData()['laravel'], $result['laravel']);
+        // Everything else the frozen feeds agree with the file on, except the
+        // planning floors the refresher keeps ahead of the policy.
+        self::assertSame(array_merge(HopDataRefresher::PHP_FLOOR_PREFIX, $this->oldData()['php']), $result['php']);
+        self::assertSame(array_merge(HopDataRefresher::LARAVEL_FLOOR_PREFIX, $this->oldData()['laravel']), $result['laravel']);
         self::assertSame($this->oldData()['phpunit'], $result['phpunit']);
         self::assertSame($this->oldData()['phpunit_php'], $result['phpunit_php']);
         self::assertSame($this->oldData()['laravel_php'], $result['laravel_php']);
@@ -142,7 +143,7 @@ final class RefreshHopDataTest extends TestCase
 
         $result = (new HopDataRefresher($policy))->refresh($this->oldData(), $feeds, new DateTimeImmutable('2026-10-29'));
 
-        self::assertSame(['8', '9', '10', '11', '12', '13', '14'], $result['laravel']);
+        self::assertSame(array_merge(HopDataRefresher::LARAVEL_FLOOR_PREFIX, ['8', '9', '10', '11', '12', '13', '14']), $result['laravel']);
         self::assertSame('13', $result['laravel_phpunit']['14']);
         self::assertSame(['8.4', '8.6'], $result['laravel_php']['14']);
         // Majors the synthetic feeds dropped keep their previous values.
@@ -158,7 +159,7 @@ final class RefreshHopDataTest extends TestCase
 
         $result = (new HopDataRefresher($policy))->refresh($this->oldData(), $this->feeds(), new DateTimeImmutable('2026-10-29'));
 
-        self::assertSame(['5.6', '7.0', '7.1', '7.2', '7.3', '7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5', '8.6'], $result['php']);
+        self::assertSame(array_merge(HopDataRefresher::PHP_FLOOR_PREFIX, ['5.6', '7.0', '7.1', '7.2', '7.3', '7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5', '8.6']), $result['php']);
         // No table grows: tables follow their own chains, not the PHP chain.
         self::assertSame($this->oldData()['phpunit_php'], $result['phpunit_php']);
         self::assertSame($this->oldData()['laravel_php'], $result['laravel_php']);
@@ -389,13 +390,26 @@ final class RefreshHopDataTest extends TestCase
 
     public function test_shape_problems_do_not_require_majors_below_a_tables_floor(): void
     {
-        // The committed laravel_phpunit table starts at 10 while the laravel
-        // chain starts at 8: the majors below the floor are not problems.
+        // The laravel chain starts at 5.8, but a table may start higher: the
+        // majors below its own floor are not problems.
         $data = $this->committedData();
-        self::assertArrayHasKey('10', $data['laravel_phpunit']);
-        self::assertArrayNotHasKey('8', $data['laravel_phpunit']);
+        unset($data['laravel_phpunit']['5.8'], $data['laravel_phpunit']['6'], $data['laravel_phpunit']['7']);
+        self::assertArrayNotHasKey('7', $data['laravel_phpunit']);
 
         self::assertSame([], (new HopDataRefresher($this->policy()))->shapeProblems($data, new DateTimeImmutable('2026-10-29')));
+    }
+
+    public function test_shape_problems_flag_a_missing_floor_in_a_chain(): void
+    {
+        $data = $this->committedData();
+        $data['php'] = array_values(array_diff($data['php'], ['5.5']));
+        $data['laravel'] = array_values(array_diff($data['laravel'], ['5.8']));
+
+        $problems = (new HopDataRefresher($this->policy()))->shapeProblems($data, new DateTimeImmutable('2026-10-29'));
+
+        self::assertCount(2, $problems);
+        self::assertStringContainsString('5.5', $problems[0]);
+        self::assertStringContainsString('5.8', $problems[1]);
     }
 
     public function test_shape_problems_flag_a_policy_version_missing_from_a_chain(): void

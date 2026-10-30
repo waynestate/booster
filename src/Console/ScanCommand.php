@@ -12,6 +12,7 @@ use Waynestate\Booster\Report\JsonWriter;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\ProcessRunner;
 use Waynestate\Booster\Scan\PhpCompatScan;
+use Waynestate\Booster\Scan\RemovalsScan;
 use Waynestate\Booster\ToolError;
 
 /**
@@ -32,6 +33,7 @@ final class ScanCommand extends BaseCommand
         $this
             ->addOption('path', null, InputOption::VALUE_REQUIRED, 'Path to the application.', '.')
             ->addOption('php', null, InputOption::VALUE_REQUIRED, 'The PHP version to ask about (major.minor).')
+            ->addOption('removals', null, InputOption::VALUE_NONE, 'List uses of functions and constructs removed in PHP up to --php, instead of the PHPCompatibility scan.')
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format (text, json).', 'text');
     }
 
@@ -50,6 +52,19 @@ final class ScanCommand extends BaseCommand
                 $chain[0],
                 $chain[count($chain) - 1],
             ));
+        }
+
+        if ((bool) $input->getOption('removals')) {
+            // Everything removed between the oldest PHP Booster plans (the
+            // chain floor) and --php, no processes involved.
+            $result = (new RemovalsScan())->scan($this->stringOption($input, 'path') ?? '.', $chain[0], $php);
+
+            $output->writeln(
+                $format === 'json' ? (new JsonWriter())->write(['removals' => $result->toArray()]) : implode("\n", (new TextWriter())->removals($result, null)),
+                OutputInterface::OUTPUT_RAW,
+            );
+
+            return self::EXIT_PASS;
         }
 
         $scan = (new PhpCompatScan($this->processes))->scan($this->stringOption($input, 'path') ?? '.', $php);

@@ -105,6 +105,37 @@ final class PlannerTest extends TestCase
         self::assertSame('13', $plan->targetPhpunit);
     }
 
+    public function test_a_laravel_58_app_climbs_through_the_old_laravel_majors(): void
+    {
+        $plan = $this->planWithComposer(
+            'laravel-blade',
+            ['require' => ['php' => '>=7.1', 'laravel/framework' => '^5.8']],
+        );
+
+        // Each old major raises the PHP floor: 6 and 7 want 7.2, 8 wants 7.3,
+        // 9 wants 8.0 and 10 wants 8.1, so PHP hops slip in between the
+        // Laravel hops until the pair is supported.
+        self::assertSame(
+            ['php-71-to-72', 'laravel-5.8-to-6', 'laravel-6-to-7', 'php-72-to-73', 'laravel-7-to-8', 'php-73-to-74', 'php-74-to-80', 'laravel-8-to-9', 'php-80-to-81', 'laravel-9-to-10', 'php-81-to-82', 'phpunit-10-to-11', 'laravel-10-to-11', 'laravel-11-to-12', 'php-82-to-83', 'phpunit-11-to-12', 'laravel-12-to-13', 'php-83-to-84', 'phpunit-12-to-13', 'php-84-to-85'],
+            $this->ids($plan),
+        );
+        self::assertSame('13', $plan->targetLaravel);
+    }
+
+    public function test_a_laravel_6_app_starts_one_major_higher(): void
+    {
+        $plan = $this->planWithComposer(
+            'laravel-blade',
+            ['require' => ['php' => '>=7.2', 'laravel/framework' => '^6.0']],
+        );
+
+        // On PHP 7.2 the first Laravel hop is already free: 6 to 7.
+        self::assertSame(
+            ['laravel-6-to-7', 'php-72-to-73', 'laravel-7-to-8', 'php-73-to-74', 'php-74-to-80', 'laravel-8-to-9', 'php-80-to-81', 'laravel-9-to-10', 'php-81-to-82', 'phpunit-10-to-11', 'laravel-10-to-11', 'laravel-11-to-12', 'php-82-to-83', 'phpunit-11-to-12', 'laravel-12-to-13', 'php-83-to-84', 'phpunit-12-to-13', 'php-84-to-85'],
+            $this->ids($plan),
+        );
+    }
+
     public function test_an_old_app_never_rests_on_a_pair_laravel_does_not_support(): void
     {
         $plan = $this->plan('laravel-blade', new PlanOptions(fromPhp: '8.1', fromLaravel: '9', toPhp: '8.3', toLaravel: '13'));
@@ -364,6 +395,35 @@ final class PlannerTest extends TestCase
         $this->expectException(ToolError::class);
         $this->expectExceptionMessage('--from-php');
         (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(), $this->today());
+    }
+
+    public function test_an_unknown_composer_php_floor_blames_composer_json_not_the_flag(): void
+    {
+        try {
+            $this->planWithComposer('raw-php', ['require' => ['php' => '>=5.4']]);
+            self::fail('Planning a PHP 5.4 app was refused.');
+        } catch (ToolError $e) {
+            // The refusal names the source it read the version from, not a flag
+            // the developer never passed.
+            self::assertStringContainsString('composer.json "5.4"', $e->getMessage());
+            self::assertStringNotContainsString('--from-php', $e->getMessage());
+        }
+    }
+
+    public function test_a_php_55_app_walks_every_hop_to_the_policy_top(): void
+    {
+        $plan = $this->planWithComposer(
+            'raw-php',
+            ['require' => ['php' => '>=5.5']],
+            new PlanOptions(toPhp: '8.5'),
+        );
+
+        // The oldest floor the registry knows: the plan walks every adjacent
+        // PHP hop from 5.5 to the policy top and nothing else.
+        self::assertSame(
+            ['php-55-to-56', 'php-56-to-70', 'php-70-to-71', 'php-71-to-72', 'php-72-to-73', 'php-73-to-74', 'php-74-to-80', 'php-80-to-81', 'php-81-to-82', 'php-82-to-83', 'php-83-to-84', 'php-84-to-85'],
+            $this->ids($plan),
+        );
     }
 
     public function test_skip_removes_a_hop_and_renumbers(): void

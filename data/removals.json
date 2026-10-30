@@ -1,0 +1,32 @@
+{
+    "schema_version": 1,
+    "removals": [
+        {"id": "mysql-functions", "removed_in": "7.0", "kind": "function-prefix", "match": "mysql_", "label": "mysql_* functions (the mysql extension)", "replacement": "mysqli or PDO"},
+        {"id": "ereg-functions", "removed_in": "7.0", "kind": "function-prefix", "match": "ereg", "label": "ereg and eregi functions", "replacement": "preg_*"},
+        {"id": "split", "removed_in": "7.0", "kind": "function", "match": "split", "label": "split() function", "replacement": "preg_split"},
+        {"id": "spliti", "removed_in": "7.0", "kind": "function", "match": "spliti", "label": "spliti() function", "replacement": "preg_split"},
+        {"id": "sql_regcase", "removed_in": "7.0", "kind": "function", "match": "sql_regcase", "label": "sql_regcase() function", "replacement": "strtoupper() with str_replace()"},
+        {"id": "set_magic_quotes_runtime", "removed_in": "7.0", "kind": "function", "match": "set_magic_quotes_runtime", "label": "set_magic_quotes_runtime() function", "replacement": "nothing: magic quotes no longer exist"},
+        {"id": "call_user_method", "removed_in": "7.0", "kind": "function", "match": "call_user_method", "label": "call_user_method() function", "replacement": "call_user_func"},
+        {"id": "call_user_method_array", "removed_in": "7.0", "kind": "function", "match": "call_user_method_array", "label": "call_user_method_array() function", "replacement": "call_user_func"},
+        {"id": "define_syslog_variables", "removed_in": "7.0", "kind": "function", "match": "define_syslog_variables", "label": "define_syslog_variables() function", "replacement": "nothing: the LOG_* constants are always defined"},
+        {"id": "new-by-reference", "removed_in": "7.0", "kind": "construct", "match": "&new", "label": "new-by-reference assignment ($x = &new Foo()); a Booster pre-pass can fix it", "replacement": "drop the &: assign the object normally"},
+        {"id": "mcrypt-functions", "removed_in": "7.2", "kind": "function-prefix", "match": "mcrypt_", "label": "mcrypt_* functions (the mcrypt extension)", "replacement": "openssl or sodium"},
+        {"id": "mdecrypt_generic", "removed_in": "7.2", "kind": "function", "match": "mdecrypt_generic", "label": "mdecrypt_generic() function", "replacement": "openssl or sodium"},
+        {"id": "each", "removed_in": "8.0", "kind": "function", "match": "each", "label": "each() function", "replacement": "foreach"},
+        {"id": "create_function", "removed_in": "8.0", "kind": "function", "match": "create_function", "label": "create_function() function", "replacement": "anonymous functions"},
+        {"id": "money_format", "removed_in": "8.0", "kind": "function", "match": "money_format", "label": "money_format() function", "replacement": "NumberFormatter"},
+        {"id": "get_magic_quotes_gpc", "removed_in": "8.0", "kind": "function", "match": "get_magic_quotes_gpc", "label": "get_magic_quotes_gpc() function", "replacement": "nothing: magic quotes no longer exist"},
+        {"id": "get_magic_quotes_runtime", "removed_in": "8.0", "kind": "function", "match": "get_magic_quotes_runtime", "label": "get_magic_quotes_runtime() function", "replacement": "nothing: magic quotes no longer exist"},
+        {"id": "is_real", "removed_in": "8.0", "kind": "function", "match": "is_real", "label": "is_real() function", "replacement": "is_float"},
+        {"id": "fgetss", "removed_in": "8.0", "kind": "function", "match": "fgetss", "label": "fgetss() function", "replacement": "fgets"},
+        {"id": "gzgetss", "removed_in": "8.0", "kind": "function", "match": "gzgetss", "label": "gzgetss() function", "replacement": "gzgets"},
+        {"id": "image2wbmp", "removed_in": "8.0", "kind": "function", "match": "image2wbmp", "label": "image2wbmp() function", "replacement": "imagewbmp"},
+        {"id": "jpeg2wbmp", "removed_in": "8.0", "kind": "function", "match": "jpeg2wbmp", "label": "jpeg2wbmp() function", "replacement": "imagewbmp"},
+        {"id": "png2wbmp", "removed_in": "8.0", "kind": "function", "match": "png2wbmp", "label": "png2wbmp() function", "replacement": "imagewbmp"},
+        {"id": "hebrevc", "removed_in": "8.0", "kind": "function", "match": "hebrevc", "label": "hebrevc() function", "replacement": "hebrev"},
+        {"id": "convert_cyr_string", "removed_in": "8.0", "kind": "function", "match": "convert_cyr_string", "label": "convert_cyr_string() function", "replacement": "iconv"},
+        {"id": "ezmlm_hash", "removed_in": "8.0", "kind": "function", "match": "ezmlm_hash", "label": "ezmlm_hash() function", "replacement": "crc32"},
+        {"id": "restore_include_path", "removed_in": "8.0", "kind": "function", "match": "restore_include_path", "label": "restore_include_path() function", "replacement": "include_path()"}
+    ]
+}

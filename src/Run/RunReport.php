@@ -16,6 +16,8 @@ final readonly class RunReport
         public bool $dryRun,
         public BaselineResult $baseline,
         public array $results,
+        public ?ProctorResult $proctor = null,
+        public bool $proctorAdvisory = false,
     ) {}
 
     public function failed(): bool
@@ -27,6 +29,9 @@ final readonly class RunReport
             if ($result->failed()) {
                 return true;
             }
+        }
+        if ($this->proctor !== null && !$this->proctorAdvisory && $this->proctor->blocking()) {
+            return true;
         }
 
         return false;
@@ -44,6 +49,8 @@ final readonly class RunReport
             'baseline' => $this->baseline->toArray(),
             'plan' => $this->plan->toArray(),
             'results' => array_map(static fn(StepResult $r): array => $r->toArray(), $this->results),
+            'proctor' => $this->proctor?->toArray(),
+            'proctor_advisory' => $this->proctorAdvisory,
         ];
     }
 }

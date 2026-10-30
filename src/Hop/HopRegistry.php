@@ -373,7 +373,7 @@ final class HopRegistry
             if ($to === null) {
                 break;
             }
-            if (!defined('RectorLaravel\Set\LaravelSetList::LARAVEL_' . $to . '0')) {
+            if (!defined('RectorLaravel\Set\LaravelSetList::LARAVEL_' . self::laravelSetSuffix($to))) {
                 // rector-laravel has no ruleset for this major yet, so there is no hop to offer.
                 continue;
             }
@@ -383,7 +383,7 @@ final class HopRegistry
                 from: $from,
                 to: $to,
                 summary: sprintf('Move a Laravel %s app to Laravel %s.', $from, $to),
-                rectorSets: ['RectorLaravel\Set\LaravelSetList::LARAVEL_' . $to . '0'],
+                rectorSets: ['RectorLaravel\Set\LaravelSetList::LARAVEL_' . self::laravelSetSuffix($to)],
                 composerSet: ['laravel/framework' => '^' . $to . '.0'],
                 notes: [
                     'Check the shared database server against the Laravel ' . $to . ' database floor before you apply this hop.',
@@ -392,6 +392,18 @@ final class HopRegistry
                 links: [sprintf('https://laravel.com/docs/%s.x/upgrade', $to)],
             ));
         }
+    }
+
+    /**
+     * The suffix of rector-laravel's set constant for a Laravel major: "13"
+     * becomes "130" and "5.8" becomes "58", because the constants are named
+     * LARAVEL_130 and LARAVEL_58.
+     */
+    private static function laravelSetSuffix(string $major): string
+    {
+        $suffix = str_replace('.', '', $major);
+
+        return str_contains($major, '.') ? $suffix : $suffix . '0';
     }
 
     private function addPhpunitHops(): void
@@ -424,18 +436,19 @@ final class HopRegistry
             kind: HopKind::Sesame,
             from: 'wayne-cas',
             to: 'sesame',
-            summary: 'Swap the wayne-cas package for SESAME using its compatibility classes (stub recipe).',
+            summary: 'Swap the wayne-cas package for SESAME using its compatibility classes.',
             classRenames: [
                 'WSU\WayneCas\WayneAuthenticate' => 'Waynestate\Sesame\WayneCas\WayneAuthenticate',
                 'WSU\WayneCas\WayneCasable' => 'Waynestate\Sesame\WayneCas\WayneCasable',
                 'WSU\WayneCas\ReadOnlyAttributes' => 'Waynestate\Sesame\WayneCas\ReadOnlyAttributes',
                 'WSU\WayneCas\WayneCasServiceProvider' => 'Waynestate\Sesame\Laravel\SesameServiceProvider',
             ],
-            composerSet: ['waynestate/sesame' => '^0.1'],
+            composerSet: ['waynestate/sesame' => '^0.2'],
             composerRemove: ['cit-web-infra/wayne-cas'],
             notes: [
-                'This recipe renames classes and swaps the Composer requirement. It does not move config/wayne-cas.php to the SESAME config; do that by hand.',
-                'SESAME is on Packagist: run composer require waynestate/sesame:^0.1 (no extra repository needed).',
+                'Booster writes config/sesame.php from config/wayne-cas.php when the old root is a plain string, and rewrites models that use WayneCasable as a trait to implements WayneCasable plus use ReadOnlyAttributes. The old config/wayne-cas.php stays in place and can be removed once SESAME is verified.',
+                'MANUAL: SESAME does not carry Duo two-factor. If the app had use2FA enabled, re-enable two-factor in the app itself; the old DUO_HOSTNAME, DUO_IKEY, DUO_SKEY and DUO_AKEY settings do nothing under SESAME.',
+                'SESAME is on Packagist: run composer require waynestate/sesame:^0.2 (no extra repository needed).',
                 'Log in through the pre-production host and check the session timeout, the Access ID attribute and Duo before you ship.',
             ],
             links: [],

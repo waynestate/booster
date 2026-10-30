@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Tests;
 
+use FilesystemIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Waynestate\Booster\Hop\Hop;
 use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Hop\HopRegistry;
@@ -17,6 +20,9 @@ use Waynestate\Booster\Run\ComposerEditor;
 use Waynestate\Booster\Run\HopExecutor;
 use Waynestate\Booster\Run\NodeRunner;
 use Waynestate\Booster\Run\ProcessResult;
+use Waynestate\Booster\Run\RectorResult;
+use Waynestate\Booster\Run\ProctorResult;
+use Waynestate\Booster\Run\ProctorRunner;
 use Waynestate\Booster\Run\RectorRunner;
 use Waynestate\Booster\Run\RunOptions;
 use Waynestate\Booster\Run\RunReport;
@@ -32,12 +38,13 @@ final class HopExecutorTest extends TestCase
      * @param int            $gateExit      exit code of each hop's gate docker run
      * @param list<string>   $rectorErrors
      * @param int            $baselineExit  exit code of the baseline docker run (the first one)
+     * @param int            $proctorExit   PROCTOR's exit code (0 pass, 1 fail, 2 tripped); -1 leaves PROCTOR unanswered
      */
-    private function fake(int $changedPerHop = 1, string $gitStatus = '', int $gateExit = 0, array $rectorErrors = [], int $baselineExit = 0): FakeProcessRunner
+    private function fake(int $changedPerHop = 1, string $gitStatus = '', int $gateExit = 0, array $rectorErrors = [], int $baselineExit = 0, int $proctorExit = -1): FakeProcessRunner
     {
         $dockerRuns = 0;
 
-        return new FakeProcessRunner(static function (array $command) use ($changedPerHop, $gitStatus, $gateExit, $rectorErrors, $baselineExit, &$dockerRuns): ProcessResult {
+        return new FakeProcessRunner(static function (array $command) use ($changedPerHop, $gitStatus, $gateExit, $rectorErrors, $baselineExit, $proctorExit, &$dockerRuns): ProcessResult {
             if ($command[0] === 'git') {
                 return new ProcessResult(0, $gitStatus, '');
             }
@@ -51,6 +58,14 @@ final class HopExecutorTest extends TestCase
                 $dockerRuns++;
 
                 return new ProcessResult($exit, $exit !== 0 ? 'FAILURES!' : '', '');
+            }
+            if ($proctorExit >= 0 && self::isProctorCommand($command)) {
+                if ($proctorExit === 2) {
+                    return new ProcessResult(2, '', 'PROCTOR could not read composer.json');
+                }
+                $fixture = $proctorExit === 0 ? 'pass-report.json' : 'fail-report.json';
+
+                return new ProcessResult($proctorExit, self::proctorFixture($fixture), '');
             }
             $files = [];
             for ($i = 0; $i < $changedPerHop; $i++) {
@@ -82,6 +97,36 @@ final class HopExecutorTest extends TestCase
         );
 
         return $executor->execute($plan, $options);
+    }
+
+    /** Like execute(), but with a PROCTOR gate wired in and answering from $fake. */
+    private function executeWithProctor(FakeProcessRunner $fake, RunOptions $options, string $example = 'raw-php', ?PlanOptions $plan = null): RunReport
+    {
+        $dir = $this->copyExample($example);
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, $plan ?? new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $executor = new HopExecutor(
+            new RectorRunner($fake, '/fake/rector'),
+            new ComposerEditor(),
+            new TargetImageRunner($fake),
+            $fake,
+            null,
+            null,
+            new ProctorRunner($fake, '/fake/proctor', 'php'),
+        );
+
+        return $executor->execute($plan, $options);
+    }
+
+    /**
+     * @return list<list<string>> the PROCTOR gate commands, in order
+     */
+    private function proctorRuns(FakeProcessRunner $fake): array
+    {
+        return array_map(
+            static fn(array $c): array => $c['command'],
+            array_values(array_filter($fake->calls, static fn(array $c): bool => self::isProctorCommand($c['command']))),
+        );
     }
 
     /**
@@ -313,6 +358,40 @@ final class HopExecutorTest extends TestCase
                 self::assertContains('--dry-run', $call['command']);
             }
         }
+    }
+
+    public function test_a_repaired_utf8_note_does_not_stop_the_run(): void
+    {
+        $note = RectorResult::REPAIRED_UTF8_NOTE . ' (src/Bad.php)';
+        $report = $this->execute($this->fake(rectorErrors: [$note]), new RunOptions(dryRun: true));
+
+        self::assertSame(['previewed', 'previewed'], $this->statuses($report));
+        self::assertFalse($report->failed());
+        foreach ($report->results as $result) {
+            self::assertContains($note, $result->messages);
+        }
+    }
+
+    public function test_a_repaired_utf8_note_is_shown_once_on_an_applied_hop(): void
+    {
+        $note = RectorResult::REPAIRED_UTF8_NOTE . ' (src/Bad.php)';
+        $report = $this->execute($this->fake(rectorErrors: [$note]), new RunOptions());
+
+        self::assertSame(['applied', 'applied'], $this->statuses($report));
+        foreach ($report->results as $result) {
+            $notes = array_values(array_filter($result->messages, static fn(string $m): bool => str_starts_with($m, RectorResult::REPAIRED_UTF8_NOTE)));
+            self::assertSame([$note], $notes);
+        }
+    }
+
+    public function test_a_real_error_still_stops_the_run_next_to_a_note(): void
+    {
+        $note = RectorResult::REPAIRED_UTF8_NOTE . ' (src/Bad.php)';
+        $report = $this->execute($this->fake(rectorErrors: ['Parse error in x.php', $note]), new RunOptions());
+
+        self::assertSame(['error', 'not-run'], $this->statuses($report));
+        self::assertStringContainsString('Parse error in x.php', implode(' ', $report->results[0]->messages));
+        self::assertStringContainsString($note, implode(' ', $report->results[0]->messages));
     }
 
     public function test_skip_gate_says_so(): void
@@ -646,5 +725,177 @@ final class HopExecutorTest extends TestCase
         self::assertStringContainsString("src/Broken.php: \"Syntax error, unexpected ';'\" cannot be repaired by tooling, so BOOSTER stops here and the file needs a person.", $messages);
         self::assertStringContainsString('src/Numeric.php: "Invalid numeric literal" cannot be repaired by tooling, so BOOSTER stops here and the file needs a person.', $messages);
         self::assertStringNotContainsString('src/Broken.php: Syntax error', $messages);
+    }
+
+    /**
+     * Plans only the cas-to-sesame hop from the wayne-cas example and runs it.
+     *
+     * @return array{0: string, 1: RunReport} the temp dir and the report
+     */
+    private function executeSesameHop(FakeProcessRunner $fake, RunOptions $options): array
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $project = (new ProjectDetector())->detect($dir);
+        // PHP and Laravel stay where the example has them, so the plan is the
+        // cas-to-sesame hop alone.
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '12', sesame: true), $this->today());
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+
+        return [$dir, $executor->execute($plan, $options)];
+    }
+
+    public function test_the_sesame_hop_moves_config_and_rewrites_the_model(): void
+    {
+        $fake = $this->fake(changedPerHop: 0);
+        [$dir, $report] = $this->executeSesameHop($fake, new RunOptions(skipGate: true));
+
+        self::assertSame(['applied'], $this->statuses($report));
+        self::assertFileExists($dir . '/config/sesame.php');
+        self::assertFileExists($dir . '/config/wayne-cas.php');
+        self::assertStringContainsString("'base_url' => 'https://cas.example.edu/cas'", (string) file_get_contents($dir . '/config/sesame.php'));
+        self::assertStringContainsString('class User implements WayneCasable', (string) file_get_contents($dir . '/app/User.php'));
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertSame('^0.2', $composer['require']['waynestate/sesame']);
+        self::assertArrayNotHasKey('cit-web-infra/wayne-cas', $composer['require']);
+        self::assertSame(['config/sesame.php', 'app/User.php'], array_map(static fn(array $f): string => $f['file'], $report->results[0]->files));
+        $messages = implode(' ', $report->results[0]->messages);
+        foreach (['DUO_HOSTNAME', 'DUO_IKEY', 'DUO_SKEY', 'DUO_AKEY'] as $needle) {
+            self::assertStringContainsString($needle, $messages);
+        }
+        self::assertStringContainsString('Gate skipped', $messages);
+    }
+
+    public function test_the_sesame_hop_dry_run_reports_but_changes_nothing(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $before = $this->snapshot($dir);
+        $fake = $this->fake(changedPerHop: 0);
+        [, $report] = $this->executeSesameHop($fake, new RunOptions(dryRun: true));
+
+        self::assertSame(['previewed'], $this->statuses($report));
+        self::assertSame($before, $this->snapshot($dir));
+        self::assertFileDoesNotExist($dir . '/config/sesame.php');
+        self::assertCount(2, $report->results[0]->files);
+        $messages = implode(' ', $report->results[0]->messages);
+        self::assertStringContainsString('Dry run: would write config/sesame.php', $messages);
+        self::assertStringContainsString('Dry run: would rewrite app/User.php', $messages);
+    }
+
+    /**
+     * Every file in the tree, by relative path and content.
+     *
+     * @return array<string, string>
+     */
+    private function snapshot(string $dir): array
+    {
+        $out = [];
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS));
+        foreach ($iterator as $file) {
+            if ($file->isFile()) {
+                $relative = str_replace('\\', '/', substr($file->getPathname(), strlen($dir) + 1));
+                $out[$relative] = (string) file_get_contents($file->getPathname());
+            }
+        }
+        ksort($out);
+
+        return $out;
+    }
+
+    public function test_the_proctor_gate_passes_after_the_last_hop(): void
+    {
+        $fake = $this->fake(proctorExit: 0);
+        $report = $this->executeWithProctor($fake, new RunOptions());
+
+        self::assertSame(['applied', 'applied'], $this->statuses($report));
+        self::assertFalse($report->failed());
+        self::assertNotNull($report->proctor);
+        self::assertSame(ProctorResult::PASSED, $report->proctor->status);
+        self::assertSame('8.3', $report->proctor->php);
+        self::assertCount(1, $this->proctorRuns($fake));
+        $command = $this->proctorRuns($fake)[0];
+        self::assertContains('--format=json', $command);
+        self::assertContains('--today=2026-10-28', $command);
+        self::assertContains('--php-runtime=8.3.0', $command);
+        self::assertContains('--policy=' . self::POLICY_FIXTURE, $command);
+    }
+
+    public function test_a_failing_proctor_gate_fails_the_run(): void
+    {
+        $fake = $this->fake(proctorExit: 1);
+        $report = $this->executeWithProctor($fake, new RunOptions());
+
+        self::assertSame(['applied', 'applied'], $this->statuses($report));
+        self::assertTrue($report->failed());
+        self::assertNotNull($report->proctor);
+        self::assertSame(ProctorResult::FAILED, $report->proctor->status);
+        self::assertCount(2, $report->proctor->failures);
+        self::assertSame('php-floor', $report->proctor->failures[0]['check']);
+    }
+
+    public function test_advisory_proctor_does_not_fail_the_run(): void
+    {
+        $fake = $this->fake(proctorExit: 1);
+        $report = $this->executeWithProctor($fake, new RunOptions(proctorAdvisory: true));
+
+        self::assertFalse($report->failed());
+        self::assertNotNull($report->proctor);
+        self::assertSame(ProctorResult::FAILED, $report->proctor->status);
+        self::assertTrue($report->proctorAdvisory);
+    }
+
+    public function test_a_tripped_proctor_gate_fails_the_run(): void
+    {
+        $fake = $this->fake(proctorExit: 2);
+        $report = $this->executeWithProctor($fake, new RunOptions());
+
+        self::assertTrue($report->failed());
+        self::assertNotNull($report->proctor);
+        self::assertSame(ProctorResult::TRIPPED, $report->proctor->status);
+        self::assertStringContainsString('could not read composer.json', (string) $report->proctor->error);
+    }
+
+    public function test_advisory_proctor_covers_a_tripped_gate_too(): void
+    {
+        $fake = $this->fake(proctorExit: 2);
+        $report = $this->executeWithProctor($fake, new RunOptions(proctorAdvisory: true));
+
+        self::assertFalse($report->failed());
+        self::assertNotNull($report->proctor);
+        self::assertSame(ProctorResult::TRIPPED, $report->proctor->status);
+    }
+
+    public function test_the_proctor_gate_is_skipped_for_dry_runs_and_skip_gate(): void
+    {
+        $dry = $this->fake(proctorExit: 0);
+        $this->executeWithProctor($dry, new RunOptions(dryRun: true));
+        self::assertSame([], $this->proctorRuns($dry));
+
+        $skipped = $this->fake(proctorExit: 0);
+        $report = $this->executeWithProctor($skipped, new RunOptions(skipGate: true));
+        self::assertSame([], $this->proctorRuns($skipped));
+        self::assertNull($report->proctor);
+    }
+
+    public function test_the_proctor_gate_is_skipped_when_a_step_failed(): void
+    {
+        $fake = $this->fake(gateExit: 1, proctorExit: 0);
+        $report = $this->executeWithProctor($fake, new RunOptions());
+
+        self::assertSame(['gate-failed', 'not-run'], $this->statuses($report));
+        self::assertTrue($report->failed());
+        self::assertSame([], $this->proctorRuns($fake));
+        self::assertNull($report->proctor);
+    }
+
+    public function test_the_report_array_carries_the_proctor_section(): void
+    {
+        $array = $this->executeWithProctor($this->fake(proctorExit: 1), new RunOptions())->toArray();
+
+        self::assertArrayHasKey('proctor', $array);
+        self::assertSame('failed', $array['proctor']['status']);
+        self::assertSame(1, $array['proctor']['exit_code']);
+        self::assertSame('8.3', $array['proctor']['php']);
+        self::assertCount(2, $array['proctor']['failures']);
+        self::assertFalse($array['proctor_advisory']);
     }
 }
