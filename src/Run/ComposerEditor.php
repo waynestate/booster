@@ -224,9 +224,13 @@ final class ComposerEditor
                 return [];
             }
             $section = 'require';
-            // Append, do not sort: the app's require order is the app's, and
-            // Composer only sorts it when config.sort-packages is on.
+            // Append the package, and sort the section the way Composer does
+            // only when config.sort-packages is on; otherwise the app's own
+            // order is kept.
             $data[$section][$package] = $constraint;
+            if (($data['config']['sort-packages'] ?? false) === true) {
+                $this->sortRequireBlock($data[$section]);
+            }
 
             return [sprintf('Set %s to %s in %s.', $package, $constraint, $section)];
         }

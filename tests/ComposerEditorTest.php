@@ -186,6 +186,39 @@ final class ComposerEditorTest extends TestCase
         );
     }
 
+    public function test_the_sesame_swap_places_every_added_package_in_composer_order_only_when_sort_packages_is_on(): void
+    {
+        // Case A: sort-packages on. Every package the swap adds lands in
+        // Composer order: platform packages first, then alphabetical.
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $data = $this->read($dir);
+        $data['config'] = ['sort-packages' => true];
+        $data['require']['ext-mbstring'] = '*';
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        self::assertSame(
+            ['php', 'ext-mbstring', 'guzzlehttp/guzzle', 'laravel/framework', 'waynestate/sesame'],
+            array_keys($this->read($dir)['require']),
+        );
+
+        // Case B: sort-packages off. The app's own order is kept (the order
+        // written above: php, laravel/framework, ext-mbstring) and the added
+        // packages are appended, guzzle last.
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $data = $this->read($dir);
+        $data['require']['ext-mbstring'] = '*';
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        self::assertSame(
+            ['php', 'laravel/framework', 'ext-mbstring', 'waynestate/sesame', 'guzzlehttp/guzzle'],
+            array_keys($this->read($dir)['require']),
+        );
+    }
+
     public function test_a_php_hop_never_adds_a_laravel_requirement(): void
     {
         $dir = $this->copyExample('raw-php');
