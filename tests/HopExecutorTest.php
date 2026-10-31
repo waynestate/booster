@@ -1235,10 +1235,17 @@ final class HopExecutorTest extends TestCase
         self::assertStringContainsString("'base_url' => Setting::get('SESAME_CAS_BASE_URL') ?? 'https://cas.example.edu/cas'", (string) file_get_contents($dir . '/config/sesame.php'));
         self::assertStringContainsString("'user_resolver' => env('SESAME_USER_RESOLVER', \Waynestate\Sesame\WayneCas\UserResolver::class)", (string) file_get_contents($dir . '/config/sesame.php'));
         self::assertStringContainsString('class User implements \Waynestate\Sesame\WayneCas\WayneCasable', (string) file_get_contents($dir . '/app/User.php'));
+        $kernel = (string) file_get_contents($dir . '/app/Http/Kernel.php');
+        self::assertStringNotContainsString("'wayne.cas',", $kernel);
+        self::assertStringContainsString("'wayne.cas' => \Waynestate\Sesame\WayneCas\WayneAuthenticate::class", $kernel);
+        self::assertStringContainsString("Route::middleware(['web', 'wayne.cas'])", (string) file_get_contents($dir . '/app/Providers/RouteServiceProvider.php'));
         $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
         self::assertSame('^0.2', $composer['require']['waynestate/sesame']);
         self::assertArrayNotHasKey('cit-web-infra/wayne-cas', $composer['require']);
-        self::assertSame(['config/sesame.php', 'app/User.php'], array_map(static fn(array $f): string => $f['file'], $report->results[0]->files));
+        self::assertSame(
+            ['config/sesame.php', 'app/Http/Kernel.php', 'app/Providers/RouteServiceProvider.php', 'app/User.php'],
+            array_map(static fn(array $f): string => $f['file'], $report->results[0]->files),
+        );
         $messages = implode(' ', $report->results[0]->messages);
         foreach (['DUO_HOSTNAME', 'DUO_IKEY', 'DUO_SKEY', 'DUO_AKEY'] as $needle) {
             self::assertStringContainsString($needle, $messages);
@@ -1256,9 +1263,11 @@ final class HopExecutorTest extends TestCase
         self::assertSame(['previewed'], $this->statuses($report));
         self::assertSame($before, $this->snapshot($dir));
         self::assertFileDoesNotExist($dir . '/config/sesame.php');
-        self::assertCount(2, $report->results[0]->files);
+        self::assertCount(4, $report->results[0]->files);
         $messages = implode(' ', $report->results[0]->messages);
         self::assertStringContainsString('Dry run: would write config/sesame.php', $messages);
+        self::assertStringContainsString('Dry run: would rewrite app/Http/Kernel.php', $messages);
+        self::assertStringContainsString('Dry run: would rewrite app/Providers/RouteServiceProvider.php', $messages);
         self::assertStringContainsString('Dry run: would rewrite app/User.php', $messages);
     }
 

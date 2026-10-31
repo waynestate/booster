@@ -52,7 +52,10 @@ final class CasMigrationTest extends TestCase
             (string) file_get_contents($this->example('laravel-wayne-cas') . '/config/wayne-cas.php'),
             (string) file_get_contents($dir . '/config/wayne-cas.php'),
         );
-        self::assertSame(['config/sesame.php', 'app/User.php'], array_map(static fn(array $f): string => $f['file'], $result->files));
+        self::assertSame(
+            ['config/sesame.php', 'app/Http/Kernel.php', 'app/Providers/RouteServiceProvider.php', 'app/User.php'],
+            array_map(static fn(array $f): string => $f['file'], $result->files),
+        );
     }
 
     public function test_the_app_vendor_config_wins_over_the_bundled_copy(): void
@@ -199,14 +202,289 @@ final class CasMigrationTest extends TestCase
 
         self::assertSame($before, $this->snapshot($dir));
         self::assertFileDoesNotExist($dir . '/config/sesame.php');
-        self::assertCount(2, $result->changes);
+        self::assertCount(4, $result->changes);
         self::assertStringStartsWith('Dry run: would write config/sesame.php', $result->changes[0]);
+        self::assertStringStartsWith('Dry run: would rewrite app/Http/Kernel.php', $result->changes[1]);
+        self::assertStringStartsWith('Dry run: would rewrite app/Providers/RouteServiceProvider.php', $result->changes[2]);
         // The example model already uses ReadOnlyAttributes, so its diff adds
         // the interface and drops the now-dead wayne-cas import.
         self::assertSame(
             'Dry run: would rewrite app/User.php: rewritten to implements \Waynestate\Sesame\WayneCas\WayneCasable; the wayne-cas import was removed.',
+            $result->changes[3],
+        );
+    }
+
+    public function test_it_moves_the_cas_middleware_onto_the_web_routes(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $result = $this->migrate($dir);
+
+        $expectedKernel = <<<'PHP'
+        <?php
+
+        namespace App\Http;
+
+        class Kernel
+        {
+            protected $middlewareGroups = [
+                'web' => [
+                    \App\Http\Middleware\EncryptCookies::class,
+                    \Illuminate\Session\Middleware\StartSession::class,
+                ],
+            ];
+
+            protected $routeMiddleware = [
+                'wayne.cas' => \Waynestate\Sesame\WayneCas\WayneAuthenticate::class,
+            ];
+        }
+        PHP . "\n";
+        self::assertSame($expectedKernel, (string) file_get_contents($dir . '/app/Http/Kernel.php'));
+        $provider = (string) file_get_contents($dir . '/app/Providers/RouteServiceProvider.php');
+        self::assertStringContainsString("Route::middleware(['web', 'wayne.cas'])", $provider);
+        self::assertStringNotContainsString("Route::middleware('web')", $provider);
+        self::assertSame(
+            'app/Http/Kernel.php: the web middleware group no longer carries wayne.cas; the wayne.cas alias now points at \Waynestate\Sesame\WayneCas\WayneAuthenticate::class.',
             $result->changes[1],
         );
+        self::assertSame(
+            'app/Providers/RouteServiceProvider.php: the web routes now load under the wayne.cas middleware.',
+            $result->changes[2],
+        );
+        self::assertSame(
+            ['file' => 'app/Http/Kernel.php', 'diff' => 'web group loses wayne.cas; alias points at \Waynestate\Sesame\WayneCas\WayneAuthenticate::class'],
+            $result->files[1],
+        );
+        self::assertSame(
+            ['file' => 'app/Providers/RouteServiceProvider.php', 'diff' => 'web routes gain the wayne.cas middleware'],
+            $result->files[2],
+        );
+    }
+
+    public function test_it_moves_a_class_reference_out_of_the_web_group_and_registers_the_alias(): void
+    {
+        $dir = $this->tempDir();
+        mkdir($dir . '/app/Http', 0775, true);
+        mkdir($dir . '/app/Providers', 0775, true);
+        file_put_contents($dir . '/app/Http/Kernel.php', <<<'PHP'
+        <?php
+
+        namespace App\Http;
+
+        class Kernel
+        {
+            protected $middlewareGroups = [
+                'web' => [
+                    \WSU\WayneCas\WayneAuthenticate::class,
+                ],
+            ];
+
+            protected $routeMiddleware = [
+                'auth' => \App\Http\Middleware\Authenticate::class,
+            ];
+        }
+        PHP . "\n");
+        file_put_contents($dir . '/app/Providers/RouteServiceProvider.php', <<<'PHP'
+        <?php
+
+        namespace App\Providers;
+
+        class RouteServiceProvider
+        {
+            protected function mapWebRoutes()
+            {
+                Route::middleware('web')->group(base_path('routes/web.php'));
+            }
+        }
+        PHP . "\n");
+        $result = $this->migrate($dir);
+
+        $kernel = (string) file_get_contents($dir . '/app/Http/Kernel.php');
+        self::assertStringNotContainsString('\WSU\WayneCas\WayneAuthenticate::class', $kernel);
+        self::assertStringContainsString("'wayne.cas' => \Waynestate\Sesame\WayneCas\WayneAuthenticate::class,", $kernel);
+        self::assertStringContainsString("'auth' => \App\Http\Middleware\Authenticate::class,", $kernel);
+        self::assertStringContainsString("Route::middleware(['web', 'wayne.cas'])->group(base_path('routes/web.php'));", (string) file_get_contents($dir . '/app/Providers/RouteServiceProvider.php'));
+        self::assertStringContainsString('the wayne.cas alias was added to $routeMiddleware pointing at', implode(' ', $result->changes));
+    }
+
+    public function test_it_rewrites_a_double_quoted_alias_in_place(): void
+    {
+        $dir = $this->tempDir();
+        mkdir($dir . '/app/Http', 0775, true);
+        mkdir($dir . '/app/Providers', 0775, true);
+        file_put_contents($dir . '/app/Http/Kernel.php', <<<'PHP'
+        <?php
+
+        namespace App\Http;
+
+        class Kernel
+        {
+            protected $middlewareGroups = [
+                'web' => [
+                    "wayne.cas",
+                ],
+            ];
+
+            protected $routeMiddleware = [
+                "wayne.cas" => \WSU\WayneCas\WayneAuthenticate::class,
+            ];
+        }
+        PHP . "\n");
+        file_put_contents($dir . '/app/Providers/RouteServiceProvider.php', <<<'PHP'
+        <?php
+
+        namespace App\Providers;
+
+        class RouteServiceProvider
+        {
+            protected function mapWebRoutes()
+            {
+                Route::middleware('web')->group(base_path('routes/web.php'));
+            }
+        }
+        PHP . "\n");
+        $result = $this->migrate($dir);
+
+        $kernel = (string) file_get_contents($dir . '/app/Http/Kernel.php');
+        self::assertStringNotContainsString('\WSU\WayneCas\WayneAuthenticate::class', $kernel);
+        self::assertStringContainsString('"wayne.cas" => \Waynestate\Sesame\WayneCas\WayneAuthenticate::class,', $kernel);
+        self::assertSame(1, substr_count($kernel, 'wayne.cas'));
+        self::assertStringContainsString("Route::middleware(['web', 'wayne.cas'])->group(base_path('routes/web.php'));", (string) file_get_contents($dir . '/app/Providers/RouteServiceProvider.php'));
+        self::assertStringContainsString('the wayne.cas alias now points at', implode(' ', $result->changes));
+    }
+
+    public function test_the_post_rector_state_only_drops_the_web_group_entry(): void
+    {
+        // Rector has already renamed both class references; Booster must drop
+        // the web group entry and leave the alias where Rector put it.
+        $dir = $this->tempDir();
+        mkdir($dir . '/app/Http', 0775, true);
+        mkdir($dir . '/app/Providers', 0775, true);
+        file_put_contents($dir . '/app/Http/Kernel.php', <<<'PHP'
+        <?php
+
+        namespace App\Http;
+
+        class Kernel
+        {
+            protected $middlewareGroups = [
+                'web' => [
+                    \Waynestate\Sesame\WayneCas\WayneAuthenticate::class,
+                ],
+            ];
+
+            protected $routeMiddleware = [
+                'wayne.cas' => \Waynestate\Sesame\WayneCas\WayneAuthenticate::class,
+            ];
+        }
+        PHP . "\n");
+        file_put_contents($dir . '/app/Providers/RouteServiceProvider.php', <<<'PHP'
+        <?php
+
+        namespace App\Providers;
+
+        class RouteServiceProvider
+        {
+            protected function mapWebRoutes()
+            {
+                Route::middleware('web')
+                    ->group(base_path('routes/web.php'));
+            }
+        }
+        PHP . "\n");
+        $result = $this->migrate($dir);
+
+        $kernel = (string) file_get_contents($dir . '/app/Http/Kernel.php');
+        self::assertSame(1, substr_count($kernel, '\Waynestate\Sesame\WayneCas\WayneAuthenticate::class'));
+        self::assertStringContainsString("Route::middleware(['web', 'wayne.cas'])", (string) file_get_contents($dir . '/app/Providers/RouteServiceProvider.php'));
+        self::assertSame(
+            'app/Http/Kernel.php: the web middleware group no longer carries wayne.cas.',
+            $result->changes[0],
+        );
+    }
+
+    public function test_a_kernel_without_an_alias_property_is_left_alone_with_a_note(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        file_put_contents($dir . '/app/Http/Kernel.php', <<<'PHP'
+        <?php
+
+        namespace App\Http;
+
+        class Kernel
+        {
+            protected $middlewareGroups = [
+                'web' => [
+                    'wayne.cas',
+                ],
+            ];
+        }
+        PHP . "\n");
+        $kernelBefore = (string) file_get_contents($dir . '/app/Http/Kernel.php');
+        $result = $this->migrate($dir);
+
+        self::assertSame($kernelBefore, (string) file_get_contents($dir . '/app/Http/Kernel.php'));
+        self::assertStringContainsString('no $routeMiddleware or $middlewareAliases', implode(' ', $result->manual));
+        self::assertNotContains('app/Http/Kernel.php', array_map(static fn(array $f): string => $f['file'], $result->files));
+        self::assertNotContains('app/Providers/RouteServiceProvider.php', array_map(static fn(array $f): string => $f['file'], $result->files));
+    }
+
+    public function test_a_missing_route_provider_is_a_manual_note(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        unlink($dir . '/app/Providers/RouteServiceProvider.php');
+        $kernelBefore = (string) file_get_contents($dir . '/app/Http/Kernel.php');
+        $result = $this->migrate($dir);
+
+        self::assertSame($kernelBefore, (string) file_get_contents($dir . '/app/Http/Kernel.php'));
+        self::assertStringContainsString('app/Providers/RouteServiceProvider.php is missing', implode(' ', $result->manual));
+        self::assertNotContains('app/Http/Kernel.php', array_map(static fn(array $f): string => $f['file'], $result->files));
+    }
+
+    public function test_an_unrecognised_web_routes_line_is_a_manual_note(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $provider = (string) file_get_contents($dir . '/app/Providers/RouteServiceProvider.php');
+        file_put_contents($dir . '/app/Providers/RouteServiceProvider.php', str_replace(
+            "Route::middleware('web')\n            ->group(base_path('routes/web.php'));",
+            "Route::middleware('web')->name('web')->group(base_path('routes/web.php'));",
+            $provider,
+        ));
+        $kernelBefore = (string) file_get_contents($dir . '/app/Http/Kernel.php');
+        $result = $this->migrate($dir);
+
+        self::assertSame($kernelBefore, (string) file_get_contents($dir . '/app/Http/Kernel.php'));
+        self::assertStringContainsString('could not find Route::middleware(\'web\') loading routes/web.php', implode(' ', $result->manual));
+    }
+
+    public function test_a_web_group_without_the_cas_middleware_is_untouched(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        file_put_contents($dir . '/app/Http/Kernel.php', <<<'PHP'
+        <?php
+
+        namespace App\Http;
+
+        class Kernel
+        {
+            protected $middlewareGroups = [
+                'web' => [
+                    \App\Http\Middleware\EncryptCookies::class,
+                ],
+            ];
+
+            protected $routeMiddleware = [
+                'wayne.cas' => \WSU\WayneCas\WayneAuthenticate::class,
+            ];
+        }
+        PHP . "\n");
+        $kernelBefore = (string) file_get_contents($dir . '/app/Http/Kernel.php');
+        $providerBefore = (string) file_get_contents($dir . '/app/Providers/RouteServiceProvider.php');
+        $result = $this->migrate($dir);
+
+        self::assertSame($kernelBefore, (string) file_get_contents($dir . '/app/Http/Kernel.php'));
+        self::assertSame($providerBefore, (string) file_get_contents($dir . '/app/Providers/RouteServiceProvider.php'));
+        self::assertNotContains('app/Http/Kernel.php', array_map(static fn(array $f): string => $f['file'], $result->files));
+        self::assertNotContains('app/Providers/RouteServiceProvider.php', array_map(static fn(array $f): string => $f['file'], $result->files));
     }
 
     public function test_a_missing_old_config_is_a_manual_note(): void

@@ -11,20 +11,30 @@ use Waynestate\Booster\ToolError;
 
 /**
  * Moves an app off cit-web-infra/wayne-cas where Rector cannot reach: the
- * published CAS config and the user model's trait usage. It never runs app
- * code; the old config is read with conservative patterns, and anything it
- * cannot move safely becomes a manual note that names the file.
+ * published CAS config, the web middleware wiring, and the user model's
+ * trait usage. It never runs app code; the old files are read with
+ * conservative patterns, and anything it cannot move safely becomes a manual
+ * note that names the file.
  */
 final class CasMigration
 {
     public const OLD_CONFIG = 'config/wayne-cas.php';
     public const NEW_CONFIG = 'config/sesame.php';
 
+    public const KERNEL = 'app/Http/Kernel.php';
+    public const ROUTE_PROVIDER = 'app/Providers/RouteServiceProvider.php';
+
     public const INTERFACE = 'WayneCasable';
     public const READ_ONLY_TRAIT = 'ReadOnlyAttributes';
+    public const CAS_ALIAS = 'wayne.cas';
 
     private const OLD_NAMESPACE = 'WSU\WayneCas';
     private const NEW_NAMESPACE = 'Waynestate\Sesame\WayneCas';
+    private const NEW_AUTHENTICATE_FQN = '\Waynestate\Sesame\WayneCas\WayneAuthenticate';
+
+    // The one line of a RouteServiceProvider that loads the web routes under
+    // the web middleware, in every spacing shape Booster will rewrite.
+    private const WEB_ROUTES_PATTERN = '/Route::middleware\(([ \t]*\x27web\x27[ \t]*)\)([ \t\n\r]*->[ \t]*group[ \t]*\([ \t]*base_path[ \t]*\([ \t]*\x27routes\/web\.php\x27[ \t]*\)[ \t]*\))/';
 
     // Fully qualified forms as they appear in source, leading backslash included.
     private const INTERFACE_FQN = '\Waynestate\Sesame\WayneCas\WayneCasable';
@@ -56,6 +66,8 @@ final class CasMigration
                 $manual[] = self::NEW_CONFIG . ' already exists, so BOOSTER left it alone. Set its cas.base_url to \'' . $root . '\' (the old wayne-cas root) if it differs.';
             }
         }
+
+        $this->middleware($appPath, $dryRun, $manual, $changes, $files);
 
         $finals = [];
         foreach ($this->modelFiles($appPath) as $relative => $absolute) {
@@ -223,6 +235,288 @@ final class CasMigration
         }
 
         return true;
+    }
+
+    /**
+     * Moves the CAS middleware off the global web group and onto the app's
+     * own web routes: the web group loses its WayneAuthenticate entry (class
+     * reference, short name or wayne.cas alias), the wayne.cas alias is set
+     * against SESAME's class in $routeMiddleware or $middlewareAliases, and
+     * the web route registration gains the alias. The move is all-or-nothing:
+     * if any piece cannot be found exactly, nothing is touched and a manual
+     * note names the file.
+     *
+     * @param list<string> $manual
+     * @param list<string> $changes
+     * @param list<array{file: string, diff: string}> $files
+     */
+    private function middleware(string $appPath, bool $dryRun, array &$manual, array &$changes, array &$files): void
+    {
+        $kernelFile = $appPath . '/' . self::KERNEL;
+        if (!is_file($kernelFile)) {
+            return;
+        }
+        $kernel = (string) file_get_contents($kernelFile);
+        $group = self::webMiddlewareGroup($kernel);
+        if ($group === null) {
+            return;
+        }
+        [$groupStart, $groupClose] = $group;
+        $entries = self::casEntries($kernel, $groupStart, $groupClose);
+        if ($entries === null || $entries === []) {
+            if ($entries === null) {
+                $manual[] = self::KERNEL . ': BOOSTER found the wayne.cas middleware mixed with other entries on one line of the web middleware group, so it left the file alone. Move the middleware by hand.';
+            }
+
+            return;
+        }
+
+        $alias = self::aliasRegistration($kernel);
+        if ($alias === null) {
+            $manual[] = self::KERNEL . ': BOOSTER found no $routeMiddleware or $middlewareAliases to register the wayne.cas alias in, so it left the middleware where it is. Register the alias by hand.';
+
+            return;
+        }
+        [$property, $propStart, $propClose, $valueSpan] = $alias;
+
+        $providerFile = $appPath . '/' . self::ROUTE_PROVIDER;
+        if (!is_file($providerFile)) {
+            $manual[] = self::ROUTE_PROVIDER . ' is missing, so BOOSTER left ' . self::KERNEL . ' alone. Remove wayne.cas from the web middleware group and add it to the web routes by hand.';
+
+            return;
+        }
+        $provider = (string) file_get_contents($providerFile);
+        if (preg_match_all(self::WEB_ROUTES_PATTERN, $provider) !== 1) {
+            $manual[] = self::ROUTE_PROVIDER . ": BOOSTER could not find Route::middleware('web') loading routes/web.php, so it left the middleware where it is. Add the wayne.cas middleware to the web routes by hand.";
+
+            return;
+        }
+
+        $ops = [];
+        foreach ($entries as [$lineStart, $lineEnd]) {
+            $end = $lineEnd < strlen($kernel) && $kernel[$lineEnd] === "\n" ? $lineEnd + 1 : $lineEnd;
+            $ops[] = [$lineStart, $end, ''];
+        }
+        $aliasAdded = false;
+        $aliasChanged = false;
+        if ($valueSpan !== null) {
+            [$valueStart, $valueEnd] = $valueSpan;
+            if (substr($kernel, $valueStart, $valueEnd - $valueStart) !== self::NEW_AUTHENTICATE_FQN . '::class') {
+                $ops[] = [$valueStart, $valueEnd, self::NEW_AUTHENTICATE_FQN . '::class'];
+                $aliasChanged = true;
+            }
+        } else {
+            $closeLineStart = strrpos(substr($kernel, 0, $propClose), "\n");
+            $closeLineStart = $closeLineStart === false ? 0 : $closeLineStart + 1;
+            $entryIndent = '';
+            foreach (self::lines(substr($kernel, $propStart, $propClose - $propStart)) as [$offset, $text]) {
+                $trimmed = trim($text);
+                if ($trimmed !== '' && !str_starts_with($trimmed, '//') && !str_starts_with($trimmed, '#')) {
+                    $entryIndent = substr($text, 0, strlen($text) - strlen(ltrim($text, " \t")));
+
+                    break;
+                }
+            }
+            if ($entryIndent === '') {
+                $closeLine = substr($kernel, $closeLineStart, $propClose - $closeLineStart);
+                $entryIndent = substr($closeLine, 0, strlen($closeLine) - strlen(ltrim($closeLine, " \t"))) . '    ';
+            }
+            $ops[] = [$closeLineStart, $closeLineStart, $entryIndent . "'" . self::CAS_ALIAS . "' => " . self::NEW_AUTHENTICATE_FQN . "::class," . "\n"];
+            $aliasAdded = true;
+        }
+
+        $newKernel = self::applyEdits($kernel, $ops);
+        $newProvider = preg_replace_callback(
+            self::WEB_ROUTES_PATTERN,
+            static fn(array $m): string => "Route::middleware(['web', '" . self::CAS_ALIAS . "'])" . substr($m[0], strlen('Route::middleware') + strlen($m[1]) + 2),
+            $provider,
+            1,
+        );
+        if (!$dryRun) {
+            file_put_contents($kernelFile, $newKernel);
+            file_put_contents($providerFile, $newProvider);
+        }
+
+        $clauses = ['the web middleware group no longer carries ' . self::CAS_ALIAS];
+        $diffClauses = ['web group loses ' . self::CAS_ALIAS];
+        if ($aliasAdded) {
+            $clauses[] = 'the ' . self::CAS_ALIAS . ' alias was added to ' . $property . ' pointing at ' . self::NEW_AUTHENTICATE_FQN . '::class';
+            $diffClauses[] = 'alias added to ' . $property;
+        } elseif ($aliasChanged) {
+            $clauses[] = 'the ' . self::CAS_ALIAS . ' alias now points at ' . self::NEW_AUTHENTICATE_FQN . '::class';
+            $diffClauses[] = 'alias points at ' . self::NEW_AUTHENTICATE_FQN . '::class';
+        }
+        $changes[] = ($dryRun ? 'Dry run: would rewrite ' : '') . self::KERNEL . ': ' . implode('; ', $clauses) . '.';
+        $files[] = ['file' => self::KERNEL, 'diff' => implode('; ', $diffClauses)];
+        $changes[] = ($dryRun ? 'Dry run: would rewrite ' : '') . self::ROUTE_PROVIDER . ': the web routes now load under the ' . self::CAS_ALIAS . ' middleware.';
+        $files[] = ['file' => self::ROUTE_PROVIDER, 'diff' => 'web routes gain the ' . self::CAS_ALIAS . ' middleware'];
+    }
+
+    /**
+     * The inner span of the 'web' entry of $middlewareGroups: offsets after
+     * the group's opening bracket up to its closing bracket. Null when the
+     * Kernel has no readable web group.
+     *
+     * @return array{0: int, 1: int}|null
+     */
+    private static function webMiddlewareGroup(string $content): ?array
+    {
+        if (preg_match('/\$middlewareGroups[ \t]*=[ \t]*\[/m', $content, $m, PREG_OFFSET_CAPTURE) !== 1) {
+            return null;
+        }
+        $groups = self::bracketSpan($content, $m[0][1] + strlen($m[0][0]) - 1);
+        if ($groups === null) {
+            return null;
+        }
+        [$groupsStart, $groupsClose] = $groups;
+        $inner = substr($content, $groupsStart, $groupsClose - $groupsStart);
+        if (preg_match('/\x27web\x27[ \t]*=>[ \t]*\[/m', $inner, $w, PREG_OFFSET_CAPTURE) !== 1) {
+            return null;
+        }
+
+        return self::bracketSpan($content, $groupsStart + $w[0][1] + strlen($w[0][0]) - 1);
+    }
+
+    /**
+     * Given the offset of an opening bracket, the offsets around the matching
+     * close: inner start and the closing bracket itself. Null on unbalanced
+     * brackets. Brace matching is naive (it does not skip strings), which is
+     * fine for the boilerplate this feeds.
+     *
+     * @return array{0: int, 1: int}|null
+     */
+    private static function bracketSpan(string $content, int $open): ?array
+    {
+        $depth = 0;
+        $length = strlen($content);
+        for ($i = $open; $i < $length; $i++) {
+            if ($content[$i] === '[') {
+                $depth++;
+            } elseif ($content[$i] === ']') {
+                $depth--;
+                if ($depth === 0) {
+                    return [$open + 1, $i];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Every single-entry line inside the group whose entry is the CAS
+     * middleware in any form: the wayne.cas alias or a WayneAuthenticate
+     * class reference. Line spans exclude the newline. Null when a line mixes
+     * the CAS entry with other entries, which Booster refuses to touch.
+     *
+     * @return list<array{0: int, 1: int}>|null
+     */
+    private static function casEntries(string $content, int $groupStart, int $groupClose): ?array
+    {
+        $entries = [];
+        foreach (self::lines(substr($content, $groupStart, $groupClose - $groupStart)) as [$offset, $text]) {
+            $trimmed = trim($text);
+            if ($trimmed === '' || str_starts_with($trimmed, '//') || str_starts_with($trimmed, '#')) {
+                continue;
+            }
+            $single = trim((string) preg_replace('/[ \t]*(?:\/\/|#).*$/', '', rtrim($trimmed, ',')));
+            if (strpos($single, ',') !== false) {
+                if (self::isCasEntry($single) || str_contains($single, self::CAS_ALIAS) || str_contains($single, 'WayneAuthenticate')) {
+                    return null;
+                }
+
+                continue;
+            }
+            if (self::isCasEntry($single)) {
+                $entries[] = [$groupStart + $offset, $groupStart + $offset + strlen($text)];
+            }
+        }
+
+        return $entries;
+    }
+
+    /**
+     * Whether one trimmed, comma-free array entry is the CAS middleware: the
+     * wayne.cas alias or a WayneAuthenticate class reference in any namespace
+     * form.
+     */
+    private static function isCasEntry(string $entry): bool
+    {
+        if ($entry === "'" . self::CAS_ALIAS . "'" || $entry === '"' . self::CAS_ALIAS . '"') {
+            return true;
+        }
+
+        return str_ends_with($entry, 'WayneAuthenticate::class');
+    }
+
+    /**
+     * The alias property that carries wayne.cas and the value span of its
+     * entry: [property name, property inner start, closing bracket offset,
+     * value offsets or null when the property has no wayne.cas entry]. Null
+     * when neither $routeMiddleware nor $middlewareAliases is readable.
+     *
+     * @return array{0: string, 1: int, 2: int, 3: array{0: int, 1: int}|null}|null
+     */
+    private static function aliasRegistration(string $content): ?array
+    {
+        foreach (['$routeMiddleware', '$middlewareAliases'] as $property) {
+            // The dollar is escaped for the pattern but kept plain in reports.
+            if (preg_match('/' . str_replace('$', '\\$', $property) . '[ \t]*=[ \t]*\[/m', $content, $m, PREG_OFFSET_CAPTURE) !== 1) {
+                continue;
+            }
+            $span = self::bracketSpan($content, $m[0][1] + strlen($m[0][0]) - 1);
+            if ($span === null) {
+                return null;
+            }
+            [$start, $close] = $span;
+            $value = null;
+            foreach (self::lines(substr($content, $start, $close - $start)) as [$offset, $text]) {
+                // Either quote style, matched by backreference so the quotes agree.
+                if (preg_match('/^[ \t]*([\x27"])wayne\.cas\1[ \t]*=>[ \t]*(.+?)[ \t]*,?[ \t]*$/', $text, $v, PREG_OFFSET_CAPTURE)) {
+                    $value = [$start + $offset + $v[2][1], $start + $offset + $v[2][1] + strlen($v[2][0])];
+
+                    break;
+                }
+            }
+
+            return [$property, $start, $close, $value];
+        }
+
+        return null;
+    }
+
+    /**
+     * Applies non-overlapping [start, end, replacement] edits to the text,
+     * highest offset first, so earlier offsets stay valid.
+     *
+     * @param list<array{0: int, 1: int, 2: string}> $ops
+     */
+    private static function applyEdits(string $content, array $ops): string
+    {
+        usort($ops, static fn(array $a, array $b): int => $b[0] <=> $a[0]);
+        foreach ($ops as [$start, $end, $replacement]) {
+            $content = substr($content, 0, $start) . $replacement . substr($content, $end);
+        }
+
+        return $content;
+    }
+
+    /**
+     * Offset and text of each line, newline exclusive.
+     *
+     * @return list<array{0: int, 1: string}>
+     */
+    private static function lines(string $content): array
+    {
+        $out = [];
+        $offset = 0;
+        while (($nl = strpos($content, "\n", $offset)) !== false) {
+            $out[] = [$offset, substr($content, $offset, $nl - $offset)];
+            $offset = $nl + 1;
+        }
+        $out[] = [$offset, substr($content, $offset)];
+
+        return $out;
     }
 
     /**
