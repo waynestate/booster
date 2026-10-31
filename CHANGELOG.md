@@ -17,6 +17,19 @@ Fixes from the second real-use report (two apps taken to PHP 7.4/Laravel 8 and P
 
 ### Changed
 
+- `cas-to-sesame` leaves an app that signs people in. Before, the hop reported success on an app that would not boot.
+  The hop now requires `waynestate/sesame:^0.3` and:
+  - writes SESAME's own published config with two changes: the CAS root falls back to the app's old wayne-cas root
+    (the environment and the playbook still win), and the wayne-cas compat user resolver is the default. The env
+    lookups, `SESAME_DRIVER` and the `fake` block for local work are kept;
+  - rewrites every model using wayne-cas's `WayneCasable` trait, in any form including Rector's fully qualified one,
+    to implement SESAME's `WayneCasable` and use `ReadOnlyAttributes`, with the one `getReadOnlyAttributes` signature.
+    A leftover trait use fails the step instead of passing silently, and stale `WSU\WayneCas` imports are removed;
+  - moves `WayneAuthenticate` from the global `web` group to the app's web routes (`wayne.cas` alias);
+  - points the `web` guard at SESAME's `sesame` driver and the users provider at `eloquent`, so `auth()->user()`
+    works and the user is reloaded every request.
+  Anything Booster cannot edit exactly becomes a manual step naming the file, and the report lists only changes it
+  made.
 - PROCTOR runs as the final target even when the plan has nothing left to do.
 - The Pinstripe scan uses Pinstripe's `laravel.neon` (Larastan) on Laravel apps that have Larastan, and skips IDE
   helper files, so Laravel apps no longer get a wall of false "undefined method" findings.
