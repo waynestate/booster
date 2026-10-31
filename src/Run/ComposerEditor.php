@@ -24,6 +24,12 @@ final class ComposerEditor
     public const LEGACY_UNBLOCK_REASON_PREFIX = 'BOOSTER temporary unblock';
 
     /**
+     * The wayne-cas package the cas-to-sesame hop removes; also the marker in
+     * the repositories urls that point at its private host.
+     */
+    private const WAYNE_CAS = 'cit-web-infra/wayne-cas';
+
+    /**
      * @return list<string> human-readable lines about what changed
      */
     public function apply(Hop $hop, string $appPath): array
@@ -49,6 +55,12 @@ final class ComposerEditor
                     unset($data[$section][$package]);
                     $changes[] = sprintf('Removed %s from %s.', $package, $section);
                 }
+            }
+            // The package's own Composer repository would survive the removal
+            // and, pointing at a private host, stop composer update to ask for
+            // credentials. Drop it with the package.
+            if ($package === self::WAYNE_CAS) {
+                $changes = [...$changes, ...$this->dropWayneCasRepositories($data)];
             }
         }
         if ($hop->kind === HopKind::Php && isset($data['config']['platform']['php'])) {
@@ -221,6 +233,55 @@ final class ComposerEditor
         $data[$section][$package] = $constraint;
 
         return [sprintf('Set %s to %s in %s.', $package, $constraint, $section)];
+    }
+
+    /**
+     * Drops every repositories entry whose url names the wayne-cas
+     * repository, case-insensitive, in both shapes Composer allows: a list of
+     * objects and an object keyed by repository name. The section goes away
+     * when the last entry leaves it; other entries stay untouched.
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return list<string>
+     */
+    private function dropWayneCasRepositories(array &$data): array
+    {
+        $repositories = $data['repositories'] ?? null;
+        if (!is_array($repositories) || $repositories === []) {
+            return [];
+        }
+
+        $changes = [];
+        if (array_is_list($repositories)) {
+            $kept = [];
+            foreach ($repositories as $entry) {
+                $url = is_array($entry) && is_string($entry['url'] ?? null) ? $entry['url'] : null;
+                if ($url !== null && str_contains(strtolower($url), self::WAYNE_CAS)) {
+                    $changes[] = sprintf('composer.json: removed the wayne-cas repository entry (%s)', $url);
+                    continue;
+                }
+                $kept[] = $entry;
+            }
+            $repositories = $kept;
+        } else {
+            foreach ($repositories as $name => $entry) {
+                $url = is_array($entry) && is_string($entry['url'] ?? null) ? $entry['url'] : null;
+                if ($url === null || !str_contains(strtolower($url), self::WAYNE_CAS)) {
+                    continue;
+                }
+                unset($repositories[$name]);
+                $changes[] = sprintf('composer.json: removed the wayne-cas repository entry (%s)', $url);
+            }
+        }
+
+        if ($repositories === []) {
+            unset($data['repositories']);
+        } else {
+            $data['repositories'] = $repositories;
+        }
+
+        return $changes;
     }
 
     private function alreadyAtLeast(string $current, string $target, bool $isPhp): bool
