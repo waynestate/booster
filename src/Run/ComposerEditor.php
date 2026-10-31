@@ -224,8 +224,9 @@ final class ComposerEditor
                 return [];
             }
             $section = 'require';
+            // Append, do not sort: the app's require order is the app's, and
+            // Composer only sorts it when config.sort-packages is on.
             $data[$section][$package] = $constraint;
-            ksort($data[$section]);
 
             return [sprintf('Set %s to %s in %s.', $package, $constraint, $section)];
         }
@@ -305,9 +306,45 @@ final class ComposerEditor
             return [];
         }
         $data['require']['guzzlehttp/guzzle'] = '^7.8';
-        ksort($data['require']);
+        // Composer only sorts the require block when config.sort-packages is
+        // on; leave the app's own order alone otherwise.
+        if (($data['config']['sort-packages'] ?? false) === true) {
+            $this->sortRequireBlock($data['require']);
+        }
 
         return ['composer.json: added guzzlehttp/guzzle ^7.8 (SESAME needs an HTTP client)'];
+    }
+
+    /**
+     * Sorts a require block the way Composer does with config.sort-packages
+     * on: php first, then the php-, ext- and lib- platform packages in that
+     * group order, then every other package alphabetically.
+     *
+     * @param array<string, mixed> $require
+     */
+    private function sortRequireBlock(array &$require): void
+    {
+        uksort($require, static function (string $a, string $b): int {
+            $groupA = self::requireBlockGroup($a);
+            $groupB = self::requireBlockGroup($b);
+            if ($groupA !== $groupB) {
+                return $groupA <=> $groupB;
+            }
+
+            return strcmp($a, $b);
+        });
+    }
+
+    /** The sort group of one require key; see sortRequireBlock(). */
+    private static function requireBlockGroup(string $package): int
+    {
+        return match (true) {
+            $package === 'php' => 0,
+            str_starts_with($package, 'php-') => 1,
+            str_starts_with($package, 'ext-') => 2,
+            str_starts_with($package, 'lib-') => 3,
+            default => 4,
+        };
     }
 
     private function alreadyAtLeast(string $current, string $target, bool $isPhp): bool

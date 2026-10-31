@@ -156,6 +156,36 @@ final class ComposerEditorTest extends TestCase
         self::assertSame('^7.0', $require['symfony/http-client']);
     }
 
+    public function test_the_sesame_swap_keeps_the_require_order_without_sort_packages(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        // The app's own order (php before laravel/framework) survives; the
+        // swap's additions land at the end, guzzle last.
+        self::assertSame(['php', 'laravel/framework', 'waynestate/sesame', 'guzzlehttp/guzzle'], array_keys($this->read($dir)['require']));
+    }
+
+    public function test_the_sesame_swap_sorts_the_require_block_when_sort_packages_is_on(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $data = $this->read($dir);
+        $data['config'] = ['sort-packages' => true];
+        $data['require']['ext-mbstring'] = '*';
+        $data['require']['lib-xml'] = '*';
+        $data['require']['php-intl'] = '*';
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        // Composer's order: php first, then the php-, ext- and lib- platform
+        // packages in that group order, then the rest alphabetically.
+        self::assertSame(
+            ['php', 'php-intl', 'ext-mbstring', 'lib-xml', 'guzzlehttp/guzzle', 'laravel/framework', 'waynestate/sesame'],
+            array_keys($this->read($dir)['require']),
+        );
+    }
+
     public function test_a_php_hop_never_adds_a_laravel_requirement(): void
     {
         $dir = $this->copyExample('raw-php');
