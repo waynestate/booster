@@ -20,6 +20,15 @@
             "source": "https://laravel.com/docs/11.x/upgrade"
         },
         {
+            "id": "test-method-static",
+            "hop": "laravel-10-to-11",
+            "detect": { "kind": "method", "match": "createFromTimestamp" },
+            "label": "Static Carbon helper reads timestamps differently",
+            "keep_old": null,
+            "check": "Check the result of every static call.",
+            "source": "https://carbon.nesbot.com/docs/"
+        },
+        {
             "id": "test-class",
             "hop": "laravel-10-to-11",
             "detect": { "kind": "class", "match": "SweetAlertThing" },

@@ -25,7 +25,7 @@ final class BehaviourScanTest extends TestCase
         $result = $this->scanner()->scan($app, 'php-80-to-81', BehaviourScan::composerRequire($app));
 
         self::assertSame(['test-function', 'test-package-below'], array_map(static fn($e): string => $e->id, $result->entries));
-        self::assertSame(6, $result->filesScanned);
+        self::assertSame(7, $result->filesScanned);
         self::assertSame(0, $result->filesSkipped);
         self::assertSame(['src/function.php:3'], $result->entries[0]->hits);
         self::assertSame(1, $result->entries[0]->total);
@@ -41,7 +41,7 @@ final class BehaviourScanTest extends TestCase
         $result = $this->scanner()->scan($app, 'laravel-10-to-11', BehaviourScan::composerRequire($app));
 
         self::assertSame(
-            ['test-method', 'test-class', 'test-property', 'test-token', 'test-blade', 'test-config-missing', 'test-package-below', 'test-always'],
+            ['test-method', 'test-method-static', 'test-class', 'test-property', 'test-token', 'test-blade', 'test-config-missing', 'test-package-below', 'test-always'],
             array_map(static fn($e): string => $e->id, $result->entries),
         );
         $byId = [];
@@ -49,6 +49,7 @@ final class BehaviourScanTest extends TestCase
             $byId[$entry->id] = $entry;
         }
         self::assertSame(['src/method.php:3'], $byId['test-method']->hits);
+        self::assertSame(['src/static.php:3'], $byId['test-method-static']->hits);
         self::assertSame(['src/class.php:3'], $byId['test-class']->hits);
         self::assertSame(['src/property.php:5'], $byId['test-property']->hits);
         self::assertSame(['src/token.php:3'], $byId['test-token']->hits);
@@ -79,6 +80,34 @@ final class BehaviourScanTest extends TestCase
         self::assertNotContains('test-package-at', $ids);
     }
 
+    public function test_package_rows_compare_against_the_pre_run_lock_when_given(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', (string) json_encode(['require' => ['acme/widget' => '^1.0']]));
+        // The lock on disk already carries major 2: an earlier step of the run bumped it.
+        file_put_contents($dir . '/composer.lock', (string) json_encode([
+            'packages' => [['name' => 'acme/widget', 'version' => '2.0.0']],
+            'packages-dev' => [],
+        ]));
+        $data = $this->tempDir() . '/entries.json';
+        file_put_contents($data, (string) json_encode([
+            'schema_version' => 1,
+            'changes' => [$this->entry('pkg-row', 'package:acme/widget@2', ['kind' => 'package'])],
+        ]));
+        $scanner = new BehaviourScan($data);
+        $require = BehaviourScan::composerRequire($dir);
+
+        // The captured pre-run lock still held major 1, so the row fires even
+        // though the lock on disk is past its major.
+        $withLock = $scanner->scan($dir, 'php-80-to-81', $require, ['acme/widget' => '1.9.0']);
+        self::assertSame(['pkg-row'], array_map(static fn($e): string => $e->id, $withLock->entries));
+
+        // Without the captured map the scan reads the lock on disk (major 2),
+        // so the row stays quiet.
+        $fromDisk = $scanner->scan($dir, 'php-80-to-81', $require);
+        self::assertSame([], $fromDisk->entries);
+    }
+
     public function test_without_packages_drops_only_the_package_entries(): void
     {
         $app = $this->dataFile('app');
@@ -87,7 +116,7 @@ final class BehaviourScanTest extends TestCase
 
         self::assertSame('laravel-10-to-11', $stripped->hop);
         self::assertSame(
-            ['test-method', 'test-class', 'test-property', 'test-token', 'test-blade', 'test-config-missing', 'test-always'],
+            ['test-method', 'test-method-static', 'test-class', 'test-property', 'test-token', 'test-blade', 'test-config-missing', 'test-always'],
             array_map(static fn($e): string => $e->id, $stripped->entries),
         );
     }
@@ -138,7 +167,7 @@ final class BehaviourScanTest extends TestCase
 
         self::assertSame([
             'hop' => 'php-80-to-81',
-            'files_scanned' => 6,
+            'files_scanned' => 7,
             'files_skipped' => 0,
             'entries' => [
                 [
@@ -241,7 +270,7 @@ final class BehaviourScanTest extends TestCase
         $this->expectLoadError([
             'schema_version' => 1,
             'changes' => [$this->entry('bad-hop', 'laravel-10', ['kind' => 'function', 'match' => 'a'])],
-        ], 'expected php-X.Y-to-Z.W');
+        ], 'expected php-74-to-80');
     }
 
     public function test_a_non_https_source_is_rejected(): void

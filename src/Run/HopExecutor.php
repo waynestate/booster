@@ -50,6 +50,15 @@ final class HopExecutor
     private ?BehaviourScan $behaviour = null;
 
     /**
+     * The locked package versions read before the first step, so the package
+     * rows on the last step compare against the lock the app started with,
+     * not one an earlier step already bumped past the row's major.
+     *
+     * @var array<string, string>
+     */
+    private array $startingLockedVersions = [];
+
+    /**
      * Untracked paths the app held before the run, so undo hints name only
      * this run's creations.
      *
@@ -102,6 +111,8 @@ final class HopExecutor
         // The composer.lock fingerprint before any hop, so the run can tell
         // whether the upgrade changed it and write the Citadel install script.
         $lockBefore = $options->dryRun ? null : $this->lockFingerprint($path);
+        // The locked versions before any hop, for the package rows above.
+        $this->startingLockedVersions = BehaviourScan::lockedVersions($path);
 
         $baseline = $this->runBaseline($plan, $path, $options);
         if ($baseline->failed() && !$options->allowFailingBaseline) {
@@ -307,7 +318,7 @@ final class HopExecutor
         if ($step->hop->kind !== HopKind::Php && $step->hop->kind !== HopKind::Laravel && !$isLast) {
             return '';
         }
-        $result = $this->behaviourScanner()->scan($path, $step->hop->id, BehaviourScan::composerRequire($path));
+        $result = $this->behaviourScanner()->scan($path, $step->hop->id, BehaviourScan::composerRequire($path), $this->startingLockedVersions);
         if (!$isLast) {
             $result = $result->withoutPackages();
         }

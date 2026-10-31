@@ -76,8 +76,9 @@ final class BehaviourScan
      * take down a plan or a run.
      *
      * @param array<string, string>|null $composerRequire
+     * @param array<string, string>|null $lockedVersions the pre-run package-to-version map; null reads the app's composer.lock
      */
-    public function scan(string $appPath, string $hopId, ?array $composerRequire): BehaviourResult
+    public function scan(string $appPath, string $hopId, ?array $composerRequire, ?array $lockedVersions = null): BehaviourResult
     {
         $entries = [];
         foreach ($this->entries as $entry) {
@@ -132,6 +133,9 @@ final class BehaviourScan
                 }
             }
         }
+        // Read the lock once per scan; a run passes the pre-run map so earlier
+        // steps that already bumped a package do not hide its row.
+        $locked = $lockedVersions ?? self::lockedVersions($appPath);
         foreach ($entries as $entry) {
             switch ($entry['kind']) {
                 case 'config':
@@ -142,7 +146,7 @@ final class BehaviourScan
                     }
                     break;
                 case 'package':
-                    if ($this->packageHit($appPath, $entry, $composerRequire)) {
+                    if ($this->packageHit($entry, $composerRequire, $locked)) {
                         $hits[$entry['id']] = ['composer.json'];
                         $totals[$entry['id']] = 1;
                     }
@@ -229,8 +233,8 @@ final class BehaviourScan
                             }
                             break;
                         case 'method':
-                            // An instance call: ->name( or ?->name(.
-                            if ($call && in_array($prev, [T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR], true) && $name === strtolower((string) $entry['match'])) {
+                            // A member call: ->name(, ?->name( or a static ::name(.
+                            if ($call && in_array($prev, [T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR, T_DOUBLE_COLON], true) && $name === strtolower((string) $entry['match'])) {
                                 $lines[$entry['id']][] = $line;
                             }
                             break;
@@ -319,15 +323,15 @@ final class BehaviourScan
      *
      * @param array{id: string, hop: string, kind: string, match: ?string, file: ?string, key: ?string, package: ?string, package_major: ?int, label: string, keep_old: ?string, check: string, source: string} $entry
      * @param array<string, string>|null $composerRequire
+     * @param array<string, string> $locked
      */
-    private function packageHit(string $appPath, array $entry, ?array $composerRequire): bool
+    private function packageHit(array $entry, ?array $composerRequire, array $locked): bool
     {
         $package = (string) $entry['package'];
         $major = (int) $entry['package_major'];
         if ($composerRequire === null || !isset($composerRequire[$package])) {
             return false;
         }
-        $locked = self::lockedVersions($appPath);
         $version = $locked[$package] ?? null;
         if ($version === null) {
             return false;
@@ -339,12 +343,13 @@ final class BehaviourScan
 
     /**
      * The package-to-version map of the app's lock file, across packages and
-     * packages-dev. Empty when the lock is missing or unreadable. Mirrors the
-     * reader HopExecutor uses for its gate messages.
+     * packages-dev. Empty when the lock is missing or unreadable. A run calls
+     * this once before the first step and passes the result back into scan(),
+     * so package rows compare against the lock the app started with.
      *
      * @return array<string, string>
      */
-    private static function lockedVersions(string $appPath): array
+    public static function lockedVersions(string $appPath): array
     {
         $lockFile = str_replace('\\', '/', rtrim($appPath, '/\\')) . '/composer.lock';
         if (!is_file($lockFile)) {
@@ -499,8 +504,8 @@ final class BehaviourScan
                 throw new ToolError(sprintf('Behaviour change %d in "%s" repeats id "%s".', $index, $path, $entry['id']));
             }
             $seen[$entry['id']] = true;
-            if (preg_match('/^(?:php|laravel)-\d+(?:\.\d+)?-to-\d+(?:\.\d+)?$|^package:[a-z0-9._\/]+@\d+$/', (string) $entry['hop']) !== 1) {
-                throw new ToolError(sprintf('Behaviour change %d in "%s" has hop "%s"; expected php-X.Y-to-Z.W, laravel-X-to-Y or package:name@major.', $index, $path, $entry['hop']));
+            if (preg_match('/^php-\d{2}-to-\d{2}$|^laravel-\d+-to-\d+$|^package:[a-z0-9._\/-]+@\d+$/', (string) $entry['hop']) !== 1) {
+                throw new ToolError(sprintf('Behaviour change %d in "%s" has hop "%s"; expected php-74-to-80, laravel-10-to-11 or package:name@major.', $index, $path, $entry['hop']));
             }
             if (!is_array($entry['detect'] ?? null)) {
                 throw new ToolError(sprintf('Behaviour change %d in "%s" needs a detect object.', $index, $path));
@@ -526,7 +531,7 @@ final class BehaviourScan
                 case 'package':
                     // The hop was validated above, so this cannot fail; the
                     // match is kept here so the parser lives in one place.
-                    preg_match('/^package:([a-z0-9._\/]+)@(\d+)$/', (string) $entry['hop'], $m);
+                    preg_match('/^package:([a-z0-9._\/-]+)@(\d+)$/', (string) $entry['hop'], $m);
                     $package = $m[1] ?? null;
                     $packageMajor = isset($m[2]) ? (int) $m[2] : null;
                     break;
