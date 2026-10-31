@@ -363,6 +363,26 @@ final class RefreshHopDataTest extends TestCase
         self::assertStringContainsString('Could not fetch', $err);
     }
 
+    public function test_a_date_only_refresh_is_no_change(): void
+    {
+        // The frozen feeds match the committed file, so a refresh judged one
+        // day later differs only in generated_on and must not rewrite it.
+        $dataPath = dirname(__DIR__) . '/data/versions.json';
+        $original = (string) file_get_contents($dataPath);
+        $data = json_decode($original, true);
+        self::assertIsArray($data);
+        $later = (new DateTimeImmutable((string) $data['generated_on']))->modify('+1 day')->format('Y-m-d');
+        try {
+            [$code, $out] = $this->runScript(['--offline', 'tests/fixtures/hop-feeds', '--today', $later]);
+
+            self::assertSame(0, $code, $out);
+            self::assertStringContainsString('is current', $out);
+            self::assertSame($original, (string) file_get_contents($dataPath));
+        } finally {
+            file_put_contents($dataPath, $original);
+        }
+    }
+
     public function test_check_fails_when_the_file_drifts_from_the_fixtures(): void
     {
         $dataPath = dirname(__DIR__) . '/data/versions.json';

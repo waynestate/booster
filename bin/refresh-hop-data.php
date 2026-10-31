@@ -170,6 +170,20 @@ function describeChanges(array $old, array $new): array
 }
 
 /**
+ * Whether two hop data payloads agree once the generated_on date is left
+ * out: a refresh stamps today, so a date-only difference is not a change.
+ *
+ * @param array<string, mixed> $a
+ * @param array<string, mixed> $b
+ */
+function sameHopData(array $a, array $b): bool
+{
+    unset($a['generated_on'], $b['generated_on']);
+
+    return $a === $b;
+}
+
+/**
  * The offline --check: shape problems first (exit 1), then the frozen feed
  * fixtures compared with the file (exit 3 when they disagree). No network.
  *
@@ -206,7 +220,10 @@ function runCheck(HopDataRefresher $refresher, array $existing, array $files): n
     } catch (ToolError $e) {
         fail($e->getMessage());
     }
-    if ($refreshed === $existing) {
+    // The check judges the file as of its own generated_on, so the date can
+    // never be the difference; the shared comparison keeps that true if the
+    // refresher ever stamps a different date here.
+    if (sameHopData($refreshed, $existing)) {
         echo sprintf("data/versions.json is current (checked against the frozen feeds in tests/fixtures/hop-feeds as of %s).\n", $generatedOn);
         exit(0);
     }
@@ -297,7 +314,9 @@ try {
 }
 
 $source = $options['offline'] !== null ? 'the frozen feeds in ' . $options['offline'] : 'the live feeds';
-if ($refreshed === $existing) {
+// A refresh stamps generated_on with today, so a date-only difference is not
+// a change: the weekly robot must not open a merge request just to bump it.
+if (sameHopData($refreshed, $existing)) {
     echo sprintf("data/versions.json is current (checked against %s as of %s).\n", $source, $todayString);
     exit(0);
 }
