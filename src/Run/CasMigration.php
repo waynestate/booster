@@ -11,10 +11,10 @@ use Waynestate\Booster\ToolError;
 
 /**
  * Moves an app off cit-web-infra/wayne-cas where Rector cannot reach: the
- * published CAS config, the web middleware wiring, and the user model's
- * trait usage. It never runs app code; the old files are read with
- * conservative patterns, and anything it cannot move safely becomes a manual
- * note that names the file.
+ * published CAS config, the web middleware wiring, the auth guard and
+ * provider, and the user model's trait usage. It never runs app code; the
+ * old files are read with conservative patterns, and anything it cannot move
+ * safely becomes a manual note that names the file.
  */
 final class CasMigration
 {
@@ -23,6 +23,7 @@ final class CasMigration
 
     public const KERNEL = 'app/Http/Kernel.php';
     public const ROUTE_PROVIDER = 'app/Providers/RouteServiceProvider.php';
+    public const AUTH_CONFIG = 'config/auth.php';
 
     public const INTERFACE = 'WayneCasable';
     public const READ_ONLY_TRAIT = 'ReadOnlyAttributes';
@@ -68,6 +69,7 @@ final class CasMigration
         }
 
         $this->middleware($appPath, $dryRun, $manual, $changes, $files);
+        $this->authConfig($appPath, $dryRun, $manual, $changes, $files);
 
         $finals = [];
         foreach ($this->modelFiles($appPath) as $relative => $absolute) {
@@ -306,22 +308,8 @@ final class CasMigration
                 $aliasChanged = true;
             }
         } else {
-            $closeLineStart = strrpos(substr($kernel, 0, $propClose), "\n");
-            $closeLineStart = $closeLineStart === false ? 0 : $closeLineStart + 1;
-            $entryIndent = '';
-            foreach (self::lines(substr($kernel, $propStart, $propClose - $propStart)) as [$offset, $text]) {
-                $trimmed = trim($text);
-                if ($trimmed !== '' && !str_starts_with($trimmed, '//') && !str_starts_with($trimmed, '#')) {
-                    $entryIndent = substr($text, 0, strlen($text) - strlen(ltrim($text, " \t")));
-
-                    break;
-                }
-            }
-            if ($entryIndent === '') {
-                $closeLine = substr($kernel, $closeLineStart, $propClose - $closeLineStart);
-                $entryIndent = substr($closeLine, 0, strlen($closeLine) - strlen(ltrim($closeLine, " \t"))) . '    ';
-            }
-            $ops[] = [$closeLineStart, $closeLineStart, $entryIndent . "'" . self::CAS_ALIAS . "' => " . self::NEW_AUTHENTICATE_FQN . "::class," . "\n"];
+            [$insertAt, $entryIndent] = self::entryInsertion($kernel, $propStart, $propClose);
+            $ops[] = [$insertAt, $insertAt, $entryIndent . "'" . self::CAS_ALIAS . "' => " . self::NEW_AUTHENTICATE_FQN . "::class," . "\n"];
             $aliasAdded = true;
         }
 
@@ -350,6 +338,199 @@ final class CasMigration
         $files[] = ['file' => self::KERNEL, 'diff' => implode('; ', $diffClauses)];
         $changes[] = ($dryRun ? 'Dry run: would rewrite ' : '') . self::ROUTE_PROVIDER . ': the web routes now load under the ' . self::CAS_ALIAS . ' middleware.';
         $files[] = ['file' => self::ROUTE_PROVIDER, 'diff' => 'web routes gain the ' . self::CAS_ALIAS . ' middleware'];
+    }
+
+    /**
+     * Points the web guard at SESAME and the users provider at eloquent:
+     * guards.web.driver becomes sesame (it was session), providers.users.driver
+     * becomes eloquent (it was wayneCas), and the users provider gains a model
+     * key when it has none. Parts already migrated are left alone; anything
+     * structural Booster cannot read exactly is left untouched with a manual
+     * note that names the file.
+     *
+     * @param list<string> $manual
+     * @param list<string> $changes
+     * @param list<array{file: string, diff: string}> $files
+     */
+    private function authConfig(string $appPath, bool $dryRun, array &$manual, array &$changes, array &$files): void
+    {
+        $file = $appPath . '/' . self::AUTH_CONFIG;
+        if (!is_file($file)) {
+            return;
+        }
+        $content = (string) file_get_contents($file);
+
+        $guards = self::section($content, 'guards');
+        if ($guards === null) {
+            $manual[] = self::AUTH_CONFIG . ': BOOSTER could not read the guards section, so it left the file alone. Point the web guard at the sesame driver by hand.';
+
+            return;
+        }
+        $web = self::entry($content, $guards[0], $guards[1], 'web');
+        if ($web === null) {
+            $manual[] = self::AUTH_CONFIG . ': BOOSTER could not find the web guard, so it left the file alone. Point it at the sesame driver by hand.';
+
+            return;
+        }
+        $guardDriver = self::driverValue($content, $web[0], $web[1]);
+        if ($guardDriver === null) {
+            $manual[] = self::AUTH_CONFIG . ": BOOSTER could not read a plain driver for the web guard, so it left the file alone. Set its driver to 'sesame' by hand.";
+
+            return;
+        }
+        [$guardDriverText, $guardDriverStart, $guardDriverEnd] = $guardDriver;
+
+        $providers = self::section($content, 'providers');
+        if ($providers === null) {
+            $manual[] = self::AUTH_CONFIG . ': BOOSTER could not read the providers section, so it left the file alone. Point the users provider at the eloquent driver by hand.';
+
+            return;
+        }
+        $users = self::entry($content, $providers[0], $providers[1], 'users');
+        if ($users === null) {
+            $manual[] = self::AUTH_CONFIG . ': BOOSTER could not find the users provider, so it left the file alone. Point it at the eloquent driver by hand.';
+
+            return;
+        }
+        $providerDriver = self::driverValue($content, $users[0], $users[1]);
+        if ($providerDriver === null) {
+            $manual[] = self::AUTH_CONFIG . ": BOOSTER could not read a plain driver for the users provider, so it left the file alone. Set its driver to 'eloquent' by hand.";
+
+            return;
+        }
+        [$providerDriverText, $providerDriverStart, $providerDriverEnd] = $providerDriver;
+
+        $ops = [];
+        $clauses = [];
+        $diffClauses = [];
+
+        if ($guardDriverText === 'session') {
+            $ops[] = [$guardDriverStart, $guardDriverEnd, 'sesame'];
+            $clauses[] = 'the web guard now uses the sesame driver';
+            $diffClauses[] = 'web guard driver session to sesame';
+        } elseif ($guardDriverText !== 'sesame') {
+            $manual[] = self::AUTH_CONFIG . ": BOOSTER found the web guard on the {$guardDriverText} driver, which it does not change. Point it at the sesame driver by hand.";
+        }
+
+        $modelFqn = is_file($appPath . '/app/Models/User.php') ? 'App\Models\User' : 'App\User';
+        if ($providerDriverText === 'wayneCas') {
+            $ops[] = [$providerDriverStart, $providerDriverEnd, 'eloquent'];
+            $clauses[] = 'the users provider now uses the eloquent driver';
+            $diffClauses[] = 'users provider driver wayneCas to eloquent';
+        } elseif ($providerDriverText !== 'eloquent') {
+            $manual[] = self::AUTH_CONFIG . ": BOOSTER found the users provider on the {$providerDriverText} driver, which it does not change. Point it at the eloquent driver by hand.";
+        }
+
+        if (in_array($providerDriverText, ['wayneCas', 'eloquent'], true) && !self::modelKey($content, $users[0], $users[1])) {
+            if (substr_count(substr($content, $users[0], $users[1] - $users[0]), "\n") === 0) {
+                $manual[] = self::AUTH_CONFIG . ': BOOSTER found the users provider on one line, so it could not add a model key. Add the model key by hand.';
+            } else {
+                [$insertAt, $indent] = self::entryInsertion($content, $users[0], $users[1]);
+                $ops[] = [$insertAt, $insertAt, $indent . "'model' => " . $modelFqn . "::class," . "\n"];
+                $clauses[] = 'the users provider got a model key pointing at ' . $modelFqn . '::class';
+                $diffClauses[] = 'model key added to the users provider';
+            }
+        }
+
+        if ($ops === []) {
+            return;
+        }
+
+        $newContent = self::applyEdits($content, $ops);
+        if (!$dryRun) {
+            file_put_contents($file, $newContent);
+        }
+        $changes[] = ($dryRun ? 'Dry run: would rewrite ' : '') . self::AUTH_CONFIG . ': ' . implode('; ', $clauses) . '.';
+        $files[] = ['file' => self::AUTH_CONFIG, 'diff' => implode('; ', $diffClauses)];
+    }
+
+    /**
+     * The inner span of a top-level 'key' => [...] section: offsets after the
+     * opening bracket up to the closing bracket itself. Null when the section
+     * is not readable. Either quote style is accepted.
+     *
+     * @return array{0: int, 1: int}|null
+     */
+    private static function section(string $content, string $key): ?array
+    {
+        if (preg_match('/^[ \t]*([\x27"])' . $key . '\1[ \t]*=>[ \t]*\[/m', $content, $m, PREG_OFFSET_CAPTURE) !== 1) {
+            return null;
+        }
+
+        return self::bracketSpan($content, $m[0][1] + strlen($m[0][0]) - 1);
+    }
+
+    /**
+     * The inner span of a 'name' => [...] entry inside [outerStart,
+     * outerClose]. Null when the entry is not readable. Either quote style is
+     * accepted.
+     *
+     * @return array{0: int, 1: int}|null
+     */
+    private static function entry(string $content, int $outerStart, int $outerClose, string $name): ?array
+    {
+        $inner = substr($content, $outerStart, $outerClose - $outerStart);
+        if (preg_match('/^[ \t]*([\x27"])' . $name . '\1[ \t]*=>[ \t]*\[/m', $inner, $m, PREG_OFFSET_CAPTURE) !== 1) {
+            return null;
+        }
+
+        return self::bracketSpan($content, $outerStart + $m[0][1] + strlen($m[0][0]) - 1);
+    }
+
+    /**
+     * The quoted value of the driver key inside [start, close]: the text and
+     * the offsets of the value alone, quotes excluded. Null when there is no
+     * plain quoted driver string.
+     *
+     * @return array{0: string, 1: int, 2: int}|null
+     */
+    private static function driverValue(string $content, int $start, int $close): ?array
+    {
+        $inner = substr($content, $start, $close - $start);
+        if (preg_match('/^[ \t]*([\x27"])driver\1[ \t]*=>[ \t]*[\x27"]([^"\x27]*)[\x27"]/m', $inner, $m, PREG_OFFSET_CAPTURE) !== 1) {
+            return null;
+        }
+        $valueOffset = $start + $m[2][1];
+
+        return [$m[2][0], $valueOffset, $valueOffset + strlen($m[2][0])];
+    }
+
+    /**
+     * Whether the entry inside [start, close] already carries a model key.
+     */
+    private static function modelKey(string $content, int $start, int $close): bool
+    {
+        $inner = substr($content, $start, $close - $start);
+
+        return preg_match('/^[ \t]*([\x27"])model\1[ \t]*=>/m', $inner) === 1;
+    }
+
+    /**
+     * Where a new entry goes before a closing bracket at [innerStart, close]:
+     * the start of the bracket's own line and the indentation a sibling entry
+     * would carry.
+     *
+     * @return array{0: int, 1: string}
+     */
+    private static function entryInsertion(string $content, int $innerStart, int $close): array
+    {
+        $closeLineStart = strrpos(substr($content, 0, $close), "\n");
+        $closeLineStart = $closeLineStart === false ? 0 : $closeLineStart + 1;
+        $indent = '';
+        foreach (self::lines(substr($content, $innerStart, $close - $innerStart)) as [$offset, $text]) {
+            $trimmed = trim($text);
+            if ($trimmed !== '' && !str_starts_with($trimmed, '//') && !str_starts_with($trimmed, '#')) {
+                $indent = substr($text, 0, strlen($text) - strlen(ltrim($text, " \t")));
+
+                break;
+            }
+        }
+        if ($indent === '') {
+            $closeLine = substr($content, $closeLineStart, $close - $closeLineStart);
+            $indent = substr($closeLine, 0, strlen($closeLine) - strlen(ltrim($closeLine, " \t"))) . '    ';
+        }
+
+        return [$closeLineStart, $indent];
     }
 
     /**

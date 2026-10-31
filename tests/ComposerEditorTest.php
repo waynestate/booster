@@ -60,7 +60,7 @@ final class ComposerEditorTest extends TestCase
 
         $require = $this->read($dir)['require'];
         self::assertArrayNotHasKey('cit-web-infra/wayne-cas', $require);
-        self::assertSame('^0.2', $require['waynestate/sesame']);
+        self::assertSame('^0.3', $require['waynestate/sesame']);
     }
 
     public function test_a_php_hop_never_adds_a_laravel_requirement(): void

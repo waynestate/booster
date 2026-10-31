@@ -1239,11 +1239,16 @@ final class HopExecutorTest extends TestCase
         self::assertStringNotContainsString("'wayne.cas',", $kernel);
         self::assertStringContainsString("'wayne.cas' => \Waynestate\Sesame\WayneCas\WayneAuthenticate::class", $kernel);
         self::assertStringContainsString("Route::middleware(['web', 'wayne.cas'])", (string) file_get_contents($dir . '/app/Providers/RouteServiceProvider.php'));
+        $auth = (string) file_get_contents($dir . '/config/auth.php');
+        self::assertStringContainsString("'driver' => 'sesame'", $auth);
+        self::assertStringContainsString("'driver' => 'eloquent'", $auth);
+        self::assertStringContainsString("'model' => App\User::class,", $auth);
+        self::assertStringNotContainsString('wayneCas', $auth);
         $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
-        self::assertSame('^0.2', $composer['require']['waynestate/sesame']);
+        self::assertSame('^0.3', $composer['require']['waynestate/sesame']);
         self::assertArrayNotHasKey('cit-web-infra/wayne-cas', $composer['require']);
         self::assertSame(
-            ['config/sesame.php', 'app/Http/Kernel.php', 'app/Providers/RouteServiceProvider.php', 'app/User.php'],
+            ['config/sesame.php', 'app/Http/Kernel.php', 'app/Providers/RouteServiceProvider.php', 'config/auth.php', 'app/User.php'],
             array_map(static fn(array $f): string => $f['file'], $report->results[0]->files),
         );
         $messages = implode(' ', $report->results[0]->messages);
@@ -1263,11 +1268,12 @@ final class HopExecutorTest extends TestCase
         self::assertSame(['previewed'], $this->statuses($report));
         self::assertSame($before, $this->snapshot($dir));
         self::assertFileDoesNotExist($dir . '/config/sesame.php');
-        self::assertCount(4, $report->results[0]->files);
+        self::assertCount(5, $report->results[0]->files);
         $messages = implode(' ', $report->results[0]->messages);
         self::assertStringContainsString('Dry run: would write config/sesame.php', $messages);
         self::assertStringContainsString('Dry run: would rewrite app/Http/Kernel.php', $messages);
         self::assertStringContainsString('Dry run: would rewrite app/Providers/RouteServiceProvider.php', $messages);
+        self::assertStringContainsString('Dry run: would rewrite config/auth.php', $messages);
         self::assertStringContainsString('Dry run: would rewrite app/User.php', $messages);
     }
 

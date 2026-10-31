@@ -53,7 +53,7 @@ final class CasMigrationTest extends TestCase
             (string) file_get_contents($dir . '/config/wayne-cas.php'),
         );
         self::assertSame(
-            ['config/sesame.php', 'app/Http/Kernel.php', 'app/Providers/RouteServiceProvider.php', 'app/User.php'],
+            ['config/sesame.php', 'app/Http/Kernel.php', 'app/Providers/RouteServiceProvider.php', 'config/auth.php', 'app/User.php'],
             array_map(static fn(array $f): string => $f['file'], $result->files),
         );
     }
@@ -202,15 +202,16 @@ final class CasMigrationTest extends TestCase
 
         self::assertSame($before, $this->snapshot($dir));
         self::assertFileDoesNotExist($dir . '/config/sesame.php');
-        self::assertCount(4, $result->changes);
+        self::assertCount(5, $result->changes);
         self::assertStringStartsWith('Dry run: would write config/sesame.php', $result->changes[0]);
         self::assertStringStartsWith('Dry run: would rewrite app/Http/Kernel.php', $result->changes[1]);
         self::assertStringStartsWith('Dry run: would rewrite app/Providers/RouteServiceProvider.php', $result->changes[2]);
+        self::assertStringStartsWith('Dry run: would rewrite config/auth.php', $result->changes[3]);
         // The example model already uses ReadOnlyAttributes, so its diff adds
         // the interface and drops the now-dead wayne-cas import.
         self::assertSame(
             'Dry run: would rewrite app/User.php: rewritten to implements \Waynestate\Sesame\WayneCas\WayneCasable; the wayne-cas import was removed.',
-            $result->changes[3],
+            $result->changes[4],
         );
     }
 
@@ -485,6 +486,232 @@ final class CasMigrationTest extends TestCase
         self::assertSame($providerBefore, (string) file_get_contents($dir . '/app/Providers/RouteServiceProvider.php'));
         self::assertNotContains('app/Http/Kernel.php', array_map(static fn(array $f): string => $f['file'], $result->files));
         self::assertNotContains('app/Providers/RouteServiceProvider.php', array_map(static fn(array $f): string => $f['file'], $result->files));
+    }
+
+    public function test_it_points_the_web_guard_and_users_provider_at_sesame(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $result = $this->migrate($dir);
+
+        $auth = (string) file_get_contents($dir . '/config/auth.php');
+        self::assertStringContainsString("'driver' => 'sesame'", $auth);
+        self::assertStringContainsString("'driver' => 'eloquent'", $auth);
+        self::assertStringContainsString("'model' => App\User::class,", $auth);
+        self::assertStringNotContainsString('wayneCas', $auth);
+        self::assertStringNotContainsString("'driver' => 'session'", $auth);
+        self::assertSame(
+            'config/auth.php: the web guard now uses the sesame driver; the users provider now uses the eloquent driver; the users provider got a model key pointing at App\User::class.',
+            $result->changes[3],
+        );
+        self::assertSame(
+            ['file' => 'config/auth.php', 'diff' => 'web guard driver session to sesame; users provider driver wayneCas to eloquent; model key added to the users provider'],
+            $result->files[3],
+        );
+    }
+
+    public function test_an_already_migrated_auth_config_is_left_alone(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        file_put_contents($dir . '/config/auth.php', <<<'PHP'
+        <?php
+
+        return [
+            'guards' => [
+                'web' => [
+                    'driver' => 'sesame',
+                    'provider' => 'users',
+                ],
+            ],
+            'providers' => [
+                'users' => [
+                    'driver' => 'eloquent',
+                    'model' => App\User::class,
+                ],
+            ],
+        ];
+        PHP . "\n");
+        $before = (string) file_get_contents($dir . '/config/auth.php');
+        $result = $this->migrate($dir);
+
+        self::assertSame($before, (string) file_get_contents($dir . '/config/auth.php'));
+        self::assertNotContains('config/auth.php', array_map(static fn(array $f): string => $f['file'], $result->files));
+    }
+
+    public function test_it_adds_a_model_key_when_the_provider_is_already_eloquent(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        file_put_contents($dir . '/config/auth.php', <<<'PHP'
+        <?php
+
+        return [
+            'guards' => [
+                'web' => [
+                    'driver' => 'sesame',
+                    'provider' => 'users',
+                ],
+            ],
+            'providers' => [
+                'users' => [
+                    'driver' => 'eloquent',
+                ],
+            ],
+        ];
+        PHP . "\n");
+        $result = $this->migrate($dir);
+
+        $after = (string) file_get_contents($dir . '/config/auth.php');
+        self::assertStringContainsString("'driver' => 'eloquent'", $after);
+        self::assertStringContainsString("'model' => App\User::class,", $after);
+        self::assertStringContainsString('the users provider got a model key', implode(' ', $result->changes));
+    }
+
+    public function test_an_existing_model_key_is_kept_when_the_provider_moves(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        file_put_contents($dir . '/config/auth.php', <<<'PHP'
+        <?php
+
+        return [
+            'guards' => [
+                'web' => [
+                    'driver' => 'session',
+                    'provider' => 'users',
+                ],
+            ],
+            'providers' => [
+                'users' => [
+                    'driver' => 'wayneCas',
+                    'model' => App\CustomUser::class,
+                ],
+            ],
+        ];
+        PHP . "\n");
+        $result = $this->migrate($dir);
+
+        $after = (string) file_get_contents($dir . '/config/auth.php');
+        self::assertStringContainsString("'driver' => 'eloquent'", $after);
+        self::assertStringContainsString("'model' => App\CustomUser::class,", $after);
+        self::assertStringNotContainsString('App\User::class', $after);
+        self::assertSame(1, substr_count($after, "'model' =>"));
+    }
+
+    public function test_an_unknown_guard_driver_is_a_manual_note_but_the_provider_still_moves(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        file_put_contents($dir . '/config/auth.php', <<<'PHP'
+        <?php
+
+        return [
+            'guards' => [
+                'web' => [
+                    'driver' => 'token',
+                    'provider' => 'users',
+                ],
+            ],
+            'providers' => [
+                'users' => [
+                    'driver' => 'wayneCas',
+                ],
+            ],
+        ];
+        PHP . "\n");
+        $result = $this->migrate($dir);
+
+        $after = (string) file_get_contents($dir . '/config/auth.php');
+        self::assertStringContainsString("'driver' => 'token'", $after);
+        self::assertStringContainsString("'driver' => 'eloquent'", $after);
+        self::assertStringContainsString('found the web guard on the token driver', implode(' ', $result->manual));
+        self::assertStringContainsString('config/auth.php: the users provider now uses the eloquent driver', implode(' ', $result->changes));
+    }
+
+    public function test_an_unknown_provider_driver_is_a_manual_note_but_the_guard_still_moves(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        file_put_contents($dir . '/config/auth.php', <<<'PHP'
+        <?php
+
+        return [
+            'guards' => [
+                'web' => [
+                    'driver' => 'session',
+                    'provider' => 'users',
+                ],
+            ],
+            'providers' => [
+                'users' => [
+                    'driver' => 'database',
+                ],
+            ],
+        ];
+        PHP . "\n");
+        $result = $this->migrate($dir);
+
+        $after = (string) file_get_contents($dir . '/config/auth.php');
+        self::assertStringContainsString("'driver' => 'sesame'", $after);
+        self::assertStringContainsString("'driver' => 'database'", $after);
+        self::assertStringNotContainsString("'model' =>", $after);
+        self::assertStringContainsString('found the users provider on the database driver', implode(' ', $result->manual));
+        self::assertStringContainsString('config/auth.php: the web guard now uses the sesame driver', implode(' ', $result->changes));
+    }
+
+    public function test_a_single_line_users_provider_gets_a_note_when_the_model_key_wont_fit(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        file_put_contents($dir . '/config/auth.php', <<<'PHP'
+        <?php
+
+        return [
+            'guards' => [
+                'web' => [
+                    'driver' => 'session',
+                    'provider' => 'users',
+                ],
+            ],
+            'providers' => [
+                'users' => ['driver' => 'wayneCas'],
+            ],
+        ];
+        PHP . "\n");
+        $result = $this->migrate($dir);
+
+        $after = (string) file_get_contents($dir . '/config/auth.php');
+        self::assertStringContainsString("'driver' => 'sesame'", $after);
+        self::assertStringContainsString("'driver' => 'eloquent'", $after);
+        self::assertStringNotContainsString("'model' =>", $after);
+        self::assertStringContainsString('found the users provider on one line', implode(' ', $result->manual));
+    }
+
+    public function test_an_unreadable_guards_section_is_a_manual_note(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        file_put_contents($dir . '/config/auth.php', <<<'PHP'
+        <?php
+
+        return [
+            'providers' => [
+                'users' => [
+                    'driver' => 'wayneCas',
+                ],
+            ],
+        ];
+        PHP . "\n");
+        $before = (string) file_get_contents($dir . '/config/auth.php');
+        $result = $this->migrate($dir);
+
+        self::assertSame($before, (string) file_get_contents($dir . '/config/auth.php'));
+        self::assertStringContainsString('could not read the guards section', implode(' ', $result->manual));
+        self::assertNotContains('config/auth.php', array_map(static fn(array $f): string => $f['file'], $result->files));
+    }
+
+    public function test_a_missing_auth_config_is_silent(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        unlink($dir . '/config/auth.php');
+        $result = $this->migrate($dir);
+
+        self::assertFileDoesNotExist($dir . '/config/auth.php');
+        self::assertNotContains('config/auth.php', array_map(static fn(array $f): string => $f['file'], $result->files));
+        self::assertStringNotContainsString('config/auth.php', implode(' ', $result->manual));
     }
 
     public function test_a_missing_old_config_is_a_manual_note(): void
