@@ -63,6 +63,9 @@ final class ComposerEditor
                 $changes = [...$changes, ...$this->dropWayneCasRepositories($data)];
             }
         }
+        if ($hop->kind === HopKind::Sesame) {
+            $changes = [...$changes, ...$this->ensureHttpClient($data)];
+        }
         if ($hop->kind === HopKind::Php && isset($data['config']['platform']['php'])) {
             $data['config']['platform']['php'] = $hop->to . '.0';
             $changes[] = sprintf('Set config.platform.php to %s.0.', $hop->to);
@@ -282,6 +285,29 @@ final class ComposerEditor
         }
 
         return $changes;
+    }
+
+    /**
+     * SESAME only suggests guzzlehttp/guzzle, and its Laravel provider builds
+     * a Guzzle client when the app binds no PSR-18 client, so an app with
+     * neither Guzzle nor the Symfony HTTP client cannot sign in. Require
+     * Guzzle when both are absent, through the same require edit as
+     * composerSet, so the gate's composer update picks it up.
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return list<string>
+     */
+    private function ensureHttpClient(array &$data): array
+    {
+        $require = $data['require'] ?? [];
+        if (isset($require['guzzlehttp/guzzle']) || isset($require['symfony/http-client'])) {
+            return [];
+        }
+        $data['require']['guzzlehttp/guzzle'] = '^7.8';
+        ksort($data['require']);
+
+        return ['composer.json: added guzzlehttp/guzzle ^7.8 (SESAME needs an HTTP client)'];
     }
 
     private function alreadyAtLeast(string $current, string $target, bool $isPhp): bool

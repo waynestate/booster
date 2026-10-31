@@ -118,6 +118,44 @@ final class ComposerEditorTest extends TestCase
         }
     }
 
+    public function test_the_sesame_swap_adds_guzzle_when_the_app_has_no_http_client(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $changes = (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        self::assertContains('composer.json: added guzzlehttp/guzzle ^7.8 (SESAME needs an HTTP client)', $changes);
+        self::assertSame('^7.8', $this->read($dir)['require']['guzzlehttp/guzzle']);
+    }
+
+    public function test_the_sesame_swap_keeps_an_existing_guzzle_constraint(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $data = $this->read($dir);
+        $data['require']['guzzlehttp/guzzle'] = '^7.5';
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        $changes = (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        self::assertSame('^7.5', $this->read($dir)['require']['guzzlehttp/guzzle']);
+        foreach ($changes as $line) {
+            self::assertStringNotContainsString('guzzlehttp/guzzle', $line);
+        }
+    }
+
+    public function test_the_sesame_swap_leaves_symfony_http_client_in_place_of_guzzle(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $data = $this->read($dir);
+        $data['require']['symfony/http-client'] = '^7.0';
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        $require = $this->read($dir)['require'];
+        self::assertArrayNotHasKey('guzzlehttp/guzzle', $require);
+        self::assertSame('^7.0', $require['symfony/http-client']);
+    }
+
     public function test_a_php_hop_never_adds_a_laravel_requirement(): void
     {
         $dir = $this->copyExample('raw-php');
