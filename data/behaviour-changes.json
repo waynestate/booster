@@ -1,0 +1,572 @@
+{
+  "schema_version": 1,
+  "changes": [
+    {
+      "id": "redis-client-default",
+      "hop": "laravel-5.8-to-6",
+      "detect": { "kind": "config", "file": "config/database.php", "key": "client" },
+      "label": "Default Redis client changed from predis to phpredis; Redis-backed features now run on a different client library and need the phpredis extension",
+      "keep_old": "'client' => 'predis' in config/database.php",
+      "check": "Exercise cache/session/queue on Redis after the hop",
+      "source": "https://laravel.com/docs/6.x/upgrade#redis-default-client"
+    },
+    {
+      "id": "queue-work-tries",
+      "hop": "laravel-5.8-to-6",
+      "detect": { "kind": "token", "match": "queue:work" },
+      "label": "php artisan queue:work retries a job once by default instead of indefinitely",
+      "keep_old": "php artisan queue:work --tries=0",
+      "check": "Review worker invocations and confirm retry expectations",
+      "source": "https://laravel.com/docs/6.x/upgrade#queue-retry-limit"
+    },
+    {
+      "id": "scheduler-between-midnight",
+      "hop": "laravel-5.8-to-6",
+      "detect": { "kind": "method", "match": "between" },
+      "label": "Scheduler between() across midnight now runs the intended window (23:00 to 4:00) instead of the swapped one (4:00 to 23:00)",
+      "keep_old": null,
+      "check": "List overnight cron jobs and confirm they fire at expected times",
+      "source": "https://laravel.com/docs/6.x/upgrade#the-between-method"
+    },
+    {
+      "id": "date-serialization-iso",
+      "hop": "laravel-6-to-7",
+      "detect": { "kind": "always" },
+      "label": "Model toArray/toJson serialize dates as ISO-8601 UTC with fractional seconds (2019-12-02T20:01:00.283041Z) instead of Y-m-d H:i:s",
+      "keep_old": "override serializeDate(DateTimeInterface $date) on the model to return $date->format('Y-m-d H:i:s')",
+      "check": "Compare a JSON API response date field before and after",
+      "source": "https://laravel.com/docs/7.x/upgrade#date-serialization"
+    },
+    {
+      "id": "mail-mailer-env",
+      "hop": "laravel-6-to-7",
+      "detect": { "kind": "token", "match": "MAIL_DRIVER" },
+      "label": "MAIL_DRIVER env var renamed to MAIL_MAILER; a .env still holding MAIL_DRIVER is ignored and the mailer falls back to the config default (smtp)",
+      "keep_old": "rename MAIL_DRIVER to MAIL_MAILER in .env",
+      "check": "Send a test mail and confirm the intended transport is used",
+      "source": "https://laravel.com/docs/7.x/upgrade#configuration-file-changes"
+    },
+    {
+      "id": "get-original-casts",
+      "hop": "laravel-6-to-7",
+      "detect": { "kind": "method", "match": "getOriginal" },
+      "label": "getOriginal() now applies casts and mutators instead of returning raw attributes",
+      "keep_old": "use getRawOriginal() for raw values",
+      "check": "Audit getOriginal() callers expecting raw values",
+      "source": "https://laravel.com/docs/7.x/upgrade#the-getoriginal-method"
+    },
+    {
+      "id": "different-rule-missing",
+      "hop": "laravel-6-to-7",
+      "detect": { "kind": "token", "match": "different" },
+      "label": "The different validation rule now fails when the compared field is missing from the request",
+      "keep_old": null,
+      "check": "Submit forms using different with the compared field empty",
+      "source": "https://laravel.com/docs/7.x/upgrade#the-different-rule"
+    },
+    {
+      "id": "pagination-tailwind-default",
+      "hop": "laravel-7-to-8",
+      "detect": { "kind": "blade", "match": "->links(" },
+      "label": "Paginator renders Tailwind markup by default; Bootstrap apps get unstyled page links",
+      "keep_old": "Paginator::useBootstrap(); in AppServiceProvider boot",
+      "check": "Open a paginated page and confirm pagination markup and styles",
+      "source": "https://laravel.com/docs/8.x/upgrade#pagination-defaults"
+    },
+    {
+      "id": "retry-after-backoff",
+      "hop": "laravel-7-to-8",
+      "detect": { "kind": "property", "match": "$retryAfter" },
+      "label": "Job, mailer, notification and listener $retryAfter property renamed to $backoff; the old property is silently ignored and custom retry delays revert to the default",
+      "keep_old": null,
+      "check": "Grep job classes for retry delays and confirm they still apply",
+      "source": "https://laravel.com/docs/8.x/upgrade#the-retryafter-method"
+    },
+    {
+      "id": "timeout-at-retry-until",
+      "hop": "laravel-7-to-8",
+      "detect": { "kind": "property", "match": "$timeoutAt" },
+      "label": "$timeoutAt property renamed to $retryUntil; the old property is silently ignored and the job retry timeout reverts to the default",
+      "keep_old": null,
+      "check": "Grep for $timeoutAt usages",
+      "source": "https://laravel.com/docs/8.x/upgrade#the-timeoutat-property"
+    },
+    {
+      "id": "flysystem-overwrite",
+      "hop": "laravel-8-to-9",
+      "detect": { "kind": "class", "match": "Storage" },
+      "label": "Storage put/write/writeStream now overwrite existing files by default",
+      "keep_old": null,
+      "check": "Find write paths that assumed a fresh file",
+      "source": "https://laravel.com/docs/9.x/upgrade#overwriting-existing-files"
+    },
+    {
+      "id": "flysystem-throw-false",
+      "hop": "laravel-8-to-9",
+      "detect": { "kind": "config", "file": "config/filesystems.php", "key": "throw" },
+      "label": "Failed writes return false instead of throwing; reading a missing file returns null instead of FileNotFoundException; deleting a missing file returns true",
+      "keep_old": "'throw' => true in the affected disk config",
+      "check": "Audit error handling around Storage calls",
+      "source": "https://laravel.com/docs/9.x/upgrade#write-exceptions"
+    },
+    {
+      "id": "http-client-timeout-30s",
+      "hop": "laravel-8-to-9",
+      "detect": { "kind": "class", "match": "Http" },
+      "label": "HTTP client has a 30 second default timeout; slow external calls that used to hang indefinitely now throw",
+      "keep_old": "Http::timeout(0); globally, or a larger per-request timeout()",
+      "check": "List outbound integrations and their worst case latency",
+      "source": "https://laravel.com/docs/9.x/upgrade#http-client-default-timeout"
+    },
+    {
+      "id": "validated-array-keys",
+      "hop": "laravel-8-to-9",
+      "detect": { "kind": "method", "match": "validated" },
+      "label": "Unvalidated array keys are always excluded from $request->validated() even without an allowed keys list",
+      "keep_old": "Validator::includeUnvalidatedArrayKeys(); in a service provider boot",
+      "check": "Compare validated() payloads for nested array inputs",
+      "source": "https://laravel.com/docs/9.x/upgrade#unvalidated-array-keys"
+    },
+    {
+      "id": "custom-cast-null-set",
+      "hop": "laravel-8-to-9",
+      "detect": { "kind": "class", "match": "CastsAttributes" },
+      "label": "Custom cast set() is now invoked when the attribute is set to null; casts assuming non-null values misbehave",
+      "keep_old": null,
+      "check": "Review custom casts for null handling",
+      "source": "https://laravel.com/docs/9.x/upgrade#custom-casts-and-null"
+    },
+    {
+      "id": "belongs-to-many-first-or-create",
+      "hop": "laravel-8-to-9",
+      "detect": { "kind": "method", "match": "firstOrCreate" },
+      "label": "belongsToMany firstOrNew/firstOrCreate/updateOrCreate now match against the related table instead of the pivot table",
+      "keep_old": null,
+      "check": "Audit sync and attach flows on pivot relations",
+      "source": "https://laravel.com/docs/9.x/upgrade#belongs-to-many-first-or-new"
+    },
+    {
+      "id": "ulid-column-name",
+      "hop": "laravel-9-to-10",
+      "detect": { "kind": "method", "match": "ulid" },
+      "label": "$table->ulid() with no argument now creates a column named ulid instead of uuid; migrations succeed but later queries on uuid break",
+      "keep_old": null,
+      "check": "Diff new migration SQL for ulid columns",
+      "source": "https://laravel.com/docs/10.x/upgrade#ulid-columns"
+    },
+    {
+      "id": "model-dates-removed",
+      "hop": "laravel-9-to-10",
+      "detect": { "kind": "property", "match": "$dates" },
+      "label": "The Eloquent $dates property was removed; models still declaring it lose datetime casting silently (date attributes come back as raw strings instead of Carbon)",
+      "keep_old": null,
+      "check": "Grep models for $dates and verify date attributes are Carbon",
+      "source": "https://laravel.com/docs/10.x/upgrade#model-dates-property"
+    },
+    {
+      "id": "carbon-diffin-float",
+      "hop": "laravel-10-to-11",
+      "detect": { "kind": "method", "match": "diffInSeconds" },
+      "label": "Carbon 3 diffIn* methods return floats and may be negative (relative diff) instead of positive integers",
+      "keep_old": "(int) abs($a->diffInSeconds($b)) per the Carbon 3 migration guide, or pin Carbon 2 while still on Laravel 11",
+      "check": "Compute a couple of diffs and compare sign and rounding",
+      "source": "https://laravel.com/docs/11.x/upgrade#carbon-3"
+    },
+    {
+      "id": "carbon-createfromtimestamp-utc",
+      "hop": "laravel-10-to-11",
+      "detect": { "kind": "method", "match": "createFromTimestamp" },
+      "label": "Carbon 3 createFromTimestamp() interprets the timestamp in UTC instead of date_default_timezone_get(); displayed times shift",
+      "keep_old": "Carbon::createFromTimestamp($ts, date_default_timezone_get()) (explicit timezone)",
+      "check": "Display a stored unix timestamp and compare the rendered time",
+      "source": "https://carbon.nesbot.com/guide/getting-started/migration.html#createfromtimestamp-utc-by-default"
+    },
+    {
+      "id": "carbon-create-nullable",
+      "hop": "laravel-10-to-11",
+      "detect": { "kind": "method", "match": "createFromFormat" },
+      "label": "Carbon 3 create/createFromFormat and friends return null instead of false on failure; === false checks stop working",
+      "keep_old": null,
+      "check": "Audit failure handling for date parsing",
+      "source": "https://carbon.nesbot.com/guide/getting-started/migration.html#falsable-nullable"
+    },
+    {
+      "id": "limit-constructor-seconds",
+      "hop": "laravel-10-to-11",
+      "detect": { "kind": "class", "match": "Limit" },
+      "label": "Rate limiter Limit and ThrottlesExceptions constructors now take seconds instead of minutes; new Limit($key, 5, 60) now means 60 seconds, not 60 minutes",
+      "keep_old": null,
+      "check": "Review throttle definitions and test a limited endpoint",
+      "source": "https://laravel.com/docs/11.x/upgrade#per-second-rate-limiting"
+    },
+    {
+      "id": "migration-change-drops-modifiers",
+      "hop": "laravel-10-to-11",
+      "detect": { "kind": "method", "match": "change" },
+      "label": "->change() column migrations now drop any modifier not re-specified (unsigned, default, comment); schema changes silently",
+      "keep_old": "re-specify all kept modifiers, or squash migrations (php artisan schema:dump)",
+      "check": "Run pending change migrations against a scratch DB and diff the schema",
+      "source": "https://laravel.com/docs/11.x/upgrade#modifying-columns"
+    },
+    {
+      "id": "hasuuids-v7",
+      "hop": "laravel-11-to-12",
+      "detect": { "kind": "class", "match": "HasUuids" },
+      "label": "HasUuids now generates ordered UUIDv7 ids instead of UUIDv4",
+      "keep_old": "use Illuminate\\Database\\Eloquent\\Concerns\\HasVersion4Uuids as HasUuids;",
+      "check": "Create a record and inspect the id version nibble",
+      "source": "https://laravel.com/docs/12.x/upgrade#models-and-uuidv7"
+    },
+    {
+      "id": "image-rule-svg",
+      "hop": "laravel-11-to-12",
+      "detect": { "kind": "token", "match": "image" },
+      "label": "The image validation rule no longer allows SVGs by default; SVG uploads now fail validation",
+      "keep_old": "image:allow_svg (or File::image(allowSvg: true))",
+      "check": "Upload an SVG through a form using the image rule",
+      "source": "https://laravel.com/docs/12.x/upgrade#image-validation"
+    },
+    {
+      "id": "local-disk-root-private",
+      "hop": "laravel-11-to-12",
+      "detect": { "kind": "config", "file": "config/filesystems.php", "key": "local" },
+      "label": "When the app does not define a local disk, its root now defaults to storage/app/private instead of storage/app",
+      "keep_old": "define the local disk with 'root' => storage_path('app')",
+      "check": "Check where Storage::disk('local') writes after the hop",
+      "source": "https://laravel.com/docs/12.x/upgrade#local-filesystem-disk-default-root-path"
+    },
+    {
+      "id": "cache-serializable-classes",
+      "hop": "laravel-12-to-13",
+      "detect": { "kind": "class", "match": "Cache" },
+      "label": "Default cache config adds serializable_classes => false; cached PHP objects outside an allow-list no longer unserialize",
+      "keep_old": "list allowed classes in serializable_classes, or cache arrays instead",
+      "check": "Read back cached objects after the hop",
+      "source": "https://laravel.com/docs/13.x/upgrade#cache-serializable_classes-configuration"
+    },
+    {
+      "id": "polyfill-array-first-last",
+      "hop": "laravel-12-to-13",
+      "detect": { "kind": "function", "match": "array_first" },
+      "label": "On PHP below 8.5 the new symfony/polyfill-php85 dependency defines global array_first()/array_last(); where laravel/helpers or custom helpers defined them with callback support, the polyfill version (no callback) silently wins",
+      "keep_old": "use Arr::first() / Arr::last() instead of the global helpers",
+      "check": "Run code paths that filter with array_first($arr, fn)",
+      "source": "https://laravel.com/docs/13.x/upgrade#symfony-php-85-polyfill-and-global-function-conflicts"
+    },
+    {
+      "id": "number-format-negative-zero",
+      "hop": "php-71-to-72",
+      "detect": { "kind": "function", "match": "number_format" },
+      "label": "number_format() no longer renders -0: small negative values such as -0.01 now display as \"0\", so sub-cent negatives lose their sign in reports",
+      "keep_old": null,
+      "check": "Render small negative amounts (for example -0.004) before and after the hop",
+      "source": "https://www.php.net/manual/en/migration72.incompatible.php"
+    },
+    {
+      "id": "bcmod-floats",
+      "hop": "php-71-to-72",
+      "detect": { "kind": "function", "match": "bcmod" },
+      "label": "bcmod() no longer truncates fractional operands to integers; bcmod('4', '3.5') now returns 0.5 instead of 1, following fmod() rather than the % operator",
+      "keep_old": "truncate both operands to integers first (for example bcdiv($a, '1', 0))",
+      "check": "Audit BC remainder calculations that take decimal operands",
+      "source": "https://www.php.net/manual/en/migration72.incompatible.php"
+    },
+    {
+      "id": "date-parse-zone-seconds",
+      "hop": "php-71-to-72",
+      "detect": { "kind": "function", "match": "date_parse" },
+      "label": "The zone element of date_parse()/date_parse_from_format() now holds seconds with inverted sign instead of minutes (for instance -120 becomes 7200)",
+      "keep_old": null,
+      "check": "Audit timezone offset handling built from parsed dates",
+      "source": "https://www.php.net/manual/en/migration72.incompatible.php"
+    },
+    {
+      "id": "bcmath-scale-trailing-zeros",
+      "hop": "php-72-to-73",
+      "detect": { "kind": "function", "match": "bcmul" },
+      "label": "bcmul() and bcpow() now return results with the requested scale, keeping trailing zeros (bcmul('1','2',2) gives 2.00 instead of 2)",
+      "keep_old": "strip trailing zeros after the call, or compute at scale 0",
+      "check": "Compare displayed or compared BC results that pass an explicit scale",
+      "source": "https://www.php.net/manual/en/migration73.incompatible.php"
+    },
+    {
+      "id": "mysqli-prepared-frac-seconds",
+      "hop": "php-72-to-73",
+      "detect": { "kind": "method", "match": "prepare" },
+      "label": "MySQLi prepared statements now return fractional seconds for DATETIME/TIME/TIMESTAMP columns declared with decimals (for example TIMESTAMP(6)); the fraction was previously dropped",
+      "keep_old": null,
+      "check": "Query a decimal datetime column through a prepared statement and compare values",
+      "source": "https://www.php.net/manual/en/migration73.incompatible.php"
+    },
+    {
+      "id": "idn-default-variant-uts46",
+      "hop": "php-73-to-74",
+      "detect": { "kind": "function", "match": "idn_to_ascii" },
+      "label": "idn_to_ascii()/idn_to_utf8() default to INTL_IDNA_VARIANT_UTS46 instead of the deprecated INTL_IDNA_VARIANT_2003; converted output can differ for some inputs when no variant is passed",
+      "keep_old": "pass INTL_IDNA_VARIANT_2003 explicitly",
+      "check": "Convert a sample of internationalized hostnames and diff the output",
+      "source": "https://www.php.net/manual/en/migration74.incompatible.php"
+    },
+    {
+      "id": "arrayobject-get-object-vars",
+      "hop": "php-73-to-74",
+      "detect": { "kind": "function", "match": "get_object_vars" },
+      "label": "get_object_vars() on an ArrayObject now always returns the object's own properties instead of the wrapped array's values (unless STD_PROP_LIST was set); reset()/current() and other property-list operations are affected the same way, while (array) casts are not",
+      "keep_old": null,
+      "check": "Exercise code paths that read ArrayObject contents via object-property operations",
+      "source": "https://www.php.net/manual/en/migration74.incompatible.php"
+    },
+    {
+      "id": "php80-string-number-compare",
+      "hop": "php-74-to-80",
+      "detect": { "kind": "always" },
+      "label": "Loose comparison of a number with a non-numeric string is now false: 0 == \"foo\", 0 == \"\" and 42 == \"42foo\" flip from true to false; < / <= against negative numbers also flip for such strings",
+      "keep_old": null,
+      "check": "Audit loose comparisons of request parameters and string DB columns",
+      "source": "https://www.php.net/manual/en/migration80.incompatible.php"
+    },
+    {
+      "id": "php80-pdo-errmode-exception",
+      "hop": "php-74-to-80",
+      "detect": { "kind": "class", "match": "PDO" },
+      "label": "PDO default error handling mode changed from \"silent\" to \"exceptions\"; failed queries now throw PDOException instead of returning false",
+      "keep_old": "new PDO($dsn, $u, $p, [PDO::ATTR_ERRMODE => PDO::ERRMODE_SILENT])",
+      "check": "Exercise a failing query (bad SQL, missing table) after the hop",
+      "source": "https://www.php.net/manual/en/migration80.incompatible.php"
+    },
+    {
+      "id": "php80-float-cast-locale",
+      "hop": "php-74-to-80",
+      "detect": { "kind": "function", "match": "setlocale" },
+      "label": "Float to string casting is now always locale-independent: echo 3.14 under a de_DE locale prints 3.14 instead of 3,14",
+      "keep_old": null,
+      "check": "Render prices or measurements under a non-C locale",
+      "source": "https://www.php.net/manual/en/migration80.incompatible.php"
+    },
+    {
+      "id": "php80-assert-throws",
+      "hop": "php-74-to-80",
+      "detect": { "kind": "function", "match": "assert" },
+      "label": "Assertion failures now throw an AssertionError by default instead of raising a notice; a failing assert can now kill a request",
+      "keep_old": "assert.exception=0 in the INI settings",
+      "check": "Trigger a failing assert and confirm it does not 500",
+      "source": "https://www.php.net/manual/en/migration80.incompatible.php"
+    },
+    {
+      "id": "php80-error-reporting-eall",
+      "hop": "php-74-to-80",
+      "detect": { "kind": "always" },
+      "label": "Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output",
+      "keep_old": "error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED in php.ini",
+      "check": "Watch error logs and rendered pages for new notices after the hop",
+      "source": "https://www.php.net/manual/en/migration80.incompatible.php"
+    },
+    {
+      "id": "php80-resource-to-object",
+      "hop": "php-74-to-80",
+      "detect": { "kind": "function", "match": "is_resource" },
+      "label": "cURL, GD images, OpenSSL keys and certificates, sockets, XML parsers, XMLWriter, sysvmsg/sysvsem/shmop, enchant and inflate/deflate handles are now objects; is_resource() checks on them return false",
+      "keep_old": null,
+      "check": "Exercise image handling, cURL calls and XML parsing after the hop",
+      "source": "https://www.php.net/manual/en/migration80.incompatible.php"
+    },
+    {
+      "id": "php81-resource-to-object",
+      "hop": "php-80-to-81",
+      "detect": { "kind": "function", "match": "is_resource" },
+      "label": "FileInfo, FTP, IMAP, LDAP, PgSQL and PSpell handles are now objects; is_resource() checks on them return false",
+      "keep_old": null,
+      "check": "Exercise fileinfo, FTP, LDAP, IMAP or PgSQL handle code after the hop",
+      "source": "https://www.php.net/manual/en/migration81.incompatible.php"
+    },
+    {
+      "id": "php81-mysqli-errmode-exception",
+      "hop": "php-80-to-81",
+      "detect": { "kind": "class", "match": "mysqli" },
+      "label": "MySQLi default error handling mode changed from \"silent\" to \"exceptions\"; failed queries now throw mysqli_sql_exception instead of returning false",
+      "keep_old": "mysqli_report(MYSQLI_REPORT_OFF);",
+      "check": "Exercise a failing mysqli query and confirm no uncaught exception",
+      "source": "https://www.php.net/manual/en/migration81.incompatible.php"
+    },
+    {
+      "id": "php81-pdo-mysql-native-types",
+      "hop": "php-80-to-81",
+      "detect": { "kind": "class", "match": "PDO" },
+      "label": "PDO MySQL emulated prepared statements now return integers and floats as native PHP types instead of strings, matching native prepared statements",
+      "keep_old": "PDO::ATTR_STRINGIFY_FETCHES option on the connection",
+      "check": "Compare gettype() of fetched columns before and after",
+      "source": "https://www.php.net/manual/en/migration81.incompatible.php"
+    },
+    {
+      "id": "php81-htmlspecialchars-ent-quotes",
+      "hop": "php-80-to-81",
+      "detect": { "kind": "function", "match": "htmlspecialchars" },
+      "label": "htmlspecialchars, htmlentities and the decode/table variants now default to ENT_QUOTES | ENT_SUBSTITUTE instead of ENT_COMPAT; ' escapes to &#039; and malformed UTF-8 becomes a Unicode substitution character instead of an empty string",
+      "keep_old": "pass ENT_COMPAT explicitly (drops both ENT_QUOTES and ENT_SUBSTITUTE)",
+      "check": "Diff HTML output containing apostrophes after the hop",
+      "source": "https://www.php.net/manual/en/migration81.incompatible.php"
+    },
+    {
+      "id": "php82-locale-case-functions",
+      "hop": "php-81-to-82",
+      "detect": { "kind": "function", "match": "setlocale" },
+      "label": "strtolower, strtoupper, stristr, stripos, strripos, lcfirst, ucfirst, ucwords, str_ireplace are no longer locale-sensitive and do ASCII case conversion; array_change_key_case and SORT_FLAG_CASE sorting likewise",
+      "keep_old": "use the MBString equivalents (mb_strtolower, mb_strtoupper, mb_str_ireplace) with the target locale",
+      "check": "Render text with locale-specific casing (Turkish i, German ss) after the hop",
+      "source": "https://www.php.net/manual/en/migration82.incompatible.php"
+    },
+    {
+      "id": "php82-filesystemiterator-skip-dots",
+      "hop": "php-81-to-82",
+      "detect": { "kind": "class", "match": "FilesystemIterator" },
+      "label": "FilesystemIterator constructed with a flags parameter no longer gets SKIP_DOTS implicitly; iteration now yields . and .. entries",
+      "keep_old": "add FilesystemIterator::SKIP_DOTS to the flags",
+      "check": "Walk a directory with custom flags and confirm no dot entries",
+      "source": "https://www.php.net/manual/en/migration82.incompatible.php"
+    },
+    {
+      "id": "range-string-digit-boundaries",
+      "hop": "php-82-to-83",
+      "detect": { "kind": "function", "match": "range" },
+      "label": "range() with string-digit boundaries (for example '0' to '9') now returns a list of characters instead of casting to a list of ints; array contents and JSON output change",
+      "keep_old": null,
+      "check": "Find range() calls with quoted digit boundaries and diff the resulting arrays",
+      "source": "https://www.php.net/manual/en/migration83.incompatible.php"
+    },
+    {
+      "id": "range-float-step-int-cast",
+      "hop": "php-82-to-83",
+      "detect": { "kind": "function", "match": "range" },
+      "label": "range() with a float step that is an integral value (for example 2.0) now produces ints instead of floats; JSON and strict type checks change",
+      "keep_old": null,
+      "check": "Diff serialized output of range() results with float steps",
+      "source": "https://www.php.net/manual/en/migration83.incompatible.php"
+    },
+    {
+      "id": "number-format-negative-decimals",
+      "hop": "php-82-to-83",
+      "detect": { "kind": "function", "match": "number_format" },
+      "label": "number_format() with a negative decimals value now rounds num to that many digits before the decimal point (for example -2 rounds to hundreds) instead of ignoring the negative value",
+      "keep_old": null,
+      "check": "Find number_format() calls with negative decimals and compare rendered numbers",
+      "source": "https://www.php.net/manual/en/migration83.incompatible.php"
+    },
+    {
+      "id": "php-debug-zts-constants-bool",
+      "hop": "php-83-to-84",
+      "detect": { "kind": "class", "match": "PHP_DEBUG" },
+      "label": "The PHP_DEBUG and PHP_ZTS constants are now bool instead of int; JSON output, arithmetic and strict comparisons (=== 1) change",
+      "keep_old": null,
+      "check": "Find uses of the two constants in output, logs or comparisons",
+      "source": "https://www.php.net/manual/en/migration84.incompatible.php"
+    },
+    {
+      "id": "resource-to-object-is-resource-checks",
+      "hop": "php-83-to-84",
+      "detect": { "kind": "function", "match": "is_resource" },
+      "label": "DBA connections, ODBC results and connections, and SoapClient::$httpurl/$sdl/$typemap are objects instead of resources; is_resource() checks on them silently return false and dependent branches misbehave",
+      "keep_old": null,
+      "check": "Audit is_resource() calls on database and SOAP handles",
+      "source": "https://www.php.net/manual/en/migration84.incompatible.php"
+    },
+    {
+      "id": "pdo-pgsql-dsn-credentials-priority",
+      "hop": "php-83-to-84",
+      "detect": { "kind": "class", "match": "PDO" },
+      "label": "For PDO_PGSQL, credentials in the DSN now take priority over PDO constructor arguments; connections that passed both now authenticate as the DSN user",
+      "keep_old": "remove credentials from the DSN (or stop passing constructor arguments)",
+      "check": "Audit pgsql connections that pass credentials in both places",
+      "source": "https://www.php.net/manual/en/migration84.incompatible.php"
+    },
+    {
+      "id": "collator-sort-regular-numeric-strings",
+      "hop": "php-84-to-85",
+      "detect": { "kind": "function", "match": "collator_sort" },
+      "label": "Collator::SORT_REGULAR now handles numeric strings the way PHP's SORT_REGULAR does; sorts of lists mixing numeric strings change order",
+      "keep_old": null,
+      "check": "Sort a sample list with numeric strings and compare order before and after",
+      "source": "https://www.php.net/manual/en/migration85.incompatible.php"
+    },
+    {
+      "id": "swal-toast-timer-key",
+      "hop": "package:realrashid/sweet-alert@8",
+      "detect": { "kind": "package" },
+      "label": "Toast close time no longer follows the global timer key (SWEET_ALERT_TIMER); v8 toasts read the new toast.auto_close key (SWEET_ALERT_TOAST_AUTO_CLOSE) instead. Default value unchanged (5000 ms in both), so an app that tuned toast lifetime through the old key, including disabling it, silently reverts toasts to 5000 ms; modals still follow the global timer",
+      "keep_old": "set 'auto_close' => <old value> in the toast config section (or SWEET_ALERT_TOAST_AUTO_CLOSE in .env)",
+      "check": "Fire a flashed toast and time how long it stays open",
+      "source": "https://raw.githubusercontent.com/realrashid/sweet-alert/v7.3.2/src/config/sweetalert.php"
+    },
+    {
+      "id": "swal-toast-progress-bar",
+      "hop": "package:realrashid/sweet-alert@8",
+      "detect": { "kind": "package" },
+      "label": "v8 toasts show a countdown progress bar by default (toast.timer_progress_bar default true); v7 toasts did not (no toast section, global default false)",
+      "keep_old": "'timer_progress_bar' => false in the toast config section (or SWEET_ALERT_TOAST_PROGRESS_BAR=false)",
+      "check": "Fire a toast and look for the shrinking bar",
+      "source": "https://raw.githubusercontent.com/realrashid/sweet-alert/v7.3.2/src/config/sweetalert.php"
+    },
+    {
+      "id": "swal-html-view-signature",
+      "hop": "package:realrashid/sweet-alert@8",
+      "detect": { "kind": "package" },
+      "label": "html() and view() take the markup as their first argument in v8; v7 took ($title, $code, $icon). PHP ignores extra arguments, so unmigrated calls render the title string as the HTML body with no error",
+      "keep_old": null,
+      "check": "Open a page that uses html() or view() and compare the rendered alert",
+      "source": "https://raw.githubusercontent.com/realrashid/sweet-alert/v8.0.0/docs/guide/upgrade-guide.md"
+    },
+    {
+      "id": "swal-modal-box-null-defaults",
+      "hop": "package:realrashid/sweet-alert@8",
+      "detect": { "kind": "package" },
+      "label": "Package defaults for width, padding and background changed from concrete v7 values to null so the CSS theme styles the modal; apps that never published the config get theme-controlled sizing, apps with a published v7 config keep the old inline values because mergeConfigFrom preserves them",
+      "keep_old": "publish the config with the v7 values (copy them from the v7 config file)",
+      "check": "Compare modal size, padding and background before and after the hop",
+      "source": "https://raw.githubusercontent.com/realrashid/sweet-alert/v7.3.2/src/config/sweetalert.php"
+    },
+    {
+      "id": "swal-js-from-cdn",
+      "hop": "package:realrashid/sweet-alert@8",
+      "detect": { "kind": "package" },
+      "label": "SweetAlert2 JS and CSS now load from cdn.jsdelivr.net by default (js.source default cdn, provider jsdelivr, SweetAlert2 v11); v7 served the bundled local file. On hosts without internet egress, alerts silently fail to render (flashed alerts have no fallback; data-confirm links fall back to window.confirm)",
+      "keep_old": "host sweetalert2.min.js yourself and set SWEET_ALERT_CDN to its URL (the v8 view has no local-file branch)",
+      "check": "On a production-like host, open a page that fires an alert and confirm the script and CSS actually load",
+      "source": "https://raw.githubusercontent.com/realrashid/sweet-alert/v8.0.0/config/sweet-alert.php"
+    },
+    {
+      "id": "swal-middleware-env-renames",
+      "hop": "package:realrashid/sweet-alert@8",
+      "detect": { "kind": "package" },
+      "label": "Two middleware env vars were renamed: SWEET_ALERT_MIDDLEWARE_ALERT_CLOSE_TIME to SWEET_ALERT_MIDDLEWARE_TIMER (default 6000 in both) and SWEET_ALERT_AUTO_DISPLAY_ERROR_MESSAGES to SWEET_ALERT_AUTO_DISPLAY_ERRORS (default true in both); .env entries with the old names are silently ignored and custom values revert to the defaults",
+      "keep_old": "rename the env vars to the new names",
+      "check": "Flash a success and an error message through the middleware and check toast duration and error auto-display",
+      "source": "https://raw.githubusercontent.com/realrashid/sweet-alert/v7.3.2/src/config/sweetalert.php"
+    },
+    {
+      "id": "guzzle-exceptions-option",
+      "hop": "package:guzzlehttp/guzzle@7",
+      "detect": { "kind": "package" },
+      "label": "Request option exceptions was removed in favour of http_errors; code passing exceptions => false gets the option silently ignored, so 4xx and 5xx responses now throw ClientException or ServerException where v6 returned the response",
+      "keep_old": "'http_errors' => false",
+      "check": "Exercise outbound calls that expect non-2xx answers (gateways, CAS, partner APIs)",
+      "source": "https://raw.githubusercontent.com/guzzle/guzzle/7.16/UPGRADING.md"
+    },
+    {
+      "id": "guzzle-save-to-option",
+      "hop": "package:guzzlehttp/guzzle@7",
+      "detect": { "kind": "package" },
+      "label": "Request option save_to was removed in favour of sink; downloads using save_to => path stop writing the file with no error and the response body is discarded",
+      "keep_old": "'sink' => $path (or an open stream)",
+      "check": "Run a download path and confirm the file appears on disk",
+      "source": "https://raw.githubusercontent.com/guzzle/guzzle/7.16/UPGRADING.md"
+    },
+    {
+      "id": "sanctum-01",
+      "hop": "package:laravel/sanctum@3",
+      "detect": { "kind": "package" },
+      "label": "Plaintext API tokens shrink from 80 to 40 random characters (Str::random(80) to Str::random(40) in createToken). The stored sha256 hash is unchanged.",
+      "keep_old": "Override createToken() in the app's HasApiTokens user model to generate Str::random(80).",
+      "check": "Find code that checks the length of a plaintext token, stores it in a fixed-width column, or validates it client side.",
+      "source": "https://github.com/laravel/sanctum/commit/c46fc083ab52f2ddac97ee4510486f90fc94f220.patch"
+    }
+  ]
+}

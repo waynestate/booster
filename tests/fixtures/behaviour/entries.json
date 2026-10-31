@@ -1,0 +1,113 @@
+{
+    "schema_version": 1,
+    "changes": [
+        {
+            "id": "test-function",
+            "hop": "php-80-to-81",
+            "detect": { "kind": "function", "match": "legacy_call" },
+            "label": "Legacy call removed from the standard library",
+            "keep_old": "legacy_call();",
+            "check": "Confirm nothing still calls legacy_call.",
+            "source": "https://www.php.net/manual/en/migration81.incompatible.php"
+        },
+        {
+            "id": "test-method",
+            "hop": "laravel-10-to-11",
+            "detect": { "kind": "method", "match": "toast_timer" },
+            "label": "UI helper toast_timer no longer exists",
+            "keep_old": "$ui->toast_timer(3000);",
+            "check": "Replace with the replacement helper.",
+            "source": "https://laravel.com/docs/11.x/upgrade"
+        },
+        {
+            "id": "test-method-static",
+            "hop": "laravel-10-to-11",
+            "detect": { "kind": "method", "match": "createFromTimestamp" },
+            "label": "Static Carbon helper reads timestamps differently",
+            "keep_old": null,
+            "check": "Check the result of every static call.",
+            "source": "https://carbon.nesbot.com/docs/"
+        },
+        {
+            "id": "test-class",
+            "hop": "laravel-10-to-11",
+            "detect": { "kind": "class", "match": "SweetAlertThing" },
+            "label": "SweetAlertThing class was dropped",
+            "keep_old": null,
+            "check": "Point references at the replacement class.",
+            "source": "https://laravel.com/docs/11.x/upgrade"
+        },
+        {
+            "id": "test-property",
+            "hop": "laravel-10-to-11",
+            "detect": { "kind": "property", "match": "$dates" },
+            "label": "Model $dates property replaced by $casts",
+            "keep_old": "protected $dates;",
+            "check": "Move the list into $casts.",
+            "source": "https://laravel.com/docs/11.x/upgrade"
+        },
+        {
+            "id": "test-token",
+            "hop": "laravel-10-to-11",
+            "detect": { "kind": "token", "match": "queue:work" },
+            "label": "queue:work token renamed",
+            "keep_old": "queue('queue:work');",
+            "check": "Update the token wherever it is passed.",
+            "source": "https://laravel.com/docs/11.x/upgrade"
+        },
+        {
+            "id": "test-blade",
+            "hop": "laravel-10-to-11",
+            "detect": { "kind": "blade", "match": "$items->links()" },
+            "label": "Pager links() call changed in blade templates",
+            "keep_old": "{{ $items->links() }}",
+            "check": "Render the pager through the new component.",
+            "source": "https://laravel.com/docs/11.x/pagination"
+        },
+        {
+            "id": "test-config-missing",
+            "hop": "laravel-10-to-11",
+            "detect": { "kind": "config", "file": "config/app.php", "key": "feature.new_thing" },
+            "label": "config/app.php needs feature.new_thing",
+            "keep_old": null,
+            "check": "Add the key with its default value.",
+            "source": "https://laravel.com/docs/11.x/upgrade"
+        },
+        {
+            "id": "test-config-present",
+            "hop": "laravel-10-to-11",
+            "detect": { "kind": "config", "file": "config/app.php", "key": "app.old_key" },
+            "label": "config/app.php already carries app.old_key",
+            "keep_old": null,
+            "check": "Nothing to do when the key is present.",
+            "source": "https://laravel.com/docs/11.x/upgrade"
+        },
+        {
+            "id": "test-package-below",
+            "hop": "package:nesbot/carbon@3",
+            "detect": { "kind": "package" },
+            "label": "Carbon 3 changes date parsing defaults",
+            "keep_old": "Carbon::parse($value, 'Europe/Paris');",
+            "check": "Check every parse call for an explicit timezone.",
+            "source": "https://carbon.nesbot.com/docs/#api-carbon-3"
+        },
+        {
+            "id": "test-package-at",
+            "hop": "package:nesbot/carbon@2",
+            "detect": { "kind": "package" },
+            "label": "Carbon 2 baseline row that must not fire at major 2",
+            "keep_old": null,
+            "check": "Only fires when the lock is below major 2.",
+            "source": "https://carbon.nesbot.com/docs/"
+        },
+        {
+            "id": "test-always",
+            "hop": "laravel-10-to-11",
+            "detect": { "kind": "always" },
+            "label": "Laravel 11 raises the minimum PHP to 8.2",
+            "keep_old": null,
+            "check": "Confirm the runtime runs PHP 8.2 or newer.",
+            "source": "https://laravel.com/docs/11.x/upgrade"
+        }
+    ]
+}

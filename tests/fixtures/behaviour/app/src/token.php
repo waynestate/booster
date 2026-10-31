@@ -1,0 +1,3 @@
+<?php
+
+queue('queue:work');
