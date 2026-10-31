@@ -2,6 +2,28 @@
 
 All notable changes to Booster are recorded here. The format follows Keep a Changelog.
 
+## [Unreleased]
+
+Fixes from the second real-use report (two apps taken to PHP 7.4/Laravel 8 and PHP 8.5/Laravel 13 with SESAME).
+
+### Added
+
+- `--test-env KEY=VALUE` (repeatable) passes settings, such as a database host, to the baseline and every gate.
+  Reports name the keys only, never the values.
+- Citadel apps (a `deployments/` folder) get a once-only `deployments/0000_composer_install_<stamp>` script when a run
+  changes `composer.lock`, because Citadel copies the old `vendor/` into each new deployment and never re-runs a
+  deployment script that already ran. It adds `php artisan migrate --force` only when the app has `artisan`.
+- The skill has an optional ADVISOR section with the real install lines.
+
+### Changed
+
+- PROCTOR runs as the final target even when the plan has nothing left to do.
+- The Pinstripe scan uses Pinstripe's `laravel.neon` (Larastan) on Laravel apps that have Larastan, and skips IDE
+  helper files, so Laravel apps no longer get a wall of false "undefined method" findings.
+- `laravel-8-to-9` removes `fideloper/proxy` (it does not allow Laravel 9) and moves a stock `TrustProxies` to
+  `Illuminate\Http\Middleware\TrustProxies`; a customised one gets a manual note. The plan suggests HELMET when that hop
+  is in it and the app has no HELMET.
+
 ## [1.3.0] - 2026-10-30
 
 Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, Laravel 5.8 and 8, CAS, oci8).
