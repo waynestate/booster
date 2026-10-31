@@ -24,6 +24,12 @@ final class ComposerEditor
     public const LEGACY_UNBLOCK_REASON_PREFIX = 'BOOSTER temporary unblock';
 
     /**
+     * The wayne-cas package the cas-to-sesame hop removes; also the marker in
+     * the repositories urls that point at its private host.
+     */
+    private const WAYNE_CAS = 'cit-web-infra/wayne-cas';
+
+    /**
      * @return list<string> human-readable lines about what changed
      */
     public function apply(Hop $hop, string $appPath): array
@@ -50,6 +56,15 @@ final class ComposerEditor
                     $changes[] = sprintf('Removed %s from %s.', $package, $section);
                 }
             }
+            // The package's own Composer repository would survive the removal
+            // and, pointing at a private host, stop composer update to ask for
+            // credentials. Drop it with the package.
+            if ($package === self::WAYNE_CAS) {
+                $changes = [...$changes, ...$this->dropWayneCasRepositories($data)];
+            }
+        }
+        if ($hop->kind === HopKind::Sesame) {
+            $changes = [...$changes, ...$this->ensureHttpClient($data)];
         }
         if ($hop->kind === HopKind::Php && isset($data['config']['platform']['php'])) {
             $data['config']['platform']['php'] = $hop->to . '.0';
@@ -209,8 +224,13 @@ final class ComposerEditor
                 return [];
             }
             $section = 'require';
+            // Append the package, and sort the section the way Composer does
+            // only when config.sort-packages is on; otherwise the app's own
+            // order is kept.
             $data[$section][$package] = $constraint;
-            ksort($data[$section]);
+            if (($data['config']['sort-packages'] ?? false) === true) {
+                $this->sortRequireBlock($data[$section]);
+            }
 
             return [sprintf('Set %s to %s in %s.', $package, $constraint, $section)];
         }
@@ -221,6 +241,114 @@ final class ComposerEditor
         $data[$section][$package] = $constraint;
 
         return [sprintf('Set %s to %s in %s.', $package, $constraint, $section)];
+    }
+
+    /**
+     * Drops every repositories entry whose url names the wayne-cas
+     * repository, case-insensitive, in both shapes Composer allows: a list of
+     * objects and an object keyed by repository name. The section goes away
+     * when the last entry leaves it; other entries stay untouched.
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return list<string>
+     */
+    private function dropWayneCasRepositories(array &$data): array
+    {
+        $repositories = $data['repositories'] ?? null;
+        if (!is_array($repositories) || $repositories === []) {
+            return [];
+        }
+
+        $changes = [];
+        if (array_is_list($repositories)) {
+            $kept = [];
+            foreach ($repositories as $entry) {
+                $url = is_array($entry) && is_string($entry['url'] ?? null) ? $entry['url'] : null;
+                if ($url !== null && str_contains(strtolower($url), self::WAYNE_CAS)) {
+                    $changes[] = sprintf('composer.json: removed the wayne-cas repository entry (%s)', $url);
+                    continue;
+                }
+                $kept[] = $entry;
+            }
+            $repositories = $kept;
+        } else {
+            foreach ($repositories as $name => $entry) {
+                $url = is_array($entry) && is_string($entry['url'] ?? null) ? $entry['url'] : null;
+                if ($url === null || !str_contains(strtolower($url), self::WAYNE_CAS)) {
+                    continue;
+                }
+                unset($repositories[$name]);
+                $changes[] = sprintf('composer.json: removed the wayne-cas repository entry (%s)', $url);
+            }
+        }
+
+        if ($repositories === []) {
+            unset($data['repositories']);
+        } else {
+            $data['repositories'] = $repositories;
+        }
+
+        return $changes;
+    }
+
+    /**
+     * SESAME only suggests guzzlehttp/guzzle, and its Laravel provider builds
+     * a Guzzle client when the app binds no PSR-18 client, so an app with
+     * neither Guzzle nor the Symfony HTTP client cannot sign in. Require
+     * Guzzle when both are absent, through the same require edit as
+     * composerSet, so the gate's composer update picks it up.
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return list<string>
+     */
+    private function ensureHttpClient(array &$data): array
+    {
+        $require = $data['require'] ?? [];
+        if (isset($require['guzzlehttp/guzzle']) || isset($require['symfony/http-client'])) {
+            return [];
+        }
+        $data['require']['guzzlehttp/guzzle'] = '^7.8';
+        // Composer only sorts the require block when config.sort-packages is
+        // on; leave the app's own order alone otherwise.
+        if (($data['config']['sort-packages'] ?? false) === true) {
+            $this->sortRequireBlock($data['require']);
+        }
+
+        return ['composer.json: added guzzlehttp/guzzle ^7.8 (SESAME needs an HTTP client)'];
+    }
+
+    /**
+     * Sorts a require block the way Composer does with config.sort-packages
+     * on: php first, then the php-, ext- and lib- platform packages in that
+     * group order, then every other package alphabetically.
+     *
+     * @param array<string, mixed> $require
+     */
+    private function sortRequireBlock(array &$require): void
+    {
+        uksort($require, static function (string $a, string $b): int {
+            $groupA = self::requireBlockGroup($a);
+            $groupB = self::requireBlockGroup($b);
+            if ($groupA !== $groupB) {
+                return $groupA <=> $groupB;
+            }
+
+            return strcmp($a, $b);
+        });
+    }
+
+    /** The sort group of one require key; see sortRequireBlock(). */
+    private static function requireBlockGroup(string $package): int
+    {
+        return match (true) {
+            $package === 'php' => 0,
+            str_starts_with($package, 'php-') => 1,
+            str_starts_with($package, 'ext-') => 2,
+            str_starts_with($package, 'lib-') => 3,
+            default => 4,
+        };
     }
 
     private function alreadyAtLeast(string $current, string $target, bool $isPhp): bool

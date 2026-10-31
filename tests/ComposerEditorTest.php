@@ -63,6 +63,162 @@ final class ComposerEditorTest extends TestCase
         self::assertSame('^0.3', $require['waynestate/sesame']);
     }
 
+    public function test_the_sesame_swap_drops_a_wayne_cas_repository_list_entry(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $data = $this->read($dir);
+        $data['repositories'] = [
+            ['type' => 'vcs', 'url' => 'https://git.wayne.edu/cit-web-infra/wayne-cas.git'],
+            ['type' => 'composer', 'url' => 'https://packages.internal.example/'],
+        ];
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        $changes = (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        self::assertContains('composer.json: removed the wayne-cas repository entry (https://git.wayne.edu/cit-web-infra/wayne-cas.git)', $changes);
+        self::assertSame([['type' => 'composer', 'url' => 'https://packages.internal.example/']], $this->read($dir)['repositories']);
+    }
+
+    public function test_the_sesame_swap_drops_a_keyed_wayne_cas_repository_entry(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $data = $this->read($dir);
+        $data['repositories'] = [
+            'wayne-cas' => ['type' => 'vcs', 'url' => 'git@git.wayne.edu:cit-web-infra/wayne-cas.git'],
+            'internal' => ['type' => 'composer', 'url' => 'https://packages.internal.example/'],
+        ];
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        $changes = (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        self::assertContains('composer.json: removed the wayne-cas repository entry (git@git.wayne.edu:cit-web-infra/wayne-cas.git)', $changes);
+        self::assertSame(['internal' => ['type' => 'composer', 'url' => 'https://packages.internal.example/']], $this->read($dir)['repositories']);
+    }
+
+    public function test_the_sesame_swap_matches_the_repository_url_case_insensitively_and_drops_an_empty_section(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $data = $this->read($dir);
+        $data['repositories'] = [['type' => 'vcs', 'url' => 'HTTPS://GIT.WAYNE.EDU/CIT-WEB-INFRA/Wayne-Cas.git']];
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        $changes = (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        self::assertContains('composer.json: removed the wayne-cas repository entry (HTTPS://GIT.WAYNE.EDU/CIT-WEB-INFRA/Wayne-Cas.git)', $changes);
+        self::assertArrayNotHasKey('repositories', $this->read($dir));
+    }
+
+    public function test_the_sesame_swap_reports_no_repository_when_there_is_none(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $changes = (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        foreach ($changes as $line) {
+            self::assertStringNotContainsString('repository', $line);
+        }
+    }
+
+    public function test_the_sesame_swap_adds_guzzle_when_the_app_has_no_http_client(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $changes = (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        self::assertContains('composer.json: added guzzlehttp/guzzle ^7.8 (SESAME needs an HTTP client)', $changes);
+        self::assertSame('^7.8', $this->read($dir)['require']['guzzlehttp/guzzle']);
+    }
+
+    public function test_the_sesame_swap_keeps_an_existing_guzzle_constraint(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $data = $this->read($dir);
+        $data['require']['guzzlehttp/guzzle'] = '^7.5';
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        $changes = (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        self::assertSame('^7.5', $this->read($dir)['require']['guzzlehttp/guzzle']);
+        foreach ($changes as $line) {
+            self::assertStringNotContainsString('guzzlehttp/guzzle', $line);
+        }
+    }
+
+    public function test_the_sesame_swap_leaves_symfony_http_client_in_place_of_guzzle(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $data = $this->read($dir);
+        $data['require']['symfony/http-client'] = '^7.0';
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        $require = $this->read($dir)['require'];
+        self::assertArrayNotHasKey('guzzlehttp/guzzle', $require);
+        self::assertSame('^7.0', $require['symfony/http-client']);
+    }
+
+    public function test_the_sesame_swap_keeps_the_require_order_without_sort_packages(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        // The app's own order (php before laravel/framework) survives; the
+        // swap's additions land at the end, guzzle last.
+        self::assertSame(['php', 'laravel/framework', 'waynestate/sesame', 'guzzlehttp/guzzle'], array_keys($this->read($dir)['require']));
+    }
+
+    public function test_the_sesame_swap_sorts_the_require_block_when_sort_packages_is_on(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $data = $this->read($dir);
+        $data['config'] = ['sort-packages' => true];
+        $data['require']['ext-mbstring'] = '*';
+        $data['require']['lib-xml'] = '*';
+        $data['require']['php-intl'] = '*';
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        // Composer's order: php first, then the php-, ext- and lib- platform
+        // packages in that group order, then the rest alphabetically.
+        self::assertSame(
+            ['php', 'php-intl', 'ext-mbstring', 'lib-xml', 'guzzlehttp/guzzle', 'laravel/framework', 'waynestate/sesame'],
+            array_keys($this->read($dir)['require']),
+        );
+    }
+
+    public function test_the_sesame_swap_places_every_added_package_in_composer_order_only_when_sort_packages_is_on(): void
+    {
+        // Case A: sort-packages on. Every package the swap adds lands in
+        // Composer order: platform packages first, then alphabetical.
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $data = $this->read($dir);
+        $data['config'] = ['sort-packages' => true];
+        $data['require']['ext-mbstring'] = '*';
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        self::assertSame(
+            ['php', 'ext-mbstring', 'guzzlehttp/guzzle', 'laravel/framework', 'waynestate/sesame'],
+            array_keys($this->read($dir)['require']),
+        );
+
+        // Case B: sort-packages off. The app's own order is kept (the order
+        // written above: php, laravel/framework, ext-mbstring) and the added
+        // packages are appended, guzzle last.
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $data = $this->read($dir);
+        $data['require']['ext-mbstring'] = '*';
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        self::assertSame(
+            ['php', 'laravel/framework', 'ext-mbstring', 'waynestate/sesame', 'guzzlehttp/guzzle'],
+            array_keys($this->read($dir)['require']),
+        );
+    }
+
     public function test_a_php_hop_never_adds_a_laravel_requirement(): void
     {
         $dir = $this->copyExample('raw-php');

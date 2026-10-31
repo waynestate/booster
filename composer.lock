@@ -1268,16 +1268,16 @@
         },
         {
             "name": "waynestate/creed",
-            "version": "0.1.3",
+            "version": "0.1.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/creed.git",
-                "reference": "8e4c9087b62f1bc6a406e759aab2c51ba52d4db4"
+                "reference": "4748ab3c8eb98d8e7d9b5a98de079928131c5920"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/creed/zipball/8e4c9087b62f1bc6a406e759aab2c51ba52d4db4",
-                "reference": "8e4c9087b62f1bc6a406e759aab2c51ba52d4db4",
+                "url": "https://api.github.com/repos/waynestate/creed/zipball/4748ab3c8eb98d8e7d9b5a98de079928131c5920",
+                "reference": "4748ab3c8eb98d8e7d9b5a98de079928131c5920",
                 "shasum": ""
             },
             "require": {
@@ -1313,7 +1313,7 @@
                 "issues": "https://github.com/waynestate/creed/issues",
                 "source": "https://github.com/waynestate/creed"
             },
-            "time": "2026-10-29T20:26:01+00:00"
+            "time": "2026-10-31T02:52:16+00:00"
         },
         {
             "name": "waynestate/proctor",
