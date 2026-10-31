@@ -4,6 +4,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-31
+
+Behaviour-change warnings, from the second real-use report: a hop can pass every gate and still change what users see.
+
 ### Added
 
 - Behaviour changes to check: `booster plan`, the run report and `--format=json` (`behaviour_changes`) now name the
