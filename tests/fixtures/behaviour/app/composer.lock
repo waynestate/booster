@@ -1,0 +1,12 @@
+{
+    "_readme": [
+        "This lock file is a Booster test fixture, not a real install."
+    ],
+    "packages": [
+        {
+            "name": "nesbot/carbon",
+            "version": "2.72.5"
+        }
+    ],
+    "packages-dev": []
+}

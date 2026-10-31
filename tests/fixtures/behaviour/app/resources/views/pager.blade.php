@@ -1,0 +1,3 @@
+<ul>
+    {{ $items->links() }}
+</ul>
