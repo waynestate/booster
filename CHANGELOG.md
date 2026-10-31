@@ -4,6 +4,18 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- Behaviour changes to check: `booster plan`, the run report and `--format=json` (`behaviour_changes`) now name the
+  silent changes a step brings: things that still pass every gate but behave differently, such as Carbon 3 reading
+  timestamps as UTC, Laravel 8's Tailwind paginator, or a SweetAlert toast that now closes on a new key. Each entry
+  shows where the app is affected (up to 5 `file:line` hits and a count), the setting that keeps the old behaviour
+  when there is one, and what to check by hand. Advisory only: it never blocks or fails a step.
+- `data/behaviour-changes.json`: 63 curated entries (Laravel 5.8 to 13 and Carbon 3, PHP 7.1 to 8.5, and package
+  majors of sweet-alert, Guzzle and Sanctum), each with its source link. An entry fires only when the app's code,
+  config or composer.json shows it is affected; three apply to every app crossing their step. Package entries print
+  on the plan's last step, compared against the lock as it was before the run.
+
 ## [1.4.0] - 2026-10-30
 
 Fixes from the second real-use report (two apps taken to PHP 7.4/Laravel 8 and PHP 8.5/Laravel 13 with SESAME).
