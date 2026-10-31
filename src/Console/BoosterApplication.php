@@ -17,7 +17,7 @@ use Waynestate\Booster\Run\SymfonyProcessRunner;
  */
 final class BoosterApplication extends Application
 {
-    public const VERSION = '1.3.0';
+    public const VERSION = '1.4.0';
 
     public function __construct(?ProcessRunner $processes = null)
     {
