@@ -28,8 +28,19 @@ Fixes from the second real-use report (two apps taken to PHP 7.4/Laravel 8 and P
   - moves `WayneAuthenticate` from the global `web` group to the app's web routes (`wayne.cas` alias);
   - points the `web` guard at SESAME's `sesame` driver and the users provider at `eloquent`, so `auth()->user()`
     works and the user is reloaded every request.
+  - removes the old wayne-cas repository entry from `composer.json`, which pointed at a repository that needs a sign-in;
+  - requires `guzzlehttp/guzzle` when the app has neither Guzzle nor `symfony/http-client`, since SESAME needs an HTTP
+    client.
   Anything Booster cannot edit exactly becomes a manual step naming the file, and the report lists only changes it
   made.
+- Packages Booster adds to `composer.json` are appended, keeping the app's order. They are sorted, in Composer's order,
+  only when the app sets `config.sort-packages`.
+- The weekly hop-data refresh treats a change of date alone as no change, so it opens a merge request only when the
+  data changed.
+
+### Fixed
+
+- The hop-data robot crashed on its first GitLab API call. Booster now locks CREED 0.1.4, whose bot client is fixed.
 - PROCTOR runs as the final target even when the plan has nothing left to do.
 - The Pinstripe scan uses Pinstripe's `laravel.neon` (Larastan) on Laravel apps that have Larastan, and skips IDE
   helper files, so Laravel apps no longer get a wall of false "undefined method" findings.
