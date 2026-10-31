@@ -490,8 +490,11 @@ Thirty-three hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at
 major at a time from 9 to 13, each list read from `data/versions.json` and trimmed to the majors whose Rector ruleset
 is installed ([Hop data](#hop-data)). An app whose PHPUnit is below 9 gets `phpunit-to-9-manual`, a manual move to
 `^9.5` placed before the first hop that targets PHP 8.0 (PHPUnit 7 and 8 do not run on PHP 8), and the regular
-PHPUnit hops then take over from 9. Then the recipes: `cas-to-sesame` (renames the `wayne-cas` classes to SESAME's
-compatibility classes and swaps the Composer requirement; planned with `--sesame`, and left out with a warning when
+PHPUnit hops then take over from 9. Then the recipes: `cas-to-sesame` (writes `config/sesame.php` from the old `wayne-cas` config, moves the CAS
+middleware from the web group onto the app's web routes, points the web guard at the `sesame` driver and the users
+provider at `eloquent` (adding a model key when it has none), rewrites user models that use the `WayneCasable`
+trait to implement SESAME's compatibility interface, and swaps the Composer requirement; planned with `--sesame`,
+and left out with a warning when
 the plan ends below PHP 8.3, which SESAME needs; it lands just before the hop from Laravel 10 to 11, and while PHP is
 still below 8.3 the PHP hops go first); `node-pin-24` (planned for any app with a `package.json` that does
 not already floor Node at the hop data's target, 26 today: sets `engines.node` to `>=26` and writes `.nvmrc`, ahead

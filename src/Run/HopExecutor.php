@@ -384,7 +384,7 @@ final class HopExecutor
                 if ($appliedErrors !== []) {
                     return new StepResult($step->number, $hop->id, StepResult::ERROR, [...self::prepassFiles($prepass), ...$applied->files], ['Rector reported errors while applying.', ...self::refusals($appliedErrors), ...$notes], false, $prepass?->files() ?? []);
                 }
-                if ($hop->kind === HopKind::Laravel) {
+                if ($hop->kind === HopKind::Laravel || $hop->kind === HopKind::Sesame) {
                     // Rector rewrites code but does not tidy imports, so a rename
                     // leaves a dead `use` behind. Clean the files this hop changed.
                     $importsRemoved = 0;

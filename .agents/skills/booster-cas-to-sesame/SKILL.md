@@ -23,10 +23,11 @@ Boost is read-only help. Booster's gate stays the authority: never skip a gate b
 
 What Rector cannot do (check these by hand):
 
-- Booster writes config/sesame.php from config/wayne-cas.php when the old root is a plain string, and rewrites models that use WayneCasable as a trait to implements WayneCasable plus use ReadOnlyAttributes. The old config/wayne-cas.php stays in place and can be removed once SESAME is verified.
+- Booster writes config/sesame.php from config/wayne-cas.php when the old root is a plain string, moves the CAS middleware from the web group onto the app's web routes, points the web guard at the sesame driver and the users provider at eloquent (adding a model key when it has none), and rewrites models that use WayneCasable as a trait to implements WayneCasable plus use ReadOnlyAttributes. The old config/wayne-cas.php stays in place and can be removed once SESAME is verified.
 - MANUAL: SESAME does not carry Duo two-factor. If the app had use2FA enabled, re-enable two-factor in the app itself; the old DUO_HOSTNAME, DUO_IKEY, DUO_SKEY and DUO_AKEY settings do nothing under SESAME.
-- SESAME is on Packagist: run composer require waynestate/sesame:^0.2 (no extra repository needed).
+- SESAME is on Packagist: run composer require waynestate/sesame:^0.3 (no extra repository needed).
 - Log in through the pre-production host and check the session timeout, the Access ID attribute and Duo before you ship.
+- Check that signed-in pages and any Gate or policy checks still work: auth()->user() now comes from SESAME's guard and is reloaded every request.
 
 Official notes:
 

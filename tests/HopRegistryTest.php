@@ -37,7 +37,7 @@ final class HopRegistryTest extends PhpUnitTestCase
     {
         $hop = (new HopRegistry())->get('cas-to-sesame');
 
-        self::assertSame(['waynestate/sesame' => '^0.2'], $hop->composerSet);
+        self::assertSame(['waynestate/sesame' => '^0.3'], $hop->composerSet);
         self::assertSame(['cit-web-infra/wayne-cas'], $hop->composerRemove);
         self::assertStringNotContainsString('stub', $hop->summary);
     }
