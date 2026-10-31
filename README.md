@@ -202,7 +202,7 @@ https://github.com/sebastianbergmann/phpunit/issues/6052
 | Command | What it does |
 |---|---|
 | `booster detect` | Reads `composer.json` and `package.json`; prints the app type, PHP, Laravel, PHPUnit, Vue, Node and Boost |
-| `booster plan` | Prints the ordered hops, the warnings (including which direct dependencies block which hops), a removals line per PHP hop, an advisory PHPCompatibility scan of the first PHP hop's target and a PHPStan scan at the destination PHP. Changes nothing. |
+| `booster plan` | Prints the ordered hops, the warnings (including which direct dependencies block which hops), a removals line per PHP hop, a behaviour-changes block per PHP and Laravel hop, an advisory PHPCompatibility scan of the first PHP hop's target and a PHPStan scan at the destination PHP. Changes nothing. |
 | `booster scan` | Advisory scans of one PHP version: PHPCompatibility by default, `--removals` for removed functions, `--phpstan` for static analysis. Exits 0 even with findings |
 | `booster run` | Runs the plan. `--dry-run` previews every hop |
 | `booster hops` | Lists every hop Booster knows |
@@ -342,6 +342,48 @@ abandoned (use acme/new instead).`). Packages the check cannot reach are reporte
 
 The check fetches from `repo.packagist.org` and from any composer-type repository the app declares in
 `composer.json`; VCS repositories are never fetched. `--no-package-check` skips the whole check, for offline use.
+
+### Behaviour changes
+
+Some changes between versions do not raise an error: a function that still exists now means something else, a config
+key that was optional is required, a default that flipped. Rector rewrites what it knows; the silent changes need a
+human eye. So `plan` and `run` carry a curated list of them, one block per PHP and Laravel hop, plus the package rows
+on the last step, where the lock lands. A booster should know its own payload.
+
+```
+Behaviour changes to check:
+  Config key needed (config/app.php)
+    check: Add the key.
+  Minimum PHP raised
+    check: Check the runtime.
+```
+
+Each entry says what changed (`label`), what keeps the old behaviour when there is anything (`keep old:`), what to
+verify (`check:`), and where the app touches it: `file:line` hits for code, the file for config and package rows, no
+location for rows that apply everywhere. It is advisory, like the scans: it never changes the exit code, and nothing
+prints when nothing matches. In JSON output the entries land under `behaviour_changes`, per step, with the fields
+`id`, `label`, `keep_old`, `check`, `source`, `hits` and `total`.
+
+The list lives in `data/behaviour-changes.json`, bundled with the phar. An entry names the hop it applies to
+(`php-80-to-81`, `laravel-10-to-11`, or `package:vendor/name@2` for a floor a package raises), how to find it
+(`detect`: a `function`, `method`, `class`, `property`, string `token`, blade snippet, config `file` and `key`,
+composer `package`, or `always`), and a `source` link that confirms the change:
+
+```json
+{
+  "id": "laravel-11-config-key",
+  "hop": "laravel-10-to-11",
+  "detect": { "kind": "config", "file": "config/app.php", "key": "cipher" },
+  "label": "Config key needed",
+  "keep_old": null,
+  "check": "Add the key.",
+  "source": "https://laravel.com/docs/11.x/upgrading"
+}
+```
+
+Only confirmed changes ship, each with its source link, and at most three `always` rows per release, so the block
+stays a checklist rather than a pamphlet. To add an entry, append it to the data file and let the loader's errors
+tell you what is missing.
 
 ### The baseline
 
