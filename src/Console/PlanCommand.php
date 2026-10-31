@@ -12,6 +12,8 @@ use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Report\JsonWriter;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\ProcessRunner;
+use Waynestate\Booster\Scan\BehaviourEntry;
+use Waynestate\Booster\Scan\BehaviourScan;
 use Waynestate\Booster\Scan\PhpCompatScan;
 use Waynestate\Booster\Scan\PhpStanScan;
 use Waynestate\Booster\Scan\RemovalsScan;
@@ -64,6 +66,33 @@ final class PlanCommand extends BaseCommand
             $removalsJson[] = ['step' => $step->number, 'hop' => $step->hop->id, ...$result->toArray()];
         }
 
+        // The behaviour scan is cheap (no processes), so it always runs, like
+        // the removals scan: curated silent changes per PHP and Laravel hop,
+        // plus the package rows on the last step, where the lock lands.
+        $behaviourByStep = [];
+        $behaviourJson = [];
+        $behaviour = new BehaviourScan();
+        $require = BehaviourScan::composerRequire($plan->project->path);
+        foreach ($plan->steps as $step) {
+            $isLast = $step->number === count($plan->steps);
+            if ($step->hop->kind !== HopKind::Php && $step->hop->kind !== HopKind::Laravel && !$isLast) {
+                continue;
+            }
+            $result = $behaviour->scan($plan->project->path, $step->hop->id, $require);
+            if (!$isLast) {
+                $result = $result->withoutPackages();
+            }
+            if ($result->entries === []) {
+                continue;
+            }
+            $behaviourByStep[$step->number] = $result;
+            $behaviourJson[] = [
+                'step' => $step->number,
+                'hop' => $step->hop->id,
+                'entries' => array_map(static fn(BehaviourEntry $entry): array => $entry->toArray(), $result->entries),
+            ];
+        }
+
         if ($format === 'json') {
             $data = $plan->toArray();
             if ($scan !== null) {
@@ -73,10 +102,12 @@ final class PlanCommand extends BaseCommand
                 $data['phpstan'] = $phpstan->toArray();
             }
             $data['removals'] = $removalsJson;
+            // Always present, even when empty, so consumers can rely on the key.
+            $data['behaviour_changes'] = $behaviourJson;
             $text = (new JsonWriter())->write($data);
         } else {
             $writer = new TextWriter();
-            $text = $writer->plan($plan, $removalsByStep);
+            $text = $writer->plan($plan, $removalsByStep, $behaviourByStep);
             if ($scan !== null) {
                 $text .= "\n\n" . $writer->phpCompat($scan);
             }

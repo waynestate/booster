@@ -20,6 +20,7 @@ use Waynestate\Booster\Prepass\PrepassResult;
 use Waynestate\Booster\Project\AppType;
 use Waynestate\Booster\Refresh\HopDataRefresher;
 use Waynestate\Booster\Report\TextWriter;
+use Waynestate\Booster\Scan\BehaviourScan;
 use Waynestate\Booster\Scan\RemovalsScan;
 use Waynestate\Booster\ToolError;
 
@@ -46,6 +47,8 @@ final class HopExecutor
 
     private ?RemovalsScan $removals = null;
 
+    private ?BehaviourScan $behaviour = null;
+
     /**
      * Untracked paths the app held before the run, so undo hints name only
      * this run's creations.
@@ -69,6 +72,11 @@ final class HopExecutor
     private function removalsScanner(): RemovalsScan
     {
         return $this->removals ??= new RemovalsScan();
+    }
+
+    private function behaviourScanner(): BehaviourScan
+    {
+        return $this->behaviour ??= new BehaviourScan();
     }
 
     public function execute(Plan $plan, RunOptions $options): RunReport
@@ -247,19 +255,28 @@ final class HopExecutor
 
     /**
      * Runs one step. For PHP hops it first lists what the language removes
-     * between the hop's two versions: an advisory in the step's messages,
-     * never a failure and never a reason to stop.
+     * between the hop's two versions, and for PHP and Laravel hops (plus the
+     * plan's last step) the curated behaviour changes: advisories in the
+     * step's messages, never a failure and never a reason to stop.
      */
     private function runStep(PlanStep $step, string $path, Plan $plan, RunOptions $options, BaselineResult $baseline): StepResult
     {
         // Scan first: the advisory must describe the app as it was before the hop rewrites it.
         $removals = $this->removalsLines($step, $path);
+        $behaviour = $this->behaviourLines($step, $path, $plan);
         $result = $this->runStepCore($step, $path, $plan, $options, $baseline);
-        if ($removals === '') {
+        if ($removals === '' && $behaviour === '') {
             return $result;
         }
+        $messages = [...$result->messages];
+        if ($removals !== '') {
+            array_unshift($messages, $removals);
+        }
+        if ($behaviour !== '') {
+            $messages[] = $behaviour;
+        }
 
-        return new StepResult($step->number, $step->hop->id, $result->status, $result->files, [$removals, ...$result->messages], $result->incomplete, $result->prepass);
+        return new StepResult($step->number, $step->hop->id, $result->status, $result->files, $messages, $result->incomplete, $result->prepass);
     }
 
     /**
@@ -277,6 +294,28 @@ final class HopExecutor
         }
 
         return implode("\n", (new TextWriter())->removals($result));
+    }
+
+    /**
+     * The advisory behaviour-changes block for a PHP or Laravel hop, and for
+     * the plan's last step where the package rows land, or '' when nothing
+     * curated applies or the app touches none of it.
+     */
+    private function behaviourLines(PlanStep $step, string $path, Plan $plan): string
+    {
+        $isLast = $step->number === count($plan->steps);
+        if ($step->hop->kind !== HopKind::Php && $step->hop->kind !== HopKind::Laravel && !$isLast) {
+            return '';
+        }
+        $result = $this->behaviourScanner()->scan($path, $step->hop->id, BehaviourScan::composerRequire($path));
+        if (!$isLast) {
+            $result = $result->withoutPackages();
+        }
+        if ($result->entries === []) {
+            return '';
+        }
+
+        return implode("\n", (new TextWriter())->behaviour($result));
     }
 
     private function runStepCore(PlanStep $step, string $path, Plan $plan, RunOptions $options, BaselineResult $baseline): StepResult

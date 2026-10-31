@@ -8,6 +8,8 @@ use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Run\BaselineResult;
 use Waynestate\Booster\Run\ProctorResult;
 use Waynestate\Booster\Run\RunReport;
+use Waynestate\Booster\Scan\BehaviourEntry;
+use Waynestate\Booster\Scan\BehaviourResult;
 use Waynestate\Booster\Scan\RemovalsResult;
 use Waynestate\Booster\Scan\ScanResult;
 
@@ -22,9 +24,10 @@ final class TextWriter
     private const MAX_FINDINGS = 20;
 
     /**
-     * @param array<int, RemovalsResult> $removalsByStep removals result per PHP step number
+     * @param array<int, RemovalsResult>  $removalsByStep removals result per PHP step number
+     * @param array<int, BehaviourResult> $behaviourByStep behaviour changes per step number
      */
-    public function plan(Plan $plan, array $removalsByStep = []): string
+    public function plan(Plan $plan, array $removalsByStep = [], array $behaviourByStep = []): string
     {
         $p = $plan->project;
         $lines = [
@@ -53,6 +56,12 @@ final class TextWriter
             $removals = $removalsByStep[$step->number] ?? null;
             if ($removals instanceof RemovalsResult) {
                 foreach ($this->removals($removals) as $line) {
+                    $lines[] = '   ' . $line;
+                }
+            }
+            $behaviour = $behaviourByStep[$step->number] ?? null;
+            if ($behaviour instanceof BehaviourResult) {
+                foreach ($this->behaviour($behaviour) as $line) {
                     $lines[] = '   ' . $line;
                 }
             }
@@ -169,6 +178,59 @@ final class TextWriter
         }
 
         return $lines;
+    }
+
+    /**
+     * The advisory behaviour-changes block for one hop: the curated silent
+     * changes that apply, and where the app touches them. Sub-lines carry two
+     * leading spaces; the caller adds its own indent.
+     *
+     * @return list<string>
+     */
+    public function behaviour(BehaviourResult $result): array
+    {
+        if ($result->entries === []) {
+            return [];
+        }
+        $lines = ['Behaviour changes to check:'];
+        foreach ($result->entries as $entry) {
+            $lines[] = $this->behaviourLine($entry);
+            if ($entry->keepOld !== null) {
+                $lines[] = '  keep old: ' . $entry->keepOld;
+            }
+            $lines[] = '  check: ' . $entry->check;
+        }
+
+        return $lines;
+    }
+
+    /**
+     * One entry as a report line: the label, then where the app touches it.
+     * Lexed kinds count hits per file; config and package rows name their
+     * file; always rows carry no location.
+     */
+    private function behaviourLine(BehaviourEntry $entry): string
+    {
+        if ($entry->kind === 'always') {
+            return $entry->label;
+        }
+        if ($entry->kind === 'config' || $entry->kind === 'package') {
+            $hits = array_map(static fn(string $hit): string => self::clean($hit), $entry->hits);
+
+            return $entry->label . ' (' . implode(', ', $hits) . ')';
+        }
+        $hits = array_map(static fn(string $hit): string => self::clean($hit), $entry->hits);
+        $files = [];
+        foreach ($hits as $hit) {
+            $files[] = explode(':', $hit, 2)[0];
+        }
+        $files = array_values(array_unique($files));
+        $shown = implode(', ', $hits);
+        if ($entry->total > count($hits)) {
+            $shown .= ' ...';
+        }
+
+        return sprintf('%s (%d in %d file%s: %s)', $entry->label, $entry->total, count($files), count($files) === 1 ? '' : 's', $shown);
     }
 
     public function run(RunReport $report): string
