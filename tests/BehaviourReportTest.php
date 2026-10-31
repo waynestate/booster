@@ -94,8 +94,17 @@ final class BehaviourReportTest extends TestCase
         $data = json_decode($out, true);
 
         self::assertSame(0, $exit);
-        // The bundled data is curated per release; with no matching entries the key stays present but empty.
+        // The bundled data is curated per release: the raw-php example trips
+        // exactly the two always rows of its first hop (php-74-to-80) and none
+        // of the lexed kinds, because src/Legacy.php calls none of them.
         self::assertArrayHasKey('behaviour_changes', $data);
-        self::assertSame([], $data['behaviour_changes']);
+        $ids = [];
+        foreach ($data['behaviour_changes'] as $block) {
+            foreach ($block['entries'] as $entry) {
+                $ids[] = $entry['id'];
+            }
+        }
+        sort($ids);
+        self::assertSame(['php80-error-reporting-eall', 'php80-string-number-compare'], $ids);
     }
 }

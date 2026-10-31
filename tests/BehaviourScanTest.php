@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Tests;
 
+use Waynestate\Booster\Packaging\PharFiles;
 use Waynestate\Booster\Scan\BehaviourScan;
 use Waynestate\Booster\ToolError;
 
@@ -155,9 +156,12 @@ final class BehaviourScanTest extends TestCase
 
     public function test_the_bundled_data_file_loads(): void
     {
-        $result = (new BehaviourScan())->scan($this->dataFile('app'), 'laravel-10-to-11', []);
+        $raw = json_decode((string) file_get_contents(PharFiles::path('data/behaviour-changes.json')), true);
+        self::assertGreaterThanOrEqual(50, count($raw['changes']));
 
-        self::assertSame([], $result->entries);
+        $result = (new BehaviourScan())->scan($this->dataFile('carbon'), 'laravel-10-to-11', []);
+
+        self::assertSame(['carbon-createfromtimestamp-utc'], array_map(static fn($e): string => $e->id, $result->entries));
     }
 
     public function test_to_array_uses_snake_case_keys(): void

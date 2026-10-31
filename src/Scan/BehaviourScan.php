@@ -504,7 +504,7 @@ final class BehaviourScan
                 throw new ToolError(sprintf('Behaviour change %d in "%s" repeats id "%s".', $index, $path, $entry['id']));
             }
             $seen[$entry['id']] = true;
-            if (preg_match('/^php-\d{2}-to-\d{2}$|^laravel-\d+-to-\d+$|^package:[a-z0-9._\/-]+@\d+$/', (string) $entry['hop']) !== 1) {
+            if (preg_match('/^php-\d{2}-to-\d{2}$|^laravel-[0-9]+(\.[0-9]+)?-to-[0-9]+$|^package:[a-z0-9._\/-]+@\d+$/', (string) $entry['hop']) !== 1) {
                 throw new ToolError(sprintf('Behaviour change %d in "%s" has hop "%s"; expected php-74-to-80, laravel-10-to-11 or package:name@major.', $index, $path, $entry['hop']));
             }
             if (!is_array($entry['detect'] ?? null)) {
