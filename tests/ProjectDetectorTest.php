@@ -73,6 +73,21 @@ final class ProjectDetectorTest extends TestCase
         self::assertFalse((new ProjectDetector())->detect($this->example('raw-php'))->usesWayneCas);
     }
 
+    public function test_wayne_ui_1_is_flagged_from_require_or_require_dev(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"cit-web-infra/wayne-ui":"^1.0"}}');
+        self::assertTrue((new ProjectDetector())->detect($dir)->usesWayneUi1);
+        self::assertTrue((new ProjectDetector())->detect($dir)->toArray()['wayneui_1']);
+
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require-dev":{"cit-web-infra/wayne-ui":"^1.0"}}');
+        self::assertTrue((new ProjectDetector())->detect($dir)->usesWayneUi1);
+
+        self::assertFalse((new ProjectDetector())->detect($this->example('laravel-blade'))->usesWayneUi1);
+        self::assertFalse((new ProjectDetector())->detect($this->example('laravel-wayne-cas'))->usesWayneUi1);
+    }
+
     public function test_boost_is_flagged_from_the_manifest_or_the_lock(): void
     {
         $dir = $this->tempDir();

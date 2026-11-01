@@ -132,6 +132,11 @@ final class SkillRenderer
                 'Use `list-routes` to note the sign-in and sign-out routes you will re-test.',
                 'Run `last-error` and `read-log-entries` after a test login.',
             ],
+            HopKind::WayneUi => [
+                "Use `search-docs` for WayneUI's MIGRATING guide and check it against every file Booster changed.",
+                'Use `list-routes` to note the pages you will check in both light and dark themes.',
+                'Run `last-error` and `read-log-entries` after the tests.',
+            ],
             HopKind::Vue => [
                 sprintf("Use `search-docs` for the Vue %s migration guide and list the breaking changes that touch this app's components.", $hop->to),
                 'Use `browser-logs` after a page load to catch the Vue warnings the console prints.',

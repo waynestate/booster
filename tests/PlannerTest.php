@@ -480,6 +480,70 @@ final class PlannerTest extends TestCase
         self::assertCount(1, array_keys($ids, 'cas-to-sesame'));
     }
 
+    public function test_wayneui_move_is_opt_in_and_goes_last(): void
+    {
+        $without = $this->planWithComposer('laravel-blade', ['require' => ['cit-web-infra/wayne-ui' => '^1.0']]);
+        self::assertNotContains('wayneui-1-to-2', $this->ids($without));
+        self::assertStringContainsString('--wayneui', implode(' ', $without->warnings));
+
+        $with = $this->planWithComposer('laravel-blade', ['require' => ['cit-web-infra/wayne-ui' => '^1.0']], new PlanOptions(wayneui: true));
+        $ids = $this->ids($with);
+        self::assertSame('wayneui-1-to-2', $ids[count($ids) - 1]);
+        self::assertCount(1, array_keys($ids, 'wayneui-1-to-2'));
+    }
+
+    /** @return list<array{string, string}> */
+    public static function wayneuiLaravelTargets(): array
+    {
+        return [['11', '8.4'], ['12', '8.5']];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('wayneuiLaravelTargets')]
+    public function test_wayneui_move_plans_at_the_end_when_the_plan_reaches_laravel_11_or_newer(string $toLaravel, string $toPhp): void
+    {
+        $plan = $this->planWithComposer('laravel-blade', ['require' => ['cit-web-infra/wayne-ui' => '^1.0']], new PlanOptions(wayneui: true, toPhp: $toPhp, toLaravel: $toLaravel));
+        $ids = $this->ids($plan);
+
+        self::assertSame('wayneui-1-to-2', $ids[count($ids) - 1]);
+        self::assertCount(1, array_keys($ids, 'wayneui-1-to-2'));
+    }
+
+    public function test_wayneui_move_is_left_out_when_the_plan_ends_below_laravel_11(): void
+    {
+        $plan = $this->planWithComposer('laravel-blade', ['require' => ['cit-web-infra/wayne-ui' => '^1.0']], new PlanOptions(wayneui: true, toPhp: '8.3', toLaravel: '10'));
+
+        self::assertNotContains('wayneui-1-to-2', $this->ids($plan));
+        self::assertContains(
+            'WayneUI 2.x needs Laravel 11 or newer; the WayneUI move was left out because the plan ends below that.',
+            $plan->warnings,
+        );
+    }
+
+    public function test_wayneui_move_without_the_package_is_skipped_with_a_warning(): void
+    {
+        $plan = $this->plan('laravel-blade', new PlanOptions(wayneui: true));
+
+        self::assertNotContains('wayneui-1-to-2', $this->ids($plan));
+        self::assertContains(
+            'Asked for the WayneUI move, but composer.json does not require cit-web-infra/wayne-ui; skipped.',
+            $plan->warnings,
+        );
+    }
+
+    public function test_only_and_until_select_the_wayneui_hop_like_any_other(): void
+    {
+        $composer = [
+            'require' => ['php' => '^8.4', 'laravel/framework' => '^12.0', 'cit-web-infra/wayne-ui' => '^1.0'],
+            'require-dev' => ['phpunit/phpunit' => '^11.0'],
+        ];
+
+        $only = $this->planWithComposer('laravel-blade', $composer, new PlanOptions(wayneui: true, toPhp: '8.4', toLaravel: '12', toPhpunit: '11', only: 'wayneui-1-to-2'));
+        self::assertSame(['wayneui-1-to-2'], $this->ids($only));
+
+        $until = $this->planWithComposer('laravel-blade', $composer, new PlanOptions(wayneui: true, toPhp: '8.4', toLaravel: '12', toPhpunit: '11', until: 'wayneui-1-to-2'));
+        self::assertSame(['wayneui-1-to-2'], $this->ids($until));
+    }
+
     public function test_an_eol_target_plans_with_a_warning_and_stops_early(): void
     {
         $plan = $this->plan('raw-php', new PlanOptions(toPhp: '8.1'));

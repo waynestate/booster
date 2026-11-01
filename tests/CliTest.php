@@ -498,11 +498,12 @@ final class CliTest extends TestCase
         self::assertStringContainsString('vue-compat-codemod', $out);
         self::assertStringContainsString('tailwind-3-to-4', $out);
         self::assertStringContainsString('phpunit-to-9-manual', $out);
+        self::assertStringContainsString('wayneui-1-to-2', $out);
         self::assertStringContainsString('[playbook]', $out);
 
         [, $json] = $this->booster(['command' => 'hops', '--format' => 'json']);
         $hops = json_decode($json, true)['hops'];
-        self::assertCount(33, $hops);
+        self::assertCount(34, $hops);
         $byId = [];
         foreach ($hops as $hop) {
             $byId[$hop['id']] = $hop;
@@ -511,6 +512,7 @@ final class CliTest extends TestCase
         self::assertFalse($byId['vue-27-to-compat']['manual']);
         self::assertFalse($byId['vue-compat-codemod']['manual']);
         self::assertFalse($byId['tailwind-3-to-4']['manual']);
+        self::assertFalse($byId['wayneui-1-to-2']['manual']);
         self::assertTrue($byId['vue-2-to-3']['manual']);
         self::assertTrue($byId['phpunit-to-9-manual']['manual']);
         self::assertSame(['vue-26-to-27', 'vue-27-to-compat', 'vue-compat-codemod'], $byId['vue-2-to-3']['alias_of']);
