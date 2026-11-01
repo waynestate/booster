@@ -7,6 +7,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 ### Added
 
 - Three more behaviour-change rows: Sanctum 4 stops loading its migrations, and yajra/laravel-oci8 adds the case-insensitive NLS defaults at 8.1.0 and drops them at 9.0.0.
+- Seven doctrine/dbal rows: getDatabase() on Oracle, BIGINT as int, update and delete with empty criteria, nested savepoints, MySQL foreign keys by engine, BinaryType as string, and Table::getColumns() as a list.
 
 ## [1.6.0] - 2026-11-01
 

@@ -594,6 +594,69 @@
       "keep_old": "in the connection config set 'session' => ['NLS_COMP' => 'LINGUISTIC', 'NLS_SORT' => 'BINARY_CI']",
       "check": "Same as the 8.x row in reverse: look for code that expects case-insensitive matching",
       "source": "https://raw.githubusercontent.com/yajra/laravel-oci8/v9.0.0/src/Oci8/Oci8ServiceProvider.php"
+    },
+    {
+      "id": "dbal-getdatabase",
+      "hop": "package:doctrine/dbal@3",
+      "detect": { "kind": "package" },
+      "label": "Connection::getDatabase() no longer asks the driver: 2.x returned what the driver knew (on Oracle, the configured user) without connecting, 3.x runs a query for the platform's current-database expression (on Oracle, the current schema) and connects if needed, so the value and the connection timing both change",
+      "keep_old": null,
+      "check": "grep getDatabase( and inspect each consumer (routing, logging, assertions that compare it to the login user)",
+      "source": "https://raw.githubusercontent.com/doctrine/dbal/3.0.0/src/Connection.php"
+    },
+    {
+      "id": "dbal-bigint-int",
+      "hop": "package:doctrine/dbal@4",
+      "detect": { "kind": "package" },
+      "label": "BIGINT columns hydrate as PHP int when the value fits the integer range (3.x always returned a string), so strict string comparisons, is_string checks and JSON id handling change",
+      "keep_old": null,
+      "check": "List bigint columns in migrations and entities and inspect the code that reads them",
+      "source": "https://raw.githubusercontent.com/doctrine/dbal/4.0.0/src/Types/BigIntType.php"
+    },
+    {
+      "id": "dbal-where-guard",
+      "hop": "package:doctrine/dbal@4",
+      "detect": { "kind": "package" },
+      "label": "Connection::update() and delete() no longer throw on empty criteria: 3.x threw InvalidArgumentException, 4.x omits the WHERE clause, so an empty criteria array now updates or deletes the whole table",
+      "keep_old": "guard the call yourself: throw before calling when the criteria array is empty",
+      "check": "Audit every Connection update or delete call site for criteria that can be empty",
+      "source": "https://raw.githubusercontent.com/doctrine/dbal/4.0.0/src/Connection.php"
+    },
+    {
+      "id": "dbal-savepoints",
+      "hop": "package:doctrine/dbal@4",
+      "detect": { "kind": "package" },
+      "label": "Nested transactions always use savepoints (3.x did so only when setNestTransactionsWithSavepoints(true) was called; the setter is deprecated in 4.x), so nested begin, commit and rollBack flows behave differently, and savepoint release is a no-op on Oracle",
+      "keep_old": null,
+      "check": "Trace nested transaction flows and re-run them on the target database",
+      "source": "https://raw.githubusercontent.com/doctrine/dbal/4.0.0/src/Connection.php"
+    },
+    {
+      "id": "dbal-mysql-fk-engine",
+      "hop": "package:doctrine/dbal@4",
+      "detect": { "kind": "package" },
+      "label": "MySQL foreign keys are no longer skipped for storage engines without foreign key support: 3.x dropped them from CREATE TABLE for such engines (MyISAM, MEMORY), 4.x emits them unconditionally, so those migrations may now fail or carry constraints",
+      "keep_old": null,
+      "check": "grep setOption('engine' and ENGINE= in migrations, fixtures and tests",
+      "source": "https://raw.githubusercontent.com/doctrine/dbal/4.0.0/src/Platforms/AbstractMySQLPlatform.php"
+    },
+    {
+      "id": "dbal-binary-string",
+      "hop": "package:doctrine/dbal@4",
+      "detect": { "kind": "package" },
+      "label": "BinaryType columns hydrate as a PHP string (3.x returned a stream resource), so code that fread()s the value or passes it on as a stream breaks silently; BlobType still returns a stream",
+      "keep_old": null,
+      "check": "Find binary columns and inspect their consumers",
+      "source": "https://raw.githubusercontent.com/doctrine/dbal/4.0.0/src/Types/BinaryType.php"
+    },
+    {
+      "id": "dbal-getcolumns-list",
+      "hop": "package:doctrine/dbal@4",
+      "detect": { "kind": "package" },
+      "label": "Table::getColumns() returns a plain list in insertion order (3.x returned a map keyed by column name with primary key and foreign key columns first), so foreach with a name key now yields integer keys and the old ordering is gone",
+      "keep_old": null,
+      "check": "grep getColumns() and inspect each use site",
+      "source": "https://raw.githubusercontent.com/doctrine/dbal/4.0.0/src/Schema/Table.php"
     }
   ]
 }
