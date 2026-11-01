@@ -81,7 +81,7 @@ final class TailwindUpgradeTest extends TestCase
         $command = $npx[0]['command'];
         $imageAt = array_search(NodeRunner::imageTag(24), $command, true);
         self::assertNotFalse($imageAt);
-        self::assertSame(['npx', '-y', $registry->tailwindUpgradeVersion()], array_slice($command, $imageAt + 1));
+        self::assertSame(['npx', '-y', '@tailwindcss/upgrade@' . $registry->tailwindUpgradeVersion()], array_slice($command, $imageAt + 1));
     }
 
     public function test_the_postcss_plugin_is_pinned_when_the_app_has_no_vite(): void
@@ -110,7 +110,7 @@ final class TailwindUpgradeTest extends TestCase
 
         self::assertSame([StepResult::PREVIEWED], $this->statuses($report));
         $messages = implode("\n", $report->results[0]->messages);
-        self::assertStringContainsString('Dry run: would run npx -y ' . (new HopRegistry())->tailwindUpgradeVersion(), $messages);
+        self::assertStringContainsString('Dry run: would run npx -y @tailwindcss/upgrade@' . (new HopRegistry())->tailwindUpgradeVersion(), $messages);
         self::assertSame($before, $this->snapshot($dir, $names));
         self::assertSame([], array_filter($fake->calls, static fn(array $c): bool => $c['command'][0] === 'docker'));
     }
