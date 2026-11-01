@@ -1227,17 +1227,18 @@ final class HopExecutor
             throw new ToolError('The Tailwind hop needs a Node runner, but this BOOSTER has none configured.');
         }
         $toolVersion = $this->registry()->tailwindUpgradeVersion();
+        $package = '@tailwindcss/upgrade@' . $toolVersion;
         if ($options->dryRun) {
             return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [], [
-                sprintf('Dry run: would run npx -y %s in the Node container, then normalize package.json (pin tailwindcss to %s, add the matching Vite or PostCSS plugin, remove autoprefixer and postcss-import).', $toolVersion, $this->registry()->tailwindVersion()),
+                sprintf('Dry run: would run npx -y %s in the Node container, then normalize package.json (pin tailwindcss to %s, add the matching Vite or PostCSS plugin, remove autoprefixer and postcss-import).', $package, $this->registry()->tailwindVersion()),
                 ...$hop->notes,
             ]);
         }
 
-        $tool = $this->node->run($path, ['npx', '-y', $toolVersion]);
+        $tool = $this->node->run($path, ['npx', '-y', $package]);
         if (!$tool->successful()) {
             return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [
-                sprintf('The Tailwind upgrade tool failed: "npx -y %s" exited %d. The working copy keeps whatever it wrote, so you can read it.', $toolVersion, $tool->exitCode),
+                sprintf('The Tailwind upgrade tool failed: "npx -y %s" exited %d. The working copy keeps whatever it wrote, so you can read it.', $package, $tool->exitCode),
                 trim($tool->stdout . "\n" . $tool->stderr),
                 $this->undoHint($path),
             ]);

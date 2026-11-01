@@ -4,6 +4,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Fixed
+
+- The `tailwind-3-to-4` hop ran `npx -y ^4.1`, which names no package; it now runs `npx -y @tailwindcss/upgrade@^4.1`.
+
 ## [1.7.0] - 2026-11-01
 
 WayneUI joins the stack: a hop for the 1.x to 2.x move, and ten more behaviour-change warnings.
