@@ -4,6 +4,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- Three more behaviour-change rows: Sanctum 4 stops loading its migrations, and yajra/laravel-oci8 adds the case-insensitive NLS defaults at 8.1.0 and drops them at 9.0.0.
+
 ## [1.6.0] - 2026-11-01
 
 The cas-to-sesame hop now finishes what a person had to do by hand on a real app.
