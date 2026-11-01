@@ -1078,6 +1078,23 @@ final class HopExecutorTest extends TestCase
         self::assertStringContainsString('Nothing to do', implode(' ', $report->results[0]->messages));
     }
 
+    public function test_a_step_names_the_php_files_that_are_not_valid_utf8_as_manual_work(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        file_put_contents($dir . '/src/b.php', "<?php // caf\xE9\n");
+        $fake = $this->fake();
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions(dryRun: true));
+
+        self::assertSame(StepResult::PREVIEWED, $report->results[0]->status);
+        $messages = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('MANUAL: src/b.php is not valid UTF-8, so Rector was run without it. Convert it to UTF-8, then upgrade it by hand.', $messages);
+        // Every hop skipped the file, so every step names it.
+        self::assertStringContainsString('MANUAL: src/b.php is not valid UTF-8, so Rector was run without it. Convert it to UTF-8, then upgrade it by hand.', implode("\n", $report->results[1]->messages));
+    }
+
     public function test_the_prepass_rewrites_new_by_reference_before_rector_runs(): void
     {
         $dir = $this->copyExample('raw-php');

@@ -40,6 +40,35 @@ final class RectorRunnerTest extends TestCase
         self::assertSame(['src/vendor'], $result->skippedDirs);
     }
 
+    public function test_run_excludes_php_files_that_are_not_valid_utf8_and_names_them(): void
+    {
+        $app = $this->tempDir();
+        file_put_contents($app . '/a.php', "<?php // cafe\n");
+        file_put_contents($app . '/b.php', "<?php // caf\xE9\n");
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, '{"file_diffs": [], "errors": []}', ''));
+        $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), $app, true, '8.0');
+
+        self::assertCount(1, $fake->calls);
+        $skipFiles = json_decode($fake->calls[0]['env']['BOOSTER_RECTOR_SKIP_FILES'], true);
+        self::assertIsArray($skipFiles);
+        self::assertContains($app . '/b.php', $skipFiles);
+        self::assertSame([['file' => 'b.php', 'reason' => 'not valid UTF-8']], $result->excluded);
+    }
+
+    public function test_empty_stdout_on_malformed_utf8_says_utf8_not_memory(): void
+    {
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(5, '', 'Json.php line 38: Malformed UTF-8 characters'));
+        try {
+            (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), '/srv/acme-app', true, '8.0');
+            self::fail('expected a ToolError');
+        } catch (ToolError $e) {
+            self::assertStringContainsString('Rector produced no JSON report (exit 5)', $e->getMessage());
+            self::assertStringContainsString('malformed UTF-8 in a file it could not encode into its report, not because of memory', $e->getMessage());
+            self::assertStringNotContainsString('--memory-limit can raise the limit', $e->getMessage());
+            self::assertStringContainsString('Json.php line 38: Malformed UTF-8 characters', $e->getMessage());
+        }
+    }
+
     public function test_a_custom_memory_limit_is_passed_to_rector(): void
     {
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, '{"file_diffs": [], "errors": []}', ''));
