@@ -1,0 +1,14 @@
+{
+    "name": "example/example-app",
+    "description": "A small WayneUI 1.x app for the migration engine tests.",
+    "repositories": [
+        {
+            "type": "git",
+            "url": "https://example.com/enterprise-apps/wayne-ui.git"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "cit-web-infra/wayne-ui": "^1.0"
+    }
+}

@@ -214,8 +214,115 @@ final class WayneUiMigrationTest extends TestCase
         self::assertSame(3, $result->changedCount());
         self::assertSame(['resources/css/app.css', 'resources/views/layout.blade.php', 'resources/views/partials/actions.blade.php'], array_column($result->files, 'file'));
         self::assertSame(48, $result->rewrites);
-        self::assertSame(58, count($result->manual));
+        // 58 from the class, icon, colour and data-hook rules, plus the two
+        // wayne-ui:: view directives and the forked public/ vendor copy.
+        self::assertSame(61, count($result->manual));
         self::assertSame(['resources/css/app.css: 5 colours.', 'resources/views/layout.blade.php: 28 class tokens, 5 icons, 2 colours.', 'resources/views/partials/actions.blade.php: 7 class tokens, 1 colour.'], $result->changes);
+    }
+
+    public function test_php_rewrites_rename_the_breadcrumbs_calls(): void
+    {
+        $dir = $this->fixture('php');
+        $this->migrate($dir);
+        $controller = $this->read($dir, 'app/Http/Controllers/MembersController.php');
+
+        self::assertStringContainsString('use WSU\WayneUi\Facades\Breadcrumbs;', $controller);
+        self::assertStringContainsString('Breadcrumbs::pushAsHeading(', $controller);
+        self::assertSame(2, substr_count($controller, 'Breadcrumbs::setSubheading('));
+        self::assertStringContainsString("Breadcrumbs::setHeading('Members');", $controller);
+        self::assertStringContainsString('Breadcrumbs::setSubtitle(', $controller);
+        self::assertStringNotContainsString('use WSU\WayneUi\Breadcrumbs;', $controller);
+        self::assertStringNotContainsString('pushAsHeader(', $controller);
+        self::assertStringNotContainsString('pushAsSubHeader(', $controller);
+        self::assertStringNotContainsString('setSubHeader(', $controller);
+        self::assertStringNotContainsString('setSubTitle(', $controller);
+        self::assertStringNotContainsString("Breadcrumbs::setHeader('Members')", $controller);
+    }
+
+    public function test_set_header_false_is_untouched_and_manual(): void
+    {
+        $dir = $this->fixture('php');
+        $result = $this->migrate($dir);
+        $controller = $this->read($dir, 'app/Http/Controllers/MembersController.php');
+
+        self::assertStringContainsString('Breadcrumbs::setHeader(false);', $controller);
+        self::assertContains('app/Http/Controllers/MembersController.php:16: Breadcrumbs::setHeader(false) becomes <x-wsu::app-shell :page-header="false">', $result->manual);
+    }
+
+    public function test_breadcrumbs_push_is_a_manual_line(): void
+    {
+        $dir = $this->fixture('php');
+        $result = $this->migrate($dir);
+
+        self::assertContains('app/Http/Controllers/MembersController.php:11: Breadcrumbs::push( argument order changed from name, icon, url to label, url, icon; a silent break, check every call', $result->manual);
+        self::assertContains('app/Http/Controllers/MembersController.php:18: Breadcrumbs::render( becomes <x-wsu::breadcrumbs /> or @breadcrumbs; the shell may already render the trail', $result->manual);
+        self::assertContains('app/Http/Controllers/MembersController.php:19: Breadcrumbs::pageHeader( becomes <x-wsu::page-header />', $result->manual);
+    }
+
+    public function test_blade_view_markers_are_manual(): void
+    {
+        $dir = $this->fixture('php');
+        $result = $this->migrate($dir);
+        $view = $this->read($dir, 'resources/views/members/index.blade.php');
+        $manual = implode("\n", $result->manual);
+
+        self::assertStringContainsString("@extends('wayne-ui:: becomes <x-wsu::app-shell>; plain pages use layout=\"plain\"", $manual);
+        self::assertStringContainsString("@section('wayne-ui:: content moves between component tags", $manual);
+        self::assertStringContainsString('resources/views/members/index.blade.php:5: navActive( prefix semantics changed; 2.x wants x.* around the route name', $manual);
+        self::assertStringContainsString('resources/views/members/index.blade.php:6: cacheBustingUrl( choose Vite fingerprinting or wayne-ui.assets.*', $manual);
+        self::assertStringContainsString('resources/views/members/index.blade.php:7: showUserInfo( remove the call; 2.x toggles it with wayne-ui.user.enabled', $manual);
+        self::assertStringContainsString('resources/views/members/index.blade.php:8: $appUserId view vars are replaced by the auth user plus wayne-ui.user.attributes', $manual);
+        self::assertStringContainsString('resources/views/members/index.blade.php:8: $appUserName view vars are replaced by the auth user plus wayne-ui.user.attributes', $manual);
+        self::assertSame($this->read($dir, 'resources/views/members/index.blade.php'), $view);
+    }
+
+    public function test_config_keys_rewrite_only_as_keys(): void
+    {
+        $dir = $this->fixture('php');
+        $result = $this->migrate($dir);
+        $config = $this->read($dir, 'config/wayne-ui.php');
+
+        self::assertStringContainsString("'home' => '/',", $config);
+        self::assertStringContainsString("'title' => 'Example App',", $config);
+        self::assertStringContainsString("'page_header' => true,", $config);
+        self::assertStringContainsString('// app-home points the brand link at the member home', $config);
+        self::assertStringNotContainsString("'app-home'", $config);
+        self::assertStringNotContainsString("'app-title'", $config);
+        self::assertStringNotContainsString("'use-page-header'", $config);
+        self::assertContains("config/wayne-ui.php:8: 'show-user-info' becomes nested user.enabled; move the value into a 'user' array", $result->manual);
+        self::assertContains("config/wayne-ui.php:9: 'subheader-logo' was removed in 2.x; delete the line", $result->manual);
+        self::assertContains("config/wayne-ui.php:10: 'subheader-logo-alt' was removed in 2.x; delete the line", $result->manual);
+        self::assertContains("config/wayne-ui.php:11: 'favicon' splits into assets.favicon plus assets.favicon_public", $result->manual);
+        self::assertContains("config/wayne-ui.php:12: 'use-wsu-header' becomes template with 'internal' or 'public'", $result->manual);
+    }
+
+    public function test_project_level_lines_are_reported(): void
+    {
+        $dir = $this->fixture('php');
+        $result = $this->migrate($dir);
+
+        self::assertContains('resources/views/vendor/wayne-ui/layouts/wsu-header.blade.php: may carry edits; delete after checking, then git rm -r --cached', $result->manual);
+        self::assertContains('resources/views/vendor/wayne-ui/: forked views override the package; delete after checking for edits, then git rm -r --cached', $result->manual);
+        self::assertContains('public/vendor/wayne-ui/: forked assets override the package; delete after checking for edits, then git rm -r --cached', $result->manual);
+        self::assertContains('composer.json: remove the wayne-ui repository entry; if the URL carries a deploy token, rotate the token, which Booster cannot do', $result->manual);
+    }
+
+    public function test_the_php_fixture_totals(): void
+    {
+        $dir = $this->fixture('php');
+        $result = $this->migrate($dir);
+
+        self::assertSame(2, $result->changedCount());
+        self::assertSame(['app/Http/Controllers/MembersController.php', 'config/wayne-ui.php'], array_column($result->files, 'file'));
+        self::assertSame(9, $result->rewrites);
+        self::assertSame(20, count($result->manual));
+        self::assertSame(['app/Http/Controllers/MembersController.php: 6 PHP rewrites.', 'config/wayne-ui.php: 3 config keys.'], $result->changes);
+
+        $before = $this->snapshot($dir);
+        $second = $this->migrate($dir);
+        self::assertSame([], $second->changes);
+        self::assertSame(0, $second->rewrites);
+        self::assertSame($before, $this->snapshot($dir));
     }
 
     /** Copies a wayneui1 fixture app into a fresh temp directory and returns it. */

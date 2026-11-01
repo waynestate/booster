@@ -10,11 +10,12 @@ use RecursiveIteratorIterator;
 
 /**
  * Moves an app from WayneUI 1.x (Bootstrap 3 markup) to WayneUI 2.x (wsu-
- * classes). The mechanical class tokens, Font Awesome icons and brand
- * colours are rewritten in place; everything context dependent becomes a
- * manual note that names the file and line. It never runs app code: the old
- * markup is read with conservative patterns. Like a booster shot, it covers
- * the mechanical rows and leaves the judgement calls to a person.
+ * classes). The mechanical class tokens, Font Awesome icons, brand colours,
+ * Breadcrumbs calls and config keys are rewritten in place; everything
+ * context dependent becomes a manual note that names the file and line. It
+ * never runs app code: the old markup is read with conservative patterns.
+ * Like a booster shot, it covers the mechanical rows and leaves the
+ * judgement calls to a person.
  */
 final class WayneUiMigration
 {
@@ -161,6 +162,56 @@ final class WayneUiMigration
         'data-ride' => '%s starts a Bootstrap carousel; 2.x has no carousel, so remove it',
     ];
 
+    /** PHP strings rewritten literally, in order: needle, replacement, display name. */
+    private const PHP_REWRITES = [
+        ['use WSU\WayneUi\Breadcrumbs;', 'use WSU\WayneUi\Facades\Breadcrumbs;', 'use WSU\WayneUi\Breadcrumbs'],
+        ['Breadcrumbs::pushAsHeader(', 'Breadcrumbs::pushAsHeading(', 'pushAsHeader'],
+        ['Breadcrumbs::pushAsSubHeader(', 'Breadcrumbs::setSubheading(', 'pushAsSubHeader'],
+        ['Breadcrumbs::setSubHeader(', 'Breadcrumbs::setSubheading(', 'setSubHeader'],
+        ['Breadcrumbs::setHeader(', 'Breadcrumbs::setHeading(', 'setHeader'],
+        ['Breadcrumbs::setSubTitle(', 'Breadcrumbs::setSubtitle(', 'setSubTitle'],
+    ];
+
+    /** Quoted config keys renamed as array keys only: old key, new key. */
+    private const CONFIG_REWRITES = [
+        ['app-home', 'home'],
+        ['app-title', 'title'],
+        ['use-page-header', 'page_header'],
+    ];
+
+    /** Config keys a person must restructure or delete, with the note. */
+    private const CONFIG_MANUAL = [
+        ['show-user-info', "'show-user-info' becomes nested user.enabled; move the value into a 'user' array"],
+        ['subheader-logo', "'subheader-logo' was removed in 2.x; delete the line"],
+        ['subheader-logo-alt', "'subheader-logo-alt' was removed in 2.x; delete the line"],
+        ['favicon', "'favicon' splits into assets.favicon plus assets.favicon_public"],
+        ['use-wsu-header', "'use-wsu-header' becomes template with 'internal' or 'public'"],
+    ];
+
+    /**
+     * PHP markers that are never rewritten: regex, rule name and advice
+     * (%s is the matched text when present).
+     *
+     * @var list<array{0: string, 1: string, 2: string}>
+     */
+    private const PHP_MARKERS = [
+        ['/Breadcrumbs::push\(/', 'breadcrumbs-push', 'Breadcrumbs::push( argument order changed from name, icon, url to label, url, icon; a silent break, check every call'],
+        ['/Breadcrumbs::render\(/', 'breadcrumbs-render', 'Breadcrumbs::render( becomes <x-wsu::breadcrumbs /> or @breadcrumbs; the shell may already render the trail'],
+        ['/Breadcrumbs::pageHeader\(/', 'breadcrumbs-page-header', 'Breadcrumbs::pageHeader( becomes <x-wsu::page-header />'],
+        ['/navActive\(|@navActive/', 'nav-active', '%s prefix semantics changed; 2.x wants x.* around the route name'],
+        ['/cacheBustingUrl\(/', 'cache-busting-url', 'cacheBustingUrl( choose Vite fingerprinting or wayne-ui.assets.*'],
+        ['/showUserInfo\(/', 'show-user-info-call', 'showUserInfo( remove the call; 2.x toggles it with wayne-ui.user.enabled'],
+        ['/@extends\(\'wayne-ui::/', 'blade-extends', "@extends('wayne-ui:: becomes <x-wsu::app-shell>; plain pages use layout=\"plain\""],
+        ['/@section\(\'wayne-ui::/', 'blade-section', "@section('wayne-ui:: content moves between component tags"],
+        ['/@stack\(\'wayne-ui::/', 'blade-stack', "@stack('wayne-ui:: becomes <x-slot:head> or <x-slot:scripts>"],
+        ['/@include\(\'wayne-ui::/', 'blade-include', "@include('wayne-ui:: check which partial; the header becomes template=\"public\""],
+        ['/\$appUserId\b/', 'app-user-id', '$appUserId view vars are replaced by the auth user plus wayne-ui.user.attributes'],
+        ['/\$appUserName\b/', 'app-user-name', '$appUserName view vars are replaced by the auth user plus wayne-ui.user.attributes'],
+    ];
+
+    /** Old publish tags that are shared with other packages. */
+    private const OLD_TAGS = ['--tag=config', '--tag=public', '--tag=layouts', '--tag=partials'];
+
     /**
      * Rewrites the mechanical rows of the 1.x to 2.x mapping across the app.
      * A dry run reports what would change and writes nothing.
@@ -175,7 +226,7 @@ final class WayneUiMigration
 
         foreach ($this->files($appPath) as $relative => $absolute) {
             $content = (string) file_get_contents($absolute);
-            $stats = ['classes' => [], 'icons' => [], 'colours' => []];
+            $stats = ['classes' => [], 'icons' => [], 'colours' => [], 'php' => [], 'config' => []];
             $new = $content;
 
             if (self::isBlade($relative)) {
@@ -183,11 +234,17 @@ final class WayneUiMigration
                 $new = $this->classes($new, $relative, $entries, $stats);
                 $this->dataHooks($new, $relative, $entries);
                 $new = $this->bladeColours($new, $relative, $entries, $stats);
+                $new = $this->php($new, $relative, $entries, $stats);
+            } elseif (self::isPhp($relative)) {
+                $new = $this->php($new, $relative, $entries, $stats);
+            } elseif ($relative === 'config/wayne-ui.php') {
+                $new = $this->configKeys($new, $relative, $entries, $stats);
             } elseif (self::isCss($relative)) {
                 $new = $this->hexes($new, $relative, 0, $entries, $stats);
             } elseif (self::isSass($relative)) {
                 $this->sass($new, $relative, $entries);
             }
+            $this->publishLines($new, $relative, $entries);
 
             if ($new === $content) {
                 continue;
@@ -197,7 +254,7 @@ final class WayneUiMigration
                 file_put_contents($absolute, $new);
             }
 
-            $rewrites += count($stats['classes']) + count($stats['icons']) + count($stats['colours']);
+            $rewrites += count($stats['classes']) + count($stats['icons']) + count($stats['colours']) + count($stats['php']) + count($stats['config']);
             $parts = [];
             $diff = [];
             if ($stats['classes'] !== []) {
@@ -212,10 +269,24 @@ final class WayneUiMigration
                 $parts[] = self::plural(count($stats['colours']), 'colour');
                 $diff[] = 'colours: ' . implode(', ', $stats['colours']);
             }
+            if ($stats['php'] !== []) {
+                $parts[] = self::plural(count($stats['php']), 'PHP rewrite');
+                $diff[] = 'php: ' . implode(', ', $stats['php']);
+            }
+            if ($stats['config'] !== []) {
+                $parts[] = self::plural(count($stats['config']), 'config key');
+                $diff[] = 'config: ' . implode(', ', $stats['config']);
+            }
 
             $changes[] = ($dryRun ? 'Dry run: would rewrite ' : '') . $relative . ': ' . implode(', ', $parts) . '.';
             $files[] = ['file' => $relative, 'diff' => implode('; ', $diff)];
         }
+
+        $composer = $appPath . '/composer.json';
+        if (is_file($composer)) {
+            $this->publishLines((string) file_get_contents($composer), 'composer.json', $entries);
+        }
+        $this->projectLevel($appPath, $entries);
 
         return new WayneUiMigrationResult($changes, $files, self::capManual($entries), $rewrites);
     }
@@ -245,7 +316,7 @@ final class WayneUiMigration
                     continue 2;
                 }
             }
-            if (self::isBlade($relative) || self::isCss($relative) || self::isSass($relative)) {
+            if (self::isBlade($relative) || self::isPhp($relative) || self::isCss($relative) || self::isSass($relative) || $relative === 'config/wayne-ui.php') {
                 $out[$relative] = $absolute;
             }
         }
@@ -261,7 +332,7 @@ final class WayneUiMigration
      * into it.
      *
      * @param list<array{0: string, 1: string}> $entries
-     * @param array{classes: list<string>, icons: list<string>, colours: list<string>} $stats
+     * @param array{classes: list<string>, icons: list<string>, colours: list<string>, php: list<string>, config: list<string>} $stats
      */
     private function icons(string $content, string $rel, array &$entries, array &$stats): string
     {
@@ -361,7 +432,7 @@ final class WayneUiMigration
      * tokens that need a person. Blade expressions survive byte for byte.
      *
      * @param list<array{0: string, 1: string}> $entries
-     * @param array{classes: list<string>, icons: list<string>, colours: list<string>} $stats
+     * @param array{classes: list<string>, icons: list<string>, colours: list<string>, php: list<string>, config: list<string>} $stats
      */
     private function classes(string $content, string $rel, array &$entries, array &$stats): string
     {
@@ -513,7 +584,7 @@ final class WayneUiMigration
      * offsets stay valid.
      *
      * @param list<array{0: string, 1: string}> $entries
-     * @param array{classes: list<string>, icons: list<string>, colours: list<string>} $stats
+     * @param array{classes: list<string>, icons: list<string>, colours: list<string>, php: list<string>, config: list<string>} $stats
      */
     private function bladeColours(string $content, string $rel, array &$entries, array &$stats): string
     {
@@ -548,7 +619,7 @@ final class WayneUiMigration
      * before the span, so manual lines keep their real line numbers.
      *
      * @param list<array{0: string, 1: string}> $entries
-     * @param array{classes: list<string>, icons: list<string>, colours: list<string>} $stats
+     * @param array{classes: list<string>, icons: list<string>, colours: list<string>, php: list<string>, config: list<string>} $stats
      */
     private function hexes(string $text, string $rel, int $lineBase, array &$entries, array &$stats): string
     {
@@ -606,6 +677,146 @@ final class WayneUiMigration
     }
 
     /**
+     * Renames the mechanical Breadcrumbs calls and notes the ones that
+     * change meaning. setHeader(false) is masked first, because it maps to
+     * a shell prop instead of a method rename.
+     *
+     * @param list<array{0: string, 1: string}> $entries
+     * @param array{classes: list<string>, icons: list<string>, colours: list<string>, php: list<string>, config: list<string>} $stats
+     */
+    private function php(string $content, string $rel, array &$entries, array &$stats): string
+    {
+        $protected = [];
+        $count = preg_match_all('/Breadcrumbs::setHeader\s*\(\s*false\s*\)/', $content, $ms, PREG_OFFSET_CAPTURE);
+        if ($count !== false) {
+            for ($i = $count - 1; $i >= 0; $i--) {
+                $full = (string) $ms[0][$i][0];
+                $offset = (int) $ms[0][$i][1];
+                $entries[] = ['set-header-false', $rel . ':' . self::lineAt($content, $offset) . ': Breadcrumbs::setHeader(false) becomes <x-wsu::app-shell :page-header="false">'];
+                $protected[$i] = $full;
+                $content = substr($content, 0, $offset) . "\x00SHF" . $i . "\x00" . substr($content, $offset + strlen($full));
+            }
+        }
+
+        foreach (self::PHP_REWRITES as [$from, $to, $name]) {
+            if (!str_contains($content, $from)) {
+                continue;
+            }
+            $n = substr_count($content, $from);
+            $content = str_replace($from, $to, $content);
+            for ($k = 0; $k < $n; $k++) {
+                $stats['php'][] = $name;
+            }
+        }
+
+        foreach (self::PHP_MARKERS as [$pattern, $rule, $advice]) {
+            $count = preg_match_all($pattern, $content, $ms, PREG_OFFSET_CAPTURE);
+            if ($count === false) {
+                continue;
+            }
+            foreach ($ms[0] as [$match, $offset]) {
+                $entries[] = [$rule, $rel . ':' . self::lineAt($content, (int) $offset) . ': ' . sprintf($advice, (string) $match)];
+            }
+        }
+
+        foreach ($protected as $i => $full) {
+            $content = str_replace("\x00SHF" . $i . "\x00", $full, $content);
+        }
+
+        return $content;
+    }
+
+    /**
+     * Renames the quoted config keys that moved, as array keys only, and
+     * notes the keys a person must restructure or delete.
+     *
+     * @param list<array{0: string, 1: string}> $entries
+     * @param array{classes: list<string>, icons: list<string>, colours: list<string>, php: list<string>, config: list<string>} $stats
+     */
+    private function configKeys(string $content, string $rel, array &$entries, array &$stats): string
+    {
+        foreach (self::CONFIG_REWRITES as [$old, $newKey]) {
+            $pattern = '/' . preg_quote("'" . $old . "'", '/') . "(\s*=>)/";
+            $n = preg_match_all($pattern, $content);
+            if ($n === false || $n === 0) {
+                continue;
+            }
+            $content = (string) preg_replace($pattern, sprintf("'%s'\$1", $newKey), $content);
+            for ($k = 0; $k < $n; $k++) {
+                $stats['config'][] = $old;
+            }
+        }
+
+        foreach (self::CONFIG_MANUAL as [$key, $advice]) {
+            $count = preg_match_all("/'" . preg_quote($key, '/') . "'\s*=>/", $content, $ms, PREG_OFFSET_CAPTURE);
+            if ($count === false) {
+                continue;
+            }
+            foreach ($ms[0] as [, $offset]) {
+                $entries[] = ['config-' . $key, $rel . ':' . self::lineAt($content, (int) $offset) . ': ' . $advice];
+            }
+        }
+
+        return $content;
+    }
+
+    /**
+     * Notes vendor:publish lines that pair an old shared tag with
+     * wayne-ui; the 2.x tags are wayne-ui-config, wayne-ui-assets and
+     * wayne-ui-views.
+     *
+     * @param list<array{0: string, 1: string}> $entries
+     */
+    private function publishLines(string $content, string $rel, array &$entries): void
+    {
+        foreach (explode("\n", $content) as $no => $line) {
+            if (!str_contains($line, 'vendor:publish') || !str_contains($line, 'wayne-ui')) {
+                continue;
+            }
+            foreach (self::OLD_TAGS as $tag) {
+                if (str_contains($line, $tag)) {
+                    $entries[] = ['vendor-publish', $rel . ':' . ($no + 1) . ': ' . $tag . ' is shared with other packages; the 2.x tags are wayne-ui-config, wayne-ui-assets and wayne-ui-views'];
+                }
+            }
+        }
+    }
+
+    /**
+     * The checks that look at the app root rather than file contents: a
+     * published wsu-header copy, forked views and assets, and a composer
+     * repository entry for the old package.
+     *
+     * @param list<array{0: string, 1: string}> $entries
+     */
+    private function projectLevel(string $appPath, array &$entries): void
+    {
+        if (is_file($appPath . '/resources/views/vendor/wayne-ui/layouts/wsu-header.blade.php')) {
+            $entries[] = ['wsu-header-file', 'resources/views/vendor/wayne-ui/layouts/wsu-header.blade.php: may carry edits; delete after checking, then git rm -r --cached'];
+        }
+        if (is_dir($appPath . '/resources/views/vendor/wayne-ui')) {
+            $entries[] = ['forked-views', 'resources/views/vendor/wayne-ui/: forked views override the package; delete after checking for edits, then git rm -r --cached'];
+        }
+        if (is_dir($appPath . '/public/vendor/wayne-ui')) {
+            $entries[] = ['forked-public', 'public/vendor/wayne-ui/: forked assets override the package; delete after checking for edits, then git rm -r --cached'];
+        }
+        $composer = $appPath . '/composer.json';
+        if (!is_file($composer)) {
+            return;
+        }
+        $json = json_decode((string) file_get_contents($composer), true);
+        if (!is_array($json)) {
+            return;
+        }
+        foreach ((array) ($json['repositories'] ?? []) as $repo) {
+            $url = is_array($repo) ? (string) ($repo['url'] ?? '') : '';
+            if (str_contains($url, 'wayne-ui')) {
+                $entries[] = ['composer-repository', 'composer.json: remove the wayne-ui repository entry; if the URL carries a deploy token, rotate the token, which Booster cannot do'];
+                break;
+            }
+        }
+    }
+
+    /**
      * Caps the manual lines at 25 per rule; the rest collapse into one
      * "<rule>: and N more" line, appended after all kept lines in rule
      * order.
@@ -649,6 +860,16 @@ final class WayneUiMigration
     private static function isBlade(string $relative): bool
     {
         return str_starts_with($relative, 'resources/views/') && str_ends_with($relative, '.blade.php');
+    }
+
+    /** Plain PHP under app/ or routes/, which carries Breadcrumbs calls. */
+    private static function isPhp(string $relative): bool
+    {
+        if (!str_ends_with($relative, '.php')) {
+            return false;
+        }
+
+        return str_starts_with($relative, 'app/') || str_starts_with($relative, 'routes/');
     }
 
     private static function isCss(string $relative): bool
