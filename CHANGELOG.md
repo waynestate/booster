@@ -7,6 +7,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 ### Fixed
 
 - The `tailwind-3-to-4` hop ran `npx -y ^4.1`, which names no package; it now runs `npx -y @tailwindcss/upgrade@^4.1`.
+- Rector now skips every vendor/ and node_modules/ directory at any depth, not only the app root, and the report names the nested ones it left alone. A vendored library with a parse error no longer stops a hop.
 
 ## [1.7.0] - 2026-11-01
 
