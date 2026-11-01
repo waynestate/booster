@@ -15,7 +15,12 @@ use Waynestate\Booster\ToolError;
  */
 final class HopRegistry
 {
-    /** The Node pin hop. The major it pins to lives in the data file. */
+    /**
+     * The Node pin hop. The major it pins to lives in the data file, so the summary
+     * and notes name whatever major the data says today. The id is a stable name that
+     * plans, skills and tests refer to; the "24" in it is historical (the first major
+     * pinned) and is not the current target. Do not rename it to follow the data.
+     */
     public const NODE_PIN_ID = 'node-pin-24';
 
     /** The Mix to Vite hop. The package versions it installs live in the data file. */
