@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "66b921fc0ad41564719ead6fce8141e4",
+    "content-hash": "01eafd035bf2e023f29fca72b9ba5faa",
     "packages": [
         {
             "name": "composer/semver",
@@ -1912,16 +1912,16 @@
         },
         {
             "name": "waynestate/proctor",
-            "version": "0.2.0",
+            "version": "0.3.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/proctor.git",
-                "reference": "88ebd260fca62d46162f9c9f3eb04a771a0b3986"
+                "reference": "91e7e9828f8448135315afcf5eda4eb3f6646bc1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/proctor/zipball/88ebd260fca62d46162f9c9f3eb04a771a0b3986",
-                "reference": "88ebd260fca62d46162f9c9f3eb04a771a0b3986",
+                "url": "https://api.github.com/repos/waynestate/proctor/zipball/91e7e9828f8448135315afcf5eda4eb3f6646bc1",
+                "reference": "91e7e9828f8448135315afcf5eda4eb3f6646bc1",
                 "shasum": ""
             },
             "require": {
@@ -1935,7 +1935,8 @@
                 "humbug/box": "4.7.1",
                 "laravel/pint": "^1.32",
                 "phpstan/phpstan": "^2.1",
-                "phpunit/phpunit": "^11.5"
+                "phpunit/phpunit": "^11.5",
+                "waynestate/pinstripe": "^0.1"
             },
             "bin": [
                 "bin/proctor"
@@ -1961,7 +1962,7 @@
                 "issues": "https://github.com/waynestate/proctor/issues",
                 "source": "https://github.com/waynestate/proctor"
             },
-            "time": "2026-10-29T03:46:10+00:00"
+            "time": "2026-11-01T10:15:12+00:00"
         }
     ],
     "packages-dev": [],
