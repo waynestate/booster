@@ -206,6 +206,7 @@ Options shared by `plan` and `run`:
 | `--from-php`, `--from-laravel` | Say what the app runs on when the manifest does not |
 | `--to-php`, `--to-laravel`, `--to-phpunit` | The target. Default: the newest version the policy supports today (PHPUnit: the newest that runs on the target PHP) |
 | `--sesame` | Include the `wayne-cas` to SESAME swap |
+| `--wayneui` | Include the WayneUI 1.x to 2.x move |
 | `--skip` | A hop id to leave out (repeat it) |
 | `--no-package-check` | Skip the Packagist dependency check (for offline use) |
 | `--until` | Cut the plan after this hop id: that step and everything before it stay, and the plan's targets move to where it lands |
@@ -528,7 +529,7 @@ three: skipping it skips them, and a person finishes the job, because Rector doe
 
 #### Hops Booster knows
 
-Thirty-three hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
+Thirty-four hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
 major at a time from 9 to 13, each list read from `data/versions.json` and trimmed to the majors whose Rector ruleset
 is installed ([Hop data](#hop-data)). An app whose PHPUnit is below 9 gets `phpunit-to-9-manual`, a manual move to
 `^9.5` placed before the first hop that targets PHP 8.0 (PHPUnit 7 and 8 do not run on PHP 8), and the regular
@@ -540,7 +541,13 @@ swaps the Composer requirement and drops any `wayne-cas` path or VCS repository 
 when nothing in the app reads its config keys any more (a manual step names the readers while anything still does),
 and flags dead `DUO_*` settings in example env files; planned with `--sesame`, and left out with a warning when the
 plan ends below PHP 8.3, which SESAME needs; it lands just before the hop from Laravel 10 to 11, and while PHP is
-still below 8.3 the PHP hops go first); `node-pin-24` (planned for any app with a `package.json` that does
+still below 8.3 the PHP hops go first); `wayneui-1-to-2` (planned with `--wayneui` for an app that requires
+`cit-web-infra/wayne-ui`, after the last Laravel hop, on Laravel 11 or newer: swaps the Composer requirement for
+`waynestate/wayne-ui ^2.0`, rewrites the one-to-one rows (class tokens, icon names, the mapped brand hexes in style
+blocks and CSS, the `Breadcrumbs` calls and the `config/wayne-ui.php` keys) and lists the rest as manual lines; it
+leaves forked views under `resources/views/vendor/wayne-ui` and `public/vendor/wayne-ui` in place for a person to
+delete, and it cannot rotate a deploy token a repository URL may carry); `node-pin-24` (planned for any app with a
+`package.json` that does
 not already floor Node at the hop data's target, 26 today: sets `engines.node` to `>=26` and writes `.nvmrc`, ahead
 of the front-end hops); `mix-to-vite` (planned when the app has a `webpack.mix.js` and the plan lands on Laravel 9 or
 newer, after `node-pin-24`: writes `vite.config.js`, swaps `laravel-mix` for `vite` and `laravel-vite-plugin` in
@@ -554,6 +561,8 @@ and `mix-to-vite`: runs the official `@tailwindcss/upgrade` tool, pins `tailwind
 Vite or PostCSS plugin and removes `autoprefixer` and `postcss-import`); and the Vue 2 to Vue 3 stage,
 `vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod`, with the `vue-2-to-3` playbook standing in for all three.
 `booster hops` prints them all.
+
+> Every other hop lifts the engine; `wayneui-1-to-2` is the one that repaints the bodywork.
 
 Booster plans any target the policy knows. A target past security support is allowed as a stop on the way up, with a
 plan warning that names the date its security support ended. A version the policy does not list at all is still
