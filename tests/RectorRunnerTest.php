@@ -25,6 +25,21 @@ final class RectorRunnerTest extends TestCase
         self::assertCount(1, $fake->commandsContaining('--memory-limit=2G'));
     }
 
+    public function test_run_names_the_vendored_directories_at_any_depth_for_the_config(): void
+    {
+        $app = $this->tempDir();
+        mkdir($app . '/src/vendor/x', 0775, true);
+        file_put_contents($app . '/src/vendor/x/y.php', "<?php\n");
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, '{"file_diffs": [], "errors": []}', ''));
+        $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), $app, true, '8.0');
+
+        self::assertCount(1, $fake->calls);
+        $skipDirs = json_decode($fake->calls[0]['env']['BOOSTER_RECTOR_SKIP_DIRS'], true);
+        self::assertIsArray($skipDirs);
+        self::assertContains($app . '/src/vendor', $skipDirs);
+        self::assertSame(['src/vendor'], $result->skippedDirs);
+    }
+
     public function test_a_custom_memory_limit_is_passed_to_rector(): void
     {
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, '{"file_diffs": [], "errors": []}', ''));
@@ -211,6 +226,39 @@ final class RectorRunnerTest extends TestCase
             $skip = SimpleParameterProvider::provideArrayParameter(Option::SKIP);
             self::assertContains('*_ide_helper*.php', $skip);
             self::assertContains('*.phpstorm.meta.php', $skip);
+        } finally {
+            foreach ($saved as $name => $value) {
+                $value === false ? putenv($name) : putenv("{$name}={$value}");
+            }
+        }
+    }
+
+    public function test_the_shared_config_skips_only_the_vendored_directories_booster_names(): void
+    {
+        // The real Rector binary is not available in the test suite, so load the
+        // config Booster ships and read back the skip list it registers.
+        $saved = [];
+        foreach (['BOOSTER_APP_PATH', 'BOOSTER_RECTOR_SETS', 'BOOSTER_CLASS_RENAMES', 'BOOSTER_PHP_TARGET', 'BOOSTER_BOOTSTRAP', 'BOOSTER_RECTOR_SKIP_DIRS'] as $name) {
+            $saved[$name] = getenv($name);
+        }
+        $app = $this->tempDir();
+        putenv('BOOSTER_APP_PATH=' . $app);
+        putenv('BOOSTER_RECTOR_SETS=');
+        putenv('BOOSTER_CLASS_RENAMES=');
+        putenv('BOOSTER_PHP_TARGET=');
+        putenv('BOOSTER_BOOTSTRAP=');
+        putenv('BOOSTER_RECTOR_SKIP_DIRS=' . json_encode([$app . '/src/vendor']));
+
+        try {
+            $configure = require PharFiles::path('config/rector.php');
+            $configure(new RectorConfig());
+
+            $skip = SimpleParameterProvider::provideArrayParameter(Option::SKIP);
+            self::assertContains($app . '/src/vendor', $skip);
+            // The app-root vendor/ is no longer hard-coded; it is skipped only
+            // when Booster names it.
+            self::assertNotContains($app . '/vendor', $skip);
+            self::assertNotContains($app . '/node_modules', $skip);
         } finally {
             foreach ($saved as $name => $value) {
                 $value === false ? putenv($name) : putenv("{$name}={$value}");
