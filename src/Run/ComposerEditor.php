@@ -245,9 +245,9 @@ final class ComposerEditor
 
     /**
      * Drops every repositories entry whose url names the wayne-cas
-     * repository, case-insensitive, in both shapes Composer allows: a list of
-     * objects and an object keyed by repository name. The section goes away
-     * when the last entry leaves it; other entries stay untouched.
+     * repository, in both shapes Composer allows: a list of objects and an
+     * object keyed by repository name. The section goes away when the last
+     * entry leaves it; other entries stay untouched.
      *
      * @param array<string, mixed> $data
      *
@@ -265,7 +265,7 @@ final class ComposerEditor
             $kept = [];
             foreach ($repositories as $entry) {
                 $url = is_array($entry) && is_string($entry['url'] ?? null) ? $entry['url'] : null;
-                if ($url !== null && str_contains(strtolower($url), self::WAYNE_CAS)) {
+                if ($url !== null && self::isWayneCasUrl($url)) {
                     $changes[] = sprintf('composer.json: removed the wayne-cas repository entry (%s)', $url);
                     continue;
                 }
@@ -275,7 +275,7 @@ final class ComposerEditor
         } else {
             foreach ($repositories as $name => $entry) {
                 $url = is_array($entry) && is_string($entry['url'] ?? null) ? $entry['url'] : null;
-                if ($url === null || !str_contains(strtolower($url), self::WAYNE_CAS)) {
+                if ($url === null || !self::isWayneCasUrl($url)) {
                     continue;
                 }
                 unset($repositories[$name]);
@@ -290,6 +290,26 @@ final class ComposerEditor
         }
 
         return $changes;
+    }
+
+    /**
+     * Whether a repositories url names the wayne-cas repository, in any of
+     * the shapes apps carry: the old cit-web-infra path on the private
+     * host, the public waynestate mirror, or a path or vcs entry whose last
+     * path segment is wayne-cas (a local checkout or a bare git url).
+     */
+    private static function isWayneCasUrl(string $url): bool
+    {
+        $url = strtolower(trim($url));
+        if (str_contains($url, self::WAYNE_CAS) || str_contains($url, 'waynestate/wayne-cas')) {
+            return true;
+        }
+        $bare = rtrim($url, '/');
+        if (str_ends_with($bare, '.git')) {
+            $bare = substr($bare, 0, -4);
+        }
+
+        return $bare === 'wayne-cas' || str_ends_with($bare, '/wayne-cas');
     }
 
     /**

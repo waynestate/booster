@@ -108,6 +108,59 @@ final class ComposerEditorTest extends TestCase
         self::assertArrayNotHasKey('repositories', $this->read($dir));
     }
 
+    public function test_the_sesame_swap_drops_a_path_repository_pointing_at_a_wayne_cas_checkout(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $data = $this->read($dir);
+        $data['repositories'] = [
+            ['type' => 'path', 'url' => '/var/www/wayne-cas', 'options' => ['symlink' => true]],
+            ['type' => 'composer', 'url' => 'https://packages.internal.example/'],
+        ];
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        $changes = (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        self::assertContains('composer.json: removed the wayne-cas repository entry (/var/www/wayne-cas)', $changes);
+        self::assertSame([['type' => 'composer', 'url' => 'https://packages.internal.example/']], $this->read($dir)['repositories']);
+    }
+
+    public function test_the_sesame_swap_drops_a_vcs_repository_on_the_public_mirror(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $data = $this->read($dir);
+        $data['repositories'] = [
+            ['type' => 'vcs', 'url' => 'https://github.com/waynestate/wayne-cas.git'],
+            ['type' => 'composer', 'url' => 'https://packages.internal.example/'],
+        ];
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        $changes = (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        self::assertContains('composer.json: removed the wayne-cas repository entry (https://github.com/waynestate/wayne-cas.git)', $changes);
+        self::assertSame([['type' => 'composer', 'url' => 'https://packages.internal.example/']], $this->read($dir)['repositories']);
+    }
+
+    public function test_the_sesame_swap_keeps_a_repository_that_only_resembles_wayne_cas(): void
+    {
+        $dir = $this->copyExample('laravel-wayne-cas');
+        $data = $this->read($dir);
+        $data['repositories'] = [
+            ['type' => 'path', 'url' => '/var/www/my-wayne-cas'],
+            ['type' => 'vcs', 'url' => 'https://github.com/example/wayne-cas-tools.git'],
+        ];
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        (new ComposerEditor())->apply((new HopRegistry())->get('cas-to-sesame'), $dir);
+
+        self::assertSame(
+            [
+                ['type' => 'path', 'url' => '/var/www/my-wayne-cas'],
+                ['type' => 'vcs', 'url' => 'https://github.com/example/wayne-cas-tools.git'],
+            ],
+            $this->read($dir)['repositories'],
+        );
+    }
+
     public function test_the_sesame_swap_reports_no_repository_when_there_is_none(): void
     {
         $dir = $this->copyExample('laravel-wayne-cas');
