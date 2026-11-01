@@ -43,6 +43,7 @@ final readonly class Project
         public ?string $lockFloorConstraint = null,
         public ?string $lockCeilingPackage = null,
         public ?string $lockCeilingConstraint = null,
+        public bool $usesWayneUi1 = false,
     ) {}
 
     /**
@@ -61,6 +62,7 @@ final readonly class Project
             'node' => $this->nodeMajor,
             'mix_file' => $this->hasMixFile,
             'wayne_cas' => $this->usesWayneCas,
+            'wayneui_1' => $this->usesWayneUi1,
             'boost' => $this->hasBoost,
             'helmet' => $this->hasHelmet,
         ];

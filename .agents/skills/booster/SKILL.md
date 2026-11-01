@@ -47,6 +47,7 @@ Playbooks:
 - `booster-phpunit-12-to-13`: Move PHPUnit 12 tests to PHPUnit 13.
 - `booster-phpunit-to-9-manual`: Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves.
 - `booster-cas-to-sesame`: Swap the wayne-cas package for SESAME using its compatibility classes.
+- `booster-wayneui-1-to-2`: Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest.
 - `booster-node-pin-24`: Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
 - `booster-mix-to-vite`: Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only).
 - `booster-tailwind-3-to-4`: Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool.

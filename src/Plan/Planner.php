@@ -247,6 +247,18 @@ final class Planner
             $warnings[] = 'The app uses wayne-cas. Add --sesame to plan the swap to SESAME.';
         }
 
+        if ($options->wayneui && $project->usesWayneUi1) {
+            if ($laravel !== null && version_compare($laravel, '11', '>=')) {
+                $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::WAYNEUI_1_TO_2_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+            } else {
+                $warnings[] = 'WayneUI 2.x needs Laravel 11 or newer; the WayneUI move was left out because the plan ends below that.';
+            }
+        } elseif ($options->wayneui) {
+            $warnings[] = 'Asked for the WayneUI move, but composer.json does not require cit-web-infra/wayne-ui; skipped.';
+        } elseif ($project->usesWayneUi1) {
+            $warnings[] = 'The app uses WayneUI 1.x. Add --wayneui to plan the move to WayneUI 2.x.';
+        }
+
         if (!$nodeLeftOut) {
             foreach ($vueHops as $id) {
                 $steps[] = $this->step(++$n, $this->registry->get($id), $php, $php, $laravel, $laravel, $phpunit, $phpunit);

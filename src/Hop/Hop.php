@@ -48,11 +48,13 @@ final readonly class Hop
     /**
      * A non-Node hop with no Rector rules and no manifest edit is a playbook
      * a person follows. Node hops always edit manifests, so they are never
-     * playbooks even when they carry no npmSet values.
+     * playbooks even when they carry no npmSet values. The WayneUI hop edits
+     * files through its own migration engine, so it is not a playbook either.
      */
     public function isManual(): bool
     {
         return $this->kind !== HopKind::Node
+            && $this->kind !== HopKind::WayneUi
             && $this->rectorSets === []
             && $this->classRenames === []
             && $this->npmSet === [];

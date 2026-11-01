@@ -42,6 +42,20 @@ final class HopRegistryTest extends PhpUnitTestCase
         self::assertStringNotContainsString('stub', $hop->summary);
     }
 
+    public function test_the_wayneui_hop_moves_to_the_released_2x_constraint_and_is_not_manual(): void
+    {
+        $hop = (new HopRegistry())->get(HopRegistry::WAYNEUI_1_TO_2_ID);
+
+        self::assertSame(HopKind::WayneUi, $hop->kind);
+        self::assertSame('1', $hop->from);
+        self::assertSame('2', $hop->to);
+        self::assertSame(['waynestate/wayne-ui' => '^2.0'], $hop->composerSet);
+        self::assertSame(['cit-web-infra/wayne-ui'], $hop->composerRemove);
+        self::assertSame([], $hop->rectorSets);
+        self::assertSame([], $hop->links);
+        self::assertFalse($hop->isManual());
+    }
+
     public function test_php_hops_cover_every_adjacent_pair_once(): void
     {
         $registry = new HopRegistry();

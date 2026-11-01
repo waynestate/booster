@@ -219,8 +219,8 @@ final class ComposerEditor
         $section = isset($data['require'][$package]) ? 'require' : (!$isPhp && isset($data['require-dev'][$package]) ? 'require-dev' : null);
 
         if ($section === null) {
-            // Only the SESAME swap adds a package that was not there; a PHP or Laravel bump never does.
-            if ($hop->kind !== HopKind::Sesame) {
+            // Only the SESAME swap or the WayneUI move adds a package that was not there; a PHP or Laravel bump never does.
+            if ($hop->kind !== HopKind::Sesame && $hop->kind !== HopKind::WayneUi) {
                 return [];
             }
             $section = 'require';

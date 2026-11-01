@@ -61,6 +61,7 @@ abstract class BaseCommand extends Command
             ->addOption('to-phpunit', null, InputOption::VALUE_REQUIRED, 'Target PHPUnit major (default: the newest that runs on the target PHP).')
             ->addOption('with-node', null, InputOption::VALUE_NONE, 'Include the Node front-end hops (Node pin, Mix to Vite, Tailwind, Vue) even when you passed a target version')
             ->addOption('sesame', null, InputOption::VALUE_NONE, 'Include the wayne-cas to SESAME swap.')
+            ->addOption('wayneui', null, InputOption::VALUE_NONE, 'Include the WayneUI 1.x to 2.x move.')
             ->addOption('skip', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hop id to leave out (repeatable).')
             ->addOption('no-package-check', null, InputOption::VALUE_NONE, 'Skip the Packagist dependency check (for offline use).')
             ->addOption('until', null, InputOption::VALUE_REQUIRED, 'Cut the plan after this hop id: that step and everything before it stay.')
@@ -116,6 +117,7 @@ abstract class BaseCommand extends Command
             toLaravel: $this->stringOption($input, 'to-laravel'),
             toPhpunit: $this->stringOption($input, 'to-phpunit'),
             sesame: (bool) $input->getOption('sesame'),
+            wayneui: (bool) $input->getOption('wayneui'),
             withNode: (bool) $input->getOption('with-node'),
             skip: is_array($skip) ? array_values(array_map('strval', $skip)) : [],
             noPackageCheck: (bool) $input->getOption('no-package-check'),

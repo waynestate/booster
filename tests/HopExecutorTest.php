@@ -1287,6 +1287,130 @@ final class HopExecutorTest extends TestCase
     }
 
     /**
+     * Copies the small WayneUI 1.x Laravel fixture and plans only the
+     * wayneui-1-to-2 hop from it.
+     *
+     * @return array{0: string, 1: RunReport} the temp dir and the report
+     */
+    private function executeWayneUiHop(FakeProcessRunner $fake, RunOptions $options): array
+    {
+        $dir = $this->copyFixture(__DIR__ . '/fixtures/wayneui1/laravel-app');
+        $project = (new ProjectDetector())->detect($dir);
+        // PHP and Laravel stay where the fixture has them, so the plan is the
+        // wayneui-1-to-2 hop alone.
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '12', toPhpunit: '11', wayneui: true), $this->today());
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+
+        return [$dir, $executor->execute($plan, $options)];
+    }
+
+    public function test_the_wayneui_hop_swaps_composer_and_rewrites_the_tokens(): void
+    {
+        $fake = $this->fake(changedPerHop: 0);
+        [$dir, $report] = $this->executeWayneUiHop($fake, new RunOptions(skipGate: true));
+
+        self::assertSame(['applied'], $this->statuses($report));
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertSame('^2.0', $composer['require']['waynestate/wayne-ui']);
+        self::assertArrayNotHasKey('cit-web-infra/wayne-ui', $composer['require']);
+        self::assertSame(
+            ['app/Http/Controllers/MembersController.php', 'config/wayne-ui.php', 'resources/views/home.blade.php', 'resources/views/layout.blade.php', 'resources/views/members.blade.php'],
+            array_map(static fn(array $f): string => $f['file'], $report->results[0]->files),
+        );
+        $home = (string) file_get_contents($dir . '/resources/views/home.blade.php');
+        self::assertStringContainsString('class="wsu-btn wsu-btn--primary"', $home);
+        self::assertStringNotContainsString('btn btn-primary', $home);
+        $controller = (string) file_get_contents($dir . '/app/Http/Controllers/MembersController.php');
+        self::assertStringContainsString('use WSU\WayneUi\Facades\Breadcrumbs;', $controller);
+        self::assertStringContainsString("Breadcrumbs::pushAsHeading('Members');", $controller);
+        self::assertStringNotContainsString('pushAsHeader(', $controller);
+        $config = (string) file_get_contents($dir . '/config/wayne-ui.php');
+        self::assertStringContainsString("'home' => '/members',", $config);
+        self::assertStringContainsString("'title' => 'Example App',", $config);
+        $messages = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('Set waynestate/wayne-ui to ^2.0 in require.', $messages);
+        self::assertStringContainsString('Removed cit-web-infra/wayne-ui from require.', $messages);
+        self::assertStringContainsString('WayneUI 1.x to 2.x: 18 rewrites in 5 files, 23 items left for a person.', $messages);
+        self::assertStringContainsString('data-toggle does nothing in 2.x', $messages);
+        self::assertStringContainsString('Gate skipped', $messages);
+    }
+
+    public function test_the_wayneui_hop_dry_run_reports_but_changes_nothing(): void
+    {
+        $dir = $this->copyFixture(__DIR__ . '/fixtures/wayneui1/laravel-app');
+        $before = $this->snapshot($dir);
+        $fake = $this->fake(changedPerHop: 0);
+        [, $report] = $this->executeWayneUiHop($fake, new RunOptions(dryRun: true));
+
+        self::assertSame(['previewed'], $this->statuses($report));
+        self::assertSame($before, $this->snapshot($dir));
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertSame('^1.0', $composer['require']['cit-web-infra/wayne-ui']);
+        self::assertCount(5, $report->results[0]->files);
+        $messages = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('Dry run: would rewrite resources/views/members.blade.php', $messages);
+        self::assertStringContainsString('Dry run: would rewrite app/Http/Controllers/MembersController.php', $messages);
+        self::assertStringContainsString('data-toggle does nothing in 2.x', $messages);
+    }
+
+    public function test_the_wayneui_hop_reports_a_failed_gate_like_other_hops(): void
+    {
+        $fake = $this->fake(changedPerHop: 0, gateExit: 1);
+        [$dir, $report] = $this->executeWayneUiHop($fake, new RunOptions());
+
+        self::assertSame(['gate-failed'], $this->statuses($report));
+        self::assertTrue($report->failed());
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertSame('^2.0', $composer['require']['waynestate/wayne-ui']);
+        self::assertArrayNotHasKey('cit-web-infra/wayne-ui', $composer['require']);
+        $messages = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('Gate failed:', $messages);
+        self::assertStringContainsString('FAILURES!', $messages);
+        self::assertStringContainsString('Undo with:', $messages);
+    }
+
+    public function test_the_wayneui_hop_is_nothing_to_do_when_the_target_is_already_allowed(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        $composer['require']['waynestate/wayne-ui'] = '^2.0';
+        file_put_contents($dir . '/composer.json', json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+        $fake = $this->fake(changedPerHop: 0);
+        $step = new PlanStep(1, (new HopRegistry())->get(HopRegistry::WAYNEUI_1_TO_2_ID), '8.2', '8.2', '10', '10', '10', '10', []);
+        $plan = new Plan((new ProjectDetector())->detect($dir), '2026-10-28', 'test', '8.2', '10', '10', [$step], []);
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions(skipGate: true));
+
+        self::assertSame(['nothing-to-do'], $this->statuses($report));
+        $messages = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('Nothing to do: the migration changed no files and composer.json already allows the target, so the gate was skipped.', $messages);
+    }
+
+    /** Copies a fixture directory into a fresh temp directory and returns it. */
+    private function copyFixture(string $from): string
+    {
+        $dir = $this->tempDir();
+        $this->copyTree($from, $dir);
+
+        return $dir;
+    }
+
+    private function copyTree(string $from, string $to): void
+    {
+        foreach (scandir($from) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            if (is_dir($from . '/' . $entry)) {
+                mkdir($to . '/' . $entry, 0775, true);
+                $this->copyTree($from . '/' . $entry, $to . '/' . $entry);
+            } else {
+                copy($from . '/' . $entry, $to . '/' . $entry);
+            }
+        }
+    }
+
+    /**
      * Every file in the tree, by relative path and content.
      *
      * @return array<string, string>

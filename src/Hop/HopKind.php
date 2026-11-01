@@ -10,6 +10,7 @@ enum HopKind: string
     case Laravel = 'laravel';
     case Phpunit = 'phpunit';
     case Sesame = 'sesame';
+    case WayneUi = 'wayneui';
     case Vue = 'vue';
     case Node = 'node';
 }

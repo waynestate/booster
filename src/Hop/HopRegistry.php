@@ -39,6 +39,9 @@ final class HopRegistry
     /** The manual playbook that moves a PHPUnit below 9 onto PHPUnit 9. */
     public const PHPUNIT_TO_9_MANUAL_ID = 'phpunit-to-9-manual';
 
+    /** The hop that moves an app from WayneUI 1.x to WayneUI 2.x. */
+    public const WAYNEUI_1_TO_2_ID = 'wayneui-1-to-2';
+
     /** The lowest Laravel major whose upgrade guide ships Vite as the front-end tool. */
     public const VITE_LARAVEL_FLOOR = '9';
 
@@ -116,6 +119,7 @@ final class HopRegistry
         $this->addPhpunitHops();
         $this->add($this->phpunitTo9ManualHop());
         $this->add($this->sesameHop());
+        $this->add($this->wayneUi1To2Hop());
         $this->add($this->nodePinHop());
         $this->add($this->mixToViteHop());
         $this->add($this->tailwindHop());
@@ -644,6 +648,34 @@ final class HopRegistry
                 'SESAME is on Packagist: run composer require waynestate/sesame:^0.3 (no extra repository needed).',
                 'Log in through the pre-production host and check the session timeout, the Access ID attribute and Duo before you ship.',
                 'Check that signed-in pages and any Gate or policy checks still work: auth()->user() now comes from SESAME\'s guard and is reloaded every request.',
+            ],
+            links: [],
+        );
+    }
+
+    /**
+     * The WayneUI 1.x to 2.x move. It swaps the private 1.x package for the
+     * released 2.x package and lets the migration engine rewrite the one-to-
+     * one items; everything else comes back as manual lines in the result.
+     */
+    private function wayneUi1To2Hop(): Hop
+    {
+        return new Hop(
+            id: self::WAYNEUI_1_TO_2_ID,
+            kind: HopKind::WayneUi,
+            from: '1',
+            to: '2',
+            summary: 'Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest.',
+            composerSet: ['waynestate/wayne-ui' => '^2.0'],
+            composerRemove: ['cit-web-infra/wayne-ui'],
+            notes: [
+                'The hop leaves forked resources/views/vendor/wayne-ui and public/vendor/wayne-ui alone, so delete them by hand after checking for edits.',
+                'Run php artisan wayne-ui:install after the composer change.',
+                'If the old repositories entry carried a deploy token, rotate the token; Booster cannot do that.',
+                'WayneUI 1.x ran jQuery and Bootstrap JS and 2.x has neither, so check every page that used data-toggle or a plugin.',
+                'Check every page in both light and dark themes; 2.x follows prefers-color-scheme.',
+                'Budget the manual lines listed in the hop result.',
+                "WayneUI's MIGRATING.md is the full spec.",
             ],
             links: [],
         );

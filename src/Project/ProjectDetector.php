@@ -19,6 +19,8 @@ final class ProjectDetector
 {
     private const WAYNE_CAS_PACKAGE = 'cit-web-infra/wayne-cas';
 
+    private const WAYNE_UI_PACKAGE = 'cit-web-infra/wayne-ui';
+
     private const BOOST_PACKAGE = 'laravel/boost';
 
     private const HELMET_PACKAGE = 'waynestate/helmet';
@@ -100,6 +102,7 @@ final class ProjectDetector
             lockFloorConstraint: $lock['floorConstraint'],
             lockCeilingPackage: $lock['ceilingPackage'],
             lockCeilingConstraint: $lock['ceilingConstraint'],
+            usesWayneUi1: array_key_exists(self::WAYNE_UI_PACKAGE, $all),
         );
     }
 
