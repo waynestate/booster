@@ -78,6 +78,10 @@ final class RectorRunner
         // config skips them all: a vendored library must never be rewritten or
         // even parsed by Rector.
         $vendored = VendoredDirs::find($appPath);
+        // PHP files that are not valid UTF-8 would make Rector die encoding its
+        // own JSON report, so Rector runs without them and the step names each
+        // one as manual work.
+        $invalid = NonUtf8Files::find($appPath, $vendored);
         $env = [
             'BOOSTER_APP_PATH' => $appPath,
             'BOOSTER_RECTOR_SETS' => json_encode($hop->rectorSets, JSON_THROW_ON_ERROR),
@@ -85,6 +89,7 @@ final class RectorRunner
             'BOOSTER_PHP_TARGET' => $phpTarget,
             'BOOSTER_RECTOR_CACHE' => sys_get_temp_dir() . '/booster-rector-' . $hop->id,
             'BOOSTER_RECTOR_SKIP_DIRS' => json_encode(array_map(static fn(string $d): string => $appPath . '/' . $d, $vendored), JSON_THROW_ON_ERROR),
+            'BOOSTER_RECTOR_SKIP_FILES' => json_encode(array_map(static fn(string $f): string => $appPath . '/' . $f, $invalid), JSON_THROW_ON_ERROR),
         ];
 
         // Laravel rules need Laravel's classes to recognise a Model or a Controller, so a Laravel
@@ -116,7 +121,7 @@ final class RectorRunner
             @rmdir($work);
         }
 
-        return $this->parse($result, $appPath, $work, $memoryLimit, $vendored);
+        return $this->parse($result, $appPath, $work, $memoryLimit, $vendored, $invalid);
     }
 
     private function binary(): string
@@ -170,13 +175,23 @@ final class RectorRunner
 
     /**
      * @param list<string> $vendored every vendor/ and node_modules/ directory under the app, relative to it
+     * @param list<string> $invalid  every PHP file that is not valid UTF-8, relative to the app; Rector ran without them
      */
-    private function parse(ProcessResult $result, string $appPath, string $work, string $memoryLimit, array $vendored): RectorResult
+    private function parse(ProcessResult $result, string $appPath, string $work, string $memoryLimit, array $vendored, array $invalid): RectorResult
     {
         // Rector exits 2 when a dry run finds changes, so the exit code alone says nothing.
         if (trim($result->stdout) === '') {
-            // An empty report means Rector died before writing it, most often of
-            // memory on a big app.
+            // An empty report means Rector died before writing it. Malformed
+            // UTF-8 in a file it could not encode into its report is one cause;
+            // say that instead of pointing at memory.
+            if (str_contains($result->stderr, 'Malformed UTF-8') || str_contains($result->stdout, 'Malformed UTF-8')) {
+                throw new ToolError(sprintf(
+                    "Rector produced no JSON report (exit %d) because it met malformed UTF-8 in a file it could not encode into its report, not because of memory.\nstderr: %s",
+                    $result->exitCode,
+                    substr(trim($result->stderr), 0, 500),
+                ));
+            }
+            // Otherwise it most often died of memory on a big app.
             throw new ToolError(sprintf(
                 "Rector produced no JSON report (exit %d). It ran with --memory-limit=%s; an exit code of 255 or a stderr line mentioning memory usually means Rector ran out of memory, and --memory-limit can raise the limit.\nstderr: %s",
                 $result->exitCode,
@@ -266,6 +281,8 @@ final class RectorRunner
             array_unshift($errors, $note);
         }
 
-        return new RectorResult($files, $errors, $rules, VendoredDirs::nested($vendored));
+        $excluded = array_map(static fn(string $f): array => ['file' => $f, 'reason' => 'not valid UTF-8'], $invalid);
+
+        return new RectorResult($files, $errors, $rules, VendoredDirs::nested($vendored), $excluded);
     }
 }
