@@ -27,9 +27,10 @@ use Waynestate\Booster\ToolError;
 /**
  * Walks a plan. For each step: preview with Rector, ask or stop when the diff
  * is over the review threshold (or the --max-changes hard limit), apply, move
- * the CAS config and model traits on the SESAME hop, edit composer.json, then
- * run the gate before the next step. It edits the working copy only: no
- * commits, no branches, no pushes.
+ * the CAS config and model traits on the SESAME hop, run the WayneUI
+ * migration on the WayneUI hop, edit composer.json, then run the gate before
+ * the next step. It edits the working copy only: no commits, no branches, no
+ * pushes.
  */
 final class HopExecutor
 {
@@ -42,6 +43,7 @@ final class HopExecutor
         private readonly ?HopRegistry $registry = null,
         private readonly ?ProctorRunner $proctor = null,
         private readonly CasMigration $casMigration = new CasMigration(),
+        private readonly WayneUiMigration $wayneUiMigration = new WayneUiMigration(),
         private readonly TrustProxiesRewriter $trustProxies = new TrustProxiesRewriter(),
     ) {}
 
@@ -344,6 +346,10 @@ final class HopExecutor
                     HopRegistry::VUE_COMPAT_CODEMOD_ID => $this->runVueCompatCodemodHop($step, $path, $options),
                     default => $this->runNodeHop($step, $path, $options, $baseline),
                 };
+            }
+
+            if ($hop->kind === HopKind::WayneUi) {
+                return $this->runWayneUiHop($step, $path, $options, $baseline);
             }
 
             // PHP hops get the new-by-reference pre-pass first: modern PHP refuses to compile
@@ -911,6 +917,49 @@ final class HopExecutor
         }
 
         return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$changes, ...$hop->notes]);
+    }
+
+    /**
+     * The WayneUI 1.x to 2.x hop. It has no Rector sets, so the migration
+     * engine does the work instead: the composer swap lands first, then the
+     * engine rewrites the one-to-one items and lists the context dependent
+     * rest as manual lines. The test gate still runs after a real run, like
+     * every other hop.
+     */
+    private function runWayneUiHop(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): StepResult
+    {
+        $hop = $step->hop;
+        if ($options->dryRun) {
+            $migration = $this->wayneUiMigration->migrate($path, true);
+            $messages = $migration->files === []
+                ? ['Dry run: nothing was changed.', ...$migration->manual, ...$hop->notes]
+                : [...$migration->changes, $migration->summary(), ...$migration->manual, ...$hop->notes];
+
+            return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $migration->files, $messages);
+        }
+
+        $messages = $this->composer->apply($hop, $path);
+        $migration = $this->wayneUiMigration->migrate($path, false);
+        if ($messages === [] && $migration->changedCount() === 0) {
+            // Nothing changed, so there is nothing for the gate to prove; skip it.
+            return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
+                'Nothing to do: the migration changed no files and composer.json already allows the target, so the gate was skipped.',
+                ...$migration->manual,
+                ...$hop->notes,
+            ]);
+        }
+
+        if (!$options->skipGate) {
+            $gate = $this->runGate($step, $path, $options, $baseline);
+            if (!$gate->passed) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $migration->files, [...$messages, ...$migration->changes, $migration->summary(), ...$migration->manual, ...$gate->lines]);
+            }
+            $messages = [...$messages, ...$gate->lines, 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.'];
+        } else {
+            $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
+        }
+
+        return new StepResult($step->number, $hop->id, StepResult::APPLIED, $migration->files, [...$messages, ...$migration->changes, $migration->summary(), ...$migration->manual, ...$hop->notes]);
     }
 
     /**
