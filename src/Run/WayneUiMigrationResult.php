@@ -26,4 +26,10 @@ final readonly class WayneUiMigrationResult
     {
         return count($this->files);
     }
+
+    /** One line for the report: what moved and what is left for a person. */
+    public function summary(): string
+    {
+        return sprintf('WayneUI 1.x to 2.x: %d rewrites in %d files, %d items left for a person.', $this->rewrites, $this->changedCount(), count($this->manual));
+    }
 }

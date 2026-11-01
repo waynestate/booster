@@ -12,8 +12,9 @@ use Waynestate\Booster\Run\WayneUiMigrationResult;
 
 /**
  * The WayneUI 1.x to 2.x hop engine: it rewrites the mechanical class tokens,
- * Font Awesome icons and brand colours, and turns every context dependent row
- * of the mapping into a manual line that names the file and line.
+ * Font Awesome icons, brand colours, Breadcrumbs calls and config keys, and
+ * turns every context dependent row of the mapping into a manual line that
+ * names the file and line.
  */
 final class WayneUiMigrationTest extends TestCase
 {
@@ -317,6 +318,30 @@ final class WayneUiMigrationTest extends TestCase
         self::assertSame(9, $result->rewrites);
         self::assertSame(20, count($result->manual));
         self::assertSame(['app/Http/Controllers/MembersController.php: 6 PHP rewrites.', 'config/wayne-ui.php: 3 config keys.'], $result->changes);
+
+        $before = $this->snapshot($dir);
+        $second = $this->migrate($dir);
+        self::assertSame([], $second->changes);
+        self::assertSame(0, $second->rewrites);
+        self::assertSame($before, $this->snapshot($dir));
+    }
+
+    public function test_the_small_app_migrates_end_to_end(): void
+    {
+        $dir = $this->fixture('app-small');
+        $result = $this->migrate($dir);
+
+        self::assertSame(5, $result->changedCount());
+        self::assertSame([
+            'app/Http/Controllers/MembersController.php',
+            'config/wayne-ui.php',
+            'resources/views/home.blade.php',
+            'resources/views/layout.blade.php',
+            'resources/views/members.blade.php',
+        ], array_column($result->files, 'file'));
+        self::assertSame(18, $result->rewrites);
+        self::assertSame(23, count($result->manual));
+        self::assertSame('WayneUI 1.x to 2.x: 18 rewrites in 5 files, 23 items left for a person.', $result->summary());
 
         $before = $this->snapshot($dir);
         $second = $this->migrate($dir);
