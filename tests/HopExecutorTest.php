@@ -1235,7 +1235,9 @@ final class HopExecutorTest extends TestCase
 
         self::assertSame(['applied'], $this->statuses($report));
         self::assertFileExists($dir . '/config/sesame.php');
-        self::assertFileExists($dir . '/config/wayne-cas.php');
+        // Nothing in the example app reads the old config's keys, so the hop
+        // removed it.
+        self::assertFileDoesNotExist($dir . '/config/wayne-cas.php');
         self::assertStringContainsString("'base_url' => Setting::get('SESAME_CAS_BASE_URL') ?? 'https://cas.example.edu/cas'", (string) file_get_contents($dir . '/config/sesame.php'));
         self::assertStringContainsString("'user_resolver' => env('SESAME_USER_RESOLVER', \Waynestate\Sesame\WayneCas\UserResolver::class)", (string) file_get_contents($dir . '/config/sesame.php'));
         self::assertStringContainsString('class User implements \Waynestate\Sesame\WayneCas\WayneCasable', (string) file_get_contents($dir . '/app/User.php'));
@@ -1252,13 +1254,14 @@ final class HopExecutorTest extends TestCase
         self::assertSame('^0.3', $composer['require']['waynestate/sesame']);
         self::assertArrayNotHasKey('cit-web-infra/wayne-cas', $composer['require']);
         self::assertSame(
-            ['config/sesame.php', 'app/Http/Kernel.php', 'app/Providers/RouteServiceProvider.php', 'config/auth.php', 'app/User.php'],
+            ['config/sesame.php', 'config/wayne-cas.php', 'app/Http/Kernel.php', 'app/Providers/RouteServiceProvider.php', 'config/auth.php', 'app/User.php'],
             array_map(static fn(array $f): string => $f['file'], $report->results[0]->files),
         );
         $messages = implode(' ', $report->results[0]->messages);
         foreach (['DUO_HOSTNAME', 'DUO_IKEY', 'DUO_SKEY', 'DUO_AKEY'] as $needle) {
             self::assertStringContainsString($needle, $messages);
         }
+        self::assertStringContainsString('config/wayne-cas.php: nothing in app/, config/, routes/ or bootstrap/ reads its config keys any more.', $messages);
         self::assertStringContainsString('Gate skipped', $messages);
     }
 
@@ -1272,9 +1275,11 @@ final class HopExecutorTest extends TestCase
         self::assertSame(['previewed'], $this->statuses($report));
         self::assertSame($before, $this->snapshot($dir));
         self::assertFileDoesNotExist($dir . '/config/sesame.php');
-        self::assertCount(5, $report->results[0]->files);
+        self::assertFileExists($dir . '/config/wayne-cas.php');
+        self::assertCount(6, $report->results[0]->files);
         $messages = implode(' ', $report->results[0]->messages);
         self::assertStringContainsString('Dry run: would write config/sesame.php', $messages);
+        self::assertStringContainsString('Dry run: would remove config/wayne-cas.php', $messages);
         self::assertStringContainsString('Dry run: would rewrite app/Http/Kernel.php', $messages);
         self::assertStringContainsString('Dry run: would rewrite app/Providers/RouteServiceProvider.php', $messages);
         self::assertStringContainsString('Dry run: would rewrite config/auth.php', $messages);

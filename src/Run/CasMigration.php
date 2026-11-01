@@ -54,15 +54,23 @@ final class CasMigration
 
         $root = $this->oldConfig($appPath, $manual);
         $oldExists = is_file($appPath . '/' . self::OLD_CONFIG);
+        $references = $oldExists ? $this->oldConfigReferences($appPath) : [];
         $newFile = $appPath . '/' . self::NEW_CONFIG;
+        $hadNewConfig = is_file($newFile);
+        $wroteConfig = false;
         // With an old config the new one carries its root as a fallback;
         // without one, SESAME's published defaults stand and a person sets
         // the base URL.
-        if (!is_file($newFile) && ($root !== null || !$oldExists)) {
+        if (!$hadNewConfig && ($root !== null || !$oldExists)) {
             $template = $this->sesameTemplate($appPath);
+            // The branch above lets an old config in only when its root was
+            // readable, so here the old file goes away when nothing in the
+            // app reads its keys any more.
+            $removeOld = $oldExists && $references === [];
             if ($template === null) {
                 $manual[] = self::NEW_CONFIG . ': BOOSTER has no SESAME config to base it on (no vendor/waynestate/sesame and no bundled copy), so it wrote nothing. Copy SESAME\'s config/sesame.php into the app' . ($root !== null ? " and set its cas.base_url to '" . $root . "'" : '') . '.';
-            } elseif ($this->writeSesameConfig($newFile, $template[0], $root, $dryRun, $manual)) {
+            } elseif ($this->writeSesameConfig($newFile, $template[0], $root, $removeOld, $dryRun, $manual)) {
+                $wroteConfig = true;
                 if ($root !== null) {
                     $changes[] = ($dryRun ? 'Dry run: would write ' : '') . self::NEW_CONFIG . sprintf(' from %s, with cas.base_url falling back to \'%s\' from %s and user_resolver defaulting to the compat resolver.', $template[1], $root, self::OLD_CONFIG);
                     $files[] = ['file' => self::NEW_CONFIG, 'diff' => 'SESAME config with the old root fallback and the compat resolver'];
@@ -70,13 +78,28 @@ final class CasMigration
                     $changes[] = ($dryRun ? 'Dry run: would write ' : '') . self::NEW_CONFIG . sprintf(' from %s with SESAME\'s defaults: there was no %s to move, and user_resolver defaults to the compat resolver.', $template[1], self::OLD_CONFIG);
                     $files[] = ['file' => self::NEW_CONFIG, 'diff' => 'SESAME config from the defaults with the compat resolver'];
                 }
+                if ($removeOld) {
+                    if (!$dryRun) {
+                        @unlink($appPath . '/' . self::OLD_CONFIG);
+                    }
+                    $changes[] = ($dryRun ? 'Dry run: would remove ' : '') . self::OLD_CONFIG . ': nothing in app/, config/, routes/ or bootstrap/ reads its config keys any more.';
+                    $files[] = ['file' => self::OLD_CONFIG, 'diff' => 'removed'];
+                }
             }
-        } elseif ($root !== null) {
+        }
+        if ($root !== null && $hadNewConfig) {
             $manual[] = self::NEW_CONFIG . ' already exists, so BOOSTER left it alone. Set its cas.base_url to \'' . $root . '\' (the old wayne-cas root) if it differs.';
+        }
+        if ($oldExists && !$wroteConfig) {
+            $manual[] = self::OLD_CONFIG . ': left in place; remove it once SESAME is verified.';
+        }
+        if ($oldExists && $wroteConfig && $references !== []) {
+            $manual[] = self::OLD_CONFIG . ': kept because ' . implode(', ', $references) . ' still read its config keys. Remove the file once those reads move to sesame.';
         }
 
         $this->middleware($appPath, $dryRun, $manual, $changes, $files);
         $this->authConfig($appPath, $dryRun, $manual, $changes, $files);
+        $this->duoSettings($appPath, $manual);
 
         $finals = [];
         foreach ($this->modelFiles($appPath) as $relative => $absolute) {
@@ -150,9 +173,49 @@ final class CasMigration
         if (self::boolValue($content, 'use2FA') === true) {
             $manual[] = 'MANUAL: the app had use2FA enabled in ' . self::OLD_CONFIG . ', but SESAME does not carry Duo. Re-enable two-factor in the app itself; DUO_HOSTNAME, DUO_IKEY, DUO_SKEY and DUO_AKEY do nothing under SESAME.';
         }
-        $manual[] = self::OLD_CONFIG . ': left in place; remove it once SESAME is verified.';
 
         return $root;
+    }
+
+    /**
+     * The app files that still read the old wayne-cas config: a config()
+     * call on its keys or on the whole array. Booster scans app/, config/,
+     * routes/ and bootstrap/ only, and skips the old config itself. Sorted
+     * relative paths.
+     *
+     * @return list<string>
+     */
+    private function oldConfigReferences(string $appPath): array
+    {
+        $references = [];
+        foreach (['app', 'config', 'routes', 'bootstrap'] as $dir) {
+            $base = $appPath . '/' . $dir;
+            if (!is_dir($base)) {
+                continue;
+            }
+            $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS));
+            foreach ($iterator as $file) {
+                if (!$file->isFile() || !str_ends_with($file->getFilename(), '.php')) {
+                    continue;
+                }
+                $relative = $this->relative($appPath, $file->getPathname());
+                if ($relative === self::OLD_CONFIG) {
+                    continue;
+                }
+                $content = @file_get_contents($file->getPathname());
+                $match = $content === false ? false : preg_match('/config\(\s*[\x27"]wayne-cas(?:[\x27"]|\.)/', $content);
+                // A match keeps the old config; a failed read or pattern
+                // counts as a match too, so Booster never deletes over an
+                // unknown.
+                if ($match === 0) {
+                    continue;
+                }
+                $references[] = $relative;
+            }
+        }
+        sort($references);
+
+        return $references;
     }
 
     /**
@@ -211,12 +274,16 @@ final class CasMigration
 
     /**
      * The comment the generated config/sesame.php carries above the published
-     * body, naming where its values came from.
+     * body, naming where its values came from and what happened to the old
+     * file.
      */
-    private static function generatedHeader(?string $root): string
+    private static function generatedHeader(?string $root, bool $removesOld): string
     {
         if ($root === null) {
             return "/*\n * Generated by Booster from SESAME's defaults: the app had no\n * config/wayne-cas.php to move.\n */";
+        }
+        if ($removesOld) {
+            return "/*\n * Generated by Booster from config/wayne-cas.php, which Booster removed:\n * nothing in the app reads its config keys any more.\n */";
         }
 
         return self::GENERATED_HEADER;
@@ -227,13 +294,14 @@ final class CasMigration
      * generated header, with up to two lines changed. When the old wayne-cas
      * root is known, cas.base_url falls back to it; when there was no old
      * config, the published line stands and a person sets the base URL.
-     * user_resolver always defaults to the compat resolver. Returns false,
-     * with a manual note, when the published config lacks the exact lines it
-     * must change, so Booster never writes a partial config.
+     * user_resolver always defaults to the compat resolver. The header names
+     * whether the old file was removed or stays in place. Returns false, with
+     * a manual note, when the published config lacks the exact lines it must
+     * change, so Booster never writes a partial config.
      *
      * @param list<string> $manual
      */
-    private function writeSesameConfig(string $file, string $template, ?string $root, bool $dryRun, array &$manual): bool
+    private function writeSesameConfig(string $file, string $template, ?string $root, bool $removesOld, bool $dryRun, array &$manual): bool
     {
         $baseLine = "'base_url' => Setting::get('SESAME_CAS_BASE_URL'),";
         $resolverLine = "'user_resolver' => env('SESAME_USER_RESOLVER'),";
@@ -243,7 +311,7 @@ final class CasMigration
             return false;
         }
         $body = preg_replace('/^<\?php[ \t]*\r?\n/', '', $template, 1);
-        $php = "<?php\n\n" . self::generatedHeader($root) . "\n" . $body;
+        $php = "<?php\n\n" . self::generatedHeader($root, $removesOld) . "\n" . $body;
         if ($root !== null) {
             $escaped = str_replace(['\\', "'"], ['\\\\', "\\'"], $root);
             $php = str_replace($baseLine, sprintf("'base_url' => Setting::get('SESAME_CAS_BASE_URL') ?? '%s',", $escaped), $php);
@@ -465,6 +533,33 @@ final class CasMigration
         }
         $changes[] = ($dryRun ? 'Dry run: would rewrite ' : '') . self::AUTH_CONFIG . ': ' . implode('; ', $clauses) . '.';
         $files[] = ['file' => self::AUTH_CONFIG, 'diff' => implode('; ', $diffClauses)];
+    }
+
+    /**
+     * Flags dead Duo settings in the app's example env files: SESAME does not
+     * do two-factor, so every DUO_* key now does nothing. Report only, even
+     * in a dry run; the keys stay where they are for a person to remove.
+     *
+     * @param list<string> $manual
+     */
+    private function duoSettings(string $appPath, array &$manual): void
+    {
+        $hits = [];
+        foreach (glob($appPath . '/.env.example*') ?: [] as $file) {
+            if (!is_file($file)) {
+                continue;
+            }
+            $content = @file_get_contents($file);
+            if ($content === false || preg_match('/^[ \t]*DUO_[A-Za-z0-9_]*[ \t]*=/m', $content) === 0) {
+                continue;
+            }
+            $hits[] = basename($file);
+        }
+        if ($hits === []) {
+            return;
+        }
+        sort($hits);
+        $manual[] = 'SESAME does not do two-factor. The DUO_* settings in ' . implode(', ', $hits) . ' now do nothing: remove them, and decide separately how this app does two-factor.';
     }
 
     /**
