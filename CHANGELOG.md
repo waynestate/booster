@@ -4,6 +4,18 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-01
+
+The cas-to-sesame hop now finishes what a person had to do by hand on a real app.
+
+### Changed
+
+- `cas-to-sesame` drops the `wayne-cas` path and vcs repositories from `composer.json`, so the moved package no longer lingers as a repository entry.
+- `cas-to-sesame` writes `config/sesame.php` from the SESAME defaults when the app has no `wayne-cas` config to carry over.
+- `cas-to-sesame` removes `config/wayne-cas.php` when nothing in the app reads its keys; when something still does, the report lists the readers as manual work.
+- `cas-to-sesame` flags dead `DUO_*` settings left in the app's configuration.
+- The README documents the full cas-to-sesame recipe.
+
 ## [1.5.0] - 2026-10-31
 
 Behaviour-change warnings, from the second real-use report: a hop can pass every gate and still change what users see.
