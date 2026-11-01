@@ -1911,6 +1911,22 @@ html:not(.motion) .dose__no,
   font-size: 0.9rem;
 }
 
+.foot__org,
+.foot__weld {
+  font-size: 0.9rem;
+}
+
+.foot__weld a {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.foot__weld a:hover,
+.foot__weld a:focus-visible {
+  color: var(--b-gold);
+}
+
 /* -------------------------------------------------------------- 10. responsive */
 
 @media (max-width: 1180px) {
