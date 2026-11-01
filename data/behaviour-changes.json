@@ -567,6 +567,33 @@
       "keep_old": "Override createToken() in the app's HasApiTokens user model to generate Str::random(80).",
       "check": "Find code that checks the length of a plaintext token, stores it in a fixed-width column, or validates it client side.",
       "source": "https://github.com/laravel/sanctum/commit/c46fc083ab52f2ddac97ee4510486f90fc94f220.patch"
+    },
+    {
+      "id": "sanctum-04-migrations-not-loaded",
+      "hop": "package:laravel/sanctum@4",
+      "detect": { "kind": "package" },
+      "label": "Sanctum 4 no longer loads its own migrations (it publishes them instead), so a fresh database, such as new CI or staging, does not get the personal_access_tokens table unless the app has published the migration",
+      "keep_old": "php artisan vendor:publish --tag=sanctum-migrations once, then commit the published migration to database/migrations",
+      "check": "Confirm personal_access_tokens exists in every environment, especially fresh CI and staging databases",
+      "source": "https://raw.githubusercontent.com/laravel/sanctum/4.x/UPGRADE.md"
+    },
+    {
+      "id": "oci8-08-nls-case-insensitive",
+      "hop": "package:yajra/laravel-oci8@8",
+      "detect": { "kind": "package" },
+      "label": "From 8.1.0 the default Oracle session variables include NLS_COMP=LINGUISTIC and NLS_SORT=BINARY_CI, so string comparisons and sorts on every oracle connection become case-insensitive",
+      "keep_old": "in the connection config set 'session' => ['NLS_COMP' => 'BINARY', 'NLS_SORT' => 'BINARY'] (or 'skip_session_vars' => true)",
+      "check": "Look for WHERE and ORDER BY on text columns that relied on case-sensitive matching, and check report sort order",
+      "source": "https://github.com/yajra/laravel-oci8/commit/96ed799f34bdb3839f09a83e144469f61f532f5d.patch"
+    },
+    {
+      "id": "oci8-09-nls-defaults-dropped",
+      "hop": "package:yajra/laravel-oci8@9",
+      "detect": { "kind": "package" },
+      "label": "Version 9.0.0 drops NLS_COMP and NLS_SORT from the default Oracle session variables again, so an app that came from 8.x and relied on case-insensitive comparisons silently reverts to case-sensitive matching",
+      "keep_old": "in the connection config set 'session' => ['NLS_COMP' => 'LINGUISTIC', 'NLS_SORT' => 'BINARY_CI']",
+      "check": "Same as the 8.x row in reverse: look for code that expects case-insensitive matching",
+      "source": "https://raw.githubusercontent.com/yajra/laravel-oci8/v9.0.0/src/Oci8/Oci8ServiceProvider.php"
     }
   ]
 }
