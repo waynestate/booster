@@ -32,8 +32,16 @@ foreach ($decode('BOOSTER_RECTOR_SETS') as $constant) {
 }
 
 $skip = [];
-foreach (['vendor', 'node_modules', 'storage', 'bootstrap/cache', '.git', 'public/build'] as $dir) {
+foreach (['storage', 'bootstrap/cache', '.git', 'public/build'] as $dir) {
     $skip[] = $appPath . '/' . $dir;
+}
+// vendor/ and node_modules/ at any depth, named by Booster through the
+// environment: an app may commit a library under src/vendor/ or similar, and
+// Rector must never rewrite or even parse one.
+foreach ($decode('BOOSTER_RECTOR_SKIP_DIRS') as $dir) {
+    if (is_string($dir) && $dir !== '') {
+        $skip[] = $dir;
+    }
 }
 // Blade templates end in .php but are not PHP files.
 $skip[] = '*.blade.php';

@@ -74,12 +74,17 @@ final class RectorRunner
             $command[] = '--dry-run';
         }
 
+        // Every vendor/ and node_modules/ directory at any depth, so the shared
+        // config skips them all: a vendored library must never be rewritten or
+        // even parsed by Rector.
+        $vendored = VendoredDirs::find($appPath);
         $env = [
             'BOOSTER_APP_PATH' => $appPath,
             'BOOSTER_RECTOR_SETS' => json_encode($hop->rectorSets, JSON_THROW_ON_ERROR),
             'BOOSTER_CLASS_RENAMES' => json_encode((object) $hop->classRenames, JSON_THROW_ON_ERROR),
             'BOOSTER_PHP_TARGET' => $phpTarget,
             'BOOSTER_RECTOR_CACHE' => sys_get_temp_dir() . '/booster-rector-' . $hop->id,
+            'BOOSTER_RECTOR_SKIP_DIRS' => json_encode(array_map(static fn(string $d): string => $appPath . '/' . $d, $vendored), JSON_THROW_ON_ERROR),
         ];
 
         // Laravel rules need Laravel's classes to recognise a Model or a Controller, so a Laravel
@@ -111,7 +116,7 @@ final class RectorRunner
             @rmdir($work);
         }
 
-        return $this->parse($result, $appPath, $work, $memoryLimit);
+        return $this->parse($result, $appPath, $work, $memoryLimit, $vendored);
     }
 
     private function binary(): string
@@ -163,7 +168,10 @@ final class RectorRunner
         return implode('/', $parts);
     }
 
-    private function parse(ProcessResult $result, string $appPath, string $work, string $memoryLimit): RectorResult
+    /**
+     * @param list<string> $vendored every vendor/ and node_modules/ directory under the app, relative to it
+     */
+    private function parse(ProcessResult $result, string $appPath, string $work, string $memoryLimit, array $vendored): RectorResult
     {
         // Rector exits 2 when a dry run finds changes, so the exit code alone says nothing.
         if (trim($result->stdout) === '') {
@@ -258,6 +266,6 @@ final class RectorRunner
             array_unshift($errors, $note);
         }
 
-        return new RectorResult($files, $errors, $rules);
+        return new RectorResult($files, $errors, $rules, VendoredDirs::nested($vendored));
     }
 }
