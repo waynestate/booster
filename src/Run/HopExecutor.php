@@ -68,6 +68,12 @@ final class HopExecutor
      */
     private array $startingUntracked = [];
 
+    /**
+     * True once the run has said which nested vendored directories Rector
+     * left alone, so the note goes out once per run, not once per hop.
+     */
+    private bool $reportedVendored = false;
+
     private function registry(): HopRegistry
     {
         return $this->registry ?? new HopRegistry();
@@ -92,6 +98,7 @@ final class HopExecutor
 
     public function execute(Plan $plan, RunOptions $options): RunReport
     {
+        $this->reportedVendored = false;
         $path = realpath($plan->project->path);
         if ($path === false) {
             throw new ToolError(sprintf('Path "%s" does not exist.', $plan->project->path));
@@ -362,6 +369,8 @@ final class HopExecutor
                 $phpunitTarget = $hop->kind === HopKind::Phpunit ? $hop->to : null;
                 $preview = $this->rector->run($hop, $path, true, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget, $options->memoryLimit);
                 [$stopErrors, $notes] = self::splitRepairedNotes($preview->errors);
+                // Say once per run which nested vendored libraries Rector left alone.
+                $this->noteVendoredDirs($preview, $notes);
                 if ($stopErrors !== []) {
                     if ($options->dryRun && $hop->kind === HopKind::Laravel && self::staleVendorErrors($stopErrors)) {
                         // The app's vendor/ still holds an older Laravel, so Rector cannot see the
@@ -644,6 +653,25 @@ final class HopExecutor
         }
 
         return [$stopping, $notes];
+    }
+
+    /**
+     * Appends the once-per-run note naming the nested vendored directories
+     * Rector was told to leave alone, so the report says which ones were
+     * skipped. It lands in $notes, so whichever way the step ends (previewed,
+     * applied, or an error after the Rector run) the message goes out exactly
+     * once per run.
+     *
+     * @param list<string> $notes
+     */
+    private function noteVendoredDirs(RectorResult $result, array &$notes): void
+    {
+        if ($result->skippedDirs === [] || $this->reportedVendored) {
+            return;
+        }
+        $this->reportedVendored = true;
+        $dirs = $result->skippedDirs;
+        $notes[] = 'Left alone (vendored libraries, never rewritten): ' . implode(', ', array_slice($dirs, 0, 10)) . (count($dirs) > 10 ? ' and ' . (count($dirs) - 10) . ' more' : '') . '.';
     }
 
     /**
