@@ -19,7 +19,7 @@
         "rector/rector": "^2.8",
         "symfony/console": "^7.1",
         "symfony/process": "^7.1",
-        "waynestate/proctor": "^0.2",
+        "waynestate/proctor": "^0.3",
         "waynestate/creed": "^0.1"
     },
     "require-dev": {
@@ -81,5 +81,10 @@
             "Waynestate\\Booster\\Tests\\": "tests/"
         }
     },
-    "minimum-stability": "stable"
+    "minimum-stability": "stable",
+    "extra": {
+        "proctor": {
+            "wayneui.copies": "fail"
+        }
+    }
 }
