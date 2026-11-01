@@ -1,0 +1,8 @@
+{
+    "name": "example-app/markup",
+    "description": "A WayneUI 1.x app for the migration tests.",
+    "require": {
+        "php": "^8.3",
+        "cit-web-infra/wayne-ui": "^1"
+    }
+}

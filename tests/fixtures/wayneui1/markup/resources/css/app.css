@@ -1,0 +1,32 @@
+.brand {
+    color: #006666;
+    background: #CFDEDC;
+}
+
+.hover {
+    border-color: #007a7a;
+}
+
+.active {
+    background: #005757;
+}
+
+.legacy {
+    color: #066;
+}
+
+.unmapped {
+    color: #066666;
+}
+
+.nonproduction {
+    color: #8B2145;
+}
+
+.header {
+    background: #093f39;
+}
+
+.soft {
+    background: #cedddb;
+}
