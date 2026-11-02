@@ -690,11 +690,26 @@ final class HopExecutor
         if ($result->excluded === []) {
             return;
         }
+        $allUtf8 = true;
+        foreach ($result->excluded as $entry) {
+            if ($entry['reason'] !== 'not valid UTF-8') {
+                $allUtf8 = false;
+
+                break;
+            }
+        }
         foreach (array_slice($result->excluded, 0, 20) as $entry) {
+            if ($entry['reason'] === 'not valid UTF-8') {
+                $notes[] = 'MANUAL: ' . $entry['file'] . ' is not valid UTF-8, so Rector was run without it. Convert it to UTF-8, then upgrade it by hand.';
+
+                continue;
+            }
             $notes[] = 'MANUAL: ' . $entry['file'] . ': ' . $entry['reason'] . '. Rector was run without it, so upgrade it by hand.';
         }
         if (count($result->excluded) > 20) {
-            $notes[] = 'MANUAL: and ' . (count($result->excluded) - 20) . ' more files that Rector was run without.';
+            $notes[] = $allUtf8
+                ? 'MANUAL: and ' . (count($result->excluded) - 20) . ' more files that are not valid UTF-8.'
+                : 'MANUAL: and ' . (count($result->excluded) - 20) . ' more files that Rector was run without.';
         }
     }
 
