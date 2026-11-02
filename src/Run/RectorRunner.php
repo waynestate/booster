@@ -213,7 +213,7 @@ final class RectorRunner
      * @param list<string> $vendored every vendor/ and node_modules/ directory under the app, relative to it
      * @param list<string> $invalid  every PHP file that is not valid UTF-8, relative to the app; Rector ran without them
      *
-     * @return array{0: RectorResult, 1: array} the result and the decoded report, so a caller can inspect the raw errors
+     * @return array{0: RectorResult, 1: array<string, mixed>} the result and the decoded report, so a caller can inspect the raw errors
      */
     private function parse(ProcessResult $result, string $appPath, string $work, string $memoryLimit, array $vendored, array $invalid): array
     {
@@ -393,6 +393,8 @@ final class RectorRunner
      * is no third run.
      *
      * @param list<array{file: string, message: string}> $eligible
+     * @param list<string>                               $command
+     * @param array<string, string>                      $env
      * @param list<string>                               $vendored
      * @param list<string>                               $invalid
      */

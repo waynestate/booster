@@ -55,6 +55,97 @@ final class RectorRunnerTest extends TestCase
         self::assertSame([['file' => 'b.php', 'reason' => 'not valid UTF-8']], $result->excluded);
     }
 
+    public function test_an_unknown_class_error_is_retried_once_without_the_file(): void
+    {
+        $app = $this->tempDir();
+        $first = (string) json_encode([
+            'file_diffs' => [['file' => $app . '/src/B.php', 'diff' => '+b']],
+            'errors' => [['file' => 'legacy/Excel.php', 'message' => 'System error: Class "PHPExcel" should be known at this point']],
+        ]);
+        $second = (string) json_encode([
+            'file_diffs' => [['file' => $app . '/src/A.php', 'diff' => '+a']],
+            'errors' => [],
+        ]);
+        $fake = new FakeProcessRunner(static function (array $command, array $env) use ($app, $first, $second): ProcessResult {
+            $skip = json_decode($env['BOOSTER_RECTOR_SKIP_FILES'] ?? '[]', true);
+            $skipped = is_array($skip) && in_array($app . '/legacy/Excel.php', $skip, true);
+
+            return new ProcessResult(2, $skipped ? $second : $first, '');
+        });
+        $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), $app, true, '8.0');
+
+        self::assertCount(2, $fake->calls);
+        $skip = json_decode($fake->calls[1]['env']['BOOSTER_RECTOR_SKIP_FILES'], true);
+        self::assertIsArray($skip);
+        self::assertContains($app . '/legacy/Excel.php', $skip);
+        self::assertSame([], $result->errors);
+        self::assertSame([
+            ['file' => 'legacy/Excel.php', 'reason' => 'Rector could not resolve a class it uses (Class "PHPExcel" should be known at this point)'],
+        ], $result->excluded);
+        self::assertSame(['src/B.php', 'src/A.php'], array_column($result->files, 'file'));
+    }
+
+    public function test_a_non_unknown_class_error_stops_the_retry(): void
+    {
+        $app = $this->tempDir();
+        $json = (string) json_encode([
+            'file_diffs' => [],
+            'errors' => [
+                ['file' => 'legacy/Excel.php', 'message' => 'System error: Class "PHPExcel" should be known at this point'],
+                ['file' => 'src/Bad.php', 'message' => 'Syntax error, unexpected token "endif"'],
+            ],
+        ]);
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, $json, ''));
+        $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), $app, true, '8.0');
+
+        self::assertCount(1, $fake->calls);
+        self::assertSame([
+            'legacy/Excel.php: System error: Class "PHPExcel" should be known at this point',
+            'src/Bad.php: Syntax error, unexpected token "endif"',
+        ], $result->errors);
+        self::assertSame([], $result->excluded);
+    }
+
+    public function test_a_failed_retry_keeps_the_second_errors(): void
+    {
+        $app = $this->tempDir();
+        $first = (string) json_encode([
+            'file_diffs' => [],
+            'errors' => [['file' => 'legacy/Excel.php', 'message' => 'System error: Class "PHPExcel" should be known at this point']],
+        ]);
+        $second = (string) json_encode([
+            'file_diffs' => [],
+            'errors' => [['file' => 'src/C.php', 'message' => 'Something else broke']],
+        ]);
+        $fake = new FakeProcessRunner(static function (array $command, array $env) use ($app, $first, $second): ProcessResult {
+            $skip = json_decode($env['BOOSTER_RECTOR_SKIP_FILES'] ?? '[]', true);
+            $skipped = is_array($skip) && in_array($app . '/legacy/Excel.php', $skip, true);
+
+            return new ProcessResult(2, $skipped ? $second : $first, '');
+        });
+        $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), $app, true, '8.0');
+
+        self::assertCount(2, $fake->calls);
+        self::assertSame(['src/C.php: Something else broke'], $result->errors);
+        self::assertSame([
+            ['file' => 'legacy/Excel.php', 'reason' => 'Rector could not resolve a class it uses (Class "PHPExcel" should be known at this point)'],
+        ], $result->excluded);
+    }
+
+    public function test_an_unknown_class_error_without_a_file_is_kept_as_an_error(): void
+    {
+        $app = $this->tempDir();
+        $json = (string) json_encode([
+            'file_diffs' => [],
+            'errors' => [['message' => 'System error: Class "Mystery" should be known at this point']],
+        ]);
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, $json, ''));
+        $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), $app, true, '8.0');
+
+        self::assertCount(1, $fake->calls);
+        self::assertSame(['System error: Class "Mystery" should be known at this point'], $result->errors);
+    }
+
     public function test_empty_stdout_on_malformed_utf8_says_utf8_not_memory(): void
     {
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(5, '', 'Json.php line 38: Malformed UTF-8 characters'));
