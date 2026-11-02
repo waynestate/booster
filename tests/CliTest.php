@@ -15,9 +15,9 @@ final class CliTest extends TestCase
      * @param array<string, mixed> $input
      * @param list<string>         $inputs answers fed to an interactive run, one per prompt
      *
-     * @return array{int, string}
+     * @return array{int, string, string} exit code, standard output, standard error
      */
-    private function booster(array $input, ?FakeProcessRunner $fake = null, bool $interactive = false, array $inputs = []): array
+    private function boosterStreams(array $input, ?FakeProcessRunner $fake = null, bool $interactive = false, array $inputs = []): array
     {
         $app = new BoosterApplication($fake);
         $app->setAutoExit(false);
@@ -27,7 +27,20 @@ final class CliTest extends TestCase
         }
         $exit = $tester->run($input, ['capture_stderr_separately' => true, 'interactive' => $interactive]);
 
-        return [$exit, $tester->getDisplay() . $tester->getErrorOutput()];
+        return [$exit, $tester->getDisplay(), $tester->getErrorOutput()];
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @param list<string>         $inputs answers fed to an interactive run, one per prompt
+     *
+     * @return array{int, string}
+     */
+    private function booster(array $input, ?FakeProcessRunner $fake = null, bool $interactive = false, array $inputs = []): array
+    {
+        [$exit, $display, $error] = $this->boosterStreams($input, $fake, $interactive, $inputs);
+
+        return [$exit, $display . $error];
     }
 
     /** A FakeProcessRunner whose discovery finds PHPCompatibility and whose scan reports a clean app. */
@@ -661,13 +674,13 @@ final class CliTest extends TestCase
 
     public function test_run_json_over_the_threshold_stops_without_prompting(): void
     {
-        [$exit, $out] = $this->booster([
+        [$exit, $stdout, $stderr] = $this->boosterStreams([
             'command' => 'run', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--format' => 'json', '--goal' => 'php-83-to-84',
         ], $this->thresholdFake(), true, ['yes']);
 
         self::assertSame(1, $exit);
-        self::assertStringNotContainsString('Apply this hop?', $out);
-        $data = json_decode($out, true);
+        self::assertStringNotContainsString('Apply this hop?', $stdout . $stderr);
+        $data = json_decode($stdout, true);
         self::assertSame('capped', $data['results'][0]['status']);
     }
 
@@ -766,11 +779,11 @@ final class CliTest extends TestCase
             return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
         });
 
-        [$exit, $out] = $this->booster([
+        [$exit, $stdout, $stderr] = $this->boosterStreams([
             'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--format' => 'json', '--goal' => 'php-74-to-84',
             '--test-env' => ['DB_CONNECTION=sqlite', 'DB_DATABASE=:memory:'],
         ], $fake);
-        $data = json_decode($out, true);
+        $data = json_decode($stdout, true);
 
         self::assertSame(0, $exit);
         self::assertSame(['DB_CONNECTION', 'DB_DATABASE'], $data['test_env']);
@@ -785,8 +798,8 @@ final class CliTest extends TestCase
             }
         }
         // The values never reach the report; only the keys do.
-        self::assertStringNotContainsString('sqlite', $out);
-        self::assertStringNotContainsString(':memory:', $out);
+        self::assertStringNotContainsString('sqlite', $stdout . $stderr);
+        self::assertStringNotContainsString(':memory:', $stdout . $stderr);
     }
 
     public function test_run_text_report_names_test_env_keys_but_not_values(): void
@@ -831,16 +844,46 @@ final class CliTest extends TestCase
             return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
         });
 
-        [$exit, $out] = $this->booster([
+        [$exit, $stdout] = $this->boosterStreams([
             'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--format' => 'json', '--goal' => 'php-74-to-84',
         ], $fake);
-        $data = json_decode($out, true);
+        $data = json_decode($stdout, true);
 
         self::assertSame(0, $exit);
         self::assertArrayHasKey('baseline', $data);
         self::assertSame('passed', $data['baseline']['status']);
         self::assertSame('7.4', $data['baseline']['php']);
         self::assertSame(0, $data['baseline']['exit_code']);
+    }
+
+    public function test_run_json_keeps_stdout_valid_json_with_progress_on_stderr(): void
+    {
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            if (self::isProctorCommand($command)) {
+                return new ProcessResult(0, self::proctorFixture('pass-report.json'), '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => '/x/src/A.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+
+        [$exit, $stdout, $stderr] = $this->boosterStreams([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--format' => 'json', '--goal' => 'php-74-to-84',
+        ], $fake);
+
+        self::assertSame(0, $exit);
+        $data = json_decode($stdout, true);
+        self::assertIsArray($data);
+        // The progress lines go to standard error, never into the JSON on stdout.
+        self::assertStringNotContainsString('hop ', $stdout);
+        self::assertStringNotContainsString('run finished:', $stdout);
+        self::assertMatchesRegularExpression('/^hop 1\/5 [a-z0-9-]+: [a-z-]+, \d+ files?, \d+ s$/m', $stderr);
+        self::assertMatchesRegularExpression('/^run finished: 5 of 5 hops run, 0 stopped, total \d+ s$/m', $stderr);
     }
 
     public function test_a_failing_proctor_gate_exits_1_and_advisory_keeps_it_zero(): void
