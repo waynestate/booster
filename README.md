@@ -147,7 +147,7 @@ BOOSTER plan for examples/laravel-blade
   PHP: 8.2 -> 8.5
   Laravel: 10 -> 13
   PHPUnit: 10 -> 13
-  policy: waynestate/creed 0.1.3 (today 2026-10-29)
+  policy: waynestate/creed 0.1.4 (today 2026-10-29)
 
 1. phpunit-10-to-11  [target-image-tests]
    Move PHPUnit 10 tests to PHPUnit 11.
@@ -691,7 +691,7 @@ the app's 197-test suite, and it is written up in [research/booster-e2e-gate.md]
 
 ## Status
 
-Version 1.0. See [CHANGELOG.md](CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) for what stays
+Version 1.7. See [CHANGELOG.md](CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) for what stays
 open, and [BEST_PRACTICES.md](BEST_PRACTICES.md) for the rules Booster follows.
 
 ## Licence

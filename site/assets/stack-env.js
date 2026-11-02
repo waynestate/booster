@@ -23,16 +23,23 @@
  * remembered ("stack-dev-base"), and ?devBase=auto forgets it.
  *
  * In test every link to a part becomes https://<part>.appstest.wayne.edu/ plus
- * the same path, query and hash: the pre-production home of the parts.
- * WayneUI is not one of the parts and stays on production in every
- * environment: its site needs its own build and does not run from a
- * subfolder.
+ * the same path, query and hash: the pre-production home of the parts. WayneUI
+ * is now one of the parts (project 0), but the stunt double takes a different
+ * mark for it: in dev a link to https://wayneui.apps.wayne.edu/ goes to
+ * http://127.0.0.1:4180/ (WAYNEUI_DEV_BASE) with the same path, query and
+ * hash, ignoring ?devBase=, because WayneUI does not run from a subfolder; in
+ * test it stays on the production href, since there is no pre-production
+ * WayneUI app and HELMET's default CSP names the production host. This
+ * deliberately departs from ADR-0017 ("WayneUI's link stays on production in
+ * every environment") for dev only, and the bytes remain identical on all 14
+ * pages.
  */
 (function () {
   "use strict";
   var PROJECTS = ["advisor", "booster", "creed", "drawbridge", "helmet", "pinstripe", "preflight",
-    "proctor", "rollcall", "sesame", "sourdough", "squire", "weld"];
+    "proctor", "rollcall", "sesame", "sourdough", "squire", "wayneui", "weld"];
   var DEFAULT_DEV_BASE = "http://127.0.0.1:18432";
+  var WAYNEUI_DEV_BASE = "http://127.0.0.1:4180";
   var ALIASES = { dev: "dev", development: "dev", prod: "production", production: "production",
     test: "test", testing: "test", appstest: "test", preprod: "test", "pre-production": "test",
     auto: "auto" };
@@ -72,7 +79,11 @@
       try { url = new URL(links[i].href); } catch (e) { continue; }
       var m = host.exec(url.hostname);
       if (!m || PROJECTS.indexOf(m[1]) === -1) { continue; }
-      links[i].href = devBase + "/" + m[1] + "/site/" + url.pathname.replace(/^\/+/, "") + url.search + url.hash;
+      if (m[1] === "wayneui") {
+        links[i].href = WAYNEUI_DEV_BASE + "/" + url.pathname.replace(/^\/+/, "") + url.search + url.hash;
+      } else {
+        links[i].href = devBase + "/" + m[1] + "/site/" + url.pathname.replace(/^\/+/, "") + url.search + url.hash;
+      }
     }
   }
   function rewriteTest() {
@@ -81,8 +92,8 @@
       var url;
       try { url = new URL(links[i].href); } catch (e) { continue; }
       var m = host.exec(url.hostname);
-      // wayneui is not in PROJECTS, so its link keeps the production href.
-      if (!m || PROJECTS.indexOf(m[1]) === -1) { continue; }
+      // wayneui has no pre-production app, so its link keeps the production href.
+      if (!m || PROJECTS.indexOf(m[1]) === -1 || m[1] === "wayneui") { continue; }
       links[i].href = "https://" + m[1] + ".appstest.wayne.edu/" + url.pathname.replace(/^\/+/, "") + url.search + url.hash;
     }
   }
