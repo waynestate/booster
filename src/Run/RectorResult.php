@@ -17,16 +17,18 @@ final readonly class RectorResult
     public const REPAIRED_UTF8_NOTE = 'Rector output contained invalid UTF-8 and was repaired';
 
     /**
-     * @param list<array{file: string, diff: string}> $files        files that changed, relative to the app
-     * @param list<string>                            $errors       Rector's own errors (parse failures and the like)
-     * @param array<string, int>                      $rules        short rule name to number of files the rule changed
-     * @param list<string>                            $skippedDirs  nested vendor/ and node_modules/ directories Rector was told to leave alone, relative to the app
+     * @param list<array{file: string, diff: string}>   $files       files that changed, relative to the app
+     * @param list<string>                              $errors      Rector's own errors (parse failures and the like)
+     * @param array<string, int>                        $rules       short rule name to number of files the rule changed
+     * @param list<string>                              $skippedDirs nested vendor/ and node_modules/ directories Rector was told to leave alone, relative to the app
+     * @param list<array{file: string, reason: string}> $excluded    files Rector was run without, relative to the app, each with why
      */
     public function __construct(
         public array $files,
         public array $errors,
         public array $rules = [],
         public array $skippedDirs = [],
+        public array $excluded = [],
     ) {}
 
     public function changedCount(): int

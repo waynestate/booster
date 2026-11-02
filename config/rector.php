@@ -43,6 +43,14 @@ foreach ($decode('BOOSTER_RECTOR_SKIP_DIRS') as $dir) {
         $skip[] = $dir;
     }
 }
+// PHP files that are not valid UTF-8, named by Booster through the environment:
+// Rector would die encoding them into its own JSON report, so it must not even
+// read them.
+foreach ($decode('BOOSTER_RECTOR_SKIP_FILES') as $file) {
+    if (is_string($file) && $file !== '') {
+        $skip[] = $file;
+    }
+}
 // Blade templates end in .php but are not PHP files.
 $skip[] = '*.blade.php';
 // IDE helper files (_ide_helper.php and friends, .phpstorm.meta.php) are editor
