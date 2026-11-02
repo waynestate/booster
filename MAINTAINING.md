@@ -40,6 +40,8 @@ docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install
 the agent-ready check. The phar scripts install Box in `tools/box`, build from a clean copy with `--no-dev`, and
 finish with `php build/booster.phar --version`.
 
+Composer kills any script process after 300 seconds by default; Booster's composer.json sets `config.process-timeout` to 900 so the PHPUnit run inside `composer ci` is not cut off on a slow or busy machine.
+
 ## CI
 
 - **GitLab:** Preflight's `php-test` (PHP 8.3, 8.4, 8.5) and `composer-audit` components, plus a `composer-ci` job.

@@ -36,6 +36,7 @@
         "waynestate/pinstripe": "Optional: the Pinstripe PHPStan preset the PHPStan advisory scan runs against (booster plan, booster scan --phpstan). Install with composer require --dev waynestate/pinstripe:\"^0.1\""
     },
     "config": {
+        "process-timeout": 900,
         "audit": {
             "abandoned": "report"
         },
