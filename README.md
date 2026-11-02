@@ -559,7 +559,11 @@ swaps the Composer requirement and drops any `wayne-cas` path or VCS repository 
 when nothing in the app reads its config keys any more (a manual step names the readers while anything still does),
 and flags dead `DUO_*` settings in example env files; planned with `--sesame`, and left out with a warning when the
 plan ends below PHP 8.3, which SESAME needs; it lands just before the hop from Laravel 10 to 11, and while PHP is
-still below 8.3 the PHP hops go first); `wayneui-1-to-2` (planned with `--wayneui` for an app that requires
+still below 8.3 the PHP hops go first); Booster also probes the repositories composer.json names for wayne-cas
+(a path entry must exist on disk, a vcs, git or gitlab entry is checked with `git ls-remote`), and when the app has
+no `vendor/` and that repository cannot be reached the swap goes first instead, because the Laravel hops need
+composer to install and composer is blocked by that repository; the plan says so in a warning; `wayneui-1-to-2`
+(planned with `--wayneui` for an app that requires
 `cit-web-infra/wayne-ui`, after the last Laravel hop, on Laravel 11 or newer: swaps the Composer requirement for
 `waynestate/wayne-ui ^2.0`, rewrites the one-to-one rows (class tokens, icon names, the mapped brand hexes in style
 blocks and CSS, the `Breadcrumbs` calls and the `config/wayne-ui.php` keys) and lists the rest as manual lines; it

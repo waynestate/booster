@@ -8,6 +8,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 - `booster run` prints one line per hop to standard error while it works: the hop's position in the plan, its id, its status, the number of files it changed and the seconds it took, and a closing line totals the hops run, the stops and the whole run. The lines go to standard error so the report on standard output is unchanged and `--format json` stays valid JSON.
 
+### Changed
+
+- When the app requires `cit-web-infra/wayne-cas`, has no `vendor/`, and the repository composer.json names for it cannot be reached, `cas-to-sesame` is now planned as the first step instead of waiting for the Laravel 10 to 11 hop, because the Laravel hops need composer to install and composer is blocked by that repository. The plan explains this in a warning. With the repository reachable, or with `vendor/` already installed, the plan is unchanged.
+
 ### Fixed
 
 - The `tailwind-3-to-4` hop ran `npx -y ^4.1`, which names no package; it now runs `npx -y @tailwindcss/upgrade@^4.1`.
