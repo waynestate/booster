@@ -31,6 +31,7 @@ final class Planner
         private readonly Policy $policy,
         private readonly HopRegistry $registry,
         private readonly ?PackageFetcher $packages = null,
+        private readonly ?WayneCasReachability $casReachability = null,
     ) {}
 
     public function plan(Project $project, PlanOptions $options, DateTimeImmutable $today): Plan
@@ -116,12 +117,38 @@ final class Planner
             }
         }
 
+        // The Laravel hops need vendor/, and composer cannot build it while
+        // the wayne-cas repository is out of reach. Probe once, before the
+        // steps are ordered: when the app requires wayne-cas, has no vendor/
+        // and its repository cannot be reached, the swap to SESAME goes first
+        // (it also drops the repositories entry that blocks composer).
+        $sesameFirstReason = null;
+        if ($project->usesWayneCas
+            && $this->casReachability !== null
+            && !in_array('cas-to-sesame', $options->skip, true)
+            && version_compare($toPhp, '8.3', '>=')
+        ) {
+            $reason = $this->casReachability->unreachableReason($project->path);
+            if (is_string($reason)) {
+                $sesameFirstReason = $reason;
+            }
+        }
+
         $steps = [];
         $php = $fromPhp;
         $laravel = $fromLaravel;
         $phpunit = $fromPhpunit;
         $sesamePlanned = false;
         $n = 0;
+
+        if ($sesameFirstReason !== null) {
+            $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+            $sesamePlanned = true;
+            $warnings[] = sprintf(
+                'cas-to-sesame goes first: the wayne-cas repository cannot be reached (%s), so the app could not install its dependencies for the Laravel hops. The swap to SESAME runs before the other hops, so the app keeps moving and lands on SESAME.',
+                $sesameFirstReason,
+            );
+        }
 
         for ($guard = 0; $guard < 64; $guard++) {
             $nextLaravel = $laravel !== null && $toLaravel !== null && $laravel !== $toLaravel ? $this->registry->nextLaravel($laravel) : null;
@@ -243,7 +270,7 @@ final class Planner
             $warnings[] = 'SESAME needs PHP 8.3 or newer; the swap was left out because the plan ends below that.';
         } elseif ($options->sesame && !$sesamePlanned) {
             $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
-        } elseif ($project->usesWayneCas) {
+        } elseif ($project->usesWayneCas && $sesameFirstReason === null) {
             $warnings[] = 'The app uses wayne-cas. Add --sesame to plan the swap to SESAME.';
         }
 

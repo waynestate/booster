@@ -14,8 +14,11 @@ use Waynestate\Booster\Plan\HttpPackageFetcher;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanOptions;
 use Waynestate\Booster\Plan\Planner;
+use Waynestate\Booster\Plan\WayneCasReachability;
 use Waynestate\Booster\Policy\PolicyLocator;
 use Waynestate\Booster\Project\ProjectDetector;
+use Waynestate\Booster\Run\ProcessRunner;
+use Waynestate\Booster\Run\SymfonyProcessRunner;
 use Waynestate\Booster\ToolError;
 
 /**
@@ -29,6 +32,12 @@ abstract class BaseCommand extends Command
     public const EXIT_FAIL = 1;
 
     public const EXIT_TOOL_ERROR = 2;
+
+    /**
+     * The runner the command already carries, when it has one: the plan's
+     * wayne-cas probe shares it, so tests see every subprocess in one place.
+     */
+    public function __construct(protected readonly ?ProcessRunner $processes = null) {}
 
     /**
      * Runs the command and turns a ToolError into exit 2 with the message on stderr.
@@ -125,7 +134,9 @@ abstract class BaseCommand extends Command
             only: $this->stringOption($input, 'only'),
         );
 
-        return (new Planner($policy, new HopRegistry(), new HttpPackageFetcher()))->plan($project, $options, $this->today($input));
+        $casReachability = new WayneCasReachability($this->processes ?? new SymfonyProcessRunner());
+
+        return (new Planner($policy, new HopRegistry(), new HttpPackageFetcher(), $casReachability))->plan($project, $options, $this->today($input));
     }
 
     protected function stringOption(InputInterface $input, string $name): ?string

@@ -28,9 +28,9 @@ use Waynestate\Booster\ToolError;
 
 final class RunCommand extends BaseCommand
 {
-    public function __construct(private readonly ProcessRunner $processes)
+    public function __construct(ProcessRunner $processes)
     {
-        parent::__construct();
+        parent::__construct($processes);
     }
 
     protected function configure(): void

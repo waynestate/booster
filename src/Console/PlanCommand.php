@@ -20,9 +20,9 @@ use Waynestate\Booster\Scan\RemovalsScan;
 
 final class PlanCommand extends BaseCommand
 {
-    public function __construct(private readonly ProcessRunner $processes)
+    public function __construct(ProcessRunner $processes)
     {
-        parent::__construct();
+        parent::__construct($processes);
     }
 
     protected function configure(): void
