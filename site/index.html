@@ -123,7 +123,7 @@
   <!-- ========================================================= record card -->
   <!-- The magic: pick an app, press Run the plan, and watch the countdown,
        each dose stamped as its gate passes, and the version climb. The data is
-         real Booster 1.0 output for the example apps in examples/. -->
+          real Booster 1.7 output for the example apps in examples/. -->
   <section class="section section--record" id="record" aria-labelledby="record-title">
     <div class="wsu-container">
       <div class="head head--split">
@@ -370,7 +370,7 @@ Warning: PHP 8.1 is past security support since 2025-12-31. Use it only as a sto
       </div>
 
       <!-- A greenbar printout, tractor-feed holes and all. Output is real
-            Booster 1.0 output against the bundled example apps. -->
+            Booster 1.7 output against the bundled example apps. -->
       <div class="printout">
         <span class="printout__feed printout__feed--l" aria-hidden="true"></span>
         <span class="printout__feed printout__feed--r" aria-hidden="true"></span>
@@ -386,7 +386,9 @@ vue            2
 node           unknown
 mix_file       no
 wayne_cas      no
-boost          no</pre>
+wayneui_1      no
+boost          no
+helmet         no</pre>
 <pre class="out" role="tabpanel" id="out-plan" aria-labelledby="tab-plan" tabindex="0" hidden><span class="out__cmd">$ bin/booster plan --path=examples/raw-php --today=2026-10-29</span>
 BOOSTER plan for examples/raw-php
   app type: raw-php
@@ -397,6 +399,12 @@ BOOSTER plan for examples/raw-php
    Move PHP 7.4 code to PHP 8.0.
    Give this hop the most review time.
    Removed between PHP 7.4 and PHP 8.0: none found.
+   Behaviour changes to check:
+   Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; &lt; / &lt;= against negative numbers also flip for such strings
+     check: Audit loose comparisons of request parameters and string DB columns
+   Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output
+     keep old: error_reporting = E_ALL &amp; ~E_NOTICE &amp; ~E_DEPRECATED in php.ini
+     check: Watch error logs and rendered pages for new notices after the hop
 2. php-80-to-81  [target-image-tests]
    Move PHP 8.0 code to PHP 8.1.
    Removed between PHP 8.0 and PHP 8.1: none found.
@@ -427,15 +435,42 @@ Baseline: SKIPPED (no gate in this run).
 1. php-74-to-80: PREVIEWED (1 files)
    Largest risk hop: loose comparison of numbers and strings changed, many warnings became thrown errors, and arithmetic on arrays throws.
    Write or extend tests before applying this hop; only tests and review find behaviour changes here.
+   Behaviour changes to check:
+   Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; &lt; / &lt;= against negative numbers also flip for such strings
+     check: Audit loose comparisons of request parameters and string DB columns
+   Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output
+     keep old: error_reporting = E_ALL &amp; ~E_NOTICE &amp; ~E_DEPRECATED in php.ini
+     check: Watch error logs and rendered pages for new notices after the hop
    --- src/Legacy.php
    --- Original
    +++ New
+   @@ -4,22 +4,18 @@
+    
+    class Legacy
+    {
+<span class="out__del">   -    /** @var string */</span>
+<span class="out__del">   -    private $name;</span>
+<span class="out__del">   -</span>
 <span class="out__del">   -    public function __construct(string $name)</span>
 <span class="out__add">   +    public function __construct(private string $name)</span>
+        {
+<span class="out__del">   -        $this->name = $name;</span>
+        }
+    
+        public function mentionsAdmin(string $text): bool
+        {
 <span class="out__del">   -        return strpos($text, 'admin') !== false;</span>
 <span class="out__add">   +        return str_contains($text, 'admin');</span>
+        }
+    
+        public function className($object): string
+        {
 <span class="out__del">   -        return get_class($object);</span>
 <span class="out__add">   +        return $object::class;</span>
+        }
+    
+        public function label(string $label = null): string
+   
 2. php-80-to-81: PREVIEWED (0 files)
    Dry run: nothing was changed.
    mysqli now throws on errors by default; PDO on MySQL returns native int and float types; htmlspecialchars() now escapes single quotes.
@@ -451,16 +486,30 @@ Dry run: these changes were previewed, none were applied.</pre>
 php-55-to-56       Move PHP 5.5 code to PHP 5.6.
 php-56-to-70       Move PHP 5.6 code to PHP 7.0.
 php-70-to-71       Move PHP 7.0 code to PHP 7.1.
-  …                one PHP minor at a time …
+php-71-to-72       Move PHP 7.1 code to PHP 7.2.
+php-72-to-73       Move PHP 7.2 code to PHP 7.3.
+php-73-to-74       Move PHP 7.3 code to PHP 7.4.
+php-74-to-80       Move PHP 7.4 code to PHP 8.0.
+php-80-to-81       Move PHP 8.0 code to PHP 8.1.
+php-81-to-82       Move PHP 8.1 code to PHP 8.2.
+php-82-to-83       Move PHP 8.2 code to PHP 8.3.
+php-83-to-84       Move PHP 8.3 code to PHP 8.4.
 php-84-to-85       Move PHP 8.4 code to PHP 8.5.
 laravel-5.8-to-6   Move a Laravel 5.8 app to Laravel 6.
-  …                one Laravel major at a time …
+laravel-6-to-7     Move a Laravel 6 app to Laravel 7.
+laravel-7-to-8     Move a Laravel 7 app to Laravel 8.
+laravel-8-to-9     Move a Laravel 8 app to Laravel 9.
+laravel-9-to-10    Move a Laravel 9 app to Laravel 10.
+laravel-10-to-11   Move a Laravel 10 app to Laravel 11.
+laravel-11-to-12   Move a Laravel 11 app to Laravel 12.
 laravel-12-to-13   Move a Laravel 12 app to Laravel 13.
 phpunit-9-to-10    Move PHPUnit 9 tests to PHPUnit 10.
-  …                one PHPUnit major at a time …
+phpunit-10-to-11   Move PHPUnit 10 tests to PHPUnit 11.
+phpunit-11-to-12   Move PHPUnit 11 tests to PHPUnit 12.
 phpunit-12-to-13   Move PHPUnit 12 tests to PHPUnit 13.
 phpunit-to-9-manual Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves. [playbook]
 cas-to-sesame      Swap the wayne-cas package for SESAME using its compatibility classes.
+wayneui-1-to-2     Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest.
 node-pin-24        Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
 mix-to-vite        Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only).
 tailwind-3-to-4    Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool.
@@ -472,6 +521,7 @@ vue-2-to-3         Move a Vue 2 front end to Vue 3 (playbook only; Rector does n
 Wrote 35 playbooks, 35 changed.
 
 <span class="out__cmd">$ bin/booster init --path=../my-app --check</span>
+Playbooks are current.
 <span class="out__note"># exits 1 when a playbook is stale, so CI notices</span></pre>
         </div>
       </div>

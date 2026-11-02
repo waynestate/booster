@@ -155,6 +155,10 @@ BOOSTER plan for examples/laravel-blade
    Move a Laravel 10 app to Laravel 11.
 3. laravel-11-to-12  [target-image-tests]
    Move a Laravel 11 app to Laravel 12.
+   Behaviour changes to check:
+   When the app does not define a local disk, its root now defaults to storage/app/private instead of storage/app (config/filesystems.php)
+     keep old: define the local disk with 'root' => storage_path('app')
+     check: Check where Storage::disk('local') writes after the hop
 4. php-82-to-83  [target-image-tests]
    Move PHP 8.2 code to PHP 8.3.
    Removed between PHP 8.2 and PHP 8.3: none found.
@@ -180,6 +184,7 @@ PHPStan on PHP 8.5: 5 findings.
    tests/PostTest.php:27 [staticMethod.deprecated] Call to deprecated method isType() of class PHPUnit\Framework\Assert:
 https://github.com/sebastianbergmann/phpunit/issues/6052
    tests/PostTest.php:33 [method.alreadyNarrowedType] Call to method PHPUnit\Framework\Assert::assertNotNull() with PHPUnit\Framework\MockObject\Rule\AnyInvokedCount will always evaluate to true.
+   Hint: Laravel app without Larastan: Eloquent and facade calls show as errors. composer require --dev larastan/larastan for a cleaner scan.
 ```
 
 <div align="center">
