@@ -21,16 +21,17 @@ use Waynestate\Booster\Run\ProcessResult;
 final class SesameFirstTest extends TestCase
 {
     /**
-     * A temp Laravel 9 app (PHP 8.1) that requires cit-web-infra/wayne-cas,
-     * optionally from a vcs repository on git.invalid.
+     * A temp Laravel 10 app (PHP 8.3 by default) that requires
+     * cit-web-infra/wayne-cas, optionally from a vcs repository on
+     * git.invalid.
      */
-    private function wayneCasApp(bool $vcsRepository = true): string
+    private function wayneCasApp(bool $vcsRepository = true, string $php = '^8.3'): string
     {
         $dir = $this->copyExample('laravel-wayne-cas');
         $file = $dir . '/composer.json';
         $data = json_decode((string) file_get_contents($file), true);
         self::assertIsArray($data);
-        $merge = ['require' => ['php' => '^8.1', 'laravel/framework' => '^9.0']];
+        $merge = ['require' => ['php' => $php, 'laravel/framework' => '^10.0']];
         if ($vcsRepository) {
             $merge['repositories'] = [['type' => 'vcs', 'url' => 'https://git.invalid/cit-web-infra/wayne-cas.git']];
         }
@@ -169,5 +170,20 @@ final class SesameFirstTest extends TestCase
         self::assertStringContainsString('connection timed out after 10 seconds', $warnings);
         self::assertStringNotContainsString('second line', $warnings);
         self::assertStringNotContainsString('git.invalid', $warnings);
+    }
+
+    public function test_SesameFirstBelow83_keeps_the_php_hops_first(): void
+    {
+        $dir = $this->wayneCasApp(true, '^8.1');
+        $fake = $this->fakeWith(2);
+        $options = new PlanOptions(fromPhp: '8.1', toPhp: '8.3');
+
+        $plan = $this->plan($dir, $fake, $options);
+        $baseline = $this->baselinePlan($dir, $options);
+
+        self::assertNotContains('cas-to-sesame', $this->ids($plan));
+        self::assertSame($this->ids($baseline), $this->ids($plan));
+        self::assertSame([], $fake->calls);
+        self::assertStringNotContainsString('goes first', implode("\n", $plan->warnings));
     }
 }

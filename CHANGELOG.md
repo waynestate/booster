@@ -10,7 +10,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### Changed
 
-- When the app requires `cit-web-infra/wayne-cas`, has no `vendor/`, and the repository composer.json names for it cannot be reached, `cas-to-sesame` is now planned as the first step instead of waiting for the Laravel 10 to 11 hop, because the Laravel hops need composer to install and composer is blocked by that repository. The plan explains this in a warning. With the repository reachable, or with `vendor/` already installed, the plan is unchanged.
+- When the app requires `cit-web-infra/wayne-cas`, has no `vendor/`, and the repository composer.json names for it cannot be reached, and the app is already on PHP 8.3 or newer, `cas-to-sesame` is now planned as the first step instead of waiting for the Laravel 10 to 11 hop, because the Laravel hops need composer to install and composer is blocked by that repository. The plan explains this in a warning. With the repository reachable, or with `vendor/` already installed, the plan is unchanged.
 
 ### Fixed
 

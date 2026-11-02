@@ -121,12 +121,15 @@ final class Planner
         // the wayne-cas repository is out of reach. Probe once, before the
         // steps are ordered: when the app requires wayne-cas, has no vendor/
         // and its repository cannot be reached, the swap to SESAME goes first
-        // (it also drops the repositories entry that blocks composer).
+        // (it also drops the repositories entry that blocks composer). The
+        // swap runs at the app's current PHP, and SESAME needs 8.3, so this
+        // only applies when the app is already on 8.3 or newer; below that
+        // the PHP hops go first exactly as today.
         $sesameFirstReason = null;
         if ($project->usesWayneCas
             && $this->casReachability !== null
             && !in_array('cas-to-sesame', $options->skip, true)
-            && version_compare($toPhp, '8.3', '>=')
+            && version_compare($fromPhp, '8.3', '>=')
         ) {
             $reason = $this->casReachability->unreachableReason($project->path);
             if (is_string($reason)) {
