@@ -148,13 +148,14 @@ final class HopExecutor
         // One line per hop to whoever passed a progress callback, so a long run
         // shows which hop it is in without touching the report on stdout.
         $started = microtime(true);
+        $progress = $options->progress;
         foreach ($plan->steps as $step) {
             $hopStarted = microtime(true);
             $result = $this->runStep($step, $path, $plan, $options, $baseline);
             $results[] = $result;
-            if ($options->progress !== null) {
+            if ($progress !== null) {
                 $files = count($result->files);
-                $options->progress(sprintf(
+                $progress(sprintf(
                     'hop %d/%d %s: %s, %d file%s, %d s',
                     $step->number,
                     count($plan->steps),
@@ -175,7 +176,7 @@ final class HopExecutor
                 break;
             }
         }
-        if ($options->progress !== null) {
+        if ($progress !== null) {
             $ran = 0;
             $stopped = 0;
             foreach ($results as $result) {
@@ -186,7 +187,7 @@ final class HopExecutor
                     $stopped = 1;
                 }
             }
-            $options->progress(sprintf(
+            $progress(sprintf(
                 'run finished: %d of %d hops run, %d stopped, total %d s',
                 $ran,
                 count($plan->steps),
