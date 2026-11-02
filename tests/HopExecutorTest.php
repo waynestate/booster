@@ -1090,9 +1090,9 @@ final class HopExecutorTest extends TestCase
 
         self::assertSame(StepResult::PREVIEWED, $report->results[0]->status);
         $messages = implode("\n", $report->results[0]->messages);
-        self::assertStringContainsString('MANUAL: src/b.php is not valid UTF-8, so Rector was run without it. Convert it to UTF-8, then upgrade it by hand.', $messages);
+        self::assertStringContainsString('MANUAL: src/b.php: not valid UTF-8. Rector was run without it, so upgrade it by hand.', $messages);
         // Every hop skipped the file, so every step names it.
-        self::assertStringContainsString('MANUAL: src/b.php is not valid UTF-8, so Rector was run without it. Convert it to UTF-8, then upgrade it by hand.', implode("\n", $report->results[1]->messages));
+        self::assertStringContainsString('MANUAL: src/b.php: not valid UTF-8. Rector was run without it, so upgrade it by hand.', implode("\n", $report->results[1]->messages));
     }
 
     public function test_the_prepass_rewrites_new_by_reference_before_rector_runs(): void

@@ -371,8 +371,8 @@ final class HopExecutor
                 [$stopErrors, $notes] = self::splitRepairedNotes($preview->errors);
                 // Say once per run which nested vendored libraries Rector left alone.
                 $this->noteVendoredDirs($preview, $notes);
-                // Name the non-UTF-8 files Rector ran without. Not once per run:
-                // every hop skipped them, so every step says so.
+                // Name the files Rector ran without. Not once per run: every hop
+                // skipped them, so every step says so.
                 $this->noteExcludedFiles($preview, $notes);
                 if ($stopErrors !== []) {
                     if ($options->dryRun && $hop->kind === HopKind::Laravel && self::staleVendorErrors($stopErrors)) {
@@ -678,10 +678,10 @@ final class HopExecutor
     }
 
     /**
-     * Appends one manual-work line per file Rector was run without because it
-     * is not valid UTF-8. Unlike the vendored note this is not once per run:
-     * every hop skipped the files, so every step names them. At most 20 files
-     * are named; the rest collapse into one line.
+     * Appends one manual-work line per file Rector was run without (not valid
+     * UTF-8, or a class it could not resolve). Unlike the vendored note this is
+     * not once per run: every hop skipped the files, so every step names them.
+     * At most 20 files are named; the rest collapse into one line.
      *
      * @param list<string> $notes
      */
@@ -691,10 +691,10 @@ final class HopExecutor
             return;
         }
         foreach (array_slice($result->excluded, 0, 20) as $entry) {
-            $notes[] = 'MANUAL: ' . $entry['file'] . ' is not valid UTF-8, so Rector was run without it. Convert it to UTF-8, then upgrade it by hand.';
+            $notes[] = 'MANUAL: ' . $entry['file'] . ': ' . $entry['reason'] . '. Rector was run without it, so upgrade it by hand.';
         }
         if (count($result->excluded) > 20) {
-            $notes[] = 'MANUAL: and ' . (count($result->excluded) - 20) . ' more files that are not valid UTF-8.';
+            $notes[] = 'MANUAL: and ' . (count($result->excluded) - 20) . ' more files that Rector was run without.';
         }
     }
 
