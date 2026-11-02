@@ -34,10 +34,14 @@ abstract class BaseCommand extends Command
     public const EXIT_TOOL_ERROR = 2;
 
     /**
-     * The runner the command already carries, when it has one: the plan's
-     * wayne-cas probe shares it, so tests see every subprocess in one place.
+     * The runner every subprocess goes through: the plan's wayne-cas probe
+     * shares it, so tests see every subprocess in one place. Commands that
+     * run processes pass their own; the rest fall back to the real runner.
      */
-    public function __construct(protected readonly ?ProcessRunner $processes = null) {}
+    public function __construct(protected readonly ProcessRunner $processes = new SymfonyProcessRunner())
+    {
+        parent::__construct();
+    }
 
     /**
      * Runs the command and turns a ToolError into exit 2 with the message on stderr.
@@ -134,7 +138,7 @@ abstract class BaseCommand extends Command
             only: $this->stringOption($input, 'only'),
         );
 
-        $casReachability = new WayneCasReachability($this->processes ?? new SymfonyProcessRunner());
+        $casReachability = new WayneCasReachability($this->processes);
 
         return (new Planner($policy, new HopRegistry(), new HttpPackageFetcher(), $casReachability))->plan($project, $options, $this->today($input));
     }
