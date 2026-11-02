@@ -4,6 +4,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- `booster run` prints one line per hop to standard error while it works: the hop's position in the plan, its id, its status, the number of files it changed and the seconds it took, and a closing line totals the hops run, the stops and the whole run. The lines go to standard error so the report on standard output is unchanged and `--format json` stays valid JSON.
+
 ### Fixed
 
 - The `tailwind-3-to-4` hop ran `npx -y ^4.1`, which names no package; it now runs `npx -y @tailwindcss/upgrade@^4.1`.

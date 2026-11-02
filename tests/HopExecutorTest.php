@@ -166,6 +166,31 @@ final class HopExecutorTest extends TestCase
         self::assertStringContainsString('Gate passed', implode(' ', $report->results[0]->messages));
     }
 
+    public function test_progress_reports_one_line_per_hop_and_a_closing_total(): void
+    {
+        $lines = [];
+        $this->execute($this->fake(), new RunOptions(progress: static function (string $line) use (&$lines): void {
+            $lines[] = $line;
+        }));
+
+        self::assertCount(3, $lines);
+        self::assertMatchesRegularExpression('/^hop 1\/2 [a-z0-9-]+: [a-z-]+, \d+ files?, \d+ s$/', $lines[0]);
+        self::assertMatchesRegularExpression('/^hop 2\/2 [a-z0-9-]+: [a-z-]+, \d+ files?, \d+ s$/', $lines[1]);
+        self::assertMatchesRegularExpression('/^run finished: 2 of 2 hops run, 0 stopped, total \d+ s$/', $lines[2]);
+    }
+
+    public function test_progress_closing_line_counts_a_stopped_hop(): void
+    {
+        $lines = [];
+        $this->execute($this->fake(gateExit: 1), new RunOptions(progress: static function (string $line) use (&$lines): void {
+            $lines[] = $line;
+        }));
+
+        self::assertCount(2, $lines);
+        self::assertMatchesRegularExpression('/^hop 1\/2 [a-z0-9-]+: [a-z-]+, \d+ files?, \d+ s$/', $lines[0]);
+        self::assertMatchesRegularExpression('/^run finished: 1 of 2 hops run, 1 stopped, total \d+ s$/', $lines[1]);
+    }
+
     public function test_the_gate_uses_the_php_the_step_moves_to(): void
     {
         $fake = $this->fake();

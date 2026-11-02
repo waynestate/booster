@@ -6,6 +6,9 @@ namespace Waynestate\Booster\Console;
 
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\Console\Output\ConsoleOutputInterface;
+use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Waynestate\Booster\Hop\HopRegistry;
@@ -100,6 +103,22 @@ final class RunCommand extends BaseCommand
             };
         }
 
+        // One line per hop to standard error, so a long run shows which hop it
+        // is in while stdout (text or JSON) stays the report alone.
+        $errorOutput = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : null;
+        $progress = null;
+        if ($errorOutput !== null) {
+            $progress = static function (string $line) use ($errorOutput): void {
+                $errorOutput->writeln($line);
+            };
+        } elseif (!$output instanceof BufferedOutput && !$output instanceof NullOutput) {
+            // A real stream without a console error output; skip test buffers so
+            // captured stdout stays clean.
+            $progress = static function (string $line): void {
+                fwrite(STDERR, $line . PHP_EOL);
+            };
+        }
+
         $report = $executor->execute($plan, new RunOptions(
             dryRun: (bool) $input->getOption('dry-run'),
             skipGate: (bool) $input->getOption('skip-gate'),
@@ -113,6 +132,7 @@ final class RunCommand extends BaseCommand
             memoryLimit: $memoryLimit,
             proctorAdvisory: (bool) $input->getOption('proctor-advisory'),
             testEnv: $testEnv,
+            progress: $progress,
         ));
 
         $output->writeln(

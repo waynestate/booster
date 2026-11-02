@@ -31,5 +31,7 @@ final readonly class RunOptions
          * @var list<string>
          */
         public array $testEnv = [],
+        /** Called with one text line after each hop and once at the end; the executor never writes to a stream itself. */
+        public ?Closure $progress = null,
     ) {}
 }

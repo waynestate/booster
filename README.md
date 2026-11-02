@@ -528,6 +528,10 @@ with the number of unique files and a reminder that nothing was applied. A Larav
 cannot see the framework's classes, so its preview is marked incomplete and the report says to run `composer install`
 first.
 
+A run prints one line per hop to standard error while it works: the hop's position in the plan, its id, its status,
+the number of files it changed and the seconds it took, and a final line totals the hops run, the stops and the whole
+run. They go to standard error so the report on standard output is untouched and `--format json` stays valid JSON.
+
 Three hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`,
 then the app's usual gate applies. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (below) and asks for a
 build gate, which runs `npm ci` and `npm run build` in the `node:26` container before the app's tests.
