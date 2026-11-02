@@ -100,6 +100,42 @@ final class RectorRunner
             $env['BOOSTER_BOOTSTRAP'] = $autoload;
         }
 
+        [$result, $work] = $this->invokeRector($command, $env, $appPath, $laravelTarget, $phpunitTarget);
+        [$first, $data] = $this->parse($result, $appPath, $work, $memoryLimit, $vendored, $invalid);
+
+        // A legacy file that extends or uses a class no autoloader knows makes Rector
+        // report "Class X should be known at this point" for it, and one such error would
+        // stop the whole hop. When those are the only blocking errors, rerun once without
+        // the files, keep the step applied, and list them as manual work. Any other error
+        // stays an error, and there is only ever one retry per call.
+        $rawErrors = is_array($data['errors'] ?? null) ? $data['errors'] : [];
+        $blocking = 0;
+        foreach ($rawErrors as $error) {
+            if (is_array($error) || is_string($error)) {
+                $blocking++;
+            }
+        }
+        $eligible = $this->unknownClassErrors($rawErrors, $appPath, $work);
+        if ($eligible !== [] && count($eligible) === $blocking) {
+            return $this->retryWithoutUnknownClasses($first, $eligible, $command, $env, $appPath, $laravelTarget, $phpunitTarget, $memoryLimit, $vendored, $invalid);
+        }
+
+        return $first;
+    }
+
+    /**
+     * Runs Rector once from a fresh scratch directory that holds a synthetic
+     * vendor/composer/installed.json, so it never needs the app's vendor/.
+     * Returns the process result and the scratch directory (already removed by
+     * the time this returns; the report's paths are relative to it).
+     *
+     * @param list<string>         $command
+     * @param array<string, string> $env
+     *
+     * @return array{0: ProcessResult, 1: string}
+     */
+    private function invokeRector(array $command, array $env, string $appPath, ?string $laravelTarget, ?string $phpunitTarget): array
+    {
         // Rector runs from a scratch directory that holds a synthetic
         // vendor/composer/installed.json, so it never needs the app's vendor/.
         $work = sys_get_temp_dir() . '/booster-work-' . bin2hex(random_bytes(6));
@@ -121,7 +157,7 @@ final class RectorRunner
             @rmdir($work);
         }
 
-        return $this->parse($result, $appPath, $work, $memoryLimit, $vendored, $invalid);
+        return [$result, $work];
     }
 
     private function binary(): string
@@ -176,8 +212,10 @@ final class RectorRunner
     /**
      * @param list<string> $vendored every vendor/ and node_modules/ directory under the app, relative to it
      * @param list<string> $invalid  every PHP file that is not valid UTF-8, relative to the app; Rector ran without them
+     *
+     * @return array{0: RectorResult, 1: array<string, mixed>} the result and the decoded report, so a caller can inspect the raw errors
      */
-    private function parse(ProcessResult $result, string $appPath, string $work, string $memoryLimit, array $vendored, array $invalid): RectorResult
+    private function parse(ProcessResult $result, string $appPath, string $work, string $memoryLimit, array $vendored, array $invalid): array
     {
         // Rector exits 2 when a dry run finds changes, so the exit code alone says nothing.
         if (trim($result->stdout) === '') {
@@ -283,6 +321,128 @@ final class RectorRunner
 
         $excluded = array_map(static fn(string $f): array => ['file' => $f, 'reason' => 'not valid UTF-8'], $invalid);
 
-        return new RectorResult($files, $errors, $rules, VendoredDirs::nested($vendored), $excluded);
+        return [new RectorResult($files, $errors, $rules, VendoredDirs::nested($vendored), $excluded), $data];
+    }
+
+    /**
+     * Finds the "should be known at this point" system errors that name a file:
+     * legacy files that extend or use classes no autoloader knows (a vendored-by-hand
+     * PHPExcel, a PEAR Services_JSON_Error). Rector cannot analyse them, but it can run
+     * without them, so the hop may retry once with them excluded. Each entry carries the
+     * file relative to the app and the raw message.
+     *
+     * @param mixed $rawErrors the report's errors value
+     *
+     * @return list<array{file: string, message: string}>
+     */
+    private function unknownClassErrors(mixed $rawErrors, string $appPath, string $work): array
+    {
+        $out = [];
+        foreach (is_array($rawErrors) ? $rawErrors : [] as $error) {
+            if (!is_array($error)) {
+                continue; // a bare string names no file
+            }
+            $message = is_string($error['message'] ?? null) ? $error['message'] : '';
+            if (preg_match('/should be known at this point/i', $message) !== 1) {
+                continue;
+            }
+            $file = is_string($error['file'] ?? null) && $error['file'] !== '' ? $error['file'] : null;
+            if ($file === null && preg_match('/"([^"]*\.php)"/', $message, $m) === 1) {
+                $file = $m[1];
+            }
+            if ($file === null) {
+                continue; // no file to run without, so the error stays
+            }
+            $relative = self::appRelative($file, $appPath, $work);
+            if ($relative === null || $relative === '') {
+                continue; // the file is outside the app; nothing to exclude
+            }
+            $out[] = ['file' => $relative, 'message' => $message];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Makes a path Rector printed app-relative the way the diffs are: resolved against
+     * the scratch work dir, then the app prefix stripped. A bare relative path that does
+     * not reach into the app is already app-relative. Returns null when an absolute path
+     * names a file outside the app.
+     */
+    private static function appRelative(string $file, string $appPath, string $work): ?string
+    {
+        $file = str_replace('\\', '/', $file);
+        $absolute = str_starts_with($file, '/') || preg_match('#^[A-Za-z]:/#', $file) === 1;
+        $resolved = $absolute ? $file : self::resolve($file, str_replace('\\', '/', $work));
+        $prefix = str_replace('\\', '/', $appPath) . '/';
+        if (str_starts_with($resolved, $prefix)) {
+            return substr($resolved, strlen($prefix));
+        }
+        if (!$absolute) {
+            return self::resolve($file, '.');
+        }
+
+        return null;
+    }
+
+    /**
+     * Reruns Rector once with the unknown-class files added to the skip list and merges
+     * the two reports: files from both runs (the second wins per file), rules summed,
+     * the second run's errors only (the eligible ones are gone), and the excluded files
+     * named as manual work. If the rerun still reports errors, they stay errors; there
+     * is no third run.
+     *
+     * @param list<array{file: string, message: string}> $eligible
+     * @param list<string>                               $command
+     * @param array<string, string>                      $env
+     * @param list<string>                               $vendored
+     * @param list<string>                               $invalid
+     */
+    private function retryWithoutUnknownClasses(RectorResult $first, array $eligible, array $command, array $env, string $appPath, ?string $laravelTarget, ?string $phpunitTarget, string $memoryLimit, array $vendored, array $invalid): RectorResult
+    {
+        $skipFiles = array_map(static fn(string $f): string => $appPath . '/' . $f, $invalid);
+        foreach ($eligible as $entry) {
+            $skipFiles[] = $appPath . '/' . $entry['file'];
+        }
+        $env['BOOSTER_RECTOR_SKIP_FILES'] = json_encode(array_values(array_unique($skipFiles)), JSON_THROW_ON_ERROR);
+
+        [$result, $work] = $this->invokeRector($command, $env, $appPath, $laravelTarget, $phpunitTarget);
+        $second = $this->parse($result, $appPath, $work, $memoryLimit, $vendored, $invalid)[0];
+
+        $files = $first->files;
+        $index = [];
+        foreach ($files as $i => $file) {
+            $index[$file['file']] = $i;
+        }
+        foreach ($second->files as $file) {
+            if (isset($index[$file['file']])) {
+                $files[$index[$file['file']]] = $file;
+            } else {
+                $index[$file['file']] = count($files);
+                $files[] = $file;
+            }
+        }
+
+        $rules = $first->rules;
+        foreach ($second->rules as $name => $count) {
+            $rules[$name] = ($rules[$name] ?? 0) + $count;
+        }
+
+        $excluded = $first->excluded;
+        $seen = [];
+        foreach ($eligible as $entry) {
+            if (isset($seen[$entry['file']])) {
+                continue;
+            }
+            $seen[$entry['file']] = true;
+            if (preg_match('/Class "?([^" ]+)"? should be known/', $entry['message'], $m) === 1) {
+                $known = 'Class "' . $m[1] . '" should be known at this point';
+            } else {
+                $known = 'a class it uses is not known';
+            }
+            $excluded[] = ['file' => $entry['file'], 'reason' => 'Rector could not resolve a class it uses (' . $known . ')'];
+        }
+
+        return new RectorResult($files, $second->errors, $rules, $first->skippedDirs, $excluded);
     }
 }
