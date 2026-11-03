@@ -154,6 +154,18 @@ abstract class BaseCommand extends Command
     }
 
     /**
+     * The --path exactly as the user typed it (the default '.' included), for
+     * "Next:" lines: stringOption tilde-expands it, which would change what
+     * the person has to type next.
+     */
+    protected function pathAsTyped(InputInterface $input): string
+    {
+        $value = $input->getOption('path');
+
+        return is_string($value) && $value !== '' ? $value : '.';
+    }
+
+    /**
      * A leading `~` in --path means the home folder: the shell does not expand a
      * tilde after `=` or inside quotes, so Booster does it here. Only a bare `~`
      * or `~/...` (and `~\...`) is rewritten, from HOME or USERPROFILE; `~user/...`

@@ -43,8 +43,20 @@ final class DetectCommand extends BaseCommand
                 : (is_bool($value) ? ($value ? 'yes' : 'no') : (string) ($value ?? 'unknown'));
             $output->writeln(sprintf('%-14s %s', $key, TextWriter::clean($shown)), OutputInterface::OUTPUT_RAW);
         }
+        $output->writeln('', OutputInterface::OUTPUT_RAW);
+        $output->writeln($this->footer($input), OutputInterface::OUTPUT_RAW);
 
         return self::EXIT_PASS;
+    }
+
+    /** The closing note: what detect read, and the command that goes next. */
+    private function footer(InputInterface $input): string
+    {
+        return implode("\n", [
+            'Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version',
+            'composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan).',
+            sprintf('Next: %s plan --path=%s', Invocation::program(), Invocation::pathArg($this->pathAsTyped($input))),
+        ]);
     }
 
     /**

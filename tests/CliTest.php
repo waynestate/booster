@@ -235,6 +235,37 @@ final class CliTest extends TestCase
         self::assertSame([], $fake->calls);
     }
 
+    public function test_plan_with_no_steps_says_there_is_nothing_to_run(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', json_encode(['require' => ['php' => '^8.5']]));
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $dir, '--today' => self::TODAY, '--no-scan' => true, '--no-package-check' => true]);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Nothing was changed. Your app is already at the target, so there is nothing to run.', $out);
+        self::assertStringNotContainsString('Preview the edits', $out);
+    }
+
+    public function test_plan_footer_points_at_the_dry_run_and_names_manual_steps(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', json_encode([
+            'require' => ['php' => '^7.4'],
+            'require-dev' => ['phpunit/phpunit' => '^8.0'],
+        ]));
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $dir, '--today' => self::TODAY, '--goal' => 'php-74-to-84', '--no-scan' => true, '--no-package-check' => true]);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('phpunit-to-9-manual', $out);
+        self::assertStringContainsString('Nothing was changed. The numbered list above is the order Booster would do things; "Will break" and "PHPStan" are advice', $out);
+        self::assertStringContainsString('for you to read, not errors.', $out);
+        self::assertStringContainsString('Booster does every step above marked automatic when you run it. Steps shown as [playbook] are yours to do by hand.', $out);
+        self::assertStringContainsString('Preview the edits: php bin/booster run --path=' . $dir . ' --dry-run', $out);
+        self::assertStringContainsString('(The real run needs Docker, and your app committed in git: php bin/booster run --path=' . $dir . ')', $out);
+    }
+
     public function test_plan_survives_a_broken_scan(): void
     {
         // Discovery succeeds (the standard is present) but the scan itself
@@ -291,6 +322,28 @@ final class CliTest extends TestCase
         self::assertStringContainsString('Will break on PHP 8.0: 1 errors, 1 warnings.', $out);
         self::assertStringContainsString('src/Legacy.php:20 [error] Function create_function()', $out);
         self::assertStringContainsString('src/Legacy.php:26 [warning] Using ${var}', $out);
+    }
+
+    public function test_scan_ends_with_the_hints_footer(): void
+    {
+        $app = $this->example('raw-php');
+        $json = [
+            'totals' => ['errors' => 1, 'warnings' => 0, 'fixable' => 0],
+            'files' => [
+                $app . '/src/Legacy.php' => [
+                    'errors' => 1,
+                    'warnings' => 0,
+                    'messages' => [['message' => 'm', 'source' => 's', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 3, 'column' => 1]],
+                ],
+            ],
+        ];
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+
+        [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $app, '--php' => '8.0'], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Nothing was changed. These are hints, not failures: scan exits with success even when it lists problems.', $out);
+        self::assertStringContainsString('Next: php bin/booster plan --path=' . $app . '    (to see the steps that fix them)', $out);
     }
 
     public function test_scan_json_reports_the_full_result(): void
@@ -591,12 +644,33 @@ final class CliTest extends TestCase
         self::assertSame(['vue-26-to-27', 'vue-27-to-compat', 'vue-compat-codemod'], $byId['vue-2-to-3']['alias_of']);
     }
 
+    public function test_hops_ends_with_the_usage_footer(): void
+    {
+        [$exit, $out] = $this->booster(['command' => 'hops']);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('These are every step Booster knows; `plan` picks the ones your app needs.', $out);
+        self::assertStringContainsString('Use an id with --until=<id>, --only=<id> or --skip=<id>. [playbook] steps are done by hand, not by Booster.', $out);
+    }
+
     public function test_detect_names_the_permutation(): void
     {
         [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $this->example('laravel-inertia-vue')]);
 
         self::assertSame(0, $exit);
         self::assertStringContainsString('laravel-inertia-vue', $out);
+    }
+
+    public function test_detect_ends_with_the_next_step_footer(): void
+    {
+        $app = $this->example('laravel-inertia-vue');
+
+        [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $app]);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version', $out);
+        self::assertStringContainsString('composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan).', $out);
+        self::assertStringContainsString('Next: php bin/booster plan --path=' . $app, $out);
     }
 
     public function test_detect_shows_boost_yes_or_no(): void
@@ -845,14 +919,132 @@ final class CliTest extends TestCase
             return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
         });
 
+        $dir = $this->copyExample('raw-php');
         [$exit, $out] = $this->booster([
-            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84',
+            'command' => 'run', '--path' => $dir, '--today' => self::TODAY, '--goal' => 'php-74-to-84',
         ], $fake);
 
         self::assertSame(0, $exit);
         self::assertMatchesRegularExpression('/^RESULT: PASS$/m', $out);
         self::assertStringNotContainsString('previewed, no tests ran', $out);
-        self::assertStringContainsString('Review with `git diff`, run your own checks, then commit. BOOSTER never commits or pushes.', $out);
+        self::assertStringContainsString('Booster edited your files but made no commit. Next: review with `git -C ' . $dir . ' diff`.', $out);
+        self::assertStringContainsString('Also read the notes under each step ("Behaviour changes to check", manual lines) and run your own checks.', $out);
+        self::assertStringContainsString('When you are happy, commit.', $out);
+        self::assertStringContainsString('Booster never commits or pushes.', $out);
+    }
+
+    public function test_a_passing_real_run_that_changes_nothing_says_nothing_changed(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        // The app already allows the target PHP, so the hop has nothing to do.
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        $composer['require']['php'] = '^8.0';
+        file_put_contents($dir . '/composer.json', (string) json_encode($composer));
+
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            if (self::isProctorCommand($command)) {
+                return new ProcessResult(0, self::proctorFixture('pass-report.json'), '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $dir, '--today' => self::TODAY, '--goal' => 'php-74-to-80',
+        ], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('NOTHING-TO-DO', $out);
+        self::assertStringContainsString('Nothing was changed.', $out);
+        self::assertStringNotContainsString('Booster edited your files', $out);
+    }
+
+    public function test_a_passing_dry_run_ends_with_the_next_step_footer(): void
+    {
+        $app = $this->example('raw-php');
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, (string) json_encode([
+            'file_diffs' => [['file' => '/x/src/Legacy.php', 'diff' => "-old\n+new"]],
+        ]), ''));
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $app, '--today' => self::TODAY, '--dry-run' => true, '--goal' => 'php-74-to-84',
+        ], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Dry run: these changes were previewed, none were applied.', $out);
+        self::assertStringContainsString('Nothing was changed. RESULT: PASS means the preview worked; no tests ran.', $out);
+        self::assertStringContainsString('Next, if the edits look right: php bin/booster run --path=' . $app, $out);
+        self::assertStringContainsString('(It needs Docker and a clean git folder. Commit or stash first.)', $out);
+    }
+
+    public function test_a_dry_run_that_previews_nothing_only_says_nothing_changed(): void
+    {
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, (string) json_encode(['file_diffs' => []]), ''));
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--dry-run' => true, '--goal' => 'php-74-to-84',
+        ], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Nothing was changed.', $out);
+        self::assertStringNotContainsString('these changes were previewed', $out);
+        self::assertStringNotContainsString('Next, if the edits look right', $out);
+    }
+
+    public function test_a_failed_real_run_names_the_step_it_stopped_at(): void
+    {
+        $files = array_fill(0, 3, ['file' => '/x/a.php', 'diff' => 'd']);
+        $fake = new FakeProcessRunner(static function (array $command) use ($files): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => $files]), '');
+        });
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--max-changes' => '2', '--goal' => 'php-74-to-84',
+        ], $fake);
+
+        self::assertSame(1, $exit);
+        self::assertStringContainsString('The upgrade stopped at step 1 (php-74-to-80). Steps after it were not run. Changes so far are still in your folder.', $out);
+        self::assertStringContainsString('Read the failure above, then either fix it by hand or undo with the "Undo with:" line under that step.', $out);
+        self::assertStringContainsString('Booster made no commit.', $out);
+        self::assertStringNotContainsString('The upgrade did not start', $out);
+    }
+
+    public function test_a_baseline_failure_says_the_upgrade_never_started(): void
+    {
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                return new ProcessResult(1, 'FAILURES!', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84',
+        ], $fake);
+
+        self::assertSame(1, $exit);
+        self::assertStringContainsString('The upgrade did not start: the app failed its check before any change. Fix that first, then run again. Nothing was changed.', $out);
+        self::assertStringNotContainsString('The upgrade stopped at step', $out);
     }
 
     public function test_the_file_count_is_singular_for_one_file(): void
@@ -1224,6 +1416,22 @@ final class CliTest extends TestCase
         [$exit, $out] = $this->booster(['command' => 'init', '--path' => $dir, '--check' => true]);
         self::assertSame(1, $exit);
         self::assertStringContainsString('stale: booster-php-74-to-80/SKILL.md', $out);
+    }
+
+    public function test_init_footer_points_at_committing_the_skills(): void
+    {
+        $dir = $this->tempDir();
+
+        [$exit, $out] = $this->booster(['command' => 'init', '--path' => $dir]);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Wrote files into ' . $dir . '/.agents/skills. They are instructions for AI coding tools and are not needed to run Booster yourself.', $out);
+        self::assertStringContainsString('Next: commit them (git add ' . $dir . '/.agents/skills && git commit), so a real run starts from a clean folder.', $out);
+
+        [$exit, $out] = $this->booster(['command' => 'init', '--path' => $dir, '--check' => true]);
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Playbooks are current.', $out);
+        self::assertStringContainsString('Nothing was changed.', $out);
     }
 
     public function test_init_check_changes_nothing(): void
