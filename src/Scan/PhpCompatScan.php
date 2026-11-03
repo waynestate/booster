@@ -15,12 +15,15 @@ use Waynestate\Booster\Run\ProcessRunner;
  * for the human doing the upgrade, never a gate. It gives the plan a boost of
  * foreknowledge, the way a supercharger gives an engine more power up front.
  *
- * The scanner is optional. Booster looks for a PHP_CodeSniffer that carries
- * the PHPCompatibility standard, trying the app's own vendor/bin/phpcs, then
- * Booster's vendor/bin/phpcs, then phpcs on the PATH. When none of them has
- * the standard, the scan reports a skip instead of failing the plan, and the
- * skip says how to fix it: approve the installer plugin when a phpcs ran
- * without the standard, install the packages when no phpcs ran at all.
+ * The scanner ships with Booster. Booster looks for a PHP_CodeSniffer that
+ * carries the PHPCompatibility standard, trying the app's own vendor/bin/phpcs,
+ * then Booster's vendor/bin/phpcs, then phpcs on the PATH. When the launcher
+ * is Booster's own copy, the standard is pointed at with --runtime-set
+ * installed_paths, because the CodeSniffer.conf that Composer's installer
+ * plugin writes cannot be trusted inside a PHAR unpacked into a temp
+ * directory. When none of the launchers has the standard, the scan reports a
+ * skip instead of failing the plan, and the skip says how to fix it:
+ * reinstall Booster's dependencies, or download the PHAR again.
  */
 final class PhpCompatScan
 {
@@ -33,16 +36,16 @@ final class PhpCompatScan
 
     /**
      * Shown when a PHP_CodeSniffer runs but does not offer the
-     * PHPCompatibility standard, which is what happens when Composer blocks
-     * the installer plugin that registers it.
+     * PHPCompatibility standard. The tool ships with Booster, so the fix is to
+     * reinstall Booster's own dependencies, never to change the app.
      */
-    private const STANDARD_NOT_REGISTERED = 'PHPCompatibility is not registered. If composer blocked a plugin, run: composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true, then composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"';
+    private const STANDARD_NOT_REGISTERED = "PHPCompatibility is not registered. Booster ships the tool with its dependencies; reinstall Booster's dependencies with: composer install in Booster's folder, or download the PHAR again";
 
     /**
      * Shown when no PHP_CodeSniffer carrying the PHPCompatibility standard can
      * be found. Plain and exact, so it can be copied straight into a terminal.
      */
-    private const MISSING_STANDARD = 'PHP compatibility scan skipped: PHPCompatibility is not installed. Enable it with: composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true, then composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"';
+    private const MISSING_STANDARD = "PHP compatibility scan skipped: no PHP_CodeSniffer carrying PHPCompatibility could run. Booster ships the tool; reinstall Booster's dependencies with: composer install in Booster's folder, or download the PHAR again";
 
     /** `phpcs -i` ran and named PHPCompatibility among the standards. */
     private const STANDARD_OFFERED = 'offered';
@@ -76,6 +79,7 @@ final class PhpCompatScan
         }
 
         $launch = $selected['launch'];
+        $installedPaths = $this->boosterInstalledPaths($launch);
 
         // Resolve to an absolute path so the reported file paths (always
         // absolute from phpcs) can be made relative to the app again. If the
@@ -90,6 +94,7 @@ final class PhpCompatScan
         $command = array_merge($launch, [
             '--standard=PHPCompatibility',
             '--runtime-set', 'testVersion', $testVersion,
+        ], $this->installedPathsArgs($installedPaths), [
             '--report=json',
             '--extensions=php,inc',
             '--ignore=' . self::IGNORE_PATTERN,
@@ -131,7 +136,7 @@ final class PhpCompatScan
 
         $binaryFound = false;
         foreach ($this->candidates($appPath) as $candidate) {
-            $status = $this->standardStatus($candidate);
+            $status = $this->standardStatus($candidate, $this->boosterInstalledPaths($candidate));
             if ($status === self::STANDARD_OFFERED) {
                 return ['launch' => $candidate, 'binaryFound' => true];
             }
@@ -178,17 +183,57 @@ final class PhpCompatScan
     }
 
     /**
-     * What `phpcs -i` says about a launcher: that it offers the
-     * PHPCompatibility standard, that it ran but names other standards only,
-     * or that it could not run at all. The last is how a missing phpcs shows
-     * up, and it is what lets the skip message say "not installed".
+     * The directory to pass as --runtime-set installed_paths when the launcher
+     * is Booster's own vendor/bin/phpcs: the folder that holds the bundled
+     * PHPCompatibility standard. The registration in CodeSniffer.conf that
+     * Composer's installer plugin writes cannot be trusted inside a PHAR
+     * unpacked into a temp directory, so the standard is pointed at directly.
+     * Null for every other launcher, and when the standard folder is absent.
      *
      * @param list<string> $launch
      */
-    private function standardStatus(array $launch): string
+    private function boosterInstalledPaths(array $launch): ?string
+    {
+        $binary = str_replace('\\', '/', (string) ($launch[1] ?? ''));
+        $own = str_replace('\\', '/', PharFiles::path('vendor') . '/bin/phpcs');
+        if ($binary !== $own) {
+            return null;
+        }
+
+        $standard = PharFiles::path('vendor') . '/phpcompatibility/php-compatibility/PHPCompatibility';
+        if (!is_dir($standard)) {
+            return null;
+        }
+
+        return PharFiles::path('vendor') . '/phpcompatibility/php-compatibility';
+    }
+
+    /**
+     * The --runtime-set arguments that point phpcs at the bundled standard,
+     * or none when the launcher is not Booster's own copy.
+     *
+     * @return list<string>
+     */
+    private function installedPathsArgs(?string $installedPaths): array
+    {
+        return $installedPaths === null ? [] : ['--runtime-set', 'installed_paths', $installedPaths];
+    }
+
+    /**
+     * What `phpcs -i` says about a launcher: that it offers the
+     * PHPCompatibility standard, that it ran but names other standards only,
+     * or that it could not run at all. The last is how a missing phpcs shows
+     * up, and it is what lets the skip message say "not installed". When the
+     * launcher is Booster's own copy, the probe carries the same
+     * --runtime-set installed_paths the scan will, so the bundled standard
+     * shows up in the list even without a CodeSniffer.conf registration.
+     *
+     * @param list<string> $launch
+     */
+    private function standardStatus(array $launch, ?string $installedPaths): string
     {
         try {
-            $result = $this->processes->run(array_merge($launch, ['-i']), null, [], 60);
+            $result = $this->processes->run(array_merge($launch, $this->installedPathsArgs($installedPaths), ['-i']), null, [], 60);
         } catch (Throwable) {
             return self::NOT_RUNNING;
         }

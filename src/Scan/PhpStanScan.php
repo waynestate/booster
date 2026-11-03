@@ -16,11 +16,12 @@ use Waynestate\Booster\Run\ProcessRunner;
  * PHPCompatibility scan is the OBD-II code reader, this is the compression
  * test: it finds the weak cylinders before the engine comes apart.
  *
- * The scanner is optional. Booster looks for a PHPStan binary, trying the
- * app's own vendor/bin/phpstan, then Booster's vendor/bin/phpstan, then
+ * The scanner ships with Booster. Booster looks for a PHPStan binary, trying
+ * the app's own vendor/bin/phpstan, then Booster's vendor/bin/phpstan, then
  * phpstan on the PATH, and for Pinstripe's preset it tries the same two
  * vendor trees. When either is missing, the scan reports a skip instead of
- * failing the plan, and the skip says how to fix it.
+ * failing the plan, and the skip says how to fix it: reinstall Booster's
+ * dependencies, or download the PHAR again.
  *
  * A Laravel app that has Larastan gets Pinstripe's laravel.neon (which
  * includes base.neon), so Eloquent models and facades resolve; every other
@@ -33,13 +34,13 @@ use Waynestate\Booster\Run\ProcessRunner;
 final class PhpStanScan
 {
     /** Shown when no PHPStan binary could be run at all. */
-    private const MISSING_PHPSTAN = 'PHPStan scan skipped: PHPStan is not installed. Enable it with: composer require --dev phpstan/phpstan waynestate/pinstripe';
+    private const MISSING_PHPSTAN = "PHPStan scan skipped: PHPStan is not installed. Booster ships the tool; reinstall Booster's dependencies with: composer install in Booster's folder, or download the PHAR again";
 
     /** Shown when a PHPStan runs but Pinstripe's preset is in neither vendor tree. */
-    private const MISSING_PRESET = 'PHPStan scan skipped: the Pinstripe PHPStan preset is not installed. Enable it with: composer require --dev waynestate/pinstripe';
+    private const MISSING_PRESET = "PHPStan scan skipped: the Pinstripe PHPStan preset is not installed. Booster ships it; reinstall Booster's dependencies with: composer install in Booster's folder, or download the PHAR again";
 
     /** Shown when the preset is present but one of its rule packages is not. */
-    private const INCOMPLETE_PRESET = 'PHPStan scan skipped: the Pinstripe PHPStan preset is incomplete. Reinstall it with: composer require --dev waynestate/pinstripe';
+    private const INCOMPLETE_PRESET = "PHPStan scan skipped: the Pinstripe PHPStan preset is incomplete. Reinstall Booster's dependencies with: composer install in Booster's folder, or download the PHAR again";
 
     /** Hint shown when a Laravel app has no Larastan, so model and facade calls read as errors. */
     private const HINT_NO_LARASTAN = 'Laravel app without Larastan: Eloquent and facade calls show as errors. composer require --dev larastan/larastan for a cleaner scan.';

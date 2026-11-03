@@ -319,25 +319,13 @@ break on the PHP version the first PHP hop lands on. The findings are hints for 
 gate: they do not change the exit code, and a scan that cannot run (missing tooling, a crash) is reported as "could
 not run" while the plan still prints in full. `--no-scan` skips both advisory scans.
 
-The scan is optional. Booster looks for a PHP_CodeSniffer that carries the PHPCompatibility standard, trying the app's
-own `vendor/bin/phpcs`, then Booster's `vendor/bin/phpcs`, then `phpcs` on the PATH. When none of them has the
-standard, the scan reports a skip and the plan goes on. To turn it on, install the packages into the app:
-
-```
-composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"
-```
-
-Before the require line, approve the installer plugin once:
-
-```
-composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
-```
-
-Composer asks for approval of `dealerdirect/phpcodesniffer-composer-installer`, the plugin that registers the
-PHPCompatibility standard with PHP_CodeSniffer. Without the approval, Composer blocks the plugin, the standard never
-registers, and the scan skips with a message that names this fix. The command writes `allow-plugins` into the app's
-own `composer.json`. That is an app-side change the person who wants the scan chooses to make; Booster never edits
-the app's `composer.json`.
+The scan needs no change to the app: Booster ships PHP_CodeSniffer and the PHPCompatibility standard with its own
+dependencies, from the PHAR and from a clone alike. Booster looks for a PHP_CodeSniffer that carries the standard,
+trying the app's own `vendor/bin/phpcs`, then Booster's `vendor/bin/phpcs`, then `phpcs` on the PATH. When it runs
+Booster's own copy, it points PHP_CodeSniffer at the bundled standard with `--runtime-set installed_paths`, because
+the registration file that Composer's installer plugin writes cannot be trusted inside a PHAR unpacked into a temp
+directory. When none of the launchers has the standard, the scan reports a skip and the plan goes on; the skip says
+to reinstall Booster's dependencies (`composer install` in Booster's folder) or download the PHAR again.
 
 The scan ignores `vendor/`, `node_modules/` and `storage/`, because those hold third-party code and generated files,
 not the app's. It reads the app only and changes nothing. `booster scan --path=../my-app --php=8.0` runs the same scan
@@ -350,13 +338,11 @@ on its own, for any PHP version Booster knows, and exits 0 even when it finds a 
 exit code, and a scan that cannot run is reported with the fix that enables it, while the plan still prints in full.
 `--no-scan` skips it.
 
-The scan is optional. Booster looks for a PHPStan binary, trying the app's own `vendor/bin/phpstan`, then Booster's
-`vendor/bin/phpstan`, then `phpstan` on the PATH, and for the preset it tries the app's vendor tree and Booster's.
-When either is missing, the report names the fix:
-
-```
-composer require --dev phpstan/phpstan waynestate/pinstripe
-```
+The scan needs no change to the app: Booster ships PHPStan and Pinstripe's preset with its own dependencies, from
+the PHAR and from a clone alike. Booster looks for a PHPStan binary, trying the app's own `vendor/bin/phpstan`, then
+Booster's `vendor/bin/phpstan`, then `phpstan` on the PATH, and for the preset it tries the app's vendor tree and
+Booster's. When either is missing, the report says to reinstall Booster's dependencies (`composer install` in
+Booster's folder) or download the PHAR again.
 
 It ignores `vendor/`, `node_modules/` and `storage/`, reads the app only and changes nothing. `booster scan
 --path=../my-app --php=8.5 --phpstan` runs the same scan on its own, for any PHP version Booster knows, and exits 0
@@ -723,8 +709,8 @@ Maintainers: how to build, test and release this project, and where its data com
 composer ci
 ```
 
-runs `composer validate --strict`, PHPUnit, Pint, PHPStan (Pinstripe's raw preset, inlined; `waynestate/pinstripe` is
-a dev requirement and supplies the preset the advisory scan uses), `composer audit`, the hop data check and the
+runs `composer validate --strict`, PHPUnit, Pint, PHPStan (Pinstripe's raw preset, inlined; `waynestate/pinstripe`
+ships with Booster and supplies the preset the advisory scan uses), `composer audit`, the hop data check and the
 agent-ready check. Nothing needs PHP on the host:
 
 ```

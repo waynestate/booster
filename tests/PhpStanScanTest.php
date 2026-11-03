@@ -177,7 +177,7 @@ final class PhpStanScanTest extends TestCase
         $scan = (new PhpStanScan($fake, null, null, $this->tempDir()))->scan($app, '8.0');
 
         self::assertFalse($scan->ok);
-        self::assertSame('PHPStan scan skipped: PHPStan is not installed. Enable it with: composer require --dev phpstan/phpstan waynestate/pinstripe', (string) $scan->error);
+        self::assertSame("PHPStan scan skipped: PHPStan is not installed. Booster ships the tool; reinstall Booster's dependencies with: composer install in Booster's folder, or download the PHAR again", (string) $scan->error);
     }
 
     public function test_a_missing_preset_is_reported_with_the_install_command(): void
@@ -191,7 +191,7 @@ final class PhpStanScanTest extends TestCase
         $scan = (new PhpStanScan($fake, null, null, $this->tempDir()))->scan($app, '8.0');
 
         self::assertFalse($scan->ok);
-        self::assertSame('PHPStan scan skipped: the Pinstripe PHPStan preset is not installed. Enable it with: composer require --dev waynestate/pinstripe', (string) $scan->error);
+        self::assertSame("PHPStan scan skipped: the Pinstripe PHPStan preset is not installed. Booster ships it; reinstall Booster's dependencies with: composer install in Booster's folder, or download the PHAR again", (string) $scan->error);
     }
 
     public function test_the_command_asks_for_the_exact_target_version_and_shape(): void
