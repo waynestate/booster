@@ -47,7 +47,7 @@ final class BehaviourReportTest extends TestCase
     public function test_behaviour_block_renders_each_entry_kind(): void
     {
         self::assertSame([
-            'Behaviour changes to check:',
+            'Behavior changes to check:',
             'Legacy call removed (1 in 1 file: src/a.php:3)',
             '  keep old: legacy_call();',
             '  check: Confirm nothing calls it.',
@@ -78,7 +78,7 @@ final class BehaviourReportTest extends TestCase
         $text = (new TextWriter())->plan($plan, [], [1 => $this->sampleResult()]);
 
         self::assertStringContainsString('1. php-74-to-80', $text);
-        self::assertStringContainsString('   Behaviour changes to check:', $text);
+        self::assertStringContainsString('   Behavior changes to check:', $text);
         self::assertStringContainsString('   Legacy call removed (1 in 1 file: src/a.php:3)', $text);
         self::assertStringContainsString('     keep old: legacy_call();', $text);
         self::assertStringContainsString('     check: Confirm nothing calls it.', $text);

@@ -44,7 +44,7 @@ report, and the entry stays in `composer.json`.
 
 The unblock is temporary by name, and Booster enforces that. When a gated step passes, Booster re-reads
 `config.policy.advisories.ignore` and reports every entry whose reason carries its own prefix (`Booster temporary
-unblock`; older runs wrote `BOOSTER temporary unblock`, which it still recognises). A step that is not the plan's
+unblock`; older runs wrote `BOOSTER temporary unblock`, which it still recognizes). A step that is not the plan's
 last one applies with a warning; the plan's last step fails until the entry is out of `composer.json`, so the
 final target never ships with the unblock still in place. Removing the entry is the app's job once it is off the
 blocked versions.

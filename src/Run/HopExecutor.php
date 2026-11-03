@@ -475,7 +475,7 @@ final class HopExecutor
                     $update = $this->lockUpdatePackages($step);
                     $wouldRun = $update === [] ? [] : [sprintf('would run: composer update -W %s', implode(' ', $update))];
                     if ($incomplete) {
-                        $messages = [...$threshold, ...$wouldRun, sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$inertiaChanges, ...$hop->notes, ...$notes];
+                        $messages = [...$threshold, ...$wouldRun, sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognize Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$inertiaChanges, ...$hop->notes, ...$notes];
                     } elseif ($files === []) {
                         $messages = [...$threshold, ...$wouldRun, 'No edits needed for this step (dry run).', ...($migration->manual ?? []), ...($proxies->manual ?? []), ...$hop->notes, ...$notes];
                     } else {

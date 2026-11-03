@@ -14,7 +14,7 @@ later red gate is not proof of a bad hop. The baseline is recorded in the report
 with the exit code and the last 20 lines of output).
 
 - A red baseline stops the run before the first hop, with a non-zero exit. `--allow-failing-baseline` lets it go on;
-  each later gate failure is then labelled "the baseline was already failing" in the text and JSON output.
+  each later gate failure is then labeled "the baseline was already failing" in the text and JSON output.
 - `--skip-gate` and `--dry-run` skip the baseline (reported as `skipped`), so a dry run never starts Docker.
 - A Mix app's `public/mix-manifest.json` is a build artifact, not committed source: a fresh clone has no manifest, so
   the suite can be red before any hop. Build the assets before the baseline (the app's usual `npm ci && npm run

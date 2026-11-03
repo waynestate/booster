@@ -149,7 +149,7 @@ final class WayneUiMigration
         ['grid', ['row'], ['col-'], '%s has no 2.x counterpart; use CSS grid or flexbox'],
         ['utility', ['pull-left', 'pull-right', 'center-block'], [], '%s has no 2.x counterpart; use a Tailwind utility or own CSS'],
         ['visibility', ['hidden-xs', 'visible-xs'], [], '%s has no 2.x counterpart; use a container query or media query'],
-        ['colour-text', ['text-danger', 'bg-success'], [], '%s becomes a Tailwind utility over semantic tokens; the exact syntax depends on the Tailwind setup'],
+        ['color-text', ['text-danger', 'bg-success'], [], '%s becomes a Tailwind utility over semantic tokens; the exact syntax depends on the Tailwind setup'],
         ['footer', ['footer'], [], '%s becomes .wsu-footer; the name is generic, so check the app CSS for its own .footer first'],
         ['selectpicker', ['selectpicker'], [], '%s plus bootstrap-select becomes a native <select>; drop the plugin classes and JS'],
     ];
@@ -266,8 +266,8 @@ final class WayneUiMigration
                 $diff[] = 'icons: ' . implode(', ', $stats['icons']);
             }
             if ($stats['colours'] !== []) {
-                $parts[] = self::plural(count($stats['colours']), 'colour');
-                $diff[] = 'colours: ' . implode(', ', $stats['colours']);
+                $parts[] = self::plural(count($stats['colours']), 'color');
+                $diff[] = 'colors: ' . implode(', ', $stats['colours']);
             }
             if ($stats['php'] !== []) {
                 $parts[] = self::plural(count($stats['php']), 'PHP rewrite');
@@ -642,7 +642,7 @@ final class WayneUiMigration
                 $last = (int) $offset + strlen($full);
                 $stats['colours'][] = '#' . $key . ' to ' . $var;
             } else {
-                $entries[] = ['colour', $rel . ':' . $line . ': ' . $note];
+                $entries[] = ['color', $rel . ':' . $line . ': ' . $note];
             }
         }
         if ($last === 0) {
@@ -672,7 +672,7 @@ final class WayneUiMigration
                 continue;
             }
             $what = $var !== null ? '#' . $key . ' becomes ' . $var : $note;
-            $entries[] = ['colour', $rel . ':' . self::lineAt($content, (int) $offset) . ': ' . $what . '; Booster does not rewrite Sass, so change it by hand'];
+            $entries[] = ['color', $rel . ':' . self::lineAt($content, (int) $offset) . ': ' . $what . '; Booster does not rewrite Sass, so change it by hand'];
         }
     }
 

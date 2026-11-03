@@ -948,7 +948,7 @@ final class CliTest extends TestCase
         self::assertMatchesRegularExpression('/^RESULT: PASS$/m', $out);
         self::assertStringNotContainsString('previewed, no tests ran', $out);
         self::assertStringContainsString('Booster edited your files but made no commit. Next: review with `git -C ' . $dir . ' diff`.', $out);
-        self::assertStringContainsString('Also read the notes under each step ("Behaviour changes to check", manual lines) and run your own checks.', $out);
+        self::assertStringContainsString('Also read the notes under each step ("Behavior changes to check", manual lines) and run your own checks.', $out);
         self::assertStringContainsString('When you are happy, commit.', $out);
         self::assertStringContainsString('Booster never commits or pushes.', $out);
     }

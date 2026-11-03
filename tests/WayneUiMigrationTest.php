@@ -218,7 +218,7 @@ final class WayneUiMigrationTest extends TestCase
         // 58 from the class, icon, colour and data-hook rules, plus the two
         // wayne-ui:: view directives and the forked public/ vendor copy.
         self::assertSame(61, count($result->manual));
-        self::assertSame(['resources/css/app.css: 5 colours.', 'resources/views/layout.blade.php: 28 class tokens, 5 icons, 2 colours.', 'resources/views/partials/actions.blade.php: 7 class tokens, 1 colour.'], $result->changes);
+        self::assertSame(['resources/css/app.css: 5 colors.', 'resources/views/layout.blade.php: 28 class tokens, 5 icons, 2 colors.', 'resources/views/partials/actions.blade.php: 7 class tokens, 1 color.'], $result->changes);
     }
 
     public function test_php_rewrites_rename_the_breadcrumbs_calls(): void

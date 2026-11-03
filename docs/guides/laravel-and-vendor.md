@@ -7,7 +7,7 @@ description: Why Laravel hops need the app's vendor folder, and where the hop da
 
 This page covers what Laravel hops need from the app, and where the hop data comes from. Next: [Deploying on Citadel](citadel.md).
 
-rector-laravel needs Laravel's classes to recognise a model or a controller. For a Laravel hop Booster loads the app's
+rector-laravel needs Laravel's classes to recognize a model or a controller. For a Laravel hop Booster loads the app's
 own `vendor/autoload.php` when it exists, so run `composer install` in the app first. PHP hops never load the app's
 autoloader. An app with no `vendor/` still gets a plan and the hops that do not need Laravel's classes.
 

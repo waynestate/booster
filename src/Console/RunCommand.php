@@ -44,7 +44,7 @@ final class RunCommand extends BaseCommand
             ->addOption('memory-limit', null, InputOption::VALUE_REQUIRED, 'Memory limit for the Rector process (for example 2G), or -1 for no limit.', RectorRunner::DEFAULT_MEMORY_LIMIT)
             ->addOption('skip-gate', null, InputOption::VALUE_NONE, 'Do not run the tests in the target image after each hop, or the PROCTOR check at the end.')
             ->addOption('image', null, InputOption::VALUE_REQUIRED, 'Run the gate in this Docker image instead of building booster-target (it needs php and composer on PATH): one name for every PHP version, a {php} template such as registry/php-apache:{php}, or a map such as 8.0=foo:1,8.1=bar:2.')
-            ->addOption('allow-failing-baseline', null, InputOption::VALUE_NONE, 'Continue even when the baseline (the app\'s tests on its current PHP) fails; later gate failures are labelled as pre-existing.')
+            ->addOption('allow-failing-baseline', null, InputOption::VALUE_NONE, 'Continue even when the baseline (the app\'s tests on its current PHP) fails; later gate failures are labeled as pre-existing.')
             ->addOption('allow-dirty', null, InputOption::VALUE_NONE, 'Run even when the working copy has uncommitted changes.')
             ->addOption('test-command', null, InputOption::VALUE_REQUIRED, 'Command that runs the app tests inside the image (default: composer test, else vendor/bin/phpunit).')
             ->addOption('proctor-command', null, InputOption::VALUE_REQUIRED, 'Extra command run in the image after the tests, for example a PROCTOR check.')
