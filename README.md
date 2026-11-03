@@ -54,10 +54,37 @@ Blade and Vue islands, and Laravel with Inertia and Vue.
 
 ## Install
 
-Booster needs PHP 8.3 or newer, but the app it upgrades does not: Rector runs from Booster's own `vendor/`, so an app
-on PHP 7.4 is rewritten by a Rector that runs on 8.3 or newer.
+Run Booster from inside the app you want to upgrade: `--path` defaults to `.`, so `booster plan` needs no flags.
+Booster needs PHP 8.3 or newer on the machine; the app it upgrades does not, because Rector runs from Booster's own
+`vendor/`.
 
-Linux and macOS:
+### Single file (PHAR)
+
+```
+mkdir -p ~/bin
+curl -L -o ~/bin/booster.phar https://github.com/waynestate/booster/releases/latest/download/booster.phar
+alias booster='php ~/bin/booster.phar'    # put this line in ~/.bashrc or ~/.zshrc to keep it
+cd /path/to/your-app
+booster detect
+booster plan
+booster run --dry-run
+booster run
+```
+
+`detect` reads the app and prints its type and versions. `plan` lists the steps. `run --dry-run` previews the edits
+and changes nothing. `run` edits files and makes no commit. A real `run` also needs git, a clean git folder (commit
+or stash first) and a Docker daemon for its test gate.
+
+### Linux, macOS and WSL (Ubuntu): clone it
+
+```
+sudo apt install php-cli php-xml php-mbstring php-zip php-curl unzip git composer
+```
+
+Ubuntu splits the XML extension out of `php-cli`, and Composer's dev dependencies need it: when Composer says
+"ext-dom is missing", run the line above. On macOS: `brew install php composer git`. Ubuntu 22.04 ships PHP 8.1, too
+old for Booster: add the [ondrej/php PPA](https://launchpad.net/+ppas?field.name=php&field.status=active) or use
+Docker (route 4). Then:
 
 ```
 git clone https://github.com/waynestate/booster.git
@@ -65,31 +92,46 @@ cd booster && composer install
 bin/booster --version
 ```
 
-Windows (PowerShell, no bash or WSL needed):
+Run Booster from its own folder with `--path` pointing at the app; never clone Booster inside an app:
+
+```
+bin/booster plan --path=/path/to/your-app
+```
+
+`--path` takes a full path, not `~`. In WSL, keep Booster and the app in your Linux home folder, not under `/mnt/c`
+(a Windows drive is slow from Linux); a Windows folder is `/mnt/c/Users/<you>/...`, and `run` needs Docker Desktop's
+WSL integration switched on.
+
+### Windows PowerShell, with PHP and Composer installed
 
 ```
 git clone https://github.com/waynestate/booster.git
 cd booster; composer install
-php vendor\bin\booster --version
+php bin\booster --version
+php bin\booster plan --path=..\my-app
 ```
 
-No PHP on the machine? Run it in Docker (the path after `-v` is where your app lives):
+### Docker only, no PHP (Windows or any OS)
 
 ```
 docker run --rm -v "${PWD}:/booster" -w /booster composer:2 composer install --no-interaction
-docker run --rm -v "${PWD}:/booster" -v "C:\path\to\app:/app" -w /booster php:8.4-cli php bin/booster plan --path=/app
+docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-cli php bin/booster plan --path=/app
 ```
 
-The `run` command's test gate starts Docker itself, so it needs a Docker daemon on the machine that runs Booster.
-When Booster itself runs in a container, use `--skip-gate` and run the tests yourself. Node hops run `npm` in a
+This route can run `detect`, `plan`, `scan` and `run --dry-run`. A real `run` starts Docker and uses git from inside
+Booster, which the `php:8.4-cli` image lacks, so for a real run use the single-file or clone route (in WSL on Windows). When
+Booster itself runs in a container, pass `--skip-gate` to `run` and run the tests yourself. Node hops run `npm` in a
 `node:26` container, so they need the same daemon but no Node installed on the machine.
+
+Booster is also on Packagist as `waynestate/booster`: give it its own folder, not your app's `vendor/`, because it
+needs PHP 8.3 even when your app doesn't. Clone it as above, or run
+`composer create-project waynestate/booster booster ^1.0`.
 
 ## Single-file download
 
-Booster also ships as a single-file PHAR, so Preflight and apps without Composer access can run it as one file. Every
-version tag publishes it: the GitLab release carries `booster.phar` as an asset, and the GitHub release at
-github.com/waynestate/booster carries the same file as an attachment. Download it from either release page and run it
-with `php booster.phar`.
+Booster ships as a single-file PHAR, so Preflight and apps without Composer access can run it as one file. The first route
+above downloads it; every version tag publishes the same `booster.phar`: the GitLab release carries it as an asset,
+and the GitHub release at github.com/waynestate/booster carries it as an attachment. Run it with `php booster.phar`.
 
 You can also build it from any commit, with the script for your OS (both need Docker, and no PHP or Composer on the
 host):
