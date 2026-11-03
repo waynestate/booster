@@ -254,4 +254,163 @@ final class PhpCompatScanTest extends TestCase
         self::assertSame('a.php', $array['findings'][0]['file']);
         self::assertSame(3, $array['findings'][0]['line']);
     }
+
+    public function test_temp_probe_of_spec_rules(): void
+    {
+        $makeJson = function (string $app): array {
+            return $this->phpcsJson([
+                $app . '/oracle-check.php' => [
+                    'errors' => 2,
+                    'warnings' => 0,
+                    'messages' => [
+                        ['message' => 'Function oci_error() is removed since PHP 8.4', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.oci_errorRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 181, 'column' => 9],
+                        ['message' => 'Function mysql_connect() is removed since PHP 7.0', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.mysql_connectRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 200, 'column' => 9],
+                    ],
+                ],
+            ]);
+        };
+
+        // require-dev declares oci8 too.
+        $app = $this->tempDir();
+        file_put_contents($app . '/composer.json', (string) json_encode(['require-dev' => ['ext-oci8' => '*']]));
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($makeJson($app)), ''));
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.4');
+        self::assertTrue($scan->ok);
+        self::assertCount(1, $scan->findings);
+        self::assertSame('PHPCompatibility.FunctionUse.RemovedFunctions.mysql_connectRemoved', $scan->findings[0]->source);
+
+        // Invalid JSON behaves exactly as today: oci finding kept.
+        $app = $this->tempDir();
+        file_put_contents($app . '/composer.json', '{not json');
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($makeJson($app)), ''));
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.4');
+        self::assertTrue($scan->ok);
+        self::assertCount(2, $scan->findings);
+
+        // ext-oci8 in another section does not declare it: oci finding kept.
+        $app = $this->tempDir();
+        file_put_contents($app . '/composer.json', (string) json_encode(['suggest' => ['ext-oci8' => 'Oracle support']]));
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($makeJson($app)), ''));
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.4');
+        self::assertTrue($scan->ok);
+        self::assertCount(2, $scan->findings);
+
+        // The key alone declares it, even with a null value.
+        $app = $this->tempDir();
+        file_put_contents($app . '/composer.json', (string) json_encode(['config' => ['platform' => ['ext-oci8' => null]]]));
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($makeJson($app)), ''));
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.4');
+        self::assertTrue($scan->ok);
+        self::assertCount(1, $scan->findings);
+
+        // Match is case insensitive, and only the exact removed-since pattern drops.
+        $app = $this->tempDir();
+        file_put_contents($app . '/composer.json', (string) json_encode(['require' => ['ext-oci8' => '*']]));
+        $json = $this->phpcsJson([
+            $app . '/oracle-check.php' => [
+                'errors' => 3,
+                'warnings' => 0,
+                'messages' => [
+                    ['message' => 'Function OCI_ERROR() is removed since PHP 8.4', 'source' => 's1', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 1, 'column' => 1],
+                    ['message' => 'Function oci_fetch_all() is deprecated since PHP 5.5 and removed since PHP 8.4', 'source' => 's2', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 2, 'column' => 1],
+                    ['message' => 'The function oci_error() is removed since PHP 8.4', 'source' => 's3', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 3, 'column' => 1],
+                ],
+            ],
+        ]);
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.4');
+        self::assertTrue($scan->ok);
+        self::assertCount(2, $scan->findings);
+        self::assertSame('s2', $scan->findings[0]->source);
+        self::assertSame('s3', $scan->findings[1]->source);
+
+        // Dropping findings changes nothing about the result shape.
+        $array = $scan->toArray();
+        self::assertSame(['status', 'test_version', 'error', 'errors', 'warnings', 'findings', 'hints'], array_keys($array));
+        self::assertSame('ok', $array['status']);
+        self::assertSame('8.4', $array['test_version']);
+        self::assertNull($array['error']);
+        self::assertSame(2, $array['errors']);
+        self::assertSame(0, $array['warnings']);
+        self::assertSame([], $array['hints']);
+    }
+
+    public function test_config_platform_ext_oci8_drops_oci_removed_findings(): void
+    {
+        $app = $this->tempDir();
+        file_put_contents($app . '/composer.json', (string) json_encode([
+            'name' => 'wayne/oracle-check',
+            'config' => ['platform' => ['php' => '8.3.0', 'ext-oci8' => '8.4']],
+        ]));
+        $json = $this->phpcsJson([
+            $app . '/oracle-check.php' => [
+                'errors' => 2,
+                'warnings' => 0,
+                'messages' => [
+                    ['message' => 'Function oci_error() is removed since PHP 8.4', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.oci_errorRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 181, 'column' => 9],
+                    ['message' => 'Function mysql_connect() is removed since PHP 7.0', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.mysql_connectRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 200, 'column' => 9],
+                ],
+            ],
+        ]);
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.4');
+
+        self::assertTrue($scan->ok);
+        self::assertCount(1, $scan->findings);
+        self::assertSame('oracle-check.php', $scan->findings[0]->file);
+        self::assertSame(200, $scan->findings[0]->line);
+        self::assertSame('PHPCompatibility.FunctionUse.RemovedFunctions.mysql_connectRemoved', $scan->findings[0]->source);
+    }
+
+    public function test_require_ext_oci8_drops_oci_removed_findings(): void
+    {
+        $app = $this->tempDir();
+        file_put_contents($app . '/composer.json', (string) json_encode([
+            'name' => 'wayne/oracle-check',
+            'require' => ['php' => '^8.3', 'ext-oci8' => '*'],
+        ]));
+        $json = $this->phpcsJson([
+            $app . '/oracle-check.php' => [
+                'errors' => 2,
+                'warnings' => 0,
+                'messages' => [
+                    ['message' => 'Function oci_error() is removed since PHP 8.4', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.oci_errorRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 181, 'column' => 9],
+                    ['message' => 'Function mysql_connect() is removed since PHP 7.0', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.mysql_connectRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 200, 'column' => 9],
+                ],
+            ],
+        ]);
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.4');
+
+        self::assertTrue($scan->ok);
+        self::assertCount(1, $scan->findings);
+        self::assertSame('oracle-check.php', $scan->findings[0]->file);
+        self::assertSame(200, $scan->findings[0]->line);
+        self::assertSame('PHPCompatibility.FunctionUse.RemovedFunctions.mysql_connectRemoved', $scan->findings[0]->source);
+    }
+
+    public function test_without_ext_oci8_the_oci_removed_finding_is_kept(): void
+    {
+        $app = $this->tempDir();
+        $json = $this->phpcsJson([
+            $app . '/oracle-check.php' => [
+                'errors' => 2,
+                'warnings' => 0,
+                'messages' => [
+                    ['message' => 'Function oci_error() is removed since PHP 8.4', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.oci_errorRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 181, 'column' => 9],
+                    ['message' => 'Function mysql_connect() is removed since PHP 7.0', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.mysql_connectRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 200, 'column' => 9],
+                ],
+            ],
+        ]);
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.4');
+
+        self::assertTrue($scan->ok);
+        self::assertCount(2, $scan->findings);
+        self::assertSame('PHPCompatibility.FunctionUse.RemovedFunctions.oci_errorRemoved', $scan->findings[0]->source);
+        self::assertSame('PHPCompatibility.FunctionUse.RemovedFunctions.mysql_connectRemoved', $scan->findings[1]->source);
+    }
 }

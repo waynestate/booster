@@ -115,7 +115,7 @@ final class PhpCompatScan
             return $this->noReport($result, $testVersion);
         }
 
-        return $this->parse($result, $testVersion, $prefix);
+        return $this->parse($result, $testVersion, $prefix, $this->declaresOci8($appPath));
     }
 
     /**
@@ -250,7 +250,42 @@ final class PhpCompatScan
         return in_array('PHPCompatibility', $standards, true) ? self::STANDARD_OFFERED : self::STANDARD_MISSING;
     }
 
-    private function parse(ProcessResult $result, string $testVersion, string $prefix): ScanResult
+    /**
+     * Whether the app's composer.json declares the oci8 extension, in
+     * require, require-dev or config.platform. PHP 8.4 moved oci8 out of the
+     * core PHP download and into PECL, so an app that installs the PECL
+     * extension on purpose keeps Oracle support, and its oci_* removed
+     * findings are not "will break" news. An absent or invalid composer.json
+     * means the app does not declare it, and the findings stay.
+     */
+    private function declaresOci8(string $appPath): bool
+    {
+        $file = $appPath . '/composer.json';
+        if (!is_file($file)) {
+            return false;
+        }
+
+        $data = json_decode((string) file_get_contents($file), true);
+        if (!is_array($data)) {
+            return false;
+        }
+
+        $sections = [
+            $data['require'] ?? null,
+            $data['require-dev'] ?? null,
+            $data['config']['platform'] ?? null,
+        ];
+
+        foreach ($sections as $section) {
+            if (is_array($section) && array_key_exists('ext-oci8', $section)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function parse(ProcessResult $result, string $testVersion, string $prefix, bool $oci8Declared = false): ScanResult
     {
         $data = json_decode($result->stdout, true);
         if (!is_array($data) || !isset($data['files']) || !is_array($data['files'])) {
@@ -273,6 +308,13 @@ final class PhpCompatScan
                 // Internal.NoCodeFound fires on plain HTML includes that carry
                 // no PHP code; it is noise, not a finding.
                 if (($message['source'] ?? '') === 'Internal.NoCodeFound') {
+                    continue;
+                }
+                // When the app installs the PECL oci8 extension itself, PHP
+                // 8.4 moving the extension out of the core download is not a
+                // break for it, so the "oci_*() is removed since PHP" findings
+                // are dropped. Every other finding stays.
+                if ($oci8Declared && preg_match('/^Function (oci\w*)\(\) is removed since PHP/i', $message['message']) === 1) {
                     continue;
                 }
                 $findings[] = new Finding(
