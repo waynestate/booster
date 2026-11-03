@@ -20,4 +20,4 @@ This page lists what Booster does not do yet, and what it decided not to build. 
 
 - **Custom rules.** Apps sometimes need a rewrite Rector does not ship. Booster has no way to register one yet; until it does, such rewrites stay manual.
 - **Pilot numbers.** No pilot cohort has run yet, so there are no counts of apps upgraded or hops applied to publish.
-- **A cas-to-sesame hop.** Swapping `wayne-cas` for SESAME is documented as a skill, but Booster does not plan or apply it as a hop yet.
+- **A `cas-to-sesame` run against a real app.** The hop exists (opt in with `--sesame`) and renames the classes, swaps the Composer requirement, writes `config/sesame.php` from the old config and rewrites the model trait. Duo two-factor stays manual work, and the hop has not been run against a real app yet.
