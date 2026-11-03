@@ -545,7 +545,7 @@
       "id": "guzzle-exceptions-option",
       "hop": "package:guzzlehttp/guzzle@7",
       "detect": { "kind": "package" },
-      "label": "Request option exceptions was removed in favour of http_errors; code passing exceptions => false gets the option silently ignored, so 4xx and 5xx responses now throw ClientException or ServerException where v6 returned the response",
+      "label": "Request option exceptions was removed in favor of http_errors; code passing exceptions => false gets the option silently ignored, so 4xx and 5xx responses now throw ClientException or ServerException where v6 returned the response",
       "keep_old": "'http_errors' => false",
       "check": "Exercise outbound calls that expect non-2xx answers (gateways, CAS, partner APIs)",
       "source": "https://raw.githubusercontent.com/guzzle/guzzle/7.16/UPGRADING.md"
@@ -554,7 +554,7 @@
       "id": "guzzle-save-to-option",
       "hop": "package:guzzlehttp/guzzle@7",
       "detect": { "kind": "package" },
-      "label": "Request option save_to was removed in favour of sink; downloads using save_to => path stop writing the file with no error and the response body is discarded",
+      "label": "Request option save_to was removed in favor of sink; downloads using save_to => path stop writing the file with no error and the response body is discarded",
       "keep_old": "'sink' => $path (or an open stream)",
       "check": "Run a download path and confirm the file appears on disk",
       "source": "https://raw.githubusercontent.com/guzzle/guzzle/7.16/UPGRADING.md"

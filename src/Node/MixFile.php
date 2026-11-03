@@ -179,7 +179,7 @@ final class MixFile
                 return;
             }
             if (preg_match('/^\.([A-Za-z_$][\w$]*)/A', substr($code, $pos), $call) !== 1) {
-                $violation = self::earlier($violation, 'an unrecognised chained call', $pos);
+                $violation = self::earlier($violation, 'an unrecognized chained call', $pos);
 
                 return;
             }

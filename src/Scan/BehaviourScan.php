@@ -481,11 +481,11 @@ final class BehaviourScan
     private static function load(string $path): array
     {
         if (!is_file($path)) {
-            throw new ToolError(sprintf('Behaviour changes data file "%s" is missing.', $path));
+            throw new ToolError(sprintf('Behavior changes data file "%s" is missing.', $path));
         }
         $raw = json_decode((string) file_get_contents($path), true);
         if (!is_array($raw) || ($raw['schema_version'] ?? null) !== 1 || !is_array($raw['changes'] ?? null)) {
-            throw new ToolError(sprintf('Behaviour changes data file "%s" must be a JSON object with schema_version 1 and a changes list.', $path));
+            throw new ToolError(sprintf('Behavior changes data file "%s" must be a JSON object with schema_version 1 and a changes list.', $path));
         }
 
         $entries = [];
@@ -493,26 +493,26 @@ final class BehaviourScan
         $always = 0;
         foreach ($raw['changes'] as $index => $entry) {
             if (!is_array($entry)) {
-                throw new ToolError(sprintf('Behaviour change %d in "%s" must be an object.', $index, $path));
+                throw new ToolError(sprintf('Behavior change %d in "%s" must be an object.', $index, $path));
             }
             foreach (['id', 'hop', 'label', 'check', 'source'] as $key) {
                 if (!isset($entry[$key]) || !is_string($entry[$key]) || $entry[$key] === '') {
-                    throw new ToolError(sprintf('Behaviour change %d in "%s" needs a non-empty string "%s".', $index, $path, $key));
+                    throw new ToolError(sprintf('Behavior change %d in "%s" needs a non-empty string "%s".', $index, $path, $key));
                 }
             }
             if (isset($seen[$entry['id']])) {
-                throw new ToolError(sprintf('Behaviour change %d in "%s" repeats id "%s".', $index, $path, $entry['id']));
+                throw new ToolError(sprintf('Behavior change %d in "%s" repeats id "%s".', $index, $path, $entry['id']));
             }
             $seen[$entry['id']] = true;
             if (preg_match('/^php-\d{2}-to-\d{2}$|^laravel-[0-9]+(\.[0-9]+)?-to-[0-9]+$|^package:[a-z0-9._\/-]+@\d+$/', (string) $entry['hop']) !== 1) {
-                throw new ToolError(sprintf('Behaviour change %d in "%s" has hop "%s"; expected php-74-to-80, laravel-10-to-11 or package:name@major.', $index, $path, $entry['hop']));
+                throw new ToolError(sprintf('Behavior change %d in "%s" has hop "%s"; expected php-74-to-80, laravel-10-to-11 or package:name@major.', $index, $path, $entry['hop']));
             }
             if (!is_array($entry['detect'] ?? null)) {
-                throw new ToolError(sprintf('Behaviour change %d in "%s" needs a detect object.', $index, $path));
+                throw new ToolError(sprintf('Behavior change %d in "%s" needs a detect object.', $index, $path));
             }
             $detect = $entry['detect'];
             if (!isset($detect['kind']) || !is_string($detect['kind']) || !in_array($detect['kind'], ['function', 'method', 'class', 'property', 'token', 'config', 'blade', 'package', 'always'], true)) {
-                throw new ToolError(sprintf('Behaviour change %d in "%s" has an unknown or missing detect kind.', $index, $path));
+                throw new ToolError(sprintf('Behavior change %d in "%s" has an unknown or missing detect kind.', $index, $path));
             }
             $kind = $detect['kind'];
             $match = null;
@@ -523,7 +523,7 @@ final class BehaviourScan
             switch ($kind) {
                 case 'config':
                     if (!isset($detect['file']) || !is_string($detect['file']) || $detect['file'] === '' || !isset($detect['key']) || !is_string($detect['key']) || $detect['key'] === '') {
-                        throw new ToolError(sprintf('Behaviour change %d in "%s" needs detect.file and detect.key for a config row.', $index, $path));
+                        throw new ToolError(sprintf('Behavior change %d in "%s" needs detect.file and detect.key for a config row.', $index, $path));
                     }
                     $file = $detect['file'];
                     $key = $detect['key'];
@@ -540,20 +540,20 @@ final class BehaviourScan
                     break;
                 default:
                     if (!isset($detect['match']) || !is_string($detect['match']) || $detect['match'] === '') {
-                        throw new ToolError(sprintf('Behaviour change %d in "%s" needs detect.match for a %s row.', $index, $path, $kind));
+                        throw new ToolError(sprintf('Behavior change %d in "%s" needs detect.match for a %s row.', $index, $path, $kind));
                     }
                     $match = $detect['match'];
             }
             if (!array_key_exists('keep_old', $entry) || (!is_string($entry['keep_old']) && $entry['keep_old'] !== null)) {
-                throw new ToolError(sprintf('Behaviour change %d in "%s" needs a keep_old string or null.', $index, $path));
+                throw new ToolError(sprintf('Behavior change %d in "%s" needs a keep_old string or null.', $index, $path));
             }
             if (!str_starts_with((string) $entry['source'], 'https://')) {
-                throw new ToolError(sprintf('Behaviour change %d in "%s" has source "%s"; expected an https URL.', $index, $path, $entry['source']));
+                throw new ToolError(sprintf('Behavior change %d in "%s" has source "%s"; expected an https URL.', $index, $path, $entry['source']));
             }
             if ($kind === 'always') {
                 $always++;
                 if ($always > self::MAX_ALWAYS) {
-                    throw new ToolError(sprintf('Behaviour changes data file "%s" has more than %d always rows.', $path, self::MAX_ALWAYS));
+                    throw new ToolError(sprintf('Behavior changes data file "%s" has more than %d always rows.', $path, self::MAX_ALWAYS));
                 }
             }
             $entries[] = [

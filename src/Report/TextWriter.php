@@ -260,7 +260,7 @@ final class TextWriter
         if ($result->entries === []) {
             return [];
         }
-        $lines = ['Behaviour changes to check:'];
+        $lines = ['Behavior changes to check:'];
         foreach ($result->entries as $entry) {
             $lines[] = $this->behaviourLine($entry);
             if ($entry->keepOld !== null) {
@@ -400,7 +400,7 @@ final class TextWriter
 
             return implode("\n", [
                 sprintf('Booster edited your files but made no commit. Next: review with `git -C %s diff`.', Invocation::pathArg($path)),
-                'Also read the notes under each step ("Behaviour changes to check", manual lines) and run your own checks.',
+                'Also read the notes under each step ("Behavior changes to check", manual lines) and run your own checks.',
                 'When you are happy, commit.',
                 'Booster never commits or pushes.',
             ]);

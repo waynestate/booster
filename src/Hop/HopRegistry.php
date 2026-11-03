@@ -511,7 +511,7 @@ final class HopRegistry
             '7.0' => ['Rector cannot replace the removed mysql_* functions; move to PDO or mysqli by hand.'],
             '8.0' => [
                 'Largest risk hop: loose comparison of numbers and strings changed, many warnings became thrown errors, and arithmetic on arrays throws.',
-                'Write or extend tests before applying this hop; only tests and review find behaviour changes here.',
+                'Write or extend tests before applying this hop; only tests and review find behavior changes here.',
             ],
             '8.1' => [
                 'mysqli now throws on errors by default; PDO on MySQL returns native int and float types; htmlspecialchars() now escapes single quotes.',
@@ -552,7 +552,7 @@ final class HopRegistry
                     'Check the shared database server against the Laravel ' . $to . ' database floor before you apply this hop.',
                     'Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.',
                     ...$this->inertiaChanges($to)['notes'],
-                    ...($to === '9' ? ['Check app/Http/Middleware/TrustProxies.php after the hop: the stock file is rewritten to the framework middleware, and a customised one is left alone.'] : []),
+                    ...($to === '9' ? ['Check app/Http/Middleware/TrustProxies.php after the hop: the stock file is rewritten to the framework middleware, and a customized one is left alone.'] : []),
                 ],
                 links: [sprintf('https://laravel.com/docs/%s.x/upgrade', $to)],
             ));
