@@ -16,6 +16,7 @@ booster plan   --path=../my-app        # the ordered hops to a supported version
 booster scan   --path=../my-app --php=<target>   # what will break on that newer PHP; advisory, changes nothing
 booster run    --path=../my-app --dry-run   # the diffs Rector would make; changes nothing
 booster run    --path=../my-app        # apply the plan, one hop at a time, with a test gate
+booster init   --path=../my-app        # optional: writes playbooks for AI coding tools into the app; commit them before a real run
 ```
 
 Replace `<target>` with the PHP version you are heading for, for example the one `plan` shows on its last step.

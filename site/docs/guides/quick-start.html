@@ -34,6 +34,7 @@ booster plan   --path=../my-app        # the ordered hops to a supported version
 booster scan   --path=../my-app --php=&lt;target&gt;   # what will break on that newer PHP; advisory, changes nothing
 booster run    --path=../my-app --dry-run   # the diffs Rector would make; changes nothing
 booster run    --path=../my-app        # apply the plan, one hop at a time, with a test gate
+booster init   --path=../my-app        # optional: writes playbooks for AI coding tools into the app; commit them before a real run
 </code></pre>
 <p>Replace <code>&lt;target&gt;</code> with the PHP version you are heading for, for example the one <code>plan</code> shows on its last step.</p>
 <p>A real run needs git and Docker on the machine that runs Booster. If you used the Docker-only route, the first four commands above work as they are, but the last one does not: its <code>php:8.4-cli</code> image has no git. Use the single-file or clone route for <code>booster run</code> (see Install).</p>
