@@ -152,7 +152,7 @@ final class PackageCompatTest extends TestCase
             $plan->warnings,
         );
         self::assertContains('laravelcollective/remote is abandoned (use spatie/ssh instead).', $plan->warnings);
-        self::assertNotContains('Not checked: laravelcollective/remote (offline).', $plan->warnings);
+        self::assertNotContains('Not checked: laravelcollective/remote (not on Packagist or unreachable).', $plan->warnings);
     }
 
     public function test_an_abandoned_package_without_a_replacement_says_so(): void
@@ -284,7 +284,7 @@ final class PackageCompatTest extends TestCase
         self::assertContains('Not checked: internal/tool (VCS repository).', $plan->warnings);
     }
 
-    public function test_a_package_packagist_does_not_know_about_is_labelled_offline(): void
+    public function test_a_package_packagist_does_not_know_about_is_labelled_not_on_packagist_or_unreachable(): void
     {
         $fetcher = $this->fetcher([]);
         $plan = $this->planWith(['require' => ['acme/missing' => '^1.0']], $fetcher);
@@ -292,7 +292,7 @@ final class PackageCompatTest extends TestCase
         $check = $plan->packageChecks[0];
         self::assertFalse($check->checked);
         self::assertNull($check->blocks);
-        self::assertContains('Not checked: acme/missing (offline).', $plan->warnings);
+        self::assertContains('Not checked: acme/missing (not on Packagist or unreachable).', $plan->warnings);
     }
 
     public function test_a_composer_type_repository_is_tried_after_packagist(): void

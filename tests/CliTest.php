@@ -116,7 +116,27 @@ final class CliTest extends TestCase
         self::assertStringContainsString('1. php-74-to-80', $out);
         self::assertStringContainsString('5. php-83-to-84', $out);
         self::assertStringNotContainsString('php-84-to-85', $out);
-        self::assertStringContainsString('Will break on PHP 8.0: no findings.', $out);
+        // Automatic steps drop the gate id and say in plain words where the tests run.
+        self::assertStringNotContainsString('[target-image-tests]', $out);
+        self::assertStringContainsString("1. php-74-to-80\n   Move PHP 7.4 code to PHP 8.0.\n   After this step your tests run in Docker.", $out);
+        self::assertStringContainsString('PHPCompatibility check for PHP 8.0: no findings.', $out);
+    }
+
+    public function test_plan_labels_manual_steps_in_plain_words(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', json_encode([
+            'require' => ['php' => '^7.4'],
+            'require-dev' => ['phpunit/phpunit' => '^8.0'],
+        ]));
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $dir, '--today' => self::TODAY, '--goal' => 'php-74-to-84', '--no-scan' => true, '--no-package-check' => true]);
+
+        self::assertSame(0, $exit);
+        // The manual hop is marked in plain words, not with its internal gate id.
+        self::assertStringContainsString('phpunit-to-9-manual  [manual: you do this one by hand]', $out);
+        self::assertStringNotContainsString('[manual-review]', $out);
+        self::assertStringNotContainsString('[target-image-tests]', $out);
     }
 
     public function test_plan_until_cuts_the_printed_plan(): void
@@ -220,7 +240,7 @@ final class CliTest extends TestCase
         [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $app, '--today' => self::TODAY, '--goal' => 'php-74-to-84'], $fake);
 
         self::assertSame(0, $exit);
-        self::assertStringContainsString('Will break on PHP 8.0: 1 errors, 0 warnings.', $out);
+        self::assertStringContainsString('PHPCompatibility check for PHP 8.0: 1 error, 0 warnings.', $out);
         self::assertStringContainsString('src/Legacy.php:12 [error] Function each()', $out);
     }
 
@@ -231,7 +251,7 @@ final class CliTest extends TestCase
         [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--no-scan' => true], $fake);
 
         self::assertSame(0, $exit);
-        self::assertStringNotContainsString('Will break on PHP', $out);
+        self::assertStringNotContainsString('PHPCompatibility check for PHP', $out);
         self::assertSame([], $fake->calls);
     }
 
@@ -259,7 +279,7 @@ final class CliTest extends TestCase
 
         self::assertSame(0, $exit);
         self::assertStringContainsString('phpunit-to-9-manual', $out);
-        self::assertStringContainsString('Nothing was changed. The numbered list above is the order Booster would do things; "Will break" and "PHPStan" are advice', $out);
+        self::assertStringContainsString('Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice', $out);
         self::assertStringContainsString('for you to read, not errors.', $out);
         self::assertStringContainsString('Booster does every step above marked automatic when you run it. Steps shown as [playbook] are yours to do by hand.', $out);
         self::assertStringContainsString('Preview the edits: php bin/booster run --path=' . $dir . ' --dry-run', $out);
@@ -319,7 +339,7 @@ final class CliTest extends TestCase
         [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $app, '--php' => '8.0'], $fake);
 
         self::assertSame(0, $exit);
-        self::assertStringContainsString('Will break on PHP 8.0: 1 errors, 1 warnings.', $out);
+        self::assertStringContainsString('PHPCompatibility check for PHP 8.0: 1 error, 1 warning.', $out);
         self::assertStringContainsString('src/Legacy.php:20 [error] Function create_function()', $out);
         self::assertStringContainsString('src/Legacy.php:26 [warning] Using ${var}', $out);
     }
@@ -399,7 +419,7 @@ final class CliTest extends TestCase
         [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $app, '--php' => '8.4', '--phpstan' => true], $fake);
 
         self::assertSame(0, $exit);
-        self::assertStringContainsString('Will break on PHP 8.4: no findings.', $out);
+        self::assertStringContainsString('PHPCompatibility check for PHP 8.4: no findings.', $out);
         self::assertStringContainsString('PHPStan on PHP 8.4: 1 finding (code quality hints, not upgrade blockers).', $out);
         self::assertStringContainsString('src/Legacy.php:12 [function.notFound] Function each()', $out);
     }
@@ -497,7 +517,7 @@ final class CliTest extends TestCase
         self::assertSame(0, $exit);
         // The PHPCompatibility scan asks about the first wall (8.0); the
         // PHPStan scan asks about where the plan lands (8.4).
-        self::assertStringContainsString('Will break on PHP 8.0: no findings.', $out);
+        self::assertStringContainsString('PHPCompatibility check for PHP 8.0: no findings.', $out);
         self::assertStringContainsString('PHPStan on PHP 8.4: 1 finding (code quality hints, not upgrade blockers).', $out);
         self::assertStringContainsString('src/Legacy.php:12 [function.notFound] Function each()', $out);
     }
@@ -538,7 +558,7 @@ final class CliTest extends TestCase
         ]);
 
         self::assertSame(0, $exit);
-        self::assertStringContainsString('Will break on PHP 8.3: 2 errors, 1 warnings.', $out);
+        self::assertStringContainsString('PHPCompatibility check for PHP 8.3: 2 errors, 1 warning.', $out);
         self::assertStringContainsString('broken.php:10 [error] Function each()', $out);
         self::assertStringContainsString('broken.php:20 [error] Function create_function()', $out);
         self::assertStringContainsString('broken.php:26 [warning] Using ${var}', $out);
@@ -554,7 +574,7 @@ final class CliTest extends TestCase
         ]);
 
         self::assertSame(0, $exit);
-        self::assertStringContainsString('Will break on PHP 8.5: no findings.', $out);
+        self::assertStringContainsString('PHPCompatibility check for PHP 8.5: no findings.', $out);
     }
 
     public function test_scan_phpstan_against_the_broken_fixture_finds_removed_functions(): void
