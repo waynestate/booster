@@ -23,6 +23,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - The text report speaks plainly: PHPStan findings are labeled "code quality hints, not upgrade blockers" and the plan shows only the first five (`booster scan --phpstan` lists them all); a dry run ends `RESULT: PASS (previewed, no tests ran)`; a step that touched one file says "(1 file)"; and when every PROCTOR finding was already there before the upgrade the line reads "no new findings ... (advisory)" instead of FAIL. JSON output is unchanged.
 - A dry-run step that has no edits to make now says "No edits needed for this step (dry run)." instead of "Dry run: nothing was changed.", which read like a failure.
 
+- Every text report now ends with a short plain-English note: what happened, whether anything was changed, and the exact next command with your `--path` filled in (`detect`, `plan`, `scan`, `hops`, `init` and `run`, dry or real; a failed real run names the step it stopped at). `--format json` output is unchanged.
+
 ### Fixed
 
 - The single-file PHAR now carries the launchers for its bundled PHPStan and PHP_CodeSniffer, so `scan` and the plan no longer print "could not run" when started from the PHAR.
