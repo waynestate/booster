@@ -86,7 +86,9 @@ return [
     |
     | public_key is the gateway's public key: a PEM string (or a path to one)
     | for ES256 and RS256, or a base64-encoded raw key (or a path to one) for
-    | EdDSA. trusted_proxies is a comma-separated list of CIDR ranges (or
+    | EdDSA. public_keys maps a kid to a key (the same forms), for a gateway
+    | rotating its signing key: set this or public_key, not both.
+    | trusted_proxies is a comma-separated list of CIDR ranges (or
     | single IPs) the gateway proxy sits behind.
     |
     | Every assertion is single-use. The driver requires a jti claim, refuses
@@ -102,6 +104,9 @@ return [
         'header' => env('SESAME_GATEWAY_HEADER', 'X-Sesame-Assertion'),
         'algorithm' => env('SESAME_GATEWAY_ALGORITHM', 'ES256'),
         'public_key' => env('SESAME_GATEWAY_PUBLIC_KEY'),
+        // kid => key, for a gateway rotating its signing key: set this or
+        // public_key, not both.
+        'public_keys' => [],
         'issuer' => Setting::get('SESAME_GATEWAY_ISSUER'),
         'audience' => env('SESAME_GATEWAY_AUDIENCE'),
         'leeway_seconds' => env('SESAME_GATEWAY_LEEWAY_SECONDS', 30),
@@ -149,6 +154,9 @@ return [
         'identity_claim' => env('SESAME_OAUTH2_IDENTITY_CLAIM', 'preferred_username'),
         'jwks_cache_ttl_seconds' => env('SESAME_OAUTH2_JWKS_CACHE_TTL_SECONDS', 3600),
         'jwks_store' => env('SESAME_OAUTH2_JWKS_STORE'),
+        // Off by default: Microsoft Entra v2 tokens are typed JWT, so an
+        // RFC 9068 typ check would refuse them.
+        'require_at_jwt' => env('SESAME_OAUTH2_REQUIRE_AT_JWT', false),
     ],
 
     /*
@@ -202,7 +210,7 @@ return [
         'jwks_uri' => Setting::get('SESAME_OIDC_JWKS_URI'),
         'end_session_endpoint' => Setting::get('SESAME_OIDC_END_SESSION_ENDPOINT'),
         'cache_ttl_seconds' => env('SESAME_OIDC_CACHE_TTL_SECONDS', 3600),
-        'cache_store' => Setting::get('SESAME_OIDC_CACHE_STORE'),
+        'cache_store' => env('SESAME_OIDC_CACHE_STORE'),
         'step_up' => [
             'prompt' => env('SESAME_OIDC_STEP_UP_PROMPT', 'login'),
             'max_age' => env('SESAME_OIDC_STEP_UP_MAX_AGE'),
@@ -271,5 +279,8 @@ return [
     */
 
     'user_resolver' => env('SESAME_USER_RESOLVER'),
+
+    // Log sign-in and sign-out events through the app's PSR-3 logger; false turns it off.
+    'log' => env('SESAME_LOG', true),
 
 ];
