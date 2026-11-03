@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "01eafd035bf2e023f29fca72b9ba5faa",
+    "content-hash": "7ac4a740af66a592de01a49de729f132",
     "packages": [
         {
             "name": "composer/semver",
-            "version": "3.5.2",
+            "version": "3.6.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/composer/semver.git",
-                "reference": "9dfce66f1e97360ea5e6d3e38ab14277e4cc591e"
+                "reference": "d92543b7ede9c4ec6b59853cefb061e39866d2cf"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/composer/semver/zipball/9dfce66f1e97360ea5e6d3e38ab14277e4cc591e",
-                "reference": "9dfce66f1e97360ea5e6d3e38ab14277e4cc591e",
+                "url": "https://api.github.com/repos/composer/semver/zipball/d92543b7ede9c4ec6b59853cefb061e39866d2cf",
+                "reference": "d92543b7ede9c4ec6b59853cefb061e39866d2cf",
                 "shasum": ""
             },
             "require": {
@@ -69,7 +69,7 @@
             "support": {
                 "irc": "ircs://irc.libera.chat:6697/composer",
                 "issues": "https://github.com/composer/semver/issues",
-                "source": "https://github.com/composer/semver/tree/3.5.2"
+                "source": "https://github.com/composer/semver/tree/3.6.0"
             },
             "funding": [
                 {
@@ -81,7 +81,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-22T15:37:26+00:00"
+            "time": "2026-10-29T09:13:34+00:00"
         },
         {
             "name": "monolog/monolog",
@@ -1800,26 +1800,35 @@
         },
         {
             "name": "waynestate/creed",
-            "version": "0.1.0",
+            "version": "0.1.6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/creed.git",
-                "reference": "843923bb29b23704d01ea04934b4c7f8d6c831f7"
+                "reference": "e1f9feefe6f57ea649b0c7ff3cd069cb793308af"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/creed/zipball/843923bb29b23704d01ea04934b4c7f8d6c831f7",
-                "reference": "843923bb29b23704d01ea04934b4c7f8d6c831f7",
+                "url": "https://api.github.com/repos/waynestate/creed/zipball/e1f9feefe6f57ea649b0c7ff3cd069cb793308af",
+                "reference": "e1f9feefe6f57ea649b0c7ff3cd069cb793308af",
                 "shasum": ""
             },
             "require": {
                 "php": "^8.3"
             },
             "require-dev": {
+                "laravel/pint": "^1.32",
+                "league/commonmark": "^2.7",
                 "opis/json-schema": "^2.4",
-                "phpunit/phpunit": "^11.5"
+                "phpstan/phpstan": "^2.1",
+                "phpunit/phpunit": "^11.5",
+                "waynestate/pinstripe": "^0.1"
             },
             "type": "library",
+            "extra": {
+                "proctor": {
+                    "wayneui.copies": "fail"
+                }
+            },
             "autoload": {
                 "psr-4": {
                     "Waynestate\\Creed\\": "src/"
@@ -1835,24 +1844,25 @@
                 }
             ],
             "description": "The Wayne State app stack version policy as data, with a framework-free PHP reader.",
+            "homepage": "https://creed.apps.wayne.edu/",
             "support": {
-                "issues": "https://github.com/waynestate/creed/issues",
-                "source": "https://github.com/waynestate/creed/tree/0.1.0"
+                "issues": "https://nougat.snu.gs/enterprise-apps/creed/-/issues",
+                "source": "https://nougat.snu.gs/enterprise-apps/creed"
             },
-            "time": "2026-10-27T23:55:36+00:00"
+            "time": "2026-11-03T15:13:26+00:00"
         },
         {
             "name": "waynestate/helmet",
-            "version": "0.2.0",
+            "version": "0.3.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/helmet.git",
-                "reference": "0ac46793af9e93551c9f932de8019abcee23260f"
+                "reference": "a8b29f6ec083fcaf0b717494fdea8c99cf02df32"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/helmet/zipball/0ac46793af9e93551c9f932de8019abcee23260f",
-                "reference": "0ac46793af9e93551c9f932de8019abcee23260f",
+                "url": "https://api.github.com/repos/waynestate/helmet/zipball/a8b29f6ec083fcaf0b717494fdea8c99cf02df32",
+                "reference": "a8b29f6ec083fcaf0b717494fdea8c99cf02df32",
                 "shasum": ""
             },
             "require": {
@@ -1874,7 +1884,8 @@
                 "waynestate/pinstripe": "^0.1"
             },
             "suggest": {
-                "laravel/framework": "For the Laravel adapter (step 2)"
+                "laravel/framework": "For the Laravel adapter (step 2)",
+                "waynestate/playbook": "WSU's shared values (CAS, Entra, gateway); private, git.wayne.edu"
             },
             "type": "library",
             "extra": {
@@ -1882,6 +1893,9 @@
                     "providers": [
                         "Waynestate\\Helmet\\Laravel\\HelmetServiceProvider"
                     ]
+                },
+                "proctor": {
+                    "wayneui.copies": "fail"
                 }
             },
             "autoload": {
@@ -1905,23 +1919,23 @@
             "description": "Wayne State's baseline runtime: security headers, session hardening, trusted proxies, a health check and structured logs for web apps.",
             "homepage": "https://helmet.apps.wayne.edu/",
             "support": {
-                "issues": "https://github.com/waynestate/helmet/issues",
-                "source": "https://github.com/waynestate/helmet"
+                "issues": "https://nougat.snu.gs/enterprise-apps/helmet/-/issues",
+                "source": "https://nougat.snu.gs/enterprise-apps/helmet"
             },
-            "time": "2026-10-29T04:28:19+00:00"
+            "time": "2026-11-03T15:53:01+00:00"
         },
         {
             "name": "waynestate/proctor",
-            "version": "0.3.0",
+            "version": "0.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/proctor.git",
-                "reference": "91e7e9828f8448135315afcf5eda4eb3f6646bc1"
+                "reference": "db63379a6873c7a63e0ffed60028676bea090fcc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/proctor/zipball/91e7e9828f8448135315afcf5eda4eb3f6646bc1",
-                "reference": "91e7e9828f8448135315afcf5eda4eb3f6646bc1",
+                "url": "https://api.github.com/repos/waynestate/proctor/zipball/db63379a6873c7a63e0ffed60028676bea090fcc",
+                "reference": "db63379a6873c7a63e0ffed60028676bea090fcc",
                 "shasum": ""
             },
             "require": {
@@ -1942,6 +1956,11 @@
                 "bin/proctor"
             ],
             "type": "library",
+            "extra": {
+                "proctor": {
+                    "wayneui.copies": "fail"
+                }
+            },
             "autoload": {
                 "psr-4": {
                     "Waynestate\\Proctor\\": "src/"
@@ -1959,15 +1978,15 @@
             "description": "A framework-free PHP CLI that measures a PHP app against the version policy.",
             "homepage": "https://proctor.apps.wayne.edu/",
             "support": {
-                "issues": "https://github.com/waynestate/proctor/issues",
-                "source": "https://github.com/waynestate/proctor"
+                "issues": "https://nougat.snu.gs/enterprise-apps/proctor/-/issues",
+                "source": "https://nougat.snu.gs/enterprise-apps/proctor"
             },
-            "time": "2026-11-01T10:15:12+00:00"
+            "time": "2026-11-03T15:15:39+00:00"
         }
     ],
     "packages-dev": [],
     "aliases": [],
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
