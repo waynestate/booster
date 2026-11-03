@@ -748,7 +748,7 @@ the app's 197-test suite, and it is written up in [research/booster-e2e-gate.md]
 
 ## Status
 
-Version 1.7. See [CHANGELOG.md](CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) for what stays
+Version 1.8. See [CHANGELOG.md](CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) for what stays
 open, and [BEST_PRACTICES.md](BEST_PRACTICES.md) for the rules Booster follows.
 
 ## License

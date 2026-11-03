@@ -4,6 +4,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-03
+
 ### Changed
 - Changed: docs and package metadata name nougat as the canonical repository, with git.wayne.edu and GitHub as read-only mirrors, until git.wayne.edu has CI runners.
 - The advisory scans bundle their tools: phpstan/phpstan, squizlabs/php_codesniffer, phpcompatibility/php-compatibility and waynestate/pinstripe moved from require-dev to require, so plan and scan run them from the PHAR or a clone without installing anything into the app. When Booster runs its own vendor/bin/phpcs it points PHP_CodeSniffer at the bundled standard with --runtime-set installed_paths; the skip messages now say to reinstall Booster's dependencies instead of editing the app's composer.json.

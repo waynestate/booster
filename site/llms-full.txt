@@ -734,7 +734,7 @@ the app's 197-test suite, and it is written up in [research/booster-e2e-gate.md]
 
 ### Status
 
-Version 1.7. See [CHANGELOG.md](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/OPEN_QUESTIONS.md) for what stays
+Version 1.8. See [CHANGELOG.md](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/OPEN_QUESTIONS.md) for what stays
 open, and [BEST_PRACTICES.md](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/BEST_PRACTICES.md) for the rules Booster follows.
 
 ### License
@@ -1147,7 +1147,7 @@ WELD is the Wayne State application stack. Booster is its upgrade layer, and it 
 - [ADVISOR](https://advisor.apps.wayne.edu/)An MCP server your agent can ask about the stack.
 - [Drawbridge](https://drawbridge.apps.wayne.edu/)The sign-in gateway, lowered on request.
 
-Version 1.7
+Version 1.8
 
 ### Next
 
