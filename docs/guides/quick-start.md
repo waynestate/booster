@@ -50,7 +50,7 @@ BOOSTER plan for examples/laravel-blade
 3. laravel-11-to-12
    Move a Laravel 11 app to Laravel 12.
    After this step your tests run in Docker.
-   Behaviour changes to check:
+    Behavior changes to check:
    When the app does not define a local disk, its root now defaults to storage/app/private instead of storage/app (config/filesystems.php)
      keep old: define the local disk with 'root' => storage_path('app')
      check: Check where Storage::disk('local') writes after the hop

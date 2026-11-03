@@ -5,7 +5,7 @@ description: How Booster asks Packagist whether your direct dependencies can fol
 
 # The dependency check
 
-This page explains the Packagist check Booster runs before the hops print. Next: [Behaviour changes](behaviour-changes.md).
+This page explains the Packagist check Booster runs before the hops print. Next: [Behavior changes](behaviour-changes.md).
 
 Before the hops print, `plan` (and `run`) asks Packagist about each direct third-party dependency in the app's
 `composer.json`: what is its newest stable release, and can that release still be installed at each hop's

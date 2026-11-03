@@ -69,7 +69,7 @@ Every route, per OS, is on [Install](install.md).
 - [Quick start](guides/quick-start.md)
 - [The scans](guides/scans.md)
 - [The dependency check](guides/dependency-check.md)
-- [Behaviour changes](guides/behaviour-changes.md)
+- [Behavior changes](guides/behaviour-changes.md)
 - [The baseline](guides/baseline.md)
 - [A smoke test for WSU apps](guides/smoke-test.md)
 - [What a hop does](guides/hops.md)

@@ -6,7 +6,7 @@
 
 <p>
   <img src="docs/readme/badges/php.svg" alt="php ^8.3">
-  <img src="docs/readme/badges/license.svg" alt="licence MIT">
+  <img src="docs/readme/badges/license.svg" alt="license MIT">
   <img src="docs/readme/badges/threshold.svg" alt="review threshold: 200 files">
   <a href="https://github.com/waynestate/booster/actions/workflows/ci.yml"><img src="https://github.com/waynestate/booster/actions/workflows/ci.yml/badge.svg" alt="GitHub CI"></a>
 </p>
@@ -204,8 +204,8 @@ BOOSTER plan for examples/laravel-blade
 3. laravel-11-to-12
    Move a Laravel 11 app to Laravel 12.
    After this step your tests run in Docker.
-   Behaviour changes to check:
-   When the app does not define a local disk, its root now defaults to storage/app/private instead of storage/app (config/filesystems.php)
+    Behavior changes to check:
+    When the app does not define a local disk, its root now defaults to storage/app/private instead of storage/app (config/filesystems.php)
      keep old: define the local disk with 'root' => storage_path('app')
      check: Check where Storage::disk('local') writes after the hop
 4. php-82-to-83
@@ -268,7 +268,7 @@ Preview the edits: booster run --path=examples/laravel-blade --dry-run
 | Command | What it does |
 |---|---|
 | `booster detect` | Reads `composer.json` and `package.json`; prints the app type, PHP, Laravel, PHPUnit, Vue, Node and Boost |
-| `booster plan` | Prints the ordered hops, the warnings (including which direct dependencies block which hops), a removals line per PHP hop, a behaviour-changes block per PHP and Laravel hop, an advisory PHPCompatibility scan of the first PHP hop's target and a PHPStan scan at the destination PHP. Changes nothing. |
+| `booster plan` | Prints the ordered hops, the warnings (including which direct dependencies block which hops), a removals line per PHP hop, a behavior-changes block per PHP and Laravel hop, an advisory PHPCompatibility scan of the first PHP hop's target and a PHPStan scan at the destination PHP. Changes nothing. |
 | `booster scan` | Advisory scans of one PHP version: PHPCompatibility by default, `--removals` for removed functions, `--phpstan` for static analysis. Exits 0 even with findings |
 | `booster run` | Runs the plan. `--dry-run` previews every hop |
 | `booster hops` | Lists every hop Booster knows |
@@ -320,7 +320,7 @@ Options for `run`:
 | `--memory-limit` | Memory limit for the Rector process (for example `2G`), or `-1` for no limit (default `2G`) |
 | `--skip-gate` | Do not run the tests in the target image after each hop, or the PROCTOR check at the end (skips the baseline too) |
 | `--image` | Run the gate in this Docker image instead of building `booster-target` (it needs `php` and `composer` on `PATH`): one name, a `{php}` template or a version map (below) |
-| `--allow-failing-baseline` | Continue when the baseline fails; later gate failures are labelled as pre-existing |
+| `--allow-failing-baseline` | Continue when the baseline fails; later gate failures are labeled as pre-existing |
 | `--allow-dirty` | Run even when the working copy has uncommitted changes |
 | `--test-command` | What runs the app's tests in the image (default `composer test`, else `vendor/bin/phpunit`, else the built-in `php -l` syntax check when the app has no tests) |
 | `--test-env` | Environment variable (`KEY=VALUE`) passed to the baseline and every gate container with `-e`; repeat it. The report names the keys only, never the values |
@@ -396,7 +396,7 @@ abandoned (use acme/new instead).`). Packages the check cannot reach are reporte
 The check fetches from `repo.packagist.org` and from any composer-type repository the app declares in
 `composer.json`; VCS repositories are never fetched. `--no-package-check` skips the whole check, for offline use.
 
-### Behaviour changes
+### Behavior changes
 
 Some changes between versions do not raise an error: a function that still exists now means something else, a config
 key that was optional is required, a default that flipped. Rector rewrites what it knows; the silent changes need a
@@ -404,14 +404,14 @@ human eye. So `plan` and `run` carry a curated list of them, one block per PHP a
 on the last step, where the lock lands. A booster should know its own payload.
 
 ```
-Behaviour changes to check:
+Behavior changes to check:
   Config key needed (config/app.php)
     check: Add the key.
   Minimum PHP raised
     check: Check the runtime.
 ```
 
-Each entry says what changed (`label`), what keeps the old behaviour when there is anything (`keep old:`), what to
+Each entry says what changed (`label`), what keeps the old behavior when there is anything (`keep old:`), what to
 verify (`check:`), and where the app touches it: `file:line` hits for code, the file for config and package rows, no
 location for rows that apply everywhere. It is advisory, like the scans: it never changes the exit code, and nothing
 prints when nothing matches. In JSON output the entries land under `behaviour_changes`, per step, with the fields
@@ -447,7 +447,7 @@ later red gate is not proof of a bad hop. The baseline is recorded in the report
 with the exit code and the last 20 lines of output).
 
 - A red baseline stops the run before the first hop, with a non-zero exit. `--allow-failing-baseline` lets it go on;
-  each later gate failure is then labelled "the baseline was already failing" in the text and JSON output.
+  each later gate failure is then labeled "the baseline was already failing" in the text and JSON output.
 - `--skip-gate` and `--dry-run` skip the baseline (reported as `skipped`), so a dry run never starts Docker.
 - A Mix app's `public/mix-manifest.json` is a build artifact, not committed source: a fresh clone has no manifest, so
   the suite can be red before any hop. Build the assets before the baseline (the app's usual `npm ci && npm run
@@ -555,7 +555,7 @@ report, and the entry stays in `composer.json`.
 
 The unblock is temporary by name, and Booster enforces that. When a gated step passes, Booster re-reads
 `config.policy.advisories.ignore` and reports every entry whose reason carries its own prefix (`Booster temporary
-unblock`; older runs wrote `BOOSTER temporary unblock`, which it still recognises). A step that is not the plan's
+unblock`; older runs wrote `BOOSTER temporary unblock`, which it still recognizes). A step that is not the plan's
 last one applies with a warning; the plan's last step fails until the entry is out of `composer.json`, so the
 final target never ships with the unblock still in place. Removing the entry is the app's job once it is off the
 blocked versions.
@@ -666,7 +666,7 @@ They are internal; do not set them.
 
 ## Laravel hops and `vendor/`
 
-rector-laravel needs Laravel's classes to recognise a model or a controller. For a Laravel hop Booster loads the app's
+rector-laravel needs Laravel's classes to recognize a model or a controller. For a Laravel hop Booster loads the app's
 own `vendor/autoload.php` when it exists, so run `composer install` in the app first. PHP hops never load the app's
 autoloader. An app with no `vendor/` still gets a plan and the hops that do not need Laravel's classes.
 
@@ -751,7 +751,7 @@ the app's 197-test suite, and it is written up in [research/booster-e2e-gate.md]
 Version 1.7. See [CHANGELOG.md](CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) for what stays
 open, and [BEST_PRACTICES.md](BEST_PRACTICES.md) for the rules Booster follows.
 
-## Licence
+## License
 
 MIT, Wayne State University, Enterprise Applications.
 
