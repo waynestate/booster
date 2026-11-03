@@ -18,9 +18,9 @@ must land. Rockets need fuel, and this one runs on fresh version data and workin
 
 ## Where it lives
 
-Development happens on Wayne State's GitLab. This GitHub repository is a read-only release mirror: `main` and tags are
-copied here automatically, and changes, issues and merge requests go to GitLab first. Nobody pushes to GitHub
-directly.
+Development happens on nougat (the canonical repository, [enterprise-apps/booster](https://nougat.snu.gs/enterprise-apps/booster)).
+This GitHub repository and git.wayne.edu are read-only mirrors: `main` and tags are copied automatically. Changes,
+issues and merge requests go to nougat. Nobody pushes to the mirrors.
 
 ## Build and test
 
@@ -112,7 +112,7 @@ without touching any remote: `php bin/hop-data-bot.php --dry-run`.
 2. `composer ci` green locally, then both pipelines green for that commit.
 3. Run a secrets scan of the history and check that nothing internal (server names, people, app names, IDs) is in the
    tree.
-4. Tag `X.Y.Z` (no `v`) on GitLab. The mirror carries the tag to GitHub, and Packagist picks it up from there.
+4. Tag `X.Y.Z` (no `v`) on nougat. The mirror carries the tag to GitHub, and Packagist picks it up from there.
 5. A release needs a maintainer's approval. Never move or delete a published tag.
 
 ## The front page
