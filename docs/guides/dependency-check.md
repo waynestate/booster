@@ -28,7 +28,7 @@ floor instead (`needs PHP 8.2 or newer`).
 A package whose newest release requires several `illuminate/*` components is judged by the loosest of those
 constraints, the one that allows the most Laravel versions. Abandoned packages get their own warning (`acme/old is
 abandoned (use acme/new instead).`). Packages the check cannot reach are reported as `Not checked: <package>
-(offline).` or `(VCS repository).`, and the plan goes on. In JSON output every package lands under
+(not on Packagist or unreachable).` or `(VCS repository).`, and the plan goes on. In JSON output every package lands under
 `package_checks`, with the fields `package`, `newest`, `blocks`, `abandoned` and `checked`.
 
 The check fetches from `repo.packagist.org` and from any composer-type repository the app declares in
