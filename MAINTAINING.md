@@ -108,7 +108,9 @@ without touching any remote: `php bin/hop-data-bot.php --dry-run`.
 ## Releasing
 
 1. Move the lines under `## [Unreleased]` in `CHANGELOG.md` (Keep a Changelog) to a new `## [X.Y.Z] - YYYY-MM-DD`
-   heading.
+   heading, and set `BoosterApplication::VERSION`, the `Version X.Y.` line in README.md and the `masthead__ver` and
+   `Version X.Y` strings in site/index.html to the new number (`tests/VersionTest.php` fails until they agree); the
+   tag build also refuses a phar whose `--version` differs from the tag.
 2. `composer ci` green locally, then both pipelines green for that commit.
 3. Run a secrets scan of the history and check that nothing internal (server names, people, app names, IDs) is in the
    tree.

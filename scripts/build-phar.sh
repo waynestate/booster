@@ -85,9 +85,29 @@ cp "$TMP/build/booster.phar" "$ROOT/build/booster.phar"
 
 echo '==> Verifying the phar runs...'
 if [ "$NO_DOCKER" = '1' ]; then
-    php build/booster.phar --version
+    PHAR_VERSION="$(php build/booster.phar --version)"
 else
-    docker run --rm -v "$ROOT:/app" -w /app "$PHP_IMAGE" php build/booster.phar --version
+    PHAR_VERSION="$(docker run --rm -v "$ROOT:/app" -w /app "$PHP_IMAGE" php build/booster.phar --version)"
+fi
+echo "$PHAR_VERSION"
+
+# When the build runs from a tag (GitLab's CI_COMMIT_TAG, or GitHub's tag ref),
+# the phar must report that version: an unbumped constant would publish a phar
+# that lies about its own release.
+TAG="${CI_COMMIT_TAG:-}"
+if [ -z "$TAG" ] && [ "${GITHUB_REF_TYPE:-}" = 'tag' ]; then
+    TAG="${GITHUB_REF_NAME:-}"
+fi
+if [ -n "$TAG" ]; then
+    case "$PHAR_VERSION" in
+        *"${TAG#v}"*)
+            echo "==> The phar reports the tag's version ($TAG)."
+            ;;
+        *)
+            echo "The phar reports $PHAR_VERSION but the tag is $TAG: bump BoosterApplication::VERSION before tagging." >&2
+            exit 1
+            ;;
+    esac
 fi
 
 echo '==> Printing the checksum...'
