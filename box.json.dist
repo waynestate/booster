@@ -9,8 +9,10 @@
         "data/removals.json",
         "data/versions.json",
         "docker/Dockerfile",
-        "vendor/waynestate/creed/policy/policy.json",
         "resources/policy.schema.json",
-        "resources/sesame/config/sesame.php"
+        "resources/sesame/config/sesame.php",
+        "vendor/bin/phpcs",
+        "vendor/bin/phpstan",
+        "vendor/waynestate/creed/policy/policy.json"
     ]
 }
