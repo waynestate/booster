@@ -118,7 +118,7 @@ final class SkillRenderer
             ],
             HopKind::Laravel => [
                 sprintf("Use `search-docs` for the Laravel %s upgrade guide and list every breaking change that touches this app's `list-routes` and `get-config` output.", $hop->to),
-                sprintf('Use `database-schema` to check the tables against the Laravel %s database floor before you apply the hop.', $hop->to),
+                sprintf("Use `database-schema` to look at the tables, and check the database server's version against the minimum Laravel %s needs, before you apply the hop.", $hop->to),
                 'Use `list-artisan-commands` and `list-routes` before the hop, then compare the output after it.',
                 'Run `last-error` and `read-log-entries` after the tests.',
             ],

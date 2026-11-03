@@ -549,7 +549,7 @@ final class HopRegistry
                 composerSet: ['laravel/framework' => '^' . $to . '.0'],
                 composerRemove: $this->laravelComposerRemove($to),
                 notes: [
-                    'Check the shared database server against the Laravel ' . $to . ' database floor before you apply this hop.',
+                    'If your database server is old, check its version against the minimum MySQL (or other database) version Laravel ' . $to . ' needs before you apply this hop.',
                     'Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.',
                     ...$this->inertiaChanges($to)['notes'],
                     ...($to === '9' ? ['Check app/Http/Middleware/TrustProxies.php after the hop: the stock file is rewritten to the framework middleware, and a customized one is left alone.'] : []),

@@ -281,7 +281,7 @@ final class CliTest extends TestCase
         self::assertStringContainsString('phpunit-to-9-manual', $out);
         self::assertStringContainsString('Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice', $out);
         self::assertStringContainsString('for you to read, not errors.', $out);
-        self::assertStringContainsString('Booster does every step above marked automatic when you run it. Steps shown as [playbook] are yours to do by hand.', $out);
+        self::assertStringContainsString('Booster does every numbered step above when you run it. Steps marked [manual: you do this one by hand] are yours to do by hand.', $out);
         self::assertStringContainsString('Preview the edits: php bin/booster run --path=' . $dir . ' --dry-run', $out);
         self::assertStringContainsString('(The real run needs Docker, and your app committed in git: php bin/booster run --path=' . $dir . ')', $out);
     }
@@ -631,6 +631,25 @@ final class CliTest extends TestCase
         self::assertStringContainsString('not defined', $out);
     }
 
+    public function test_help_without_a_command_prints_the_overview(): void
+    {
+        foreach (['--help', '-h'] as $flag) {
+            [$exit, $out] = $this->booster([$flag => true]);
+
+            self::assertSame(0, $exit, $flag);
+            self::assertStringStartsWith('Booster moves an app to a supported PHP or Laravel version, one step at a time. Nothing is committed for you.', $out, $flag);
+            self::assertStringContainsString('plan', $out, $flag);
+        }
+    }
+
+    public function test_plan_help_still_shows_its_own_options(): void
+    {
+        [$exit, $out] = $this->booster(['command' => 'plan', '--help' => true]);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('--path', $out);
+    }
+
     public function test_hops_lists_every_hop_and_marks_playbooks(): void
     {
         [$exit, $out] = $this->booster(['command' => 'hops']);
@@ -709,6 +728,17 @@ final class CliTest extends TestCase
         [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $dir, '--format' => 'json']);
         self::assertSame(0, $exit);
         self::assertTrue(json_decode($out, true)['boost']);
+    }
+
+    public function test_detect_explains_the_yes_no_keys_before_the_next_step(): void
+    {
+        $app = $this->example('laravel-inertia-vue');
+
+        [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $app]);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.', $out);
+        self::assertLessThan(strpos($out, 'Next: '), strpos($out, 'Keys: '), 'the Keys line comes before the Next line');
     }
 
     public function test_detect_expands_a_leading_tilde_in_path(): void

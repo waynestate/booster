@@ -49,12 +49,13 @@ final class DetectCommand extends BaseCommand
         return self::EXIT_PASS;
     }
 
-    /** The closing note: what detect read, and the command that goes next. */
+    /** The closing note: what detect read, what the yes/no keys mean, and the command that goes next. */
     private function footer(InputInterface $input): string
     {
         return implode("\n", [
             'Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version',
             'composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan).',
+            'Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.',
             sprintf('Next: %s plan --path=%s', Invocation::program(), Invocation::pathArg($this->pathAsTyped($input))),
         ]);
     }

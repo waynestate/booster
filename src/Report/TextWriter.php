@@ -129,7 +129,7 @@ final class TextWriter
         return implode("\n", [
             'Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice',
             'for you to read, not errors.',
-            'Booster does every step above marked automatic when you run it.' . ($manual ? ' Steps shown as [playbook] are yours to do by hand.' : ''),
+            'Booster does every numbered step above when you run it.' . ($manual ? ' Steps marked [manual: you do this one by hand] are yours to do by hand.' : ''),
             sprintf('Preview the edits: %s run --path=%s --dry-run', $program, $pathArg),
             sprintf('(The real run needs Docker, and your app committed in git: %s run --path=%s)', $program, $pathArg),
         ]);
@@ -570,7 +570,7 @@ final class TextWriter
                 sprintf('Baseline: composer install failed (exit %d) on PHP %s.', $baseline->exitCode ?? -1, $php),
                 "The gate never ran, so its state is unknown; fix the app's composer.json and composer.lock, or pass --allow-failing-baseline.",
             ],
-            BaselineResult::SKIPPED => ['Baseline: SKIPPED (no gate in this run).'],
+            BaselineResult::SKIPPED => ['Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).'],
             default => [sprintf('Baseline: %s.', $baseline->status)],
         };
         // The syntax check is a built-in fallback, so say once what it does

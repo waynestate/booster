@@ -52,7 +52,7 @@ final class SkillRendererTest extends TestCase
         $text = $this->files()['booster-laravel-10-to-11/SKILL.md'];
 
         self::assertStringContainsString("Use `search-docs` for the Laravel 11 upgrade guide and list every breaking change that touches this app's `list-routes` and `get-config` output.", $text);
-        self::assertStringContainsString('Use `database-schema` to check the tables against the Laravel 11 database floor before you apply the hop.', $text);
+        self::assertStringContainsString("Use `database-schema` to look at the tables, and check the database server's version against the minimum Laravel 11 needs, before you apply the hop.", $text);
         self::assertStringContainsString('Use `list-artisan-commands` and `list-routes` before the hop, then compare the output after it.', $text);
         self::assertStringContainsString('Run `last-error` and `read-log-entries` after the tests.', $text);
     }
