@@ -1,0 +1,80 @@
+{
+  "title": "Booster",
+  "tagline": "Moves a Wayne State PHP app to current PHP and Laravel, one checked step at a time.",
+  "items": [
+    {
+      "title": "Overview",
+      "path": "index"
+    },
+    {
+      "title": "Install",
+      "path": "install"
+    },
+    {
+      "title": "Guides",
+      "items": [
+        {
+          "title": "Quick start",
+          "path": "guides/quick-start"
+        },
+        {
+          "title": "The scans",
+          "path": "guides/scans"
+        },
+        {
+          "title": "The dependency check",
+          "path": "guides/dependency-check"
+        },
+        {
+          "title": "Behaviour changes",
+          "path": "guides/behaviour-changes"
+        },
+        {
+          "title": "The baseline",
+          "path": "guides/baseline"
+        },
+        {
+          "title": "A smoke test for WSU apps",
+          "path": "guides/smoke-test"
+        },
+        {
+          "title": "What a hop does",
+          "path": "guides/hops"
+        },
+        {
+          "title": "Laravel hops and vendor/",
+          "path": "guides/laravel-and-vendor"
+        },
+        {
+          "title": "Deploying on Citadel",
+          "path": "guides/citadel"
+        }
+      ]
+    },
+    {
+      "title": "Reference",
+      "items": [
+        {
+          "title": "Commands",
+          "path": "reference/commands"
+        },
+        {
+          "title": "Configuration",
+          "path": "reference/configuration"
+        },
+        {
+          "title": "Hops",
+          "path": "reference/hops"
+        }
+      ]
+    },
+    {
+      "title": "Checks",
+      "path": "checks"
+    },
+    {
+      "title": "Next",
+      "path": "next"
+    }
+  ]
+}
