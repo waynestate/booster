@@ -1,0 +1,403 @@
+/* docs.css: the shared docs-site layout, owned by Squire (kit/docs/).
+ *
+ * Layout only. Every color and type choice comes from a WayneUI token, held behind a --dk-* alias so a
+ * repo can retheme without touching this file. The builder stamps one page per doc; this file makes those
+ * pages read like a book instead of a form. No gradients, no glow, one hairline where a line is enough.
+ */
+
+:root {
+  --dk-bg: var(--wsu-surface, #ffffff);
+  --dk-ink: var(--wsu-text, #18181b);
+  --dk-muted: var(--wsu-text-muted, #3f3f46);
+  --dk-rule: var(--wsu-border, #d4d4d8);
+  --dk-accent: var(--wsu-brand, #0c5449);
+  --dk-on-accent: var(--wsu-on-brand, #ffffff);
+  --dk-code-bg: var(--wsu-surface-sunken, #fafafa);
+  --dk-display: var(--wsu-font-family-display, Georgia, "Times New Roman", serif);
+  --dk-mono: var(--wsu-font-family-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  --dk-radius: var(--wsu-radius-box, 0.75rem);
+  --dk-focus: var(--wsu-focus-ring, #0c5449);
+  --dk-focus-w: var(--wsu-size-focus-ring-width, 0.1875rem);
+  --dk-focus-o: var(--wsu-size-focus-ring-offset, 0.125rem);
+  --dk-sidebar: 16rem;
+  --dk-prose-max: 46rem;
+  --dk-gap: var(--wsu-space-6, 1.5rem);
+}
+
+.docs-header,
+.docs-layout,
+.docs-footer {
+  max-width: 100rem;
+  margin-inline: auto;
+}
+
+.docs-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--dk-gap);
+  padding: var(--dk-gap);
+  border-bottom: 1px solid var(--dk-rule);
+}
+
+.docs-header__brand {
+  font-family: var(--dk-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--dk-ink);
+  text-decoration: none;
+}
+
+.docs-header__home {
+  color: var(--dk-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.docs-layout {
+  padding: var(--dk-gap);
+}
+
+.docs-menu {
+  margin-bottom: var(--dk-gap);
+}
+
+.docs-menu summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--dk-ink);
+  padding: 0.5rem 0;
+}
+
+.docs-nav--sidebar {
+  display: none;
+}
+
+.docs-nav__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.docs-nav__list .docs-nav__list {
+  margin-left: 1rem;
+}
+
+.docs-nav__label {
+  display: block;
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dk-muted);
+}
+
+.docs-nav a {
+  display: block;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--dk-radius);
+  color: var(--dk-ink);
+  text-decoration: none;
+}
+
+.docs-nav a:hover {
+  background: var(--dk-code-bg);
+  color: var(--dk-accent);
+}
+
+.docs-nav a[aria-current="page"] {
+  background: var(--dk-accent);
+  color: var(--dk-on-accent);
+}
+
+.docs-content {
+  min-width: 0;
+}
+
+.docs-article {
+  max-width: var(--dk-prose-max);
+  font-family: var(--dk-display);
+  line-height: 1.7;
+  color: var(--dk-ink);
+}
+
+.docs-article h1,
+.docs-article h2,
+.docs-article h3 {
+  line-height: 1.25;
+  scroll-margin-top: var(--dk-gap);
+}
+
+.docs-article h1 {
+  font-size: 2rem;
+  margin: 0 0 1rem;
+}
+
+.docs-article h2 {
+  font-size: 1.5rem;
+  margin: 2rem 0 0.75rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--dk-rule);
+}
+
+.docs-article h3 {
+  font-size: 1.2rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.docs-article p {
+  margin: 0 0 1rem;
+}
+
+.docs-article a {
+  color: var(--dk-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.docs-heading-link {
+  margin-left: 0.4em;
+  opacity: 0;
+  color: var(--dk-accent);
+  text-decoration: none;
+}
+
+.docs-article h1:hover .docs-heading-link,
+.docs-article h2:hover .docs-heading-link,
+.docs-article h3:hover .docs-heading-link,
+.docs-heading-link:focus-visible {
+  opacity: 1;
+}
+
+.docs-article code {
+  font-family: var(--dk-mono);
+  font-size: 0.9em;
+  background: var(--dk-code-bg);
+  border-radius: calc(var(--dk-radius) / 2);
+  padding: 0.1em 0.35em;
+}
+
+.docs-copy {
+  position: relative;
+}
+
+.docs-copy__button {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-family: var(--dk-mono);
+  font-size: 0.75rem;
+  color: var(--dk-ink);
+  background: var(--dk-bg);
+  border: 1px solid var(--dk-rule);
+  border-radius: calc(var(--dk-radius) / 2);
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+
+.docs-copy__button:hover {
+  color: var(--dk-accent);
+  border-color: var(--dk-accent);
+}
+
+.docs-copy__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.docs-article pre {
+  background: var(--dk-code-bg);
+  border: 1px solid var(--dk-rule);
+  border-radius: var(--dk-radius);
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.docs-article pre code {
+  background: none;
+  padding: 0;
+}
+
+.docs-table {
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.docs-article table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.docs-article th,
+.docs-article td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--dk-rule);
+}
+
+.docs-toc {
+  margin-top: var(--dk-gap);
+  max-width: var(--dk-prose-max);
+}
+
+.docs-toc__title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dk-muted);
+  margin: 0 0 0.5rem;
+}
+
+.docs-toc__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid var(--dk-rule);
+}
+
+.docs-toc__item a {
+  display: block;
+  padding: 0.25rem 0.75rem;
+  color: var(--dk-muted);
+  text-decoration: none;
+}
+
+.docs-toc__item a:hover {
+  color: var(--dk-accent);
+}
+
+.docs-toc__item--sub a {
+  padding-left: 1.5rem;
+}
+
+.docs-pager {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--dk-gap);
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--dk-rule);
+}
+
+.docs-pager__link {
+  display: block;
+  max-width: 50%;
+  color: var(--dk-ink);
+  text-decoration: none;
+}
+
+.docs-pager__link--next {
+  text-align: right;
+}
+
+.docs-pager__dir {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--dk-muted);
+}
+
+.docs-pager__title {
+  color: var(--dk-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.docs-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--dk-gap);
+  padding: var(--dk-gap);
+  border-top: 1px solid var(--dk-rule);
+  color: var(--dk-muted);
+  font-size: 0.9rem;
+}
+
+.docs-footer a {
+  color: var(--dk-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+:where(a, button, summary, [tabindex]):focus-visible {
+  outline: var(--dk-focus-w) solid var(--dk-focus);
+  outline-offset: var(--dk-focus-o);
+}
+
+@media (min-width: 760px) {
+  .docs-menu {
+    display: none;
+  }
+
+  .docs-nav--sidebar {
+    display: block;
+  }
+
+  .docs-layout {
+    display: grid;
+    grid-template-columns: var(--dk-sidebar) minmax(0, 1fr);
+    gap: var(--dk-gap);
+    align-items: start;
+  }
+
+  .docs-nav--sidebar {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .docs-content {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .docs-toc {
+    grid-column: 2;
+    grid-row: 2;
+    margin-top: 0;
+  }
+}
+
+@media (min-width: 1200px) {
+  .docs-layout--toc {
+    grid-template-columns: var(--dk-sidebar) minmax(0, 1fr) 16rem;
+  }
+
+  .docs-layout--toc .docs-toc {
+    grid-column: 3;
+    grid-row: 1;
+    position: sticky;
+    top: var(--dk-gap);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media print {
+  .docs-menu,
+  .docs-nav,
+  .docs-toc,
+  .docs-pager,
+  .docs-header__home,
+  .docs-heading-link {
+    display: none !important;
+  }
+
+  .docs-layout {
+    display: block;
+  }
+}
