@@ -27,7 +27,7 @@ Boost is read-only help. Booster's gate stays the authority: never skip a gate b
 What Rector cannot do (check these by hand):
 
 - Largest risk hop: loose comparison of numbers and strings changed, many warnings became thrown errors, and arithmetic on arrays throws.
-- Write or extend tests before applying this hop; only tests and review find behaviour changes here.
+- Write or extend tests before applying this hop; only tests and review find behavior changes here.
 
 Official notes:
 
