@@ -557,6 +557,49 @@ final class CliTest extends TestCase
         self::assertTrue(json_decode($out, true)['boost']);
     }
 
+    public function test_detect_expands_a_leading_tilde_in_path(): void
+    {
+        $home = $this->tempDir();
+        mkdir($home . '/app', 0775, true);
+        file_put_contents($home . '/app/composer.json', json_encode(['require' => ['php' => '^8.3']]));
+
+        $previousHome = getenv('HOME');
+        putenv('HOME=' . $home);
+        try {
+            [$exit, $out] = $this->booster(['command' => 'detect', '--path' => '~/app']);
+
+            self::assertSame(0, $exit);
+            self::assertMatchesRegularExpression('/^app_type\s+raw-php$/m', $out);
+        } finally {
+            if ($previousHome === false) {
+                putenv('HOME');
+            } else {
+                putenv('HOME=' . $previousHome);
+            }
+        }
+    }
+
+    public function test_detect_reports_a_missing_tilde_path_as_not_a_directory(): void
+    {
+        $home = $this->tempDir();
+
+        $previousHome = getenv('HOME');
+        putenv('HOME=' . $home);
+        try {
+            [$exit, $out] = $this->booster(['command' => 'detect', '--path' => '~/nope']);
+
+            self::assertSame(2, $exit);
+            self::assertStringContainsString('is not a directory', $out);
+            self::assertStringContainsString($home . '/nope', $out);
+        } finally {
+            if ($previousHome === false) {
+                putenv('HOME');
+            } else {
+                putenv('HOME=' . $previousHome);
+            }
+        }
+    }
+
     public function test_plan_reports_laravel_boost_only_when_it_is_there(): void
     {
         $dir = $this->tempDir();

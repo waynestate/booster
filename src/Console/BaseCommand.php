@@ -146,8 +146,34 @@ abstract class BaseCommand extends Command
     protected function stringOption(InputInterface $input, string $name): ?string
     {
         $value = $input->getOption($name);
+        if (!is_string($value) || $value === '') {
+            return null;
+        }
 
-        return is_string($value) && $value !== '' ? $value : null;
+        return $name === 'path' ? $this->expandLeadingTilde($value) : $value;
+    }
+
+    /**
+     * A leading `~` in --path means the home folder: the shell does not expand a
+     * tilde after `=` or inside quotes, so Booster does it here. Only a bare `~`
+     * or `~/...` (and `~\...`) is rewritten, from HOME or USERPROFILE; `~user/...`
+     * stays as typed, and a missing home directory leaves the value alone.
+     */
+    private function expandLeadingTilde(string $value): string
+    {
+        if ($value !== '~' && !str_starts_with($value, '~/') && !str_starts_with($value, '~\\')) {
+            return $value;
+        }
+
+        $home = getenv('HOME');
+        if (!is_string($home) || $home === '') {
+            $home = getenv('USERPROFILE');
+        }
+        if (!is_string($home) || $home === '') {
+            return $value;
+        }
+
+        return $value === '~' ? $home : $home . substr($value, 1);
     }
 
     protected function errorOutput(OutputInterface $output): OutputInterface
