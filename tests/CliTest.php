@@ -1475,6 +1475,7 @@ final class CliTest extends TestCase
         [$exit, $out] = $this->booster(['command' => 'init', '--path' => $dir]);
 
         self::assertSame(0, $exit);
+        self::assertMatchesRegularExpression('/Wrote \d+ playbooks \(one for each step Booster knows, plus a general one\), \d+ changed\./', $out);
         self::assertStringContainsString('Wrote files into ' . $dir . '/.agents/skills. They are instructions for AI coding tools and are not needed to run Booster yourself.', $out);
         self::assertStringContainsString('Next: commit them (git add ' . $dir . '/.agents/skills && git commit), so a real run starts from a clean folder.', $out);
 
