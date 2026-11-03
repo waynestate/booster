@@ -913,6 +913,47 @@ final class HopExecutorTest extends TestCase
         self::assertStringContainsString('composer test >"$tests_log" 2>&1', $run[count($run) - 1]);
     }
 
+    public function test_an_app_with_no_tests_gets_the_syntax_check_gate(): void
+    {
+        // The raw-php example has no scripts.test, no phpunit config file and
+        // no phpunit or pest dependency, so the gate is the built-in check.
+        $fake = $this->fake();
+        $this->execute($fake, new RunOptions());
+
+        $run = $this->dockerRuns($fake)[0]['command'];
+        self::assertStringContainsString(HopExecutor::SYNTAX_CHECK_COMMAND . ' >"$tests_log" 2>&1', $run[count($run) - 1]);
+    }
+
+    public function test_a_phpunit_config_file_selects_vendor_bin_phpunit(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        file_put_contents($dir . '/phpunit.xml.dist', '<?xml version="1.0"?><phpunit/>');
+
+        $fake = $this->fake();
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.2', toPhp: '8.3'), $this->today());
+        (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions());
+
+        $run = $this->dockerRuns($fake)[0]['command'];
+        self::assertStringContainsString('vendor/bin/phpunit >"$tests_log" 2>&1', $run[count($run) - 1]);
+    }
+
+    public function test_a_pest_dependency_selects_vendor_bin_phpunit(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        $composer['require-dev']['pestphp/pest'] = '^3.0';
+        file_put_contents($dir . '/composer.json', json_encode($composer));
+
+        $fake = $this->fake();
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.2', toPhp: '8.3'), $this->today());
+        (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions());
+
+        $run = $this->dockerRuns($fake)[0]['command'];
+        self::assertStringContainsString('vendor/bin/phpunit >"$tests_log" 2>&1', $run[count($run) - 1]);
+    }
+
     public function test_rector_json_paths_become_relative_to_the_app(): void
     {
         $fake = new FakeProcessRunner(static function (array $command, array $env): ProcessResult {

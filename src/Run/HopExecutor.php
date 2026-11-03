@@ -34,6 +34,13 @@ use Waynestate\Booster\ToolError;
  */
 final class HopExecutor
 {
+    /**
+     * The gate for an app with no tests of its own: every PHP file outside
+     * vendor/ and node_modules/ must still parse on the target PHP. It proves
+     * the code loads, not that it works.
+     */
+    public const SYNTAX_CHECK_COMMAND = "find . -name '*.php' -not -path './vendor/*' -not -path './node_modules/*' -print0 | xargs -0 -r -n1 php -l > /dev/null";
+
     public function __construct(
         private readonly RectorRunner $rector,
         private readonly ComposerEditor $composer,
@@ -2122,12 +2129,39 @@ final class HopExecutor
         return $data;
     }
 
+    /**
+     * What runs in the gate when the user passed no --test-command. The app's
+     * own suite wins: a composer "test" script, then PHPUnit or Pest when the
+     * app declares one (a config file or a require line). An app with neither
+     * gets the built-in syntax check instead of a missing vendor/bin/phpunit.
+     */
     private function defaultTestCommand(string $path): string
     {
         $composer = is_file($path . '/composer.json') ? json_decode((string) file_get_contents($path . '/composer.json'), true) : null;
         $scripts = is_array($composer) && is_array($composer['scripts'] ?? null) ? $composer['scripts'] : [];
+        if (array_key_exists('test', $scripts)) {
+            return 'composer test';
+        }
+        foreach (['phpunit.xml', 'phpunit.xml.dist', 'phpunit.dist.xml'] as $config) {
+            if (is_file($path . '/' . $config)) {
+                return 'vendor/bin/phpunit';
+            }
+        }
+        $packages = [];
+        if (is_array($composer)) {
+            foreach (['require-dev', 'require'] as $section) {
+                if (is_array($composer[$section] ?? null)) {
+                    $packages = [...$packages, ...array_keys($composer[$section])];
+                }
+            }
+        }
+        foreach (['phpunit/phpunit', 'pestphp/pest'] as $package) {
+            if (in_array($package, $packages, true)) {
+                return 'vendor/bin/phpunit';
+            }
+        }
 
-        return array_key_exists('test', $scripts) ? 'composer test' : 'vendor/bin/phpunit';
+        return self::SYNTAX_CHECK_COMMAND;
     }
 
     /**
