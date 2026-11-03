@@ -6,6 +6,8 @@ namespace Waynestate\Booster\Report;
 
 use Waynestate\Booster\Console\Invocation;
 use Waynestate\Booster\Plan\Plan;
+use Waynestate\Booster\Plan\PlanStep;
+use Waynestate\Booster\Plan\Planner;
 use Waynestate\Booster\Run\BaselineResult;
 use Waynestate\Booster\Run\ProctorResult;
 use Waynestate\Booster\Run\RunReport;
@@ -53,8 +55,11 @@ final class TextWriter
         $lines[] = '';
 
         foreach ($plan->steps as $step) {
-            $lines[] = sprintf('%d. %s  [%s]', $step->number, $step->hop->id, implode(', ', $step->gates));
+            $lines[] = $this->stepLine($step);
             $lines[] = '   ' . $step->hop->summary;
+            if (in_array(Planner::GATE_TESTS, $step->gates, true)) {
+                $lines[] = '   After this step your tests run in Docker.';
+            }
             if ($step->hop->extraReview) {
                 $lines[] = '   Give this hop the most review time.';
             }
@@ -83,6 +88,26 @@ final class TextWriter
     }
 
     /**
+     * The heading line of one plan step: the number and the id, plus a bracket
+     * only when it says something. The two built-in gates say their thing in
+     * plain words (the Docker note after the summary, the manual marker in the
+     * bracket), so they never appear as ids; any other gate keeps its id in
+     * the bracket.
+     */
+    private function stepLine(PlanStep $step): string
+    {
+        $gates = array_values(array_diff($step->gates, [Planner::GATE_TESTS, Planner::GATE_MANUAL]));
+        if ($step->hop->isManual()) {
+            $gates = ['manual: you do this one by hand', ...$gates];
+        }
+        if ($gates === []) {
+            return sprintf('%d. %s', $step->number, $step->hop->id);
+        }
+
+        return sprintf('%d. %s  [%s]', $step->number, $step->hop->id, implode(', ', $gates));
+    }
+
+    /**
      * The closing note after a plan: nothing was changed, what the list means,
      * and the two commands that go next.
      */
@@ -102,7 +127,7 @@ final class TextWriter
         $pathArg = Invocation::pathArg($path);
 
         return implode("\n", [
-            'Nothing was changed. The numbered list above is the order Booster would do things; "Will break" and "PHPStan" are advice',
+            'Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice',
             'for you to read, not errors.',
             'Booster does every step above marked automatic when you run it.' . ($manual ? ' Steps shown as [playbook] are yours to do by hand.' : ''),
             sprintf('Preview the edits: %s run --path=%s --dry-run', $program, $pathArg),
@@ -126,14 +151,18 @@ final class TextWriter
         }
 
         if ($scan->findings === []) {
-            return sprintf('Will break on PHP %s: no findings.', $scan->testVersion);
+            return sprintf('PHPCompatibility check for PHP %s: no findings.', $scan->testVersion);
         }
 
+        $errors = $scan->errorCount();
+        $warnings = $scan->warningCount();
         $lines = [sprintf(
-            'Will break on PHP %s: %d errors, %d warnings.',
+            'PHPCompatibility check for PHP %s: %d %s, %d %s.',
             $scan->testVersion,
-            $scan->errorCount(),
-            $scan->warningCount(),
+            $errors,
+            $errors === 1 ? 'error' : 'errors',
+            $warnings,
+            $warnings === 1 ? 'warning' : 'warnings',
         )];
         foreach (array_slice($scan->findings, 0, self::MAX_FINDINGS) as $finding) {
             $lines[] = sprintf('   %s:%d [%s] %s', self::clean($finding->file), $finding->line, $finding->severity, self::clean($finding->message));

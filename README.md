@@ -195,33 +195,42 @@ BOOSTER plan for examples/laravel-blade
   PHPUnit: 10 -> 13
   policy: waynestate/creed 0.1.4 (today 2026-10-29)
 
-1. phpunit-10-to-11  [target-image-tests]
+1. phpunit-10-to-11
    Move PHPUnit 10 tests to PHPUnit 11.
-2. laravel-10-to-11  [target-image-tests]
+   After this step your tests run in Docker.
+2. laravel-10-to-11
    Move a Laravel 10 app to Laravel 11.
-3. laravel-11-to-12  [target-image-tests]
+   After this step your tests run in Docker.
+3. laravel-11-to-12
    Move a Laravel 11 app to Laravel 12.
+   After this step your tests run in Docker.
    Behaviour changes to check:
    When the app does not define a local disk, its root now defaults to storage/app/private instead of storage/app (config/filesystems.php)
      keep old: define the local disk with 'root' => storage_path('app')
      check: Check where Storage::disk('local') writes after the hop
-4. php-82-to-83  [target-image-tests]
+4. php-82-to-83
    Move PHP 8.2 code to PHP 8.3.
+   After this step your tests run in Docker.
    Removed between PHP 8.2 and PHP 8.3: none found.
-5. phpunit-11-to-12  [target-image-tests]
+5. phpunit-11-to-12
    Move PHPUnit 11 tests to PHPUnit 12.
-6. laravel-12-to-13  [target-image-tests]
+   After this step your tests run in Docker.
+6. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
-7. php-83-to-84  [target-image-tests]
+   After this step your tests run in Docker.
+7. php-83-to-84
    Move PHP 8.3 code to PHP 8.4.
+   After this step your tests run in Docker.
    Removed between PHP 8.3 and PHP 8.4: none found.
-8. phpunit-12-to-13  [target-image-tests]
+8. phpunit-12-to-13
    Move PHPUnit 12 tests to PHPUnit 13.
-9. php-84-to-85  [target-image-tests]
+   After this step your tests run in Docker.
+9. php-84-to-85
    Move PHP 8.4 code to PHP 8.5.
+   After this step your tests run in Docker.
    Removed between PHP 8.4 and PHP 8.5: none found.
 
-Will break on PHP 8.3: no findings.
+PHPCompatibility check for PHP 8.3: no findings.
 
 PHPStan on PHP 8.5: 5 findings (code quality hints, not upgrade blockers).
    app/Models/Post.php:7 [class.notFound] Class App\Models\Post extends unknown class Illuminate\Database\Eloquent\Model.
@@ -232,7 +241,7 @@ https://github.com/sebastianbergmann/phpunit/issues/6052
    tests/PostTest.php:33 [method.alreadyNarrowedType] Call to method PHPUnit\Framework\Assert::assertNotNull() with PHPUnit\Framework\MockObject\Rule\AnyInvokedCount will always evaluate to true.
    Hint: Laravel app without Larastan: Eloquent and facade calls show as errors. composer require --dev larastan/larastan for a cleaner scan.
 
-Nothing was changed. The numbered list above is the order Booster would do things; "Will break" and "PHPStan" are advice
+Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every step above marked automatic when you run it.
 Preview the edits: booster run --path=examples/laravel-blade --dry-run
@@ -381,7 +390,7 @@ constraint's floor, the warning names the floor instead (`needs PHP 8.2 or newer
 A package whose newest release requires several `illuminate/*` components is judged by the loosest of those
 constraints, the one that allows the most Laravel versions. Abandoned packages get their own warning (`acme/old is
 abandoned (use acme/new instead).`). Packages the check cannot reach are reported as `Not checked: <package>
-(offline).` or `(VCS repository).`, and the plan goes on. In JSON output every package lands under
+(not on Packagist or unreachable).` or `(VCS repository).`, and the plan goes on. In JSON output every package lands under
 `package_checks`, with the fields `package`, `newest`, `blocks`, `abandoned` and `checked`.
 
 The check fetches from `repo.packagist.org` and from any composer-type repository the app declares in
