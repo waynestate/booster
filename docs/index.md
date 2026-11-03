@@ -46,20 +46,43 @@ Blade and Vue islands, and Laravel with Inertia and Vue.
 
 Two one-liners get Booster onto your machine:
 
+<!-- docs-test: skip needs network -->
 ```
 curl -L -o ~/bin/booster.phar https://github.com/waynestate/booster/releases/latest/download/booster.phar
 ```
 
 or, from Packagist:
 
+<!-- docs-test: skip installs software -->
 ```
 composer create-project waynestate/booster booster ^1.0
 ```
 
 Then the first command, run from inside the app you want to upgrade:
 
-```
+```bash run
 booster detect
+```
+
+```output
+path           .
+app_type       laravel-blade
+composer_json  yes
+php            8.2
+laravel        10
+phpunit        10
+vue            unknown
+node           unknown
+mix_file       no
+wayne_cas      no
+wayneui_1      no
+boost          no
+helmet         no
+
+Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version
+composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan).
+Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.
+Next: php bin/booster plan --path=.
 ```
 
 Every route, per OS, is on [Install](install.md).

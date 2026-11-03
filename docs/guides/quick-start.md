@@ -7,6 +7,7 @@ description: The first commands to run, and what a plan looks like.
 
 This page runs Booster on an app for the first time. Next: [What a hop does](hops.md) for what each step does.
 
+<!-- docs-test: skip run on your own app -->
 ```
 booster detect --path=../my-app        # which of the five permutations, and which versions
 booster plan   --path=../my-app        # the ordered hops to a supported version
@@ -24,6 +25,7 @@ Booster prints its progress lines on standard error. In Windows PowerShell they 
 
 The one-command form for a forced image upgrade:
 
+<!-- docs-test: skip run on your own app -->
 ```
 booster run --path=../my-app --goal=php-74-to-84
 ```
@@ -38,9 +40,11 @@ Without a lock, `composer.json` stays the sole source.
 A plan for the bundled Laravel 10 example app on PHP 8.2 looks like this (the order keeps the app on a PHP and
 Laravel pair Laravel supports at every step):
 
+```bash run
+booster plan --path=examples/laravel-blade --today=2026-10-29
 ```
-$ booster plan --path=examples/laravel-blade --today=2026-10-29
 
+```output
 BOOSTER plan for examples/laravel-blade
   app type: laravel-blade
   PHP: 8.2 -> 8.5
@@ -57,7 +61,7 @@ BOOSTER plan for examples/laravel-blade
 3. laravel-11-to-12
    Move a Laravel 11 app to Laravel 12.
    After this step your tests run in Docker.
-    Behavior changes to check:
+   Behavior changes to check:
    When the app does not define a local disk, its root now defaults to storage/app/private instead of storage/app (config/filesystems.php)
      keep old: define the local disk with 'root' => storage_path('app')
      check: Check where Storage::disk('local') writes after the hop
@@ -97,8 +101,8 @@ https://github.com/sebastianbergmann/phpunit/issues/6052
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: booster run --path=examples/laravel-blade --dry-run
-(The real run needs Docker, and your app committed in git: booster run --path=examples/laravel-blade)
+Preview the edits: php bin/booster run --path=examples/laravel-blade --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade)
 ```
 
 <div align="center">

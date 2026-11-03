@@ -13,6 +13,7 @@ Booster needs PHP 8.3 or newer on the machine; the app it upgrades does not, bec
 
 ## Single file (PHAR)
 
+<!-- docs-test: skip needs network -->
 ```
 mkdir -p ~/bin
 curl -L -o ~/bin/booster.phar https://github.com/waynestate/booster/releases/latest/download/booster.phar
@@ -30,6 +31,7 @@ or stash first) and a Docker daemon for its test gate.
 
 ## Linux, macOS and WSL (Ubuntu): clone it
 
+<!-- docs-test: skip installs software -->
 ```
 sudo apt install php-cli php-xml php-mbstring php-zip php-curl unzip git composer
 ```
@@ -39,6 +41,7 @@ Ubuntu splits the XML extension out of `php-cli`, and Composer's dev dependencie
 old for Booster: add the [ondrej/php PPA](https://launchpad.net/+ppas?field.name=php&field.status=active) or use
 the Docker route below. Then:
 
+<!-- docs-test: skip needs network -->
 ```
 git clone https://github.com/waynestate/booster.git
 cd booster && composer install
@@ -47,6 +50,7 @@ bin/booster --version
 
 Run Booster from its own folder with `--path` pointing at the app; never clone Booster inside an app:
 
+<!-- docs-test: skip run on your own app -->
 ```
 bin/booster plan --path=/path/to/your-app
 ```
@@ -57,6 +61,7 @@ Windows folder is `/mnt/c/Users/<you>/...`, and `run` needs Docker Desktop's WSL
 
 ## Windows PowerShell, with PHP and Composer installed
 
+<!-- docs-test: skip needs network -->
 ```
 git clone https://github.com/waynestate/booster.git
 cd booster; composer install
@@ -66,6 +71,7 @@ php bin\booster plan --path=..\my-app
 
 ## Docker only, no PHP (Windows or any OS)
 
+<!-- docs-test: skip needs Docker -->
 ```
 git clone https://github.com/waynestate/booster.git
 cd booster
@@ -97,12 +103,14 @@ host):
 
 Windows (PowerShell):
 
+<!-- docs-test: skip needs Docker -->
 ```
 .\scripts\build-phar.ps1
 ```
 
 Linux / macOS:
 
+<!-- docs-test: skip needs Docker -->
 ```
 scripts/build-phar.sh
 ```

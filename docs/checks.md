@@ -14,6 +14,7 @@ Checks: `composer ci` (the same command runs on GitLab and GitHub).
 
 Development happens on Wayne State's GitLab; this repository is a release mirror. Changes land there first.
 
+<!-- docs-test: skip needs network -->
 ```
 composer ci
 ```
@@ -22,6 +23,7 @@ runs `composer validate --strict`, PHPUnit, Pint, PHPStan (Pinstripe's raw prese
 ships with Booster and supplies the preset the advisory scan uses), `composer audit`, the hop data check and the
 agent-ready check. Nothing needs PHP on the host:
 
+<!-- docs-test: skip needs Docker -->
 ```
 docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install --no-interaction && composer ci"
 ```

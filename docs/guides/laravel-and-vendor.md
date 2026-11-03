@@ -27,6 +27,7 @@ for it, and a plan toward a major without one stops there with a warning instead
 `bin/refresh-hop-data.php` rewrites the file from the public feeds (Packagist for PHPUnit and Laravel, endoflife.date
 for Laravel's supported PHP ranges, npm for the Vite packages) plus CREED's policy for what counts as supported:
 
+<!-- docs-test: skip needs network -->
 ```
 php bin/refresh-hop-data.php             # fetch the feeds, rewrite the file, print what changed
 php bin/refresh-hop-data.php --check     # offline CI check: validate the shape, then compare the frozen feeds

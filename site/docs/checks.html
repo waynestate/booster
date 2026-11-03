@@ -32,11 +32,13 @@
 <a rel="noopener" href="https://github.com/waynestate/booster/blob/main/MAINTAINING.md">MAINTAINING.md</a>.</p>
 <p>Checks: <code>composer ci</code> (the same command runs on GitLab and GitHub).</p>
 <p>Development happens on Wayne State's GitLab; this repository is a release mirror. Changes land there first.</p>
+<!-- docs-test: skip needs network -->
 <pre><code>composer ci
 </code></pre>
 <p>runs <code>composer validate --strict</code>, PHPUnit, Pint, PHPStan (Pinstripe's raw preset, inlined; <code>waynestate/pinstripe</code>
 ships with Booster and supplies the preset the advisory scan uses), <code>composer audit</code>, the hop data check and the
 agent-ready check. Nothing needs PHP on the host:</p>
+<!-- docs-test: skip needs Docker -->
 <pre><code>docker run --rm -v &quot;${PWD}:/app&quot; -w /app composer:2.10.3 sh -c &quot;composer install --no-interaction &amp;&amp; composer ci&quot;
 </code></pre>
 <p><code>contract/expectations.json</code> says what Booster must detect, plan and change for each example app in <code>examples/</code>;

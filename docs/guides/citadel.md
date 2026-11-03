@@ -10,6 +10,7 @@ This page covers the deployment script Booster writes for a real run. Next: [Che
 When a real (not dry) run changes `composer.lock` and the app has a `deployments/` directory, Booster writes one
 deployment script, `deployments/0000_composer_install_<YYYYMMDDHHMM>`:
 
+<!-- docs-test: skip installs software -->
 ```sh
 #!/bin/sh
 # Added by Booster: this upgrade changed composer.lock. Citadel runs each deployment script once, in name order,
