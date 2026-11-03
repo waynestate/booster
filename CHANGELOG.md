@@ -12,6 +12,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 - `booster run` prints one line per hop to standard error while it works: the hop's position in the plan, its id, its status, the number of files it changed and the seconds it took, and a closing line totals the hops run, the stops and the whole run. The lines go to standard error so the report on standard output is unchanged and `--format json` stays valid JSON.
 - `--path` accepts a leading `~` for your home folder: `~` and `~/...` (or `~\...` on Windows) are rewritten from `HOME`, or `USERPROFILE` on Windows, because the shell does not expand a tilde after `=` or inside quotes. `~user/...` stays as typed.
+- A test keeps the reported version, the newest CHANGELOG heading, the README and the front page in step, and the tag build refuses a phar that reports a different version than its tag.
 
 ### Changed
 
