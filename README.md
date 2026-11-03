@@ -223,7 +223,7 @@ BOOSTER plan for examples/laravel-blade
 
 Will break on PHP 8.3: no findings.
 
-PHPStan on PHP 8.5: 5 findings.
+PHPStan on PHP 8.5: 5 findings (code quality hints, not upgrade blockers).
    app/Models/Post.php:7 [class.notFound] Class App\Models\Post extends unknown class Illuminate\Database\Eloquent\Model.
    app/Models/Post.php:9 [missingType.property] Property App\Models\Post::$casts has no type specified.
    tests/PostTest.php:18 [property.onlyWritten] Property App\Tests\PostTest::$repository is never read, only written.
@@ -231,6 +231,12 @@ PHPStan on PHP 8.5: 5 findings.
 https://github.com/sebastianbergmann/phpunit/issues/6052
    tests/PostTest.php:33 [method.alreadyNarrowedType] Call to method PHPUnit\Framework\Assert::assertNotNull() with PHPUnit\Framework\MockObject\Rule\AnyInvokedCount will always evaluate to true.
    Hint: Laravel app without Larastan: Eloquent and facade calls show as errors. composer require --dev larastan/larastan for a cleaner scan.
+
+Nothing was changed. The numbered list above is the order Booster would do things; "Will break" and "PHPStan" are advice
+for you to read, not errors.
+Booster does every step above marked automatic when you run it.
+Preview the edits: booster run --path=examples/laravel-blade --dry-run
+(The real run needs Docker, and your app committed in git: booster run --path=examples/laravel-blade)
 ```
 
 <div align="center">
