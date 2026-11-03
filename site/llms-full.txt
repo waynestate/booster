@@ -8,7 +8,7 @@ The README and the Markdown twin of every page, joined. The index is https://boo
 
 ## README
 
-Source: https://github.com/waynestate/booster/blob/HEAD/README.md
+Source: https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/README.md
 
 ## Booster
 
@@ -18,12 +18,16 @@ Source: https://github.com/waynestate/booster/blob/HEAD/README.md
 
 Checks: `composer ci` (the same command runs on GitLab and GitHub).
 
-Development happens on Wayne State's GitLab; this repository is a release mirror. Changes land there first.
+### Where the code lives
+
+The canonical repository is on nougat: [enterprise-apps/booster](https://nougat.snu.gs/enterprise-apps/booster). git.wayne.edu and GitHub ([waynestate/booster](https://github.com/waynestate/booster)) are read-only mirrors of it.
+Open issues and merge requests on nougat, not on the mirrors.
+This moves to git.wayne.edu once it has CI runners. Nougat is the shot; the mirrors are the bandage.
 
 > A booster shot keeps your immunity current. This one keeps your PHP current, and it stings less.
 
-Front page: [`site/index.html`](https://github.com/waynestate/booster/blob/HEAD/site/index.html), a static page you can open in a browser or serve from `site/`.
-On Citadel it is served by the raw-PHP deploy layer in [`deploy/`](https://github.com/waynestate/booster/blob/HEAD/deploy/): a Squire kit whose front controller serves `site/` behind HELMET's security headers. For local development, keep serving `site/` directly.
+Front page: [`site/index.html`](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/site/index.html), a static page you can open in a browser or serve from `site/`.
+On Citadel it is served by the raw-PHP deploy layer in [`deploy/`](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/deploy/): a Squire kit whose front controller serves `site/` behind HELMET's security headers. For local development, keep serving `site/` directly.
 
 Booster is WELD's upgrade tool. It plans the hops that take a WSU PHP app from the PHP or Laravel version it runs now
 to one the version policy still supports, and it runs them one at a time: [Rector](https://getrector.com) rewrites the
@@ -99,9 +103,9 @@ Run Booster from its own folder with `--path` pointing at the app; never clone B
 bin/booster plan --path=/path/to/your-app
 ```
 
-`--path` takes a full path, not `~`. In WSL, keep Booster and the app in your Linux home folder, not under `/mnt/c`
-(a Windows drive is slow from Linux); a Windows folder is `/mnt/c/Users//...`, and `run` needs Docker Desktop's
-WSL integration switched on.
+`--path` takes a path, and a leading `~` means your home folder (from `HOME`, or `USERPROFILE` on Windows). In WSL,
+keep Booster and the app in your Linux home folder, not under `/mnt/c` (a Windows drive is slow from Linux); a
+Windows folder is `/mnt/c/Users//...`, and `run` needs Docker Desktop's WSL integration switched on.
 
 #### Windows PowerShell, with PHP and Composer installed
 
@@ -245,7 +249,7 @@ Options shared by `plan` and `run`:
 
 | Option | Meaning |
 |---|---|
-| `--path` | The app (default `.`) |
+| `--path` | The app (default `.`); a leading `~` means your home folder |
 | `--format` | `text` (default) or `json` |
 | `--policy` | CREED's `policy.json`. Default: `BOOSTER_POLICY`, then the copy in the `waynestate/creed` package |
 | `--today` | Override today's date (`YYYY-MM-DD`) so runs are repeatable |
@@ -272,7 +276,7 @@ Options for `scan`:
 
 | Option | Meaning |
 |---|---|
-| `--path` | The app (default `.`) |
+| `--path` | The app (default `.`); a leading `~` means your home folder |
 | `--php` | Required. The PHP version to ask about (`major.minor`, one Booster knows) |
 | `--removals` | List uses of functions and constructs removed in PHP up to `--php`, instead of the PHPCompatibility scan |
 | `--phpstan` | Also run the PHPStan scan (Pinstripe preset) at the same PHP version |
@@ -289,7 +293,7 @@ Options for `run`:
 | `--image` | Run the gate in this Docker image instead of building `booster-target` (it needs `php` and `composer` on `PATH`): one name, a `{php}` template or a version map (below) |
 | `--allow-failing-baseline` | Continue when the baseline fails; later gate failures are labelled as pre-existing |
 | `--allow-dirty` | Run even when the working copy has uncommitted changes |
-| `--test-command` | What runs the app's tests in the image (default `composer test`, else `vendor/bin/phpunit`) |
+| `--test-command` | What runs the app's tests in the image (default `composer test`, else `vendor/bin/phpunit`, else the built-in `php -l` syntax check when the app has no tests) |
 | `--test-env` | Environment variable (`KEY=VALUE`) passed to the baseline and every gate container with `-e`; repeat it. The report names the keys only, never the values |
 | `--proctor-command` | An extra command run in the image after the tests, for example a PROCTOR check |
 | `--proctor-advisory` | Report the PROCTOR result but do not fail the run on it. Applied automatically when the run stops before the final target (`--until`, `--only`, or a target past security support) |
@@ -305,25 +309,13 @@ break on the PHP version the first PHP hop lands on. The findings are hints for 
 gate: they do not change the exit code, and a scan that cannot run (missing tooling, a crash) is reported as "could
 not run" while the plan still prints in full. `--no-scan` skips both advisory scans.
 
-The scan is optional. Booster looks for a PHP_CodeSniffer that carries the PHPCompatibility standard, trying the app's
-own `vendor/bin/phpcs`, then Booster's `vendor/bin/phpcs`, then `phpcs` on the PATH. When none of them has the
-standard, the scan reports a skip and the plan goes on. To turn it on, install the packages into the app:
-
-```
-composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"
-```
-
-Before the require line, approve the installer plugin once:
-
-```
-composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
-```
-
-Composer asks for approval of `dealerdirect/phpcodesniffer-composer-installer`, the plugin that registers the
-PHPCompatibility standard with PHP_CodeSniffer. Without the approval, Composer blocks the plugin, the standard never
-registers, and the scan skips with a message that names this fix. The command writes `allow-plugins` into the app's
-own `composer.json`. That is an app-side change the person who wants the scan chooses to make; Booster never edits
-the app's `composer.json`.
+The scan needs no change to the app: Booster ships PHP_CodeSniffer and the PHPCompatibility standard with its own
+dependencies, from the PHAR and from a clone alike. Booster looks for a PHP_CodeSniffer that carries the standard,
+trying the app's own `vendor/bin/phpcs`, then Booster's `vendor/bin/phpcs`, then `phpcs` on the PATH. When it runs
+Booster's own copy, it points PHP_CodeSniffer at the bundled standard with `--runtime-set installed_paths`, because
+the registration file that Composer's installer plugin writes cannot be trusted inside a PHAR unpacked into a temp
+directory. When none of the launchers has the standard, the scan reports a skip and the plan goes on; the skip says
+to reinstall Booster's dependencies (`composer install` in Booster's folder) or download the PHAR again.
 
 The scan ignores `vendor/`, `node_modules/` and `storage/`, because those hold third-party code and generated files,
 not the app's. It reads the app only and changes nothing. `booster scan --path=../my-app --php=8.0` runs the same scan
@@ -336,13 +328,11 @@ on its own, for any PHP version Booster knows, and exits 0 even when it finds a 
 exit code, and a scan that cannot run is reported with the fix that enables it, while the plan still prints in full.
 `--no-scan` skips it.
 
-The scan is optional. Booster looks for a PHPStan binary, trying the app's own `vendor/bin/phpstan`, then Booster's
-`vendor/bin/phpstan`, then `phpstan` on the PATH, and for the preset it tries the app's vendor tree and Booster's.
-When either is missing, the report names the fix:
-
-```
-composer require --dev phpstan/phpstan waynestate/pinstripe
-```
+The scan needs no change to the app: Booster ships PHPStan and Pinstripe's preset with its own dependencies, from
+the PHAR and from a clone alike. Booster looks for a PHPStan binary, trying the app's own `vendor/bin/phpstan`, then
+Booster's `vendor/bin/phpstan`, then `phpstan` on the PATH, and for the preset it tries the app's vendor tree and
+Booster's. When either is missing, the report says to reinstall Booster's dependencies (`composer install` in
+Booster's folder) or download the PHAR again.
 
 It ignores `vendor/`, `node_modules/` and `storage/`, reads the app only and changes nothing. `booster scan
 --path=../my-app --php=8.5 --phpstan` runs the same scan on its own, for any PHP version Booster knows, and exits 0
@@ -353,8 +343,8 @@ even when it finds a wall of missing types.
 Before the hops print, `plan` (and `run`) asks Packagist about each direct third-party dependency in the app's
 `composer.json`: what is its newest stable release, and can that release still be installed at each hop's
 destination? Only plain `require` and `require-dev` entries count; PHP, extensions (`ext-*`, `lib-*`), Laravel
-itself (`laravel/framework`, its `illuminate/*` components) and PHPUnit are Booster's own business, so they are
-skipped.
+itself (`laravel/framework`, its `illuminate/*` components), PHPUnit and Booster's own scan tools are Booster's
+own business, so they are skipped.
 
 The answer is advisory, like the scans: a package that cannot follow the plan does not drop the hop. It adds a
 warning that names the package, the hop it blocks, and what to do about it:
@@ -365,8 +355,8 @@ acme/legacy-auth 2.3.0 supports Laravel up to 10 and PHP up to 8.3, so it blocks
 
 The warning names only the dimensions the blocked hop fails on: a Laravel ceiling alone, a PHP ceiling alone, or both
 together. A ceiling is printed as the newest version Booster plans that the constraint allows (a PHP constraint capping
-at 7.x reads "7.4", not "7"), and a constraint with no upper bound has no ceiling to name, so the warning names its
-floor instead (`needs PHP 8.2 or newer`).
+at 7.x reads "7.4", not "7"). When the constraint has no upper bound, or when the hop's target is below the
+constraint's floor, the warning names the floor instead (`needs PHP 8.2 or newer`).
 
 A package whose newest release requires several `illuminate/*` components is judged by the loosest of those
 constraints, the one that allows the most Laravel versions. Abandoned packages get their own warning (`acme/old is
@@ -421,10 +411,11 @@ tell you what is missing.
 
 #### The baseline
 
-Before the first hop, `run` runs the app's own tests on the PHP the app is on now, in the same `booster-target:`
-image the gate uses. The point is to tell "Booster broke it" from "it was already broken": a red baseline means the
-suite was red before any change, so a later red gate is not proof of a bad hop. The baseline is recorded in the report
-(`passed`, `failed` or `skipped`, with the exit code and the last 20 lines of output).
+Before the first hop, `run` runs the app's own tests (or the built-in `php -l` syntax check when the app has no
+tests) on the PHP the app is on now, in the same `booster-target:` image the gate uses. The point is to tell
+"Booster broke it" from "it was already broken": a red baseline means the suite was red before any change, so a
+later red gate is not proof of a bad hop. The baseline is recorded in the report (`passed`, `failed` or `skipped`,
+with the exit code and the last 20 lines of output).
 
 - A red baseline stops the run before the first hop, with a non-zero exit. `--allow-failing-baseline` lets it go on;
   each later gate failure is then labelled "the baseline was already failing" in the text and JSON output.
@@ -432,6 +423,10 @@ suite was red before any change, so a later red gate is not proof of a bad hop. 
 - A Mix app's `public/mix-manifest.json` is a build artifact, not committed source: a fresh clone has no manifest, so
   the suite can be red before any hop. Build the assets before the baseline (the app's usual `npm ci && npm run
   build`), or pass `--allow-failing-baseline` knowing why.
+- When the app has no tests of its own, the baseline and every gate run a built-in check instead: every PHP file
+  outside `vendor/` and `node_modules/` must still parse on the target PHP (`php -l`). That proves the code loads on
+  the new PHP, not that it works: click through the app before you ship. Pass `--test-command` to run something else,
+  or add a smoke test (below) to get the real gate back.
 
 #### A smoke test for WSU apps
 
@@ -674,7 +669,7 @@ for a new hop stays human work. `composer ci` ends with the offline `--check`: i
 the bundled policy, then recomputes it from the frozen feeds in `tests/fixtures/hop-feeds` as of the file's
 `generated_on` date, so the check itself needs no network. A scheduled pipeline runs the hop data robot,
 `bin/hop-data-bot.php`, against the live feeds; when a feed moved while the file slept, the robot opens (or updates)
-a merge request on Booster itself with the new file, and a person merges it. [MAINTAINING.md](https://github.com/waynestate/booster/blob/HEAD/MAINTAINING.md) covers
+a merge request on Booster itself with the new file, and a person merges it. [MAINTAINING.md](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/MAINTAINING.md) covers
 the token the robot needs.
 
 ### Deploying on Citadel
@@ -698,14 +693,14 @@ install` alone. Commit the script with the rest of the upgrade. To drop it again
 
 ### Checks
 
-Maintainers: how to build, test and release this project, and where its data comes from, is in [MAINTAINING.md](https://github.com/waynestate/booster/blob/HEAD/MAINTAINING.md).
+Maintainers: how to build, test and release this project, and where its data comes from, is in [MAINTAINING.md](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/MAINTAINING.md).
 
 ```
 composer ci
 ```
 
-runs `composer validate --strict`, PHPUnit, Pint, PHPStan (Pinstripe's raw preset, inlined; `waynestate/pinstripe` is
-a dev requirement and supplies the preset the advisory scan uses), `composer audit`, the hop data check and the
+runs `composer validate --strict`, PHPUnit, Pint, PHPStan (Pinstripe's raw preset, inlined; `waynestate/pinstripe`
+ships with Booster and supplies the preset the advisory scan uses), `composer audit`, the hop data check and the
 agent-ready check. Nothing needs PHP on the host:
 
 ```
@@ -720,12 +715,12 @@ docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install
 Proof runs against real Wayne State applications are on a private site, [proof.apps.wayne.edu/booster](https://proof.apps.wayne.edu/booster/), behind a Wayne State employee sign-in.
 
 Proven how: the first full run with the gate on took a Laravel 12 app from PHP 8.2 to 8.4 in two hops, each gated by
-the app's 197-test suite, and it is written up in [research/booster-e2e-gate.md](https://github.com/waynestate/booster/blob/HEAD/research/booster-e2e-gate.md).
+the app's 197-test suite, and it is written up in [research/booster-e2e-gate.md](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/research/booster-e2e-gate.md).
 
 ### Status
 
-Version 1.7. See [CHANGELOG.md](https://github.com/waynestate/booster/blob/HEAD/CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](https://github.com/waynestate/booster/blob/HEAD/OPEN_QUESTIONS.md) for what stays
-open, and [BEST_PRACTICES.md](https://github.com/waynestate/booster/blob/HEAD/BEST_PRACTICES.md) for the rules Booster follows.
+Version 1.7. See [CHANGELOG.md](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/OPEN_QUESTIONS.md) for what stays
+open, and [BEST_PRACTICES.md](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/BEST_PRACTICES.md) for the rules Booster follows.
 
 ### Licence
 
