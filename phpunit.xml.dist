@@ -6,6 +6,7 @@
     <testsuites>
         <testsuite name="booster">
             <directory>tests</directory>
+            <exclude>tests/docs-fixture</exclude>
         </testsuite>
     </testsuites>
 </phpunit>
