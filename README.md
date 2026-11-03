@@ -84,7 +84,7 @@ sudo apt install php-cli php-xml php-mbstring php-zip php-curl unzip git compose
 Ubuntu splits the XML extension out of `php-cli`, and Composer's dev dependencies need it: when Composer says
 "ext-dom is missing", run the line above. On macOS: `brew install php composer git`. Ubuntu 22.04 ships PHP 8.1, too
 old for Booster: add the [ondrej/php PPA](https://launchpad.net/+ppas?field.name=php&field.status=active) or use
-Docker (route 4). Then:
+the Docker route below. Then:
 
 ```
 git clone https://github.com/waynestate/booster.git
