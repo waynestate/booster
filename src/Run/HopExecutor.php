@@ -477,7 +477,7 @@ final class HopExecutor
                     if ($incomplete) {
                         $messages = [...$threshold, ...$wouldRun, sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognise Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$inertiaChanges, ...$hop->notes, ...$notes];
                     } elseif ($files === []) {
-                        $messages = [...$threshold, ...$wouldRun, 'Dry run: nothing was changed.', ...($migration->manual ?? []), ...($proxies->manual ?? []), ...$hop->notes, ...$notes];
+                        $messages = [...$threshold, ...$wouldRun, 'No edits needed for this step (dry run).', ...($migration->manual ?? []), ...($proxies->manual ?? []), ...$hop->notes, ...$notes];
                     } else {
                         $messages = [...$threshold, ...$wouldRun, ...($migration->changes ?? []), ...($proxies->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...($proxies->manual ?? []), ...$hop->notes, ...$notes];
                     }
@@ -1044,7 +1044,7 @@ final class HopExecutor
         if ($options->dryRun) {
             $migration = $this->wayneUiMigration->migrate($path, true);
             $messages = $migration->files === []
-                ? ['Dry run: nothing was changed.', ...$migration->manual, ...$hop->notes]
+                ? ['No edits needed for this step (dry run).', ...$migration->manual, ...$hop->notes]
                 : [...$migration->changes, $migration->summary(), ...$migration->manual, ...$hop->notes];
 
             return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $migration->files, $messages);

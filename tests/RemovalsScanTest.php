@@ -271,7 +271,7 @@ final class RemovalsScanTest extends TestCase
         self::assertStringContainsString('Removed between PHP 7.4 and PHP 8.0: 1 hit (advisory).', $out);
         self::assertStringContainsString('src/legacy.php:2 each() function -> foreach', $out);
         self::assertLessThan(
-            (int) strpos($out, 'Dry run: nothing was changed.'),
+            (int) strpos($out, 'No edits needed for this step (dry run).'),
             (int) strpos($out, 'Removed between PHP 7.4 and PHP 8.0'),
         );
     }
