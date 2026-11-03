@@ -404,7 +404,7 @@ BOOSTER plan for examples/raw-php
    After this step your tests run in Docker.
    Give this hop the most review time.
    Removed between PHP 7.4 and PHP 8.0: none found.
-   Behaviour changes to check:
+    Behavior changes to check:
    Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; &lt; / &lt;= against negative numbers also flip for such strings
      check: Audit loose comparisons of request parameters and string DB columns
    Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output
@@ -450,8 +450,8 @@ Baseline: SKIPPED (no gate in this run).
 
 1. php-74-to-80: PREVIEWED (1 file)
    Largest risk hop: loose comparison of numbers and strings changed, many warnings became thrown errors, and arithmetic on arrays throws.
-   Write or extend tests before applying this hop; only tests and review find behaviour changes here.
-   Behaviour changes to check:
+    Write or extend tests before applying this hop; only tests and review find behavior changes here.
+    Behavior changes to check:
    Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; &lt; / &lt;= against negative numbers also flip for such strings
      check: Audit loose comparisons of request parameters and string DB columns
    Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output
@@ -701,7 +701,7 @@ Task:
 1. With Booster cloned beside the app, run bin/booster detect --path=../my-app and confirm the shape is raw-php.
 2. Run bin/booster plan --path=../my-app. Expect PHP hops only, one minor at a time.
 3. Run bin/booster scan --path=../my-app --php=X.Y for the first hop's target and list what will break; add --removals for removed functions and --phpstan for static analysis.
-4. Run bin/booster run --path=../my-app --dry-run and summarise the diffs per hop.
+4. Run bin/booster run --path=../my-app --dry-run and summarize the diffs per hop.
 5. Only when I say so: bin/booster run --path=../my-app. It needs a clean git working copy and a Docker daemon for the gate, which runs `composer test` (or vendor/bin/phpunit) in the target PHP image.
 
 Constraints:
@@ -731,7 +731,7 @@ Read first:
 Task:
 1. With Booster cloned beside the app, run bin/booster detect --path=../my-app and confirm the shape is raw-php-vue, with the Vue and Node versions.
 2. Run bin/booster plan --path=../my-app and sort the hops: PHP hops (Rector), node-pin-24 (pins Node 26 in package.json and writes .nvmrc), and the staged Vue hops if the app is on Vue 2: vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
-3. Run bin/booster run --path=../my-app --dry-run and summarise the diffs.
+3. Run bin/booster run --path=../my-app --dry-run and summarize the diffs.
 4. For the Vue hops, list the playbook steps for this app: the compat build, then the codemod, keeping every manual item the codemod lists. Rector does not read Vue, so Booster changes nothing there: a person does that work.
 
 Constraints:
@@ -761,7 +761,7 @@ Task:
 1. Run `composer install` in the app first: rector-laravel needs Laravel's classes, and a Laravel hop without vendor is only a partial preview.
 2. With Booster cloned beside the app, run bin/booster plan --path=../my-app and explain the order: it keeps the app on a PHP and Laravel pair Laravel supports at every step.
 3. If composer.json requires wayne-cas, run the plan again with --sesame and say what the cas-to-sesame hop renames. Only the two-factor sign-in stays manual; list that for a person.
-4. Run bin/booster run --path=../my-app --dry-run and summarise the diffs per hop.
+4. Run bin/booster run --path=../my-app --dry-run and summarize the diffs per hop.
 
 Constraints:
 - Plan and dry run only, until I say so. Never commit or push.
@@ -790,7 +790,7 @@ Read first:
 Task:
 1. Run `composer install` in the app, then, with Booster cloned beside it, bin/booster plan --path=../my-app.
 2. If the plan has mix-to-vite, say whether this webpack.mix.js is the simple shape Booster converts (mix.js, .vue(), .sass(), .postCss(), .version(), and if (mix.inProduction()) { mix.version(); }) or which call it will refuse by name. A Vue 2 front end takes the staged Vue hops first: vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
-3. Run bin/booster run --path=../my-app --dry-run and summarise the diffs, Blade layouts included.
+3. Run bin/booster run --path=../my-app --dry-run and summarize the diffs, Blade layouts included.
 4. List any withoutMix() calls for me to rename to withoutVite() by hand.
 
 Constraints:
@@ -821,7 +821,7 @@ Task:
 1. Run `composer install` in the app, then, with Booster cloned beside it, bin/booster detect --path=../my-app and bin/booster plan --path=../my-app.
 2. Sort the hops: Laravel and PHP (Rector), node-pin-24, and the staged Vue hops if the app is on Vue 2 (playbooks, not code changes): vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
 3. For each Laravel hop, list what to check by hand on the Inertia side: Booster has no Inertia checks per Laravel hop yet.
-4. Run bin/booster run --path=../my-app --dry-run and summarise the diffs per hop.
+4. Run bin/booster run --path=../my-app --dry-run and summarize the diffs per hop.
 
 Constraints:
 - Plan and dry run only, until I say so. Never commit or push.
@@ -908,7 +908,7 @@ Output: the plan sorted by kind, the Inertia checks per Laravel hop, the dry-run
   <div class="wsu-container foot__row">
     <p class="foot__joke">Side effects may include passing tests.</p>
     <p class="foot__weld">Part of <a href="https://weld.apps.wayne.edu/">WELD</a>, the Wayne State app stack.</p>
-    <p class="foot__org">Wayne State University · Enterprise Applications · MIT licence</p>
+    <p class="foot__org">Wayne State University · Enterprise Applications · MIT license</p>
   </div>
 </footer>
 
