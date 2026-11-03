@@ -1,0 +1,50 @@
+{
+    "blocks": {
+        "commands": {
+            "type": "symfony-commands",
+            "run": "php bin/booster",
+            "cli": "booster",
+            "level": 3
+        },
+        "hops": {
+            "type": "json-table",
+            "run": "php bin/booster hops --format=json",
+            "path": "hops",
+            "columns": [
+                ["Hop", "id", "code"],
+                ["Kind", "kind"],
+                ["From", "from"],
+                ["To", "to"],
+                ["What it does", "summary"]
+            ]
+        },
+        "env": {
+            "type": "env",
+            "scan": [
+                "src",
+                "bin"
+            ],
+            "prefix": "BOOSTER_",
+            "ignore": [
+                "BOOSTER_APP_PATH",
+                "BOOSTER_BOOTSTRAP",
+                "BOOSTER_CLASS_RENAMES",
+                "BOOSTER_PHP_TARGET",
+                "BOOSTER_RECTOR_CACHE",
+                "BOOSTER_RECTOR_SETS",
+                "BOOSTER_RECTOR_SKIP_DIRS",
+                "BOOSTER_RECTOR_SKIP_FILES"
+            ],
+            "describe": {
+                "BOOSTER_POLICY": [
+                    "Path to CREED's policy.json",
+                    "none (uses the snapshot bundled with BOOSTER)"
+                ],
+                "BOOSTER_BOT_TOKEN": [
+                    "Push token for the hop data robot (bin/hop-data-bot.php). Never in git, never logged, never printed",
+                    "none"
+                ]
+            }
+        }
+    }
+}

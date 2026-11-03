@@ -76,5 +76,16 @@
       "title": "Next",
       "path": "next"
     }
+  ],
+  "source": "https://nougat.snu.gs/enterprise-apps/booster",
+  "mirrors": [
+    {
+      "title": "git.wayne.edu",
+      "url": "https://git.wayne.edu/enterprise-apps/booster"
+    },
+    {
+      "title": "GitHub",
+      "url": "https://github.com/waynestate/booster"
+    }
   ]
 }
