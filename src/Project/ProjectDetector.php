@@ -28,7 +28,7 @@ final class ProjectDetector
     public function detect(string $path): Project
     {
         if (!is_dir($path)) {
-            throw new ToolError(sprintf('Path "%s" is not a directory.', $path));
+            throw new ToolError(sprintf('Path "%s" is not a directory. Check the spelling, and point --path at the folder that holds composer.json.', $path));
         }
 
         $composer = $this->readJson($path . '/composer.json');

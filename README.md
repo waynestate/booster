@@ -98,9 +98,9 @@ Run Booster from its own folder with `--path` pointing at the app; never clone B
 bin/booster plan --path=/path/to/your-app
 ```
 
-`--path` takes a full path, not `~`. In WSL, keep Booster and the app in your Linux home folder, not under `/mnt/c`
-(a Windows drive is slow from Linux); a Windows folder is `/mnt/c/Users/<you>/...`, and `run` needs Docker Desktop's
-WSL integration switched on.
+`--path` takes a path, and a leading `~` means your home folder (from `HOME`, or `USERPROFILE` on Windows). In WSL,
+keep Booster and the app in your Linux home folder, not under `/mnt/c` (a Windows drive is slow from Linux); a
+Windows folder is `/mnt/c/Users/<you>/...`, and `run` needs Docker Desktop's WSL integration switched on.
 
 ### Windows PowerShell, with PHP and Composer installed
 
@@ -259,7 +259,7 @@ Options shared by `plan` and `run`:
 
 | Option | Meaning |
 |---|---|
-| `--path` | The app (default `.`) |
+| `--path` | The app (default `.`); a leading `~` means your home folder |
 | `--format` | `text` (default) or `json` |
 | `--policy` | CREED's `policy.json`. Default: `BOOSTER_POLICY`, then the copy in the `waynestate/creed` package |
 | `--today` | Override today's date (`YYYY-MM-DD`) so runs are repeatable |
@@ -286,7 +286,7 @@ Options for `scan`:
 
 | Option | Meaning |
 |---|---|
-| `--path` | The app (default `.`) |
+| `--path` | The app (default `.`); a leading `~` means your home folder |
 | `--php` | Required. The PHP version to ask about (`major.minor`, one Booster knows) |
 | `--removals` | List uses of functions and constructs removed in PHP up to `--php`, instead of the PHPCompatibility scan |
 | `--phpstan` | Also run the PHPStan scan (Pinstripe preset) at the same PHP version |
