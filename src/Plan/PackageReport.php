@@ -31,7 +31,7 @@ final readonly class PackageReport
                 $warnings[] = $check->abandonedWarning;
             }
             if (!$check->checked) {
-                $label = $check->reason === 'vcs' ? 'VCS repository' : 'offline';
+                $label = $check->reason === 'vcs' ? 'VCS repository' : 'not on Packagist or unreachable';
                 $notChecked[] = sprintf('%s (%s)', $check->package, $label);
             }
         }
