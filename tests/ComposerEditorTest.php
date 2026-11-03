@@ -37,6 +37,19 @@ final class ComposerEditorTest extends TestCase
         self::assertSame($before, file_get_contents($dir . '/composer.json'));
     }
 
+    public function test_a_php_hop_adds_a_missing_php_constraint(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        $data = $this->read($dir);
+        unset($data['require']['php']);
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        $changes = (new ComposerEditor())->apply((new HopRegistry())->get('php-80-to-81'), $dir);
+
+        self::assertSame(['Set php to ^8.1 in require.'], $changes);
+        self::assertSame('^8.1', $this->read($dir)['require']['php']);
+    }
+
     public function test_a_laravel_hop_raises_the_framework_and_moves_the_platform_pin(): void
     {
         $dir = $this->copyExample('laravel-blade');
@@ -278,6 +291,18 @@ final class ComposerEditorTest extends TestCase
         (new ComposerEditor())->apply((new HopRegistry())->get('laravel-10-to-11'), $dir);
 
         self::assertArrayNotHasKey('laravel/framework', $this->read($dir)['require']);
+    }
+
+    public function test_a_laravel_hop_never_adds_a_missing_php_constraint(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        $data = $this->read($dir);
+        unset($data['require']['php']);
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        (new ComposerEditor())->apply((new HopRegistry())->get('laravel-10-to-11'), $dir);
+
+        self::assertArrayNotHasKey('php', $this->read($dir)['require']);
     }
 
     public function test_no_composer_json_is_not_an_error(): void

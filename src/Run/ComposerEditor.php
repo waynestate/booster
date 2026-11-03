@@ -219,8 +219,13 @@ final class ComposerEditor
         $section = isset($data['require'][$package]) ? 'require' : (!$isPhp && isset($data['require-dev'][$package]) ? 'require-dev' : null);
 
         if ($section === null) {
-            // Only the SESAME swap or the WayneUI move adds a package that was not there; a PHP or Laravel bump never does.
-            if ($hop->kind !== HopKind::Sesame && $hop->kind !== HopKind::WayneUi) {
+            // The SESAME swap and the WayneUI move add packages that were not
+            // there, and a PHP hop adds the php constraint itself when the app
+            // never declared one; a Laravel, PHPUnit or other bump never does.
+            $addsMissingPackage = $hop->kind === HopKind::Sesame
+                || $hop->kind === HopKind::WayneUi
+                || ($hop->kind === HopKind::Php && $isPhp);
+            if (!$addsMissingPackage) {
                 return [];
             }
             $section = 'require';

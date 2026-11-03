@@ -26,6 +26,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - `composer ci` no longer dies at Composer's 300 second process timeout: `config.process-timeout` is 900.
 - A Rector "Class X should be known at this point" error on a legacy file no longer stops the hop: Booster reruns it once without those files, applies the rest, and lists the files as manual work.
 - `bin/booster` is committed as executable, so `bin/booster --version` works on a plain clone (Linux, macOS, WSL); a test keeps it that way.
+- A PHP hop adds `require.php` when `composer.json` has none, so PROCTOR no longer flags the upgraded app for a missing PHP constraint. (The lock file's hash is refreshed by the next `composer update`.)
 
 ## [1.7.0] - 2026-11-01
 
