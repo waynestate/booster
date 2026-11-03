@@ -17,7 +17,11 @@
 
 Checks: `composer ci` (the same command runs on GitLab and GitHub).
 
-Development happens on Wayne State's GitLab; this repository is a release mirror. Changes land there first.
+## Where the code lives
+
+The canonical repository is on nougat: [enterprise-apps/booster](https://nougat.snu.gs/enterprise-apps/booster). git.wayne.edu and GitHub ([waynestate/booster](https://github.com/waynestate/booster)) are read-only mirrors of it.
+Open issues and merge requests on nougat, not on the mirrors.
+This moves to git.wayne.edu once it has CI runners. Nougat is the shot; the mirrors are the bandage.
 
 > A booster shot keeps your immunity current. This one keeps your PHP current, and it stings less.
 
