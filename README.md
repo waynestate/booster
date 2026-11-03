@@ -13,7 +13,7 @@
 
 **Boosts your versions.** One dose at a time, and every dose gets a stamp.
 
-**Not to be confused with:** Booster moves an app to a newer PHP or framework version; Pinstripe's Rector set only modernises code within the PHP version the app already runs.
+**Not to be confused with:** Booster moves an app to a newer PHP or framework version; Pinstripe's Rector set only modernizes code within the PHP version the app already runs.
 
 Checks: `composer ci` (the same command runs on GitLab and GitHub).
 

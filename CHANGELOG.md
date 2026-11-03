@@ -44,12 +44,12 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [1.7.0] - 2026-11-01
 
-WayneUI joins the stack: a hop for the 1.x to 2.x move, and ten more behaviour-change warnings.
+WayneUI joins the stack: a hop for the 1.x to 2.x move, and ten more behavior-change warnings.
 
 ### Added
 
 - The `wayneui-1-to-2` hop, opt-in with `--wayneui`, for apps that require `cit-web-infra/wayne-ui`. It runs after the last Laravel hop and only when the plan reaches Laravel 11 or later (WayneUI 2.x supports 11 and newer); a plan that ends lower warns and leaves the hop out, and an app that uses WayneUI 1.x without the flag gets a nudge.
-- The hop rewrites only the one-to-one items of WayneUI's `MIGRATING.md`, about 57 percent of the mapping: Bootstrap 3 class tokens in class attributes (whole tokens only), Font Awesome icons without size modifiers, five brand colours in CSS and Blade, the Breadcrumbs renames and three `config/wayne-ui.php` keys. It swaps the Composer requirement to `waynestate/wayne-ui` `^2.0`.
+- The hop rewrites only the one-to-one items of WayneUI's `MIGRATING.md`, about 57 percent of the mapping: Bootstrap 3 class tokens in class attributes (whole tokens only), Font Awesome icons without size modifiers, five brand colors in CSS and Blade, the Breadcrumbs renames and three `config/wayne-ui.php` keys. It swaps the Composer requirement to `waynestate/wayne-ui` `^2.0`.
 - Everything else is listed in the report as `file:line` manual items: layout and component markup that has no one-to-one class, `Breadcrumbs::push(` (its argument order changed, a silent break), `navActive` prefix semantics, jQuery and Bootstrap script hooks, and the old publish tags.
 - The hop never deletes forked `resources/views/vendor/wayne-ui` or `public/vendor/wayne-ui`, never edits a `repositories` credential, and says that rotating a deploy token is a person's job.
 - Three more behaviour-change rows: Sanctum 4 stops loading its migrations, and yajra/laravel-oci8 adds the case-insensitive NLS defaults at 8.1.0 and drops them at 9.0.0.
@@ -69,11 +69,11 @@ The cas-to-sesame hop now finishes what a person had to do by hand on a real app
 
 ## [1.5.0] - 2026-10-31
 
-Behaviour-change warnings, from the second real-use report: a hop can pass every gate and still change what users see.
+Behavior-change warnings, from the second real-use report: a hop can pass every gate and still change what users see.
 
 ### Added
 
-- Behaviour changes to check: `booster plan`, the run report and `--format=json` (`behaviour_changes`) now name the
+- Behavior changes to check: `booster plan`, the run report and `--format=json` (`behaviour_changes`) now name the
   silent changes a step brings: things that still pass every gate but behave differently, such as Carbon 3 reading
   timestamps as UTC, Laravel 8's Tailwind paginator, or a SweetAlert toast that now closes on a new key. Each entry
   shows where the app is affected (up to 5 `file:line` hits and a count), the setting that keeps the old behaviour
@@ -126,7 +126,7 @@ Fixes from the second real-use report (two apps taken to PHP 7.4/Laravel 8 and P
 - The Pinstripe scan uses Pinstripe's `laravel.neon` (Larastan) on Laravel apps that have Larastan, and skips IDE
   helper files, so Laravel apps no longer get a wall of false "undefined method" findings.
 - `laravel-8-to-9` removes `fideloper/proxy` (it does not allow Laravel 9) and moves a stock `TrustProxies` to
-  `Illuminate\Http\Middleware\TrustProxies`; a customised one gets a manual note. The plan suggests HELMET when that hop
+  `Illuminate\Http\Middleware\TrustProxies`; a customized one gets a manual note. The plan suggests HELMET when that hop
   is in it and the app has no HELMET.
 
 ## [1.3.0] - 2026-10-30
@@ -323,7 +323,7 @@ Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, L
 - A target-image test gate (`docker/Dockerfile`, `booster-target:<php>`).
 - A recorded baseline test run before the first hop: the app's suite on its current PHP, so a later red gate can be
   told apart from a suite that was already red. A red baseline stops the run unless `--allow-failing-baseline` is
-  passed, in which case later gate failures are labelled as pre-existing.
+  passed, in which case later gate failures are labeled as pre-existing.
 - Coding-tab playbooks generated into `.agents/skills`, with `booster init --check`.
 - A contract (`contract/expectations.json`) and example apps for all five permutations.
 - GitLab and GitHub CI that both call `composer ci`.

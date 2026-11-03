@@ -21,7 +21,7 @@ Booster edits your working copy and prints a report. It never commits to, pushes
 (the only merge requests it opens are its own hop-data refresh on Booster itself): a person reads the diff and merges it.
 
 **Not to be confused with:** Booster moves an app to a newer PHP or framework version; Pinstripe's Rector set only
-modernises code within the PHP version the app already runs.
+modernizes code within the PHP version the app already runs.
 
 ## Where it fits in WELD
 
