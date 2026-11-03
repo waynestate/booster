@@ -58,7 +58,7 @@ final class InitCommand extends BaseCommand
             return $stale === [] ? self::EXIT_PASS : self::EXIT_FAIL;
         }
 
-        $output->writeln(sprintf('Wrote %d playbooks, %d changed.', count($files), count($stale)), OutputInterface::OUTPUT_RAW);
+        $output->writeln(sprintf('Wrote %d playbooks (one for each step Booster knows, plus a general one), %d changed.', count($files), count($stale)), OutputInterface::OUTPUT_RAW);
         $output->writeln('', OutputInterface::OUTPUT_RAW);
         $dirArg = Invocation::pathArg($dir);
         $output->writeln(implode("\n", [

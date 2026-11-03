@@ -1189,6 +1189,36 @@ final class HopExecutorTest extends TestCase
         self::assertStringContainsString('Nothing to do', implode(' ', $report->results[0]->messages));
     }
 
+    public function test_a_dry_run_no_edit_hop_labels_the_general_notes(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        // A Rector set keeps the hop out of isManual(), so the run takes the
+        // generic dry-run path this test is about.
+        $hop = new Hop(
+            id: 'php-81-to-82',
+            kind: HopKind::Php,
+            from: '8.1',
+            to: '8.2',
+            summary: 'Move PHP 8.1 code to PHP 8.2.',
+            rectorSets: ['Rector\\Set\\ValueObject\\SetList::PHP_82'],
+            notes: ['mysqli now throws on errors by default, so check your error handling.'],
+        );
+        $step = new PlanStep(1, $hop, '8.1', '8.2', null, null, null, null, [Planner::GATE_TESTS]);
+        $plan = new Plan((new ProjectDetector())->detect($dir), self::TODAY, 'test', '8.2', null, null, [$step], []);
+        $fake = $this->fake(changedPerHop: 0);
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions(dryRun: true));
+
+        self::assertSame([StepResult::PREVIEWED], $this->statuses($report));
+        $messages = $report->results[0]->messages;
+        $noEdits = array_search('No edits needed for this step (dry run).', $messages, true);
+        self::assertIsInt($noEdits);
+        $general = array_search('General notes for this step (nothing found in your app, just good to know):', $messages, true);
+        self::assertIsInt($general);
+        self::assertSame($noEdits + 1, $general);
+        self::assertSame('mysqli now throws on errors by default, so check your error handling.', $messages[$general + 1]);
+    }
+
     public function test_a_step_names_the_php_files_that_are_not_valid_utf8_as_manual_work(): void
     {
         $dir = $this->copyExample('raw-php');
