@@ -397,18 +397,23 @@ final class TextWriter
     {
         $php = $baseline->php ?? '?';
         $lines = match ($baseline->status) {
-            BaselineResult::PASSED => [sprintf('Baseline: PASS on PHP %s (tests green before any change).', $php)],
+            BaselineResult::PASSED => [sprintf('Baseline: PASS on PHP %s (%s).', $php, $this->baselinePassReason($baseline))],
             BaselineResult::FAILED => [
                 sprintf('Baseline: FAIL on PHP %s (exit %d).', $php, $baseline->exitCode ?? -1),
-                "The app's tests fail before any change; fix them or pass --allow-failing-baseline.",
+                $this->baselineFailReason($baseline),
             ],
             BaselineResult::INSTALL_FAILED => [
                 sprintf('Baseline: composer install failed (exit %d) on PHP %s.', $baseline->exitCode ?? -1, $php),
-                "The app's tests never ran, so their state is unknown; fix the app's composer.json and composer.lock, or pass --allow-failing-baseline.",
+                "The gate never ran, so its state is unknown; fix the app's composer.json and composer.lock, or pass --allow-failing-baseline.",
             ],
             BaselineResult::SKIPPED => ['Baseline: SKIPPED (no gate in this run).'],
             default => [sprintf('Baseline: %s.', $baseline->status)],
         };
+        // The syntax check is a built-in fallback, so say once what it does
+        // and what it cannot prove. Skipped runs check nothing, so no note.
+        if ($baseline->gateKind === BaselineResult::GATE_SYNTAX && $baseline->status !== BaselineResult::SKIPPED) {
+            $lines[] = 'No tests found, so each step checks that every PHP file still parses (php -l). That proves the code loads on the new PHP, not that it works: click through the app before you ship.';
+        }
         if ($baseline->warning !== null) {
             $lines[] = $baseline->warning;
         }
@@ -423,6 +428,26 @@ final class TextWriter
         }
 
         return $lines;
+    }
+
+    /** What a green baseline proved, named by what the baseline ran. */
+    private function baselinePassReason(BaselineResult $baseline): string
+    {
+        return match ($baseline->gateKind) {
+            BaselineResult::GATE_SYNTAX => 'syntax check: the app has no tests',
+            BaselineResult::GATE_CUSTOM => 'your test command passed before any change',
+            default => 'tests green before any change',
+        };
+    }
+
+    /** Why a red baseline stops the run, named by what the baseline ran. */
+    private function baselineFailReason(BaselineResult $baseline): string
+    {
+        if ($baseline->gateKind === BaselineResult::GATE_SYNTAX) {
+            return sprintf('A PHP file does not parse on PHP %s before any change. Fix it or pass --allow-failing-baseline.', $baseline->php ?? '?');
+        }
+
+        return "The app's tests fail before any change; fix them or pass --allow-failing-baseline.";
     }
 
     /** Drops control characters except newline and tab. */

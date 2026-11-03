@@ -34,6 +34,13 @@ use Waynestate\Booster\ToolError;
  */
 final class HopExecutor
 {
+    /**
+     * The gate for an app with no tests of its own: every PHP file outside
+     * vendor/ and node_modules/ must still parse on the target PHP. It proves
+     * the code loads, not that it works.
+     */
+    public const SYNTAX_CHECK_COMMAND = "find . -name '*.php' -not -path './vendor/*' -not -path './node_modules/*' -print0 | xargs -0 -r -n1 php -l > /dev/null";
+
     public function __construct(
         private readonly RectorRunner $rector,
         private readonly ComposerEditor $composer,
@@ -128,8 +135,8 @@ final class HopExecutor
             // The suite is red (or never ran) before Booster touches anything, so a later red
             // gate would be unprovable. Stop before the first hop and say so plainly.
             $reason = $baseline->status === BaselineResult::INSTALL_FAILED
-                ? sprintf('composer install failed (exit %d) before the app\'s tests ran. Fix the app\'s composer.json and composer.lock, or pass --allow-failing-baseline.', $baseline->exitCode ?? -1)
-                : "the app's tests fail before any change. Fix them or pass --allow-failing-baseline.";
+                ? sprintf('composer install failed (exit %d) before the gate ran. Fix the app\'s composer.json and composer.lock, or pass --allow-failing-baseline.', $baseline->exitCode ?? -1)
+                : $this->baselineFailureReason($baseline);
             $results = [];
             foreach ($plan->steps as $step) {
                 $results[] = new StepResult($step->number, $step->hop->id, StepResult::NOT_RUN, [], [
@@ -281,8 +288,9 @@ final class HopExecutor
         $warning = StockTests::onlyStockExamples($path)
             ? "The app's tests are only Laravel's stock examples, so the gate cannot prove anything. See \"A smoke test for WSU apps\" in the README."
             : null;
+        $kind = $this->gateKind($options, $path);
         if ($options->dryRun || $options->skipGate || $php === null) {
-            return new BaselineResult(BaselineResult::SKIPPED, $php, null, [], $warning);
+            return new BaselineResult(BaselineResult::SKIPPED, $php, null, [], $warning, $kind);
         }
 
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
@@ -294,7 +302,7 @@ final class HopExecutor
             default => BaselineResult::FAILED,
         };
 
-        return new BaselineResult($status, $php, $outcome->exitCode, $outcome->output, $warning);
+        return new BaselineResult($status, $php, $outcome->exitCode, $outcome->output, $warning, $kind);
     }
 
     /**
@@ -539,7 +547,7 @@ final class HopExecutor
                         return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...($proxies->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...($proxies->manual ?? []), ...$gate->lines, ...$notes], false, $prepass?->files() ?? []);
                     }
                     $messages = [...$messages, ...$gate->lines];
-                    $messages[] = 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.';
+                    $messages[] = $this->gatePassedLine($step->phpAfter, $baseline->gateKind);
                     $update = $this->lockUpdatePackages($step);
                     if ($update !== []) {
                         $messages[] = sprintf('The gate refreshed composer.lock (composer update -W %s).', implode(' ', $update));
@@ -1015,7 +1023,7 @@ final class HopExecutor
             if (!$gate->passed) {
                 return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
             }
-            $changes = [...$changes, ...$gate->lines, 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.'];
+            $changes = [...$changes, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $baseline->gateKind)];
         } else {
             $changes[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
         }
@@ -1058,7 +1066,7 @@ final class HopExecutor
             if (!$gate->passed) {
                 return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $migration->files, [...$messages, ...$migration->changes, $migration->summary(), ...$migration->manual, ...$gate->lines]);
             }
-            $messages = [...$messages, ...$gate->lines, 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.'];
+            $messages = [...$messages, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $baseline->gateKind)];
         } else {
             $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
         }
@@ -1134,7 +1142,7 @@ final class HopExecutor
             if (!$gate->passed) {
                 return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
             }
-            $changes = [...$changes, ...$gate->lines, 'Gate passed: tests are green on PHP ' . ($step->phpAfter ?? '?') . '.'];
+            $changes = [...$changes, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $baseline->gateKind)];
         } else {
             $changes[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
         }
@@ -2122,12 +2130,81 @@ final class HopExecutor
         return $data;
     }
 
+    /**
+     * What runs in the gate when the user passed no --test-command. The app's
+     * own suite wins: a composer "test" script, then PHPUnit or Pest when the
+     * app declares one (a config file or a require line). An app with neither
+     * gets the built-in syntax check instead of a missing vendor/bin/phpunit.
+     */
     private function defaultTestCommand(string $path): string
     {
         $composer = is_file($path . '/composer.json') ? json_decode((string) file_get_contents($path . '/composer.json'), true) : null;
         $scripts = is_array($composer) && is_array($composer['scripts'] ?? null) ? $composer['scripts'] : [];
+        if (array_key_exists('test', $scripts)) {
+            return 'composer test';
+        }
+        foreach (['phpunit.xml', 'phpunit.xml.dist', 'phpunit.dist.xml'] as $config) {
+            if (is_file($path . '/' . $config)) {
+                return 'vendor/bin/phpunit';
+            }
+        }
+        $packages = [];
+        if (is_array($composer)) {
+            foreach (['require-dev', 'require'] as $section) {
+                if (is_array($composer[$section] ?? null)) {
+                    $packages = [...$packages, ...array_keys($composer[$section])];
+                }
+            }
+        }
+        foreach (['phpunit/phpunit', 'pestphp/pest'] as $package) {
+            if (in_array($package, $packages, true)) {
+                return 'vendor/bin/phpunit';
+            }
+        }
 
-        return array_key_exists('test', $scripts) ? 'composer test' : 'vendor/bin/phpunit';
+        return self::SYNTAX_CHECK_COMMAND;
+    }
+
+    /**
+     * Which gate this run uses, so the report can name it: the user's
+     * --test-command, the app's own suite, or the built-in syntax check for
+     * an app with no tests.
+     */
+    private function gateKind(RunOptions $options, string $path): string
+    {
+        if ($options->testCommand !== null) {
+            return BaselineResult::GATE_CUSTOM;
+        }
+
+        return $this->defaultTestCommand($path) === self::SYNTAX_CHECK_COMMAND
+            ? BaselineResult::GATE_SYNTAX
+            : BaselineResult::GATE_TESTS;
+    }
+
+    /**
+     * The step's closing line for a green gate, named by what the gate ran.
+     */
+    private function gatePassedLine(?string $phpAfter, string $gateKind): string
+    {
+        $php = $phpAfter ?? '?';
+
+        return match ($gateKind) {
+            BaselineResult::GATE_SYNTAX => 'Gate passed: syntax check is clean on PHP ' . $php . '.',
+            BaselineResult::GATE_CUSTOM => 'Gate passed: your test command passed on PHP ' . $php . '.',
+            default => 'Gate passed: tests are green on PHP ' . $php . '.',
+        };
+    }
+
+    /**
+     * Why a red baseline stops the run, named by what the baseline ran.
+     */
+    private function baselineFailureReason(BaselineResult $baseline): string
+    {
+        if ($baseline->gateKind === BaselineResult::GATE_SYNTAX) {
+            return sprintf('a PHP file does not parse on PHP %s before any change. Fix it or pass --allow-failing-baseline.', $baseline->php ?? '?');
+        }
+
+        return "the app's tests fail before any change. Fix them or pass --allow-failing-baseline.";
     }
 
     /**

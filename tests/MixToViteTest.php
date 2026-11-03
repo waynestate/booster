@@ -137,7 +137,8 @@ final class MixToViteTest extends TestCase
 
         $messages = implode("\n", $report->results[0]->messages);
         self::assertStringContainsString('Build gate passed', $messages);
-        self::assertStringContainsString('Gate passed: tests are green on PHP 8.3.', $messages);
+        // makeApp() writes no tests, so the gate is the built-in syntax check.
+        self::assertStringContainsString('Gate passed: syntax check is clean on PHP 8.3.', $messages);
     }
 
     public function test_an_applied_hop_reports_the_dropped_production_block(): void
