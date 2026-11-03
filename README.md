@@ -119,7 +119,7 @@ docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-
 ```
 
 This route can run `detect`, `plan`, `scan` and `run --dry-run`. A real `run` starts Docker and uses git from inside
-Booster, which the `php:8.4-cli` image lacks, so for a real run use route 1 or route 2 (in WSL on Windows). When
+Booster, which the `php:8.4-cli` image lacks, so for a real run use the single-file or clone route (in WSL on Windows). When
 Booster itself runs in a container, pass `--skip-gate` to `run` and run the tests yourself. Node hops run `npm` in a
 `node:26` container, so they need the same daemon but no Node installed on the machine.
 
@@ -129,7 +129,7 @@ needs PHP 8.3 even when your app doesn't. Clone it as above, or run
 
 ## Single-file download
 
-Booster ships as a single-file PHAR, so Preflight and apps without Composer access can run it as one file. Route 1
+Booster ships as a single-file PHAR, so Preflight and apps without Composer access can run it as one file. The first route
 above downloads it; every version tag publishes the same `booster.phar`: the GitLab release carries it as an asset,
 and the GitHub release at github.com/waynestate/booster carries it as an attachment. Run it with `php booster.phar`.
 

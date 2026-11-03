@@ -570,7 +570,7 @@ bin/booster --version
 bin/booster plan --path=/path/to/your-app</pre>
             <button class="copy" type="button" data-copy="#code-unix">Copy</button>
           </div>
-          <p class="os__note">Ubuntu splits the XML extension out of <code>php-cli</code>, and Composer's dev dependencies need it: when Composer says 'ext-dom is missing', run that line. On macOS: <code>brew install php composer git</code>. Ubuntu 22.04 ships PHP 8.1, too old for Booster: add the ondrej/php PPA or use Docker (route 4). Never clone Booster inside an app, and <code>--path</code> takes a full path, not <code>~</code>.</p>
+          <p class="os__note">Ubuntu splits the XML extension out of <code>php-cli</code>, and Composer's dev dependencies need it: when Composer says 'ext-dom is missing', run that line. On macOS: <code>brew install php composer git</code>. Ubuntu 22.04 ships PHP 8.1, too old for Booster: add the ondrej/php PPA or use the Docker route below. Never clone Booster inside an app, and <code>--path</code> takes a full path, not <code>~</code>.</p>
           <p class="os__note">In WSL, keep Booster and the app in your Linux home folder, not under <code>/mnt/c</code> (a Windows drive is slow from Linux); a Windows folder is <code>/mnt/c/Users/&lt;you&gt;/...</code>, and <code>run</code> needs Docker Desktop's WSL integration switched on.</p>
         </div>
         <div class="os__panel" role="tabpanel" id="os-win-panel" aria-labelledby="os-win" tabindex="0" hidden>
@@ -591,7 +591,7 @@ docker run --rm -v "${PWD}:/booster" -w /booster composer:2 composer install --n
 docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-cli php bin/booster plan --path=/app</pre>
             <button class="copy" type="button" data-copy="#code-docker">Copy</button>
           </div>
-          <p class="os__note">This route can run <code>detect</code>, <code>plan</code>, <code>scan</code> and <code>run --dry-run</code>. A real <code>run</code> starts Docker and uses git from inside Booster, which the <code>php:8.4-cli</code> image lacks, so for a real run use route 1 or route 2 (in WSL on Windows). When Booster itself runs in a container, pass <code>--skip-gate</code> to <code>run</code> and run the tests yourself.</p>
+          <p class="os__note">This route can run <code>detect</code>, <code>plan</code>, <code>scan</code> and <code>run --dry-run</code>. A real <code>run</code> starts Docker and uses git from inside Booster, which the <code>php:8.4-cli</code> image lacks, so for a real run use the single-file or clone route (in WSL on Windows). When Booster itself runs in a container, pass <code>--skip-gate</code> to <code>run</code> and run the tests yourself.</p>
         </div>
 
         <div class="install__side">
