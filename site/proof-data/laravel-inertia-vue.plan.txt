@@ -1,0 +1,32 @@
+BOOSTER plan for examples/laravel-inertia-vue
+  app type: laravel-inertia-vue
+  PHP: 8.3 -> 8.5
+  Laravel: 12 -> 13
+  policy: waynestate/creed 0.1.4 (today 2026-11-03)
+
+1. laravel-12-to-13
+   Move a Laravel 12 app to Laravel 13.
+   After this step your tests run in Docker.
+2. php-83-to-84
+   Move PHP 8.3 code to PHP 8.4.
+   After this step your tests run in Docker.
+   Removed between PHP 8.3 and PHP 8.4: none found.
+3. php-84-to-85
+   Move PHP 8.4 code to PHP 8.5.
+   After this step your tests run in Docker.
+   Removed between PHP 8.4 and PHP 8.5: none found.
+4. node-pin-24
+   Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
+   After this step your tests run in Docker.
+
+PHPCompatibility check for PHP 8.4: no findings.
+
+PHPStan scan: could not run
+   phpstan exited 1 without a JSON report.
+   [ERROR] No files found to analyse.
+
+Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
+for you to read, not errors.
+Booster does every numbered step above when you run it.
+Preview the edits: php bin/booster run --path=examples/laravel-inertia-vue --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-inertia-vue)

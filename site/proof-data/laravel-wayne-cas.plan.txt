@@ -1,0 +1,38 @@
+BOOSTER plan for examples/laravel-wayne-cas
+  app type: laravel-blade
+  PHP: 8.3 -> 8.5
+  Laravel: 12 -> 13
+  policy: waynestate/creed 0.1.4 (today 2026-11-03)
+
+1. laravel-12-to-13
+   Move a Laravel 12 app to Laravel 13.
+   After this step your tests run in Docker.
+2. php-83-to-84
+   Move PHP 8.3 code to PHP 8.4.
+   After this step your tests run in Docker.
+   Removed between PHP 8.3 and PHP 8.4: none found.
+3. php-84-to-85
+   Move PHP 8.4 code to PHP 8.5.
+   After this step your tests run in Docker.
+   Removed between PHP 8.4 and PHP 8.5: none found.
+
+Warning: The app uses wayne-cas. Add --sesame to plan the swap to SESAME.
+
+Warning: Not checked: cit-web-infra/wayne-cas (not on Packagist or unreachable).
+
+PHPCompatibility check for PHP 8.4: no findings.
+
+PHPStan on PHP 8.5: 16 findings (code quality hints, not upgrade blockers).
+   app/Http/Kernel.php:7 [missingType.property] Property App\Http\Kernel::$middlewareGroups has no type specified.
+   app/Http/Kernel.php:9 [class.notFound] Class App\Http\Middleware\EncryptCookies not found.
+   app/Http/Kernel.php:10 [class.notFound] Class Illuminate\Session\Middleware\StartSession not found.
+   app/Http/Kernel.php:15 [missingType.property] Property App\Http\Kernel::$routeMiddleware has no type specified.
+   app/Http/Kernel.php:16 [class.notFound] Class WSU\WayneCas\WayneAuthenticate not found.
+   (11 more; run `booster scan --phpstan` to see all)
+   Hint: Laravel app without Larastan: Eloquent and facade calls show as errors. composer require --dev larastan/larastan for a cleaner scan.
+
+Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
+for you to read, not errors.
+Booster does every numbered step above when you run it.
+Preview the edits: php bin/booster run --path=examples/laravel-wayne-cas --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-wayne-cas)

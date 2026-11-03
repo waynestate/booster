@@ -1,0 +1,81 @@
+BOOSTER dry run (nothing was changed)
+
+Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+
+1. php-74-to-80: PREVIEWED (1 file)
+   Largest risk hop: loose comparison of numbers and strings changed, many warnings became thrown errors, and arithmetic on arrays throws.
+   Write or extend tests before applying this hop; only tests and review find behavior changes here.
+   Behavior changes to check:
+   Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; < / <= against negative numbers also flip for such strings
+     check: Audit loose comparisons of request parameters and string DB columns
+   Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output
+     keep old: error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED in php.ini
+     check: Watch error logs and rendered pages for new notices after the hop
+   --- src/Legacy.php
+   --- Original
+   +++ New
+   @@ -4,22 +4,18 @@
+    
+    class Legacy
+    {
+   -    /** @var string */
+   -    private $name;
+   -
+   -    public function __construct(string $name)
+   +    public function __construct(private string $name)
+        {
+   -        $this->name = $name;
+        }
+    
+        public function mentionsAdmin(string $text): bool
+        {
+   -        return strpos($text, 'admin') !== false;
+   +        return str_contains($text, 'admin');
+        }
+    
+        public function className($object): string
+        {
+   -        return get_class($object);
+   +        return $object::class;
+        }
+    
+        public function label(string $label = null): string
+   
+2. php-80-to-81: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   mysqli now throws on errors by default; PDO on MySQL returns native int and float types; htmlspecialchars() now escapes single quotes.
+   Passing null to a non-nullable built-in parameter is deprecated: check the log after the run.
+3. php-81-to-82: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+4. php-82-to-83: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+5. php-83-to-84: PREVIEWED (1 file)
+   Implicitly nullable parameters (T $a = null) are deprecated; fputcsv(), fgetcsv() and str_getcsv() want an explicit escape argument.
+   --- src/Legacy.php
+   --- Original
+   +++ New
+   @@ -22,7 +22,7 @@
+            return get_class($object);
+        }
+    
+   -    public function label(string $label = null): string
+   +    public function label(?string $label = null): string
+        {
+            return $label ?? $this->name;
+        }
+   
+6. php-84-to-85: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
+   PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
+
+Unique files across hops: 1. Later hops were previewed against the original tree, so the same file can appear in several hops.
+
+RESULT: PASS (previewed, no tests ran)
+
+Dry run: these changes were previewed, none were applied.
+Nothing was changed. RESULT: PASS means the preview worked; no tests ran.
+Next, if the edits look right: php bin/booster run --path=examples/raw-php
+(It needs Docker and a clean git folder. Commit or stash first.)

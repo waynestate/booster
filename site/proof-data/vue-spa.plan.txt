@@ -1,0 +1,44 @@
+BOOSTER plan for examples/vue-spa
+  app type: raw-php-vue
+  PHP: 8.0 -> 8.5
+  policy: waynestate/creed 0.1.4 (today 2026-11-03)
+
+1. php-80-to-81
+   Move PHP 8.0 code to PHP 8.1.
+   After this step your tests run in Docker.
+   Removed between PHP 8.0 and PHP 8.1: none found.
+2. php-81-to-82
+   Move PHP 8.1 code to PHP 8.2.
+   After this step your tests run in Docker.
+   Removed between PHP 8.1 and PHP 8.2: none found.
+3. php-82-to-83
+   Move PHP 8.2 code to PHP 8.3.
+   After this step your tests run in Docker.
+   Removed between PHP 8.2 and PHP 8.3: none found.
+4. php-83-to-84
+   Move PHP 8.3 code to PHP 8.4.
+   After this step your tests run in Docker.
+   Removed between PHP 8.3 and PHP 8.4: none found.
+5. php-84-to-85
+   Move PHP 8.4 code to PHP 8.5.
+   After this step your tests run in Docker.
+   Removed between PHP 8.4 and PHP 8.5: none found.
+6. node-pin-24
+   Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
+   After this step your tests run in Docker.
+7. vue-27-to-compat
+   Move a Vue 2.7 front end to Vue 3 through the @vue/compat build.
+   After this step your tests run in Docker.
+8. vue-compat-codemod
+   Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists.
+   After this step your tests run in Docker.
+
+PHPCompatibility check for PHP 8.1: no findings.
+
+PHPStan on PHP 8.5: no findings.
+
+Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
+for you to read, not errors.
+Booster does every numbered step above when you run it.
+Preview the edits: php bin/booster run --path=examples/vue-spa --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/vue-spa)

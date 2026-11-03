@@ -1,0 +1,40 @@
+BOOSTER dry run (nothing was changed)
+
+Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+
+1. php-80-to-81: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   mysqli now throws on errors by default; PDO on MySQL returns native int and float types; htmlspecialchars() now escapes single quotes.
+   Passing null to a non-nullable built-in parameter is deprecated: check the log after the run.
+2. php-81-to-82: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+3. php-82-to-83: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+4. php-83-to-84: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   Implicitly nullable parameters (T $a = null) are deprecated; fputcsv(), fgetcsv() and str_getcsv() want an explicit escape argument.
+5. php-84-to-85: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
+   PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
+6. node-pin-24: PREVIEWED (0 files)
+   Dry run: would set engines.node to >=26 in package.json and write .nvmrc with 26.
+   The pin is a floor, not a ceiling: engines.node ">=26" still allows newer Node majors.
+   Later front-end hops run in the same node:26 container, so this hop comes before them.
+7. vue-27-to-compat: PREVIEWED (0 files)
+   Dry run: would set vue to ^3.5 in package.json, set @vue/compat to ^3.5 in package.json, set @vue/compiler-sfc to ^3.5 in package.json, set vue-loader to ^17.4 in package.json if it is listed and remove vue-template-compiler from package.json.
+   Point the bundler at @vue/compat instead of vue (an alias in webpack or resolve.alias in Vite) and start with compat MODE 2 so the build warns instead of breaking.
+   Fix every migration warning the build prints, then switch MODE to 3 to turn compat off, and remove @vue/compat from package.json.
+   Move Vuex to Pinia and Vue Router 3 to 4 by hand; the compat build does not rewrite your store or routes.
+8. vue-compat-codemod: PREVIEWED (0 files)
+   Dry run: Refusing to run the codemod: package.json does not list @vue/compat, so the app needs vue-27-to-compat first. Run that hop, then run this hop again.
+   vue-upgrade-tool is lightly maintained; review every change it makes before you trust the diff.
+   The tool lists the items it cannot fix; Booster keeps them in the hop result, so work through that list before you switch @vue/compat MODE to 3.
+   The codemod needs @vue/compat in package.json, which the vue-27-to-compat hop installs; run that hop first.
+
+RESULT: PASS (previewed, no tests ran)
+
+Nothing was changed.
