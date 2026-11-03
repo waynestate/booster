@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Run;
 
 /**
- * The baseline: the app's own tests, run once on the PHP the app is on now,
- * before the first hop touches anything. A red baseline means the suite was
- * already broken, so a later red gate is not Booster's doing.
+ * The baseline: what the gate runs, once, on the PHP the app is on now,
+ * before the first hop touches anything. That is the app's own tests, or the
+ * built-in syntax check when the app has no tests. A red baseline means the
+ * gate was already failing, so a later red gate is not Booster's doing.
  */
 final readonly class BaselineResult
 {
@@ -20,9 +21,19 @@ final readonly class BaselineResult
     /** composer install failed before the tests ran, so the suite's state is unknown. */
     public const INSTALL_FAILED = 'install-failed';
 
+    /** The baseline ran the app's own test suite. */
+    public const GATE_TESTS = 'tests';
+
+    /** The baseline was the built-in php -l syntax check, because the app has no tests. */
+    public const GATE_SYNTAX = 'syntax';
+
+    /** The baseline was the command the user passed with --test-command. */
+    public const GATE_CUSTOM = 'custom';
+
     /**
-     * @param list<string> $output  the last lines of the run's output
-     * @param string|null  $warning an advisory about the suite itself (for example that it holds only Laravel's stock examples)
+     * @param list<string> $output   the last lines of the run's output
+     * @param string|null  $warning  an advisory about the suite itself (for example that it holds only Laravel's stock examples)
+     * @param string       $gateKind which gate the baseline ran: the app's tests, the built-in syntax check, or a --test-command
      */
     public function __construct(
         public string $status,
@@ -30,6 +41,7 @@ final readonly class BaselineResult
         public ?int $exitCode,
         public array $output = [],
         public ?string $warning = null,
+        public string $gateKind = self::GATE_TESTS,
     ) {}
 
     public function failed(): bool
@@ -48,6 +60,7 @@ final readonly class BaselineResult
             'exit_code' => $this->exitCode,
             'output' => $this->output,
             'warning' => $this->warning,
+            'gate' => $this->gateKind,
         ];
     }
 }

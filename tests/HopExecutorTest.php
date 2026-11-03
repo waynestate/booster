@@ -248,6 +248,49 @@ final class HopExecutorTest extends TestCase
         self::assertStringContainsString('--allow-failing-baseline', implode(' ', $report->results[0]->messages));
     }
 
+    public function test_the_report_names_the_syntax_check_when_the_app_has_no_tests(): void
+    {
+        $fake = $this->fake();
+        $report = $this->execute($fake, new RunOptions());
+
+        self::assertSame(BaselineResult::GATE_SYNTAX, $report->baseline->gateKind);
+        $text = (new TextWriter())->run($report);
+        self::assertStringContainsString('Baseline: PASS on PHP 8.1 (syntax check: the app has no tests).', $text);
+        self::assertStringContainsString('No tests found, so each step checks that every PHP file still parses (php -l). That proves the code loads on the new PHP, not that it works: click through the app before you ship.', $text);
+        // The note goes out once per run, right after the baseline line.
+        self::assertSame(1, substr_count($text, 'No tests found'));
+        self::assertStringContainsString('Gate passed: syntax check is clean on PHP 8.3.', $text);
+        self::assertStringNotContainsString('tests are green', $text);
+    }
+
+    public function test_a_failing_syntax_baseline_says_a_php_file_does_not_parse(): void
+    {
+        $fake = $this->fake(baselineExit: 1);
+        $report = $this->execute($fake, new RunOptions());
+
+        self::assertSame(['not-run', 'not-run'], $this->statuses($report));
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('a PHP file does not parse on PHP 8.1 before any change. Fix it or pass --allow-failing-baseline.', $all);
+        self::assertStringNotContainsString("the app's tests fail", $all);
+        $text = (new TextWriter())->run($report);
+        self::assertStringContainsString('Baseline: FAIL on PHP 8.1 (exit 1).', $text);
+        self::assertStringContainsString('A PHP file does not parse on PHP 8.1 before any change. Fix it or pass --allow-failing-baseline.', $text);
+    }
+
+    public function test_an_explicit_test_command_is_named_as_yours_in_the_report(): void
+    {
+        $fake = $this->fake();
+        $report = $this->execute($fake, new RunOptions(testCommand: 'php artisan test'));
+
+        self::assertSame(BaselineResult::GATE_CUSTOM, $report->baseline->gateKind);
+        $run = $this->dockerRuns($fake)[0]['command'];
+        self::assertStringContainsString('php artisan test >"$tests_log" 2>&1', $run[count($run) - 1]);
+        $text = (new TextWriter())->run($report);
+        self::assertStringContainsString('Baseline: PASS on PHP 8.1 (your test command passed before any change).', $text);
+        self::assertStringContainsString('Gate passed: your test command passed on PHP 8.3.', $text);
+        self::assertStringNotContainsString('No tests found', $text);
+    }
+
     public function test_allow_failing_baseline_continues_and_labels_gate_failures(): void
     {
         $report = $this->execute($this->fake(baselineExit: 1, gateExit: 1), new RunOptions(allowFailingBaseline: true));
@@ -310,6 +353,8 @@ final class HopExecutorTest extends TestCase
         self::assertSame('passed', $array['baseline']['status']);
         self::assertSame('8.1', $array['baseline']['php']);
         self::assertSame(0, $array['baseline']['exit_code']);
+        // The raw-php example has no tests, so the baseline ran the syntax check.
+        self::assertSame('syntax', $array['baseline']['gate']);
     }
 
     public function test_the_baseline_keeps_the_tail_the_container_reports(): void
