@@ -8,11 +8,11 @@ use Waynestate\Booster\Console\Invocation;
 
 final class InvocationTest extends TestCase
 {
-    public function test_a_checkout_run_is_named_php_bin_booster(): void
+    public function test_a_booster_path_keeps_its_path_as_typed(): void
     {
-        self::assertSame('php bin/booster', Invocation::program('/home/u/booster/bin/booster'));
+        self::assertSame('php /home/u/booster/bin/booster', Invocation::program('/home/u/booster/bin/booster'));
         self::assertSame('php bin/booster', Invocation::program('bin/booster'));
-        self::assertSame('php bin/booster', Invocation::program('C:\\tools\\booster'));
+        self::assertSame('php C:\\tools\\booster', Invocation::program('C:\\tools\\booster'));
     }
 
     public function test_a_phar_keeps_its_path_as_typed(): void

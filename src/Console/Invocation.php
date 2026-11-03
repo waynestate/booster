@@ -6,16 +6,17 @@ namespace Waynestate\Booster\Console;
 
 /**
  * How this Booster was started, so a report's "Next:" line names the same
- * command the person just typed: `php bin/booster` from a checkout,
- * `php something.phar` for a phar, or the bare alias when there is no file
- * to hand to php.
+ * command the person just typed: a bin/booster or a .phar exactly as typed
+ * after `php`, the bare alias when there is no file to hand to php, and
+ * `php bin/booster` when the runner gives nothing away (tests, phpunit).
  */
 final class Invocation
 {
     /**
      * The program name for a "Next:" line. Reads argv[0] unless a test passes
      * one. A basename of `booster` (bin/booster) or a `.phar` keeps the path
-     * as typed after `php`; a bare `booster` with no such file in the current
+     * as typed after `php` (backslashes count as dir parts, so this works on
+     * Windows too); a bare `booster` with no such file in the current
      * directory is an alias or a script on PATH, so it stays `booster`.
      * Anything else (phpunit, tests) falls back to the checkout form.
      */
@@ -26,7 +27,7 @@ final class Invocation
             return 'php bin/booster';
         }
 
-        $base = basename($argv0);
+        $base = basename(str_replace('\\', '/', $argv0));
         if ($base !== 'booster' && !str_ends_with($base, '.phar')) {
             return 'php bin/booster';
         }
