@@ -264,7 +264,7 @@ final class CliTest extends TestCase
         self::assertSame(0, $exit);
         self::assertStringContainsString('1. php-74-to-80', $out);
         self::assertStringContainsString('PHPCompatibility scan: could not run', $out);
-        self::assertStringContainsString('PHPCompatibility is not registered. If composer blocked a plugin, run: composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true, then composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"', $out);
+        self::assertStringContainsString("PHPCompatibility is not registered. Booster ships the tool with its dependencies; reinstall Booster's dependencies with: composer install in Booster's folder, or download the PHAR again", $out);
     }
 
     public function test_scan_prints_the_findings_and_exits_0(): void

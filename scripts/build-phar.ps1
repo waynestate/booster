@@ -10,7 +10,7 @@
       2. copies the runtime sources into a temp dir and installs only the no-dev
          (runtime) dependencies there,
       3. runs Box against that temp copy, so the phar contains src/, config/,
-         docker/, resources/ and the runtime vendor deps only (no dev deps),
+         data/, docker/, resources/ and the runtime vendor deps only (no dev deps),
       4. copies the built phar back into build/,
       5. verifies it runs by printing Booster's version.
 
@@ -59,6 +59,7 @@ try {
     Copy-Item -Recurse -Force -LiteralPath (Join-Path $Root 'src') -Destination (Join-Path $Tmp 'src')
     Copy-Item -Recurse -Force -LiteralPath (Join-Path $Root 'bin') -Destination (Join-Path $Tmp 'bin')
     Copy-Item -Recurse -Force -LiteralPath (Join-Path $Root 'config') -Destination (Join-Path $Tmp 'config')
+    Copy-Item -Recurse -Force -LiteralPath (Join-Path $Root 'data') -Destination (Join-Path $Tmp 'data')
     Copy-Item -Recurse -Force -LiteralPath (Join-Path $Root 'docker') -Destination (Join-Path $Tmp 'docker')
     Copy-Item -Recurse -Force -LiteralPath (Join-Path $Root 'resources') -Destination (Join-Path $Tmp 'resources')
     Copy-Item -Force -LiteralPath (Join-Path $Root 'composer.json') -Destination (Join-Path $Tmp 'composer.json')

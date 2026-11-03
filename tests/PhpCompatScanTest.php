@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Tests;
 
+use Waynestate\Booster\Packaging\PharFiles;
 use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\Run\SymfonyProcessRunner;
 use Waynestate\Booster\Scan\PhpCompatScan;
@@ -71,6 +72,74 @@ final class PhpCompatScanTest extends TestCase
         self::assertContains('--ignore=(?:^|/)(?:vendor|node_modules|storage)(?:/|\z)', $command);
     }
 
+    public function test_boosters_own_phpcs_gets_the_installed_paths_flag(): void
+    {
+        // The app has no phpcs of its own, so discovery lands on Booster's
+        // vendor/bin/phpcs (present once Booster's dependencies are
+        // installed). Both the -i probe and the scan must point phpcs at the
+        // bundled standard with --runtime-set installed_paths.
+        $app = $this->tempDir();
+        $json = $this->phpcsJson([]);
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(0, (string) json_encode($json), ''));
+
+        (new PhpCompatScan($fake))->scan($app, '8.0');
+
+        $own = PharFiles::path('vendor') . '/bin/phpcs';
+        self::assertContains($own, $fake->calls[0]['command']);
+        $expected = PharFiles::path('vendor') . '/phpcompatibility/php-compatibility';
+        $commands = array_merge($fake->commandsContaining('-i'), $fake->commandsContaining('--standard=PHPCompatibility'));
+        self::assertCount(2, $commands);
+        foreach ($commands as $command) {
+            $i = array_search('installed_paths', $command, true);
+            self::assertFalse($i === false);
+            self::assertSame('--runtime-set', $command[$i - 1]);
+            self::assertSame($expected, $command[$i + 1]);
+        }
+    }
+
+    public function test_the_app_and_path_launchers_get_no_installed_paths_flag(): void
+    {
+        $json = $this->phpcsJson([]);
+        $clean = static fn(): ProcessResult => new ProcessResult(0, (string) json_encode($json), '');
+        $own = PharFiles::path('vendor') . '/bin/phpcs';
+
+        // The app's own phpcs wins discovery: neither its -i probe nor the
+        // scan may carry the flag.
+        $app = $this->tempDir();
+        mkdir($app . '/vendor/bin', 0775, true);
+        file_put_contents($app . '/vendor/bin/phpcs', '');
+        $appFake = $this->phpcsFake($clean);
+
+        (new PhpCompatScan($appFake))->scan($app, '8.0');
+
+        self::assertContains($app . '/vendor/bin/phpcs', $appFake->calls[0]['command']);
+        self::assertCount(0, $appFake->commandsContaining('installed_paths'));
+
+        // With Booster's own phpcs unable to run, discovery falls through to
+        // phpcs on the PATH. The probe of Booster's own copy keeps the flag
+        // (it is Booster's launcher); the PATH launcher's probe and scan must
+        // not carry it.
+        $bare = $this->tempDir();
+        $pathFake = new FakeProcessRunner(static function (array $command) use ($clean, $own): ProcessResult {
+            if (in_array('-i', $command, true)) {
+                if (in_array($own, $command, true)) {
+                    return new ProcessResult(1, '', 'could not run');
+                }
+
+                return new ProcessResult(0, self::PHPCOMPAT_STANDARDS, '');
+            }
+
+            return $clean();
+        });
+
+        (new PhpCompatScan($pathFake))->scan($bare, '8.0');
+
+        self::assertContains('phpcs', $pathFake->calls[1]['command']);
+        self::assertContains('installed_paths', $pathFake->calls[0]['command']);
+        self::assertNotContains('installed_paths', $pathFake->calls[1]['command']);
+        self::assertNotContains('installed_paths', $pathFake->calls[2]['command']);
+    }
+
     public function test_a_clean_app_has_no_findings(): void
     {
         $app = $this->tempDir();
@@ -98,12 +167,11 @@ final class PhpCompatScanTest extends TestCase
         self::assertStringContainsString('/nonexistent/phpcs', (string) $scan->error);
     }
 
-    public function test_a_running_phpcs_without_the_standard_points_at_the_blocked_plugin(): void
+    public function test_a_running_phpcs_without_the_standard_points_at_reinstalling_boosters_dependencies(): void
     {
         $app = $this->tempDir();
-        // The app's own phpcs is present, as after a `composer require` whose
-        // installer plugin Composer blocked: it runs, but its standard list
-        // lacks PHPCompatibility.
+        // The app's own phpcs is present: it runs, but its standard list
+        // lacks PHPCompatibility, as does every other candidate's.
         mkdir($app . '/vendor/bin', 0775, true);
         file_put_contents($app . '/vendor/bin/phpcs', '');
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, "The installed standards are PEAR, PSR1, PSR2, PSR12, Squiz, Zend\n", ''));
@@ -111,10 +179,10 @@ final class PhpCompatScanTest extends TestCase
         $scan = (new PhpCompatScan($fake))->scan($app, '8.0');
 
         self::assertFalse($scan->ok);
-        self::assertSame('PHPCompatibility is not registered. If composer blocked a plugin, run: composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true, then composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"', (string) $scan->error);
+        self::assertSame("PHPCompatibility is not registered. Booster ships the tool with its dependencies; reinstall Booster's dependencies with: composer install in Booster's folder, or download the PHAR again", (string) $scan->error);
     }
 
-    public function test_no_running_phpcs_keeps_the_install_hint_with_the_plugin_approval(): void
+    public function test_no_running_phpcs_points_at_reinstalling_boosters_dependencies(): void
     {
         $app = $this->tempDir();
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(1, '', 'phpcs: command not found'));
@@ -122,7 +190,7 @@ final class PhpCompatScanTest extends TestCase
         $scan = (new PhpCompatScan($fake))->scan($app, '8.0');
 
         self::assertFalse($scan->ok);
-        self::assertSame('PHP compatibility scan skipped: PHPCompatibility is not installed. Enable it with: composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true, then composer require --dev phpcompatibility/php-compatibility:"^10.0@alpha"', (string) $scan->error);
+        self::assertSame("PHP compatibility scan skipped: no PHP_CodeSniffer carrying PHPCompatibility could run. Booster ships the tool; reinstall Booster's dependencies with: composer install in Booster's folder, or download the PHAR again", (string) $scan->error);
     }
 
     public function test_a_crash_without_json_is_a_scan_error(): void

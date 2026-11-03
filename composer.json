@@ -16,24 +16,19 @@
         "php": "^8.3",
         "composer/semver": "^3.4",
         "driftingly/rector-laravel": "^2.7",
+        "phpcompatibility/php-compatibility": "^10.0.0@alpha",
+        "phpstan/phpstan": "^2.1",
         "rector/rector": "^2.8",
+        "squizlabs/php_codesniffer": "^3.13",
         "symfony/console": "^7.1",
         "symfony/process": "^7.1",
         "waynestate/proctor": "^0.3",
-        "waynestate/creed": "^0.1"
+        "waynestate/creed": "^0.1",
+        "waynestate/pinstripe": "^0.1"
     },
     "require-dev": {
         "laravel/pint": "^1.32",
-        "phpcompatibility/php-compatibility": "^10.0.0@alpha",
-        "phpstan/phpstan": "^2.1",
-        "phpunit/phpunit": "^11.5",
-        "squizlabs/php_codesniffer": "^3.13",
-        "waynestate/pinstripe": "^0.1"
-    },
-    "suggest": {
-        "phpcompatibility/php-compatibility": "Optional: enables the PHP compatibility advisory scan (booster plan, booster scan). Install with composer require --dev phpcompatibility/php-compatibility:\"^10.0@alpha\"",
-        "squizlabs/php_codesniffer": "Optional: the PHP_CodeSniffer runner the PHP compatibility scan needs.",
-        "waynestate/pinstripe": "Optional: the Pinstripe PHPStan preset the PHPStan advisory scan runs against (booster plan, booster scan --phpstan). Install with composer require --dev waynestate/pinstripe:\"^0.1\""
+        "phpunit/phpunit": "^11.5"
     },
     "config": {
         "process-timeout": 900,
