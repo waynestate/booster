@@ -16,6 +16,9 @@ final class BoxFilesListTest extends TestCase
     /** @var list<string> */
     private const DIRECTORIES = ['config', 'data', 'docker', 'resources'];
 
+    /** @var list<string> */
+    private const SCAN_LAUNCHERS = ['vendor/bin/phpcs', 'vendor/bin/phpstan'];
+
     public function test_every_runtime_file_is_listed_in_box_files(): void
     {
         $root = dirname(__DIR__);
@@ -40,6 +43,35 @@ final class BoxFilesListTest extends TestCase
         }
 
         self::assertSame([], $missing, 'Files missing from box.json.dist "files": ' . implode(', ', $missing));
+    }
+
+    /**
+     * The PHPCompatibility and PHPStan scans launch Booster's own tools
+     * through vendor/bin/phpcs and vendor/bin/phpstan inside the unpacked
+     * PHAR. Box auto-discovery skips vendor/bin, so the two Composer proxy
+     * files must be listed explicitly, or both scans report a skip.
+     */
+    public function test_the_scan_tool_launchers_are_listed_in_box_files(): void
+    {
+        $root = dirname(__DIR__);
+        $boxPath = $root . '/box.json.dist';
+        self::assertFileExists($boxPath);
+
+        $box = json_decode((string) file_get_contents($boxPath), true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($box);
+        self::assertArrayHasKey('files', $box);
+        self::assertIsArray($box['files']);
+
+        $listed = array_map(static fn($path): string => str_replace('\\', '/', (string) $path), $box['files']);
+
+        $missing = [];
+        foreach (self::SCAN_LAUNCHERS as $launcher) {
+            if (! in_array($launcher, $listed, true)) {
+                $missing[] = $launcher;
+            }
+        }
+
+        self::assertSame([], $missing, 'Scan tool launchers missing from box.json.dist "files": ' . implode(', ', $missing));
     }
 
     /**
