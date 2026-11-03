@@ -10,10 +10,16 @@ This page runs Booster on an app for the first time. Next: [What a hop does](hop
 ```
 booster detect --path=../my-app        # which of the five permutations, and which versions
 booster plan   --path=../my-app        # the ordered hops to a supported version
-booster scan   --path=../my-app --php=8.0   # what will break on that PHP; advisory, changes nothing
+booster scan   --path=../my-app --php=<target>   # what will break on that newer PHP; advisory, changes nothing
 booster run    --path=../my-app --dry-run   # the diffs Rector would make; changes nothing
 booster run    --path=../my-app        # apply the plan, one hop at a time, with a test gate
 ```
+
+Replace `<target>` with the PHP version you are heading for, for example the one `plan` shows on its last step.
+
+A real run needs git and Docker on the machine that runs Booster. If you used the Docker-only route, the first four commands above work as they are, but the last one does not: its `php:8.4-cli` image has no git. Use the single-file or clone route for `booster run` (see Install).
+
+Booster prints its progress lines on standard error. In Windows PowerShell they print in red, as if they were errors. They are not errors; the exit code tells you whether the run worked.
 
 The one-command form for a forced image upgrade:
 

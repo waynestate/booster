@@ -51,9 +51,9 @@ Run Booster from its own folder with `--path` pointing at the app; never clone B
 bin/booster plan --path=/path/to/your-app
 ```
 
-`--path` takes a full path, not `~`. In WSL, keep Booster and the app in your Linux home folder, not under `/mnt/c`
-(a Windows drive is slow from Linux); a Windows folder is `/mnt/c/Users/<you>/...`, and `run` needs Docker Desktop's
-WSL integration switched on.
+`--path` takes a path, and a leading `~` means your home folder (from `HOME`, or `USERPROFILE` on Windows). In WSL,
+keep Booster and the app in your Linux home folder, not under `/mnt/c` (a Windows drive is slow from Linux); a
+Windows folder is `/mnt/c/Users/<you>/...`, and `run` needs Docker Desktop's WSL integration switched on.
 
 ## Windows PowerShell, with PHP and Composer installed
 
@@ -67,14 +67,20 @@ php bin\booster plan --path=..\my-app
 ## Docker only, no PHP (Windows or any OS)
 
 ```
-docker run --rm -v "${PWD}:/booster" -w /booster composer:2 composer install --no-interaction
+git clone https://github.com/waynestate/booster.git
+cd booster
+docker run --rm -v "${PWD}:/booster" -w /booster composer:2.10.3 composer install --no-interaction
 docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-cli php bin/booster plan --path=/app
 ```
+
+Run these from inside the booster folder.
 
 This route can run `detect`, `plan`, `scan` and `run --dry-run`. A real `run` starts Docker and uses git from inside
 Booster, which the `php:8.4-cli` image lacks, so for a real run use the single-file or clone route (in WSL on Windows). When
 Booster itself runs in a container, pass `--skip-gate` to `run` and run the tests yourself. Node hops run `npm` in a
 `node:26` container, so they need the same daemon but no Node installed on the machine.
+
+Booster prints its progress lines on standard error. In Windows PowerShell they print in red, as if they were errors. They are not errors; the exit code tells you whether the run worked.
 
 Booster is also on Packagist as `waynestate/booster`: give it its own folder, not your app's `vendor/`, because it
 needs PHP 8.3 even when your app doesn't. Clone it as above, or run
