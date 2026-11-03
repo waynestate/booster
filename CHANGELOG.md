@@ -20,6 +20,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - A PHP file that is not valid UTF-8 no longer crashes Rector's report: Booster runs Rector without it and lists it as manual work. If Rector still dies on malformed UTF-8 the error now says so instead of pointing at memory.
 - `composer ci` no longer dies at Composer's 300 second process timeout: `config.process-timeout` is 900.
 - A Rector "Class X should be known at this point" error on a legacy file no longer stops the hop: Booster reruns it once without those files, applies the rest, and lists the files as manual work.
+- `bin/booster` is committed as executable, so `bin/booster --version` works on a plain clone (Linux, macOS, WSL); a test keeps it that way.
 
 ## [1.7.0] - 2026-11-01
 
