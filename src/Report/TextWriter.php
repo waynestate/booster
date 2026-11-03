@@ -23,6 +23,9 @@ final class TextWriter
     /** How many findings the text report shows before it says "and more". */
     private const MAX_FINDINGS = 20;
 
+    /** How many PHPStan findings the plan shows before it points at `booster scan --phpstan`. */
+    private const SHORT_FINDINGS = 5;
+
     /**
      * @param array<int, RemovalsResult>  $removalsByStep removals result per PHP step number
      * @param array<int, BehaviourResult> $behaviourByStep behaviour changes per step number
@@ -115,9 +118,12 @@ final class TextWriter
 
     /**
      * The advisory PHPStan section that follows a plan: what static analysis
-     * says at the target PHP version, or why the scan could not run.
+     * says at the target PHP version, or why the scan could not run. With
+     * $short (the plan) only the first five findings print, and the tail
+     * points at `booster scan --phpstan` for the rest; $short false (the
+     * scan command) lists up to MAX_FINDINGS as before.
      */
-    public function phpStan(ScanResult $scan): string
+    public function phpStan(ScanResult $scan, bool $short = false): string
     {
         if (!$scan->ok) {
             $lines = ['PHPStan scan: could not run'];
@@ -131,14 +137,17 @@ final class TextWriter
         $count = count($scan->findings);
         $lines = [$count === 0
             ? sprintf('PHPStan on PHP %s: no findings.', $scan->testVersion)
-            : sprintf('PHPStan on PHP %s: %d %s.', $scan->testVersion, $count, $count === 1 ? 'finding' : 'findings')];
-        foreach (array_slice($scan->findings, 0, self::MAX_FINDINGS) as $finding) {
+            : sprintf('PHPStan on PHP %s: %d %s (code quality hints, not upgrade blockers).', $scan->testVersion, $count, $count === 1 ? 'finding' : 'findings')];
+        $limit = $short ? self::SHORT_FINDINGS : self::MAX_FINDINGS;
+        foreach (array_slice($scan->findings, 0, $limit) as $finding) {
             $tag = $finding->source !== '' ? $finding->source : $finding->severity;
             $lines[] = sprintf('   %s:%d [%s] %s', self::clean($finding->file), $finding->line, $tag, self::clean($finding->message));
         }
-        $hidden = count($scan->findings) - self::MAX_FINDINGS;
+        $hidden = count($scan->findings) - $limit;
         if ($hidden > 0) {
-            $lines[] = sprintf('   (%d more findings...)', $hidden);
+            $lines[] = $short
+                ? sprintf('   (%d more; run `booster scan --phpstan` to see all)', $hidden)
+                : sprintf('   (%d more findings...)', $hidden);
         }
         foreach ($scan->hints as $hint) {
             $lines[] = '   Hint: ' . self::clean($hint);
@@ -247,7 +256,7 @@ final class TextWriter
         $lines[] = '';
         $previewedFiles = [];
         foreach ($report->results as $r) {
-            $count = $r->incomplete ? '(incomplete)' : sprintf('(%d files)', count($r->files));
+            $count = $r->incomplete ? '(incomplete)' : sprintf('(%d file%s)', count($r->files), count($r->files) === 1 ? '' : 's');
             $lines[] = sprintf('%d. %s: %s %s', $r->step, $r->hopId, strtoupper($r->status), $count);
             foreach ($r->messages as $message) {
                 foreach (explode("\n", self::clean($message)) as $line) {
@@ -286,7 +295,12 @@ final class TextWriter
             $lines[] = 'Added deployments/' . $report->deployScript . ': Citadel runs it once, first, so existing deployments install the upgraded vendor/.';
             $lines[] = 'Undo with: rm deployments/' . $report->deployScript . ' (inside the app).';
         }
-        $lines[] = 'RESULT: ' . ($report->failed() ? 'FAIL' : 'PASS');
+        if ($report->dryRun && !$report->failed()) {
+            // A dry run never runs the gate, so a green preview is not a green app.
+            $lines[] = 'RESULT: PASS (previewed, no tests ran)';
+        } else {
+            $lines[] = 'RESULT: ' . ($report->failed() ? 'FAIL' : 'PASS');
+        }
         if ($report->dryRun && $previewedFiles !== []) {
             $lines[] = 'Dry run: these changes were previewed, none were applied.';
         } elseif (!$report->dryRun && !$report->failed()) {
@@ -323,7 +337,12 @@ final class TextWriter
                 break;
             case ProctorResult::FAILED:
                 if ($comparison !== null && $comparison->baselineTaken) {
-                    $lines[] = sprintf('PROCTOR: FAIL on PHP %s (%d new, %d already present).%s', $php, count($comparison->new), count($comparison->alreadyPresent), $advisory);
+                    if ($comparison->new === [] && $comparison->alreadyPresent !== []) {
+                        // Nothing new: every failure predates the upgrade, so the gate reports it as an advisory.
+                        $lines[] = sprintf('PROCTOR: no new findings on PHP %s (%d already present before the upgrade; advisory).', $php, count($comparison->alreadyPresent));
+                    } else {
+                        $lines[] = sprintf('PROCTOR: FAIL on PHP %s (%d new, %d already present).%s', $php, count($comparison->new), count($comparison->alreadyPresent), $advisory);
+                    }
                 } else {
                     $count = count($proctor->failures);
                     $lines[] = sprintf('PROCTOR: FAIL on PHP %s (%d finding%s).%s', $php, $count, $count === 1 ? '' : 's', $advisory);

@@ -1962,7 +1962,7 @@ final class HopExecutorTest extends TestCase
         $report = $this->executeWithProctor($this->fake(proctorExit: 1), new RunOptions());
         $text = (new TextWriter())->run($report);
 
-        self::assertStringContainsString('PROCTOR: FAIL on PHP 8.3 (0 new, 2 already present).', $text);
+        self::assertStringContainsString('PROCTOR: no new findings on PHP 8.3 (2 already present before the upgrade; advisory).', $text);
         self::assertStringContainsString('Already present (not blocking):', $text);
         self::assertStringNotContainsString('New:', $text);
         self::assertStringNotContainsString('Fix the findings above', $text);

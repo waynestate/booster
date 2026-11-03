@@ -347,8 +347,68 @@ final class CliTest extends TestCase
 
         self::assertSame(0, $exit);
         self::assertStringContainsString('Will break on PHP 8.4: no findings.', $out);
-        self::assertStringContainsString('PHPStan on PHP 8.4: 1 finding.', $out);
+        self::assertStringContainsString('PHPStan on PHP 8.4: 1 finding (code quality hints, not upgrade blockers).', $out);
         self::assertStringContainsString('src/Legacy.php:12 [function.notFound] Function each()', $out);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private static function phpstanMessages(int $count): array
+    {
+        $messages = [];
+        for ($i = 1; $i <= $count; $i++) {
+            $messages[] = ['message' => sprintf('Finding %d.', $i), 'line' => $i, 'ignorable' => true, 'identifier' => 'function.notFound'];
+        }
+
+        return $messages;
+    }
+
+    public function test_plan_shows_only_the_first_five_phpstan_findings(): void
+    {
+        $app = $this->example('raw-php');
+        $report = $this->phpstanReport([
+            $app . '/src/Legacy.php' => [
+                'errors' => 54,
+                'messages' => self::phpstanMessages(54),
+            ],
+        ]);
+        $fake = $this->dualFake(
+            static fn(): ProcessResult => new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''),
+            static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($report), ''),
+        );
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $app, '--today' => self::TODAY, '--goal' => 'php-74-to-84'], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('PHPStan on PHP 8.4: 54 findings (code quality hints, not upgrade blockers).', $out);
+        self::assertStringContainsString('src/Legacy.php:1 [function.notFound] Finding 1.', $out);
+        self::assertStringContainsString('src/Legacy.php:5 [function.notFound] Finding 5.', $out);
+        self::assertStringNotContainsString('src/Legacy.php:6 [function.notFound] Finding 6.', $out);
+        self::assertStringContainsString('   (49 more; run `booster scan --phpstan` to see all)', $out);
+    }
+
+    public function test_scan_lists_phpstan_findings_up_to_the_cap(): void
+    {
+        $app = $this->example('raw-php');
+        $report = $this->phpstanReport([
+            $app . '/src/Legacy.php' => [
+                'errors' => 54,
+                'messages' => self::phpstanMessages(54),
+            ],
+        ]);
+        $fake = $this->dualFake(
+            static fn(): ProcessResult => new ProcessResult(0, '{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}', ''),
+            static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($report), ''),
+        );
+
+        [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $app, '--php' => '8.4', '--phpstan' => true], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('PHPStan on PHP 8.4: 54 findings (code quality hints, not upgrade blockers).', $out);
+        self::assertStringContainsString('src/Legacy.php:20 [function.notFound] Finding 20.', $out);
+        self::assertStringNotContainsString('src/Legacy.php:21 [function.notFound] Finding 21.', $out);
+        self::assertStringContainsString('   (34 more findings...)', $out);
     }
 
     public function test_scan_without_the_flag_stays_phpcompat_only(): void
@@ -385,7 +445,7 @@ final class CliTest extends TestCase
         // The PHPCompatibility scan asks about the first wall (8.0); the
         // PHPStan scan asks about where the plan lands (8.4).
         self::assertStringContainsString('Will break on PHP 8.0: no findings.', $out);
-        self::assertStringContainsString('PHPStan on PHP 8.4: 1 finding.', $out);
+        self::assertStringContainsString('PHPStan on PHP 8.4: 1 finding (code quality hints, not upgrade blockers).', $out);
         self::assertStringContainsString('src/Legacy.php:12 [function.notFound] Function each()', $out);
     }
 
@@ -754,6 +814,71 @@ final class CliTest extends TestCase
         self::assertStringNotContainsString('these changes were previewed', $out);
     }
 
+    public function test_a_passing_dry_run_says_no_tests_ran(): void
+    {
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, (string) json_encode([
+            'file_diffs' => [['file' => '/x/src/Legacy.php', 'diff' => "-old\n+new"]],
+        ]), ''));
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--dry-run' => true, '--goal' => 'php-74-to-84',
+        ], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertMatchesRegularExpression('/^RESULT: PASS \(previewed, no tests ran\)$/m', $out);
+        self::assertStringNotContainsString('Review with `git diff`', $out);
+    }
+
+    public function test_a_passing_real_run_keeps_the_plain_result_line(): void
+    {
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            if (self::isProctorCommand($command)) {
+                return new ProcessResult(0, self::proctorFixture('pass-report.json'), '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84',
+        ], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertMatchesRegularExpression('/^RESULT: PASS$/m', $out);
+        self::assertStringNotContainsString('previewed, no tests ran', $out);
+        self::assertStringContainsString('Review with `git diff`, run your own checks, then commit. BOOSTER never commits or pushes.', $out);
+    }
+
+    public function test_the_file_count_is_singular_for_one_file(): void
+    {
+        $one = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, (string) json_encode([
+            'file_diffs' => [['file' => '/x/src/A.php', 'diff' => 'd']],
+        ]), ''));
+
+        [, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--dry-run' => true, '--goal' => 'php-74-to-84',
+        ], $one);
+
+        self::assertStringContainsString('PREVIEWED (1 file)', $out);
+        self::assertStringNotContainsString('(1 files)', $out);
+
+        $two = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, (string) json_encode([
+            'file_diffs' => [['file' => '/x/src/A.php', 'diff' => 'd'], ['file' => '/x/src/B.php', 'diff' => 'd']],
+        ]), ''));
+
+        [, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--dry-run' => true, '--goal' => 'php-74-to-84',
+        ], $two);
+
+        self::assertStringContainsString('PREVIEWED (2 files)', $out);
+    }
+
     public function test_run_rejects_a_bad_cap(): void
     {
         [$exit] = $this->booster(['command' => 'run', '--path' => $this->example('raw-php'), '--max-changes' => 'lots']);
@@ -989,7 +1114,7 @@ final class CliTest extends TestCase
             'command' => 'run', '--path' => $this->copyExample('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84',
         ], $fake);
         self::assertSame(0, $exit);
-        self::assertStringContainsString('PROCTOR: FAIL', $out);
+        self::assertStringContainsString('PROCTOR: no new findings on PHP 8.4 (2 already present before the upgrade; advisory).', $out);
         self::assertStringContainsString('Already present (not blocking):', $out);
         self::assertStringNotContainsString('New:', $out);
         self::assertStringContainsString('RESULT: PASS', $out);

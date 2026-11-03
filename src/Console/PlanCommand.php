@@ -112,7 +112,8 @@ final class PlanCommand extends BaseCommand
                 $text .= "\n\n" . $writer->phpCompat($scan);
             }
             if ($phpstan !== null) {
-                $text .= "\n\n" . $writer->phpStan($phpstan);
+                // The plan shows only the first five findings; the scan command lists them all.
+                $text .= "\n\n" . $writer->phpStan($phpstan, true);
             }
         }
 
