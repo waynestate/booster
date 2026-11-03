@@ -136,7 +136,7 @@ final class RunCommand extends BaseCommand
         ));
 
         $output->writeln(
-            $format === 'json' ? (new JsonWriter())->write($report->toArray()) : (new TextWriter())->run($report),
+            $format === 'json' ? (new JsonWriter())->write($report->toArray()) : (new TextWriter())->run($report, $this->pathAsTyped($input)),
             OutputInterface::OUTPUT_RAW,
         );
 

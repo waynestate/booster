@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Report;
 
+use Waynestate\Booster\Console\Invocation;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Run\BaselineResult;
 use Waynestate\Booster\Run\ProctorResult;
 use Waynestate\Booster\Run\RunReport;
+use Waynestate\Booster\Run\StepResult;
 use Waynestate\Booster\Scan\BehaviourEntry;
 use Waynestate\Booster\Scan\BehaviourResult;
 use Waynestate\Booster\Scan\RemovalsResult;
@@ -78,6 +80,34 @@ final class TextWriter
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * The closing note after a plan: nothing was changed, what the list means,
+     * and the two commands that go next.
+     */
+    public function planFooter(Plan $plan, string $path, string $program): string
+    {
+        if ($plan->steps === []) {
+            return 'Nothing was changed. Your app is already at the target, so there is nothing to run.';
+        }
+
+        $manual = false;
+        foreach ($plan->steps as $step) {
+            if ($step->hop->isManual()) {
+                $manual = true;
+                break;
+            }
+        }
+        $pathArg = Invocation::pathArg($path);
+
+        return implode("\n", [
+            'Nothing was changed. The numbered list above is the order Booster would do things; "Will break" and "PHPStan" are advice',
+            'for you to read, not errors.',
+            'Booster does every step above marked automatic when you run it.' . ($manual ? ' Steps shown as [playbook] are yours to do by hand.' : ''),
+            sprintf('Preview the edits: %s run --path=%s --dry-run', $program, $pathArg),
+            sprintf('(The real run needs Docker, and your app committed in git: %s run --path=%s)', $program, $pathArg),
+        ]);
     }
 
     /**
@@ -242,8 +272,10 @@ final class TextWriter
         return sprintf('%s (%d in %d file%s: %s)', $entry->label, $entry->total, count($files), count($files) === 1 ? '' : 's', $shown);
     }
 
-    public function run(RunReport $report): string
+    public function run(RunReport $report, ?string $path = null, ?string $program = null): string
     {
+        $path ??= $report->plan->project->path;
+        $program ??= Invocation::program();
         $lines = [$report->dryRun ? 'BOOSTER dry run (nothing was changed)' : 'BOOSTER run', ''];
         if ($report->testEnvKeys !== []) {
             // Keys only: the values may hold credentials and never reach a report.
@@ -301,13 +333,97 @@ final class TextWriter
         } else {
             $lines[] = 'RESULT: ' . ($report->failed() ? 'FAIL' : 'PASS');
         }
-        if ($report->dryRun && $previewedFiles !== []) {
-            $lines[] = 'Dry run: these changes were previewed, none were applied.';
-        } elseif (!$report->dryRun && !$report->failed()) {
-            $lines[] = 'Review with `git diff`, run your own checks, then commit. BOOSTER never commits or pushes.';
+        $lines[] = '';
+        foreach (explode("\n", $this->runFooter($report, $path, $program, $previewedFiles)) as $line) {
+            $lines[] = $line;
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * The closing note after a run: what the result means and what to type
+     * next, or where the upgrade stopped. A dry run or a run that changed
+     * nothing says "Nothing was changed."; a failed real run names the step
+     * it stopped at, or that it never started.
+     *
+     * @param array<string, true> $previewedFiles the dry-run files, keyed by name
+     */
+    private function runFooter(RunReport $report, string $path, string $program, array $previewedFiles): string
+    {
+        if ($report->dryRun) {
+            if ($report->failed() || $previewedFiles === []) {
+                return 'Nothing was changed.';
+            }
+
+            return implode("\n", [
+                'Dry run: these changes were previewed, none were applied.',
+                'Nothing was changed. RESULT: PASS means the preview worked; no tests ran.',
+                sprintf('Next, if the edits look right: %s run --path=%s', $program, Invocation::pathArg($path)),
+                '(It needs Docker and a clean git folder. Commit or stash first.)',
+            ]);
+        }
+
+        if (!$report->failed()) {
+            if (!$this->anythingChanged($report)) {
+                return 'Nothing was changed.';
+            }
+
+            return implode("\n", [
+                sprintf('Booster edited your files but made no commit. Next: review with `git -C %s diff`.', Invocation::pathArg($path)),
+                'Also read the notes under each step ("Behaviour changes to check", manual lines) and run your own checks.',
+                'When you are happy, commit.',
+                'Booster never commits or pushes.',
+            ]);
+        }
+
+        foreach ($report->results as $result) {
+            if ($result->failed()) {
+                return implode("\n", [
+                    sprintf('The upgrade stopped at step %d (%s). Steps after it were not run. Changes so far are still in your folder.', $result->step, $result->hopId),
+                    'Read the failure above, then either fix it by hand or undo with the "Undo with:" line under that step.',
+                    'Booster made no commit.',
+                ]);
+            }
+        }
+        if ($report->baseline->failed() && $this->nothingRan($report)) {
+            return 'The upgrade did not start: the app failed its check before any change. Fix that first, then run again. Nothing was changed.';
+        }
+        if (!$this->anythingChanged($report)) {
+            return 'Nothing was changed.';
+        }
+
+        return implode("\n", [
+            'Changes so far are still in your folder.',
+            'Booster made no commit.',
+        ]);
+    }
+
+    /** Whether a real run left anything in the folder: a step applied, or the deploy script was added. */
+    private function anythingChanged(RunReport $report): bool
+    {
+        if ($report->deployScript !== null) {
+            return true;
+        }
+        foreach ($report->results as $result) {
+            if ($result->status === StepResult::APPLIED) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Whether no step got as far as doing anything: a stop before the first step. */
+    private function nothingRan(RunReport $report): bool
+    {
+        foreach ($report->results as $result) {
+            if ($result->status !== StepResult::NOT_RUN) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

@@ -60,11 +60,14 @@ final class ScanCommand extends BaseCommand
             // Everything removed between the oldest PHP Booster plans (the
             // chain floor) and --php, no processes involved.
             $result = (new RemovalsScan())->scan($this->stringOption($input, 'path') ?? '.', $chain[0], $php);
+            $text = $format === 'json'
+                ? (new JsonWriter())->write(['removals' => $result->toArray()])
+                : implode("\n", (new TextWriter())->removals($result, null));
+            if ($format !== 'json') {
+                $text .= "\n\n" . $this->footer($input);
+            }
 
-            $output->writeln(
-                $format === 'json' ? (new JsonWriter())->write(['removals' => $result->toArray()]) : implode("\n", (new TextWriter())->removals($result, null)),
-                OutputInterface::OUTPUT_RAW,
-            );
+            $output->writeln($text, OutputInterface::OUTPUT_RAW);
 
             return self::EXIT_PASS;
         }
@@ -87,10 +90,20 @@ final class ScanCommand extends BaseCommand
             if ($phpstan !== null) {
                 $text .= "\n\n" . $writer->phpStan($phpstan);
             }
+            $text .= "\n\n" . $this->footer($input);
         }
 
         $output->writeln($text, OutputInterface::OUTPUT_RAW);
 
         return self::EXIT_PASS;
+    }
+
+    /** The closing note: hints, not failures, and the command that goes next. */
+    private function footer(InputInterface $input): string
+    {
+        return implode("\n", [
+            'Nothing was changed. These are hints, not failures: scan exits with success even when it lists problems.',
+            sprintf('Next: %s plan --path=%s    (to see the steps that fix them)', Invocation::program(), Invocation::pathArg($this->pathAsTyped($input))),
+        ]);
     }
 }

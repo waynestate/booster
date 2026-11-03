@@ -52,11 +52,19 @@ final class InitCommand extends BaseCommand
                 $output->writeln('stale: ' . $relative, OutputInterface::OUTPUT_RAW);
             }
             $output->writeln($stale === [] ? 'Playbooks are current.' : 'Run `booster init` to refresh them.', OutputInterface::OUTPUT_RAW);
+            $output->writeln('', OutputInterface::OUTPUT_RAW);
+            $output->writeln('Nothing was changed.', OutputInterface::OUTPUT_RAW);
 
             return $stale === [] ? self::EXIT_PASS : self::EXIT_FAIL;
         }
 
         $output->writeln(sprintf('Wrote %d playbooks, %d changed.', count($files), count($stale)), OutputInterface::OUTPUT_RAW);
+        $output->writeln('', OutputInterface::OUTPUT_RAW);
+        $dirArg = Invocation::pathArg($dir);
+        $output->writeln(implode("\n", [
+            sprintf('Wrote files into %s. They are instructions for AI coding tools and are not needed to run Booster yourself.', $dirArg),
+            sprintf('Next: commit them (git add %s && git commit), so a real run starts from a clean folder.', $dirArg),
+        ]), OutputInterface::OUTPUT_RAW);
 
         return self::EXIT_PASS;
     }

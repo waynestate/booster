@@ -31,6 +31,11 @@ final class HopsCommand extends BaseCommand
         foreach ($hops as $hop) {
             $output->writeln(sprintf('%-18s %s%s', $hop->id, $hop->summary, $hop->isManual() ? ' [playbook]' : ''), OutputInterface::OUTPUT_RAW);
         }
+        $output->writeln('', OutputInterface::OUTPUT_RAW);
+        $output->writeln(implode("\n", [
+            'These are every step Booster knows; `plan` picks the ones your app needs.',
+            'Use an id with --until=<id>, --only=<id> or --skip=<id>. [playbook] steps are done by hand, not by Booster.',
+        ]), OutputInterface::OUTPUT_RAW);
 
         return self::EXIT_PASS;
     }
