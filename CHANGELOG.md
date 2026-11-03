@@ -6,6 +6,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### Changed
 
+- Synced Squire's docs builder and agent-ready kit (`bin/docs-site.php`, `bin/agent-ready.php`, `site/assets/agent-ready.js`): table cells strip Symfony console style tags, and the kit JS uses bindingless catch blocks. The command reference and docs site are rebuilt.
 - The PHPCompatibility check no longer calls `oci_*()` functions "removed since PHP 8.4" for an app that declares `ext-oci8` in `require`, `require-dev` or `config.platform`: PHP 8.4 moved oci8 out of the PHP download and into PECL, and such an app installs the PECL extension on purpose. Other findings are unchanged.
 - The `cas-to-sesame` step now requires SESAME `^0.4` (SESAME 0.4.0 is out; a `^0.3` constraint would have stayed on 0.3.x), and the SESAME config Booster falls back on when the app has no vendor copy is SESAME 0.4.0's: it gains `gateway.public_keys`, `oauth2.require_at_jwt` and `log`. The step's own edits are unchanged; SESAME 0.4.0 only added optional settings.
 - A dry-run step with no edits prints "General notes for this step (nothing found in your app, just good to know):" before the hop's version notes, so they no longer read like findings in your app.

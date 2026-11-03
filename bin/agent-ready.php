@@ -47,7 +47,7 @@ final class AgentReadyKit
 
     public const FILES = [
         'assets/agent-ready.css' => 'be9bf22d00b10ab07774db1abe7fb6c4c282b4b6a9a0fe91191ee0a49e83de71',
-        'assets/agent-ready.js' => '17b4c83f48264f96b846102f0e0183d9317b800644e6cf6f0c8219f9960f1cb5',
+        'assets/agent-ready.js' => '7077fa5a37b0d4ec50a78564421155b57ef7a158dd033ebfb8825c0d5df9dbd2',
     ];
 
     /** The stack's agent entry points, listed in every llms.txt except their own. */

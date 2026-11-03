@@ -3,7 +3,9 @@
 declare(strict_types=1);
 use League\CommonMark\Environment\Environment;
 use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
+use League\CommonMark\Extension\CommonMark\Node\Block\FencedCode;
 use League\CommonMark\Extension\CommonMark\Node\Block\Heading;
+use League\CommonMark\Extension\CommonMark\Node\Inline\Code;
 use League\CommonMark\Extension\CommonMark\Node\Inline\Link;
 use League\CommonMark\Extension\GithubFlavoredMarkdownExtension;
 use League\CommonMark\Node\Inline\Text;
@@ -20,9 +22,12 @@ use League\CommonMark\Renderer\HtmlRenderer;
  *
  * From docs/ and CHANGELOG.md it writes, into site/docs/:
  *   <path>.html   one page per Markdown file, nav order, with a sidebar, an "On this page" list, prev/next
- * and it checks what a person wrote: every page is in nav.json, every nav path has a file, internal links
- * reach a real page, and the kit's files are the kit's bytes. A squire reads the map so the knight can ask
- * for directions.
+ *   images        every image a page references, byte for byte, at its path under docs/, so the built page's
+ *                 relative src still resolves
+ * and it checks what a person wrote: every page is in nav.json, every nav path has a file, every content link
+ * reaches a built page, a file the site serves or an external address, a fragment names a real heading, every
+ * referenced image exists under docs/, and the kit's files are the kit's bytes. A squire reads the map so the
+ * knight can ask for directions.
  *
  * Generated blocks: a page may hold a region between `<!-- generated:NAME -->` and `<!-- /generated -->`
  * that the builder owns. docs/docs.json defines the blocks by name and rewrites each placed region: json-table
@@ -32,9 +37,23 @@ use League\CommonMark\Renderer\HtmlRenderer;
  * A plain run rewrites stale regions in the sources and then builds; --check reports a stale region instead of
  * writing.
  *
+ * Changelog page: when docs/nav.json lists a page whose path is "changelog", the builder also owns
+ * docs/changelog.md, mirrored from CHANGELOG.md under the usual front matter and a marker comment, with the
+ * top-level heading dropped, every version heading kept as written, and each relative link rewritten to a blob
+ * link under the nav.json source (or dropped, keeping its label, when there is no source). A plain run writes the
+ * page before building; --check reports docs/changelog.md (missing) or (out of date) instead of writing, and a
+ * nav entry without a CHANGELOG.md is a finding.
+ *
+ * Tested examples: --examples runs the command examples in the docs and fails when reality drifts from what they
+ * promise. A fenced block tagged `run` (bash, sh, shell or console, optionally `exit=N`) runs its lines in order in
+ * a fresh temp copy of the examples.cwd folder; the next `output` block is the expected stdout and stderr. Every
+ * shell block must be tagged run or carry a `<!-- docs-test: skip REASON -->` line before it, and the skips are
+ * counted in the summary. Generated-block regions are ignored, and a plain build or --check never runs examples.
+ *
  * Usage:
  *   php bin/docs-site.php [--root=.]                 write site/docs/ from docs/
  *   php bin/docs-site.php [--root=.] --check         write nothing; exit 1 on stale pages or findings
+ *   php bin/docs-site.php [--root=.] --examples      run the tested examples; exit 1 on any finding
  *   php bin/docs-site.php --sync-to=<repo>           from Squire only: copy the kit and this file
  *   php bin/docs-site.php --rehash                   from Squire only: record the kit's hashes below
  *
@@ -58,6 +77,751 @@ final class DocsKit
         'assets/docs.css' => '60894e7bae3c3680ef34a3a326275d8aa21b9268aa6aa71bd65f3fb42aae547a',
         'assets/docs.js' => '6d6b437090cfa24e14439e59fc94c2deac678c292d97f681f6ae83633ee0b28f',
     ];
+}
+
+/**
+ * --examples: runs the command examples in the docs and fails when reality drifts from what they promise.
+ *
+ * A fenced block whose info string is `bash run`, `sh run`, `console run` or `shell run` (optionally `exit=N`,
+ * default 0) is a command block: each non-empty line is a command (a leading `$ ` is stripped), run in order in a
+ * fresh temp copy of the `examples.cwd` folder from docs/docs.json. The next fenced block, when its info string is
+ * exactly `output`, is the expected output (stdout then stderr, per command). Both sides are normalized before the
+ * comparison: CRLF to LF, trailing spaces trimmed per line, trailing blank lines removed, the example working
+ * directory shown as `<cwd>`, the repo root as `<root>`, plus every regex rule in `examples.normalize`. Every shell
+ * block (bash, sh, shell, console, powershell, pwsh) must carry the run tag or a `<!-- docs-test: skip REASON -->`
+ * line directly before it; skips are counted and grouped in the summary line, capped by `examples.maxSkips`.
+ * Generated-block regions are ignored, and the plain build and --check never run examples.
+ */
+final class DocsExamples
+{
+    /** The languages a command block may use; powershell and pwsh only count for the strictness rule. */
+    private const COMMAND_LANGUAGES = ['bash', 'sh', 'shell', 'console'];
+
+    /** The languages that must be tagged run or skipped with a reason. */
+    private const STRICT_LANGUAGES = ['bash', 'sh', 'shell', 'console', 'powershell', 'pwsh'];
+
+    private string $root;
+
+    /** @var string|null the repo folder copied into each example working directory */
+    private ?string $cwd = null;
+
+    /** @var array<string, string> an alias first word to the command that replaces it */
+    private array $alias = [];
+
+    /** @var array<string, string> extra environment variables for the example commands */
+    private array $env = [];
+
+    private int $timeout = 60;
+
+    /** @var list<array{0: string, 1: string}> normalize rules as [compiled pattern, replacement] pairs */
+    private array $normalize = [];
+
+    private ?int $maxSkips = null;
+
+    /** @var array<string, array{label: string, count: int}> skipped examples, by case-folded reason group */
+    private array $skips = [];
+
+    private int $runCount = 0;
+
+    public function __construct(string $root)
+    {
+        if (! is_dir($root)) {
+            throw new DocsSiteError("The folder {$root} does not exist.");
+        }
+        $this->root = rtrim($root, '/\\');
+        $this->loadConfig();
+    }
+
+    /**
+     * Runs every command example under docs/ and reports what drifted.
+     *
+     * @return array{findings: list<string>, summary: string}
+     */
+    public function run(): array
+    {
+        $findings = [];
+        foreach ($this->pages() as $path => $file) {
+            $raw = str_replace("\r\n", "\n", (string) file_get_contents($file));
+            $lines = $this->blankGeneratedRegions(explode("\n", $raw));
+            $fences = $this->fences($lines);
+            $workDir = null;
+            try {
+                foreach ($fences as $index => $fence) {
+                    $kind = $this->classify($fence['info']);
+                    if ($kind['strict']) {
+                        $findings = array_merge($findings, $this->accountStrictness($path, $fence, $lines, $kind));
+                    }
+                    if (! $kind['command']) {
+                        continue;
+                    }
+                    if ($workDir === null) {
+                        $workDir = $this->prepareWorkDir();
+                    }
+                    $findings = array_merge($findings, $this->runBlock($path, $fence, $fences[$index + 1] ?? null, $lines, $kind, $workDir));
+                }
+            } finally {
+                if ($workDir !== null) {
+                    self::removeDir($workDir);
+                }
+            }
+        }
+        if ($this->maxSkips !== null && $this->skipTotal() > $this->maxSkips) {
+            $findings[] = "docs.json maxSkips {$this->maxSkips} exceeded: {$this->skipTotal()} skipped";
+        }
+
+        return ['findings' => $findings, 'summary' => $this->summary()];
+    }
+
+    /** Reads the optional examples key of docs/docs.json; a broken config is a tool error (exit 2). */
+    private function loadConfig(): void
+    {
+        $path = $this->root.'/docs/docs.json';
+        if (! is_file($path)) {
+            return;
+        }
+        $data = json_decode((string) file_get_contents($path), true);
+        if (! is_array($data) || array_is_list($data)) {
+            throw new DocsSiteError("{$path} must be a JSON object.");
+        }
+        if (! array_key_exists('examples', $data)) {
+            return;
+        }
+        $examples = $data['examples'];
+        if (! is_array($examples) || array_is_list($examples)) {
+            throw new DocsSiteError("{$path}: the \"examples\" key must be an object.");
+        }
+        if (isset($examples['cwd'])) {
+            if (! is_string($examples['cwd']) || $examples['cwd'] === '') {
+                throw new DocsSiteError("{$path}: examples.cwd must be a non-empty string.");
+            }
+            $this->cwd = $examples['cwd'];
+            if (! is_dir($this->root.'/'.$this->cwd)) {
+                throw new DocsSiteError("{$path}: the examples cwd folder {$this->cwd} does not exist.");
+            }
+        }
+        if (isset($examples['alias'])) {
+            if (! is_array($examples['alias']) || array_is_list($examples['alias'])) {
+                throw new DocsSiteError("{$path}: examples.alias must be an object of strings.");
+            }
+            foreach ($examples['alias'] as $word => $replacement) {
+                if (! is_string($replacement) || $replacement === '') {
+                    throw new DocsSiteError("{$path}: examples.alias.{$word} must be a non-empty string.");
+                }
+                $this->alias[(string) $word] = $replacement;
+            }
+        }
+        if (isset($examples['env'])) {
+            if (! is_array($examples['env']) || array_is_list($examples['env'])) {
+                throw new DocsSiteError("{$path}: examples.env must be an object of strings.");
+            }
+            foreach ($examples['env'] as $key => $value) {
+                if (! is_string($value)) {
+                    throw new DocsSiteError("{$path}: examples.env.{$key} must be a string.");
+                }
+                $this->env[(string) $key] = $value;
+            }
+        }
+        if (isset($examples['timeout'])) {
+            if (! is_int($examples['timeout']) || $examples['timeout'] < 1) {
+                throw new DocsSiteError("{$path}: examples.timeout must be a positive number of seconds.");
+            }
+            $this->timeout = $examples['timeout'];
+        }
+        if (isset($examples['normalize'])) {
+            if (! is_array($examples['normalize']) || ! array_is_list($examples['normalize'])) {
+                throw new DocsSiteError("{$path}: examples.normalize must be a list of [pattern, replacement] pairs.");
+            }
+            foreach ($examples['normalize'] as $rule) {
+                if (! is_array($rule) || count($rule) !== 2 || ! is_string($rule[0]) || ! is_string($rule[1])) {
+                    throw new DocsSiteError("{$path}: every examples.normalize rule is a [\"/re/\", \"replacement\"] pair.");
+                }
+                if (preg_match('#^/(.+)/(.*)$#s', $rule[0], $m) !== 1) {
+                    throw new DocsSiteError("{$path}: the normalize pattern {$rule[0]} needs surrounding slashes.");
+                }
+                $full = '/'.$m[1].'/'.$m[2];
+                if (@preg_match($full, '') === false) {
+                    throw new DocsSiteError("{$path}: the normalize pattern {$rule[0]} is not a valid regular expression.");
+                }
+                $this->normalize[] = [$full, $rule[1]];
+            }
+        }
+        if (isset($examples['maxSkips'])) {
+            if (! is_int($examples['maxSkips']) || $examples['maxSkips'] < 0) {
+                throw new DocsSiteError("{$path}: examples.maxSkips must be a whole number.");
+            }
+            $this->maxSkips = $examples['maxSkips'];
+        }
+    }
+
+    /**
+     * Every doc page, by path (no .md) with its absolute file, sorted, private pages skipped.
+     *
+     * @return array<string, string>
+     */
+    private function pages(): array
+    {
+        $docs = $this->root.'/docs';
+        $out = [];
+        foreach ($this->walk($docs, 'md') as $relative) {
+            $path = substr($relative, 0, -3);
+            $out[$path] = $docs.'/'.$relative;
+        }
+        ksort($out);
+
+        return $out;
+    }
+
+    /**
+     * Replaces the content of every generated-block region with blank lines, keeping the line count and numbers.
+     *
+     * @param  list<string>  $lines
+     * @return list<string>
+     */
+    private function blankGeneratedRegions(array $lines): array
+    {
+        $count = count($lines);
+        $i = 0;
+        while ($i < $count) {
+            if (preg_match('/^\s*<!--\s+generated:([A-Za-z0-9_-]+)\s+-->\s*$/', $lines[$i]) !== 1) {
+                $i++;
+
+                continue;
+            }
+            $close = -1;
+            for ($j = $i + 1; $j < $count; $j++) {
+                if (preg_match('/^\s*<!--\s+\/generated\s+-->\s*$/', $lines[$j]) === 1) {
+                    $close = $j;
+
+                    break;
+                }
+            }
+            $end = $close === -1 ? $count - 1 : $close - 1;
+            for ($k = $i + 1; $k <= $end; $k++) {
+                $lines[$k] = '';
+            }
+            $i = $close === -1 ? $count : $close + 1;
+        }
+
+        return array_values($lines);
+    }
+
+    /**
+     * The fenced blocks of one page, in document order. start and end are 0-based line indexes of the content.
+     *
+     * @param  list<string>  $lines
+     * @return list<array{line: int, info: string, start: int, end: int}>
+     */
+    private function fences(array $lines): array
+    {
+        $out = [];
+        $count = count($lines);
+        $i = 0;
+        while ($i < $count) {
+            if (preg_match('/^ {0,3}(`{3,}|~{3,})\s*(.*)$/', $lines[$i], $open) !== 1) {
+                $i++;
+
+                continue;
+            }
+            $char = $open[1][0];
+            $length = strlen($open[1]);
+            $info = trim($open[2]);
+            if ($char === '`' && str_contains($info, '`')) {
+                $i++;
+
+                continue;
+            }
+            $close = -1;
+            for ($j = $i + 1; $j < $count; $j++) {
+                if (preg_match('/^ {0,3}'.$char.'{'.$length.',}[ \t]*$/', $lines[$j]) === 1) {
+                    $close = $j;
+
+                    break;
+                }
+            }
+            if ($close === -1) {
+                $out[] = ['line' => $i + 1, 'info' => $info, 'start' => $i + 1, 'end' => $count - 1];
+
+                break;
+            }
+            $out[] = ['line' => $i + 1, 'info' => $info, 'start' => $i + 1, 'end' => $close - 1];
+            $i = $close + 1;
+        }
+
+        return $out;
+    }
+
+    /**
+     * What a fence info string means for the gate.
+     *
+     * @return array{language: string, command: bool, strict: bool, exit: int}
+     */
+    private function classify(string $info): array
+    {
+        $tokens = preg_split('/\s+/', trim($info)) ?: [];
+        $language = strtolower($tokens[0] ?? '');
+        $exit = 0;
+        foreach ($tokens as $token) {
+            if (preg_match('/^exit=(\d+)$/', $token, $m) === 1) {
+                $exit = (int) $m[1];
+            }
+        }
+
+        return [
+            'language' => $language,
+            'command' => in_array($language, self::COMMAND_LANGUAGES, true) && in_array('run', $tokens, true),
+            'strict' => in_array($language, self::STRICT_LANGUAGES, true),
+            'exit' => $exit,
+        ];
+    }
+
+    /**
+     * The strictness rule: a shell block must be tagged run or skipped with a reason. Tagged blocks count as run;
+     * skipped ones are grouped by the words before the first comma, case-folded.
+     *
+     * @param  array{line: int, info: string, start: int, end: int}  $fence
+     * @param  array{language: string, command: bool, strict: bool, exit: int}  $kind
+     * @param  list<string>  $lines
+     * @return list<string>
+     */
+    private function accountStrictness(string $path, array $fence, array $lines, array $kind): array
+    {
+        if (in_array('run', preg_split('/\s+/', trim($fence['info'])) ?: [], true)) {
+            $this->runCount++;
+
+            return [];
+        }
+        $previous = $fence['line'] >= 2 ? $lines[$fence['line'] - 2] : '';
+        $reason = $this->skipMarker($previous);
+        if ($reason === null) {
+            return ["docs/{$path}.md:{$fence['line']} shell block without run or a skip reason"];
+        }
+        if ($reason === '') {
+            return ["docs/{$path}.md:".($fence['line'] - 1).' skip without a reason'];
+        }
+        $group = strtolower(trim(explode(',', $reason)[0]));
+        $entry = $this->skips[$group] ?? ['label' => trim(explode(',', $reason)[0]), 'count' => 0];
+        $entry['count']++;
+        $this->skips[$group] = $entry;
+
+        return [];
+    }
+
+    /**
+     * The reason on a `<!-- docs-test: skip REASON -->` line: the reason, '' when it has none, null when the line is
+     * not such a marker.
+     */
+    private function skipMarker(string $line): ?string
+    {
+        if (preg_match('/^\s*<!--\s*(.*?)\s*-->\s*$/', $line, $m) !== 1) {
+            return null;
+        }
+        if (preg_match('/^docs-test:\s+skip\s*(.*)$/', trim($m[1]), $m) !== 1) {
+            return null;
+        }
+
+        return trim($m[1]);
+    }
+
+    /**
+     * Runs one command block and compares its output with the following output block, when there is one. A failed
+     * command stops the rest of its block; the other blocks and pages still run.
+     *
+     * @param  array{line: int, info: string, start: int, end: int}  $fence
+     * @param  array{line: int, info: string, start: int, end: int}|null  $next
+     * @param  array{language: string, command: bool, strict: bool, exit: int}  $kind
+     * @param  list<string>  $lines
+     * @return list<string>
+     */
+    private function runBlock(string $path, array $fence, ?array $next, array $lines, array $kind, string $workDir): array
+    {
+        $commands = [];
+        for ($k = $fence['start']; $k <= $fence['end']; $k++) {
+            $line = trim($lines[$k]);
+            if ($line === '') {
+                continue;
+            }
+            $commands[] = preg_replace('/^\$\s+/', '', $line) ?? $line;
+        }
+        $expected = [];
+        if ($next !== null && trim($next['info']) === 'output') {
+            for ($k = $next['start']; $k <= $next['end']; $k++) {
+                $expected[] = $lines[$k];
+            }
+        }
+        $raw = '';
+        $findings = [];
+        $failed = false;
+        foreach ($commands as $command) {
+            $result = $this->execute($workDir, $this->applyAlias($command));
+            if ($result['timedOut']) {
+                $findings[] = "docs/{$path}.md:{$fence['line']} timed out after {$this->timeout} seconds";
+                $failed = true;
+
+                break;
+            }
+            if ($result['code'] !== $kind['exit']) {
+                $findings[] = "docs/{$path}.md:{$fence['line']} exited {$result['code']}, expected {$kind['exit']}";
+                $failed = true;
+
+                break;
+            }
+            if ($result['stdout'] !== '' && ! str_ends_with($result['stdout'], "\n")) {
+                $raw .= "\n";
+            }
+            $raw .= $result['stdout'].$result['stderr'];
+        }
+        if (! $failed) {
+            $want = $this->normaliseOutput(implode("\n", $expected), $workDir);
+            $got = $this->normaliseOutput($raw, $workDir);
+            if ($want !== $got) {
+                $findings[] = "docs/{$path}.md:{$fence['line']} output differs";
+                foreach ($this->diffLines(explode("\n", $want), explode("\n", $got)) as $line) {
+                    $findings[] = $line;
+                }
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Replaces the first word of a command with its alias, when one matches.
+     */
+    private function applyAlias(string $command): string
+    {
+        $parts = preg_split('/\s+/', trim($command), 2) ?: [];
+        $word = $parts[0] ?? '';
+        if (! isset($this->alias[$word])) {
+            return $command;
+        }
+        $rest = $parts[1] ?? '';
+        $replacement = $this->expandReplacement($this->alias[$word]);
+
+        return $rest === '' ? $replacement : $replacement.' '.$rest;
+    }
+
+    /**
+     * A leading `php ` in the replacement means PHP_BINARY; a relative script path resolves against the root; words
+     * with spaces get quoted so the command string survives the shell.
+     */
+    private function expandReplacement(string $replacement): string
+    {
+        $parts = preg_split('/\s+/', trim($replacement)) ?: [];
+        if (($parts[0] ?? '') === 'php') {
+            $parts[0] = PHP_BINARY;
+        }
+        foreach ($parts as $k => $part) {
+            if ($k === 0 || str_starts_with($part, '-') || self::isAbsolutePath($part)) {
+                continue;
+            }
+            $parts[$k] = $this->root.'/'.$part;
+
+            break;
+        }
+        foreach ($parts as $k => $part) {
+            if (preg_match('/\s/', $part) === 1) {
+                $parts[$k] = '"'.$part.'"';
+            }
+        }
+
+        return implode(' ', $parts);
+    }
+
+    private static function isAbsolutePath(string $path): bool
+    {
+        if (str_starts_with($path, '/') || str_starts_with($path, '\\')) {
+            return true;
+        }
+
+        return preg_match('/^[A-Za-z]:[\\\\\/]/', $path) === 1;
+    }
+
+    /**
+     * Runs one command string in the example working directory and collects its output, with a timeout.
+     *
+     * @return array{code: int, stdout: string, stderr: string, timedOut: bool}
+     */
+    private function execute(string $workDir, string $command): array
+    {
+        $process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $workDir, $this->environment());
+        if (! is_resource($process)) {
+            return ['code' => 127, 'stdout' => '', 'stderr' => 'could not start the command', 'timedOut' => false];
+        }
+        fclose($pipes[0]);
+        $stdout = '';
+        $stderr = '';
+        $eofOut = false;
+        $eofErr = false;
+        $timedOut = false;
+        $deadline = microtime(true) + $this->timeout;
+        while (! ($eofOut && $eofErr)) {
+            $read = [];
+            if (! $eofOut) {
+                $read[] = $pipes[1];
+            }
+            if (! $eofErr) {
+                $read[] = $pipes[2];
+            }
+            $remaining = $deadline - microtime(true);
+            if ($remaining <= 0.0) {
+                $timedOut = true;
+
+                break;
+            }
+            $write = null;
+            $except = null;
+            $selected = @stream_select($read, $write, $except, 0, (int) min(1000000, $remaining * 1000000));
+            if ($selected === false) {
+                usleep(10000);
+
+                continue;
+            }
+            if ($selected === 0) {
+                $timedOut = true;
+
+                break;
+            }
+            foreach ($read as $stream) {
+                $chunk = (string) fread($stream, 8192);
+                if ($chunk === '') {
+                    if ($stream === $pipes[1]) {
+                        $eofOut = true;
+                    } else {
+                        $eofErr = true;
+                    }
+
+                    continue;
+                }
+                if ($stream === $pipes[1]) {
+                    $stdout .= $chunk;
+                } else {
+                    $stderr .= $chunk;
+                }
+            }
+        }
+        if ($timedOut) {
+            proc_terminate($process);
+        }
+        // proc_close closes the pipes itself and waits for the command to finish.
+        $code = proc_close($process);
+
+        return ['code' => $code, 'stdout' => $stdout, 'stderr' => $stderr, 'timedOut' => $timedOut];
+    }
+
+    /**
+     * The environment of the example commands: the current environment plus the configured variables.
+     *
+     * @return array<string, string>
+     */
+    private function environment(): array
+    {
+        $env = getenv() ?: [];
+        foreach ($this->env as $key => $value) {
+            $env[$key] = $value;
+        }
+
+        return $env;
+    }
+
+    /**
+     * Collapses one side of an output comparison: line endings, trailing blanks, path placeholders, normalize rules.
+     */
+    private function normaliseOutput(string $text, string $workDir): string
+    {
+        $lines = array_map('rtrim', explode("\n", str_replace("\r\n", "\n", $text)));
+        while ($lines !== [] && $lines[count($lines) - 1] === '') {
+            array_pop($lines);
+        }
+        $text = implode("\n", $lines);
+        $text = $this->replacePaths($text, $workDir, '<cwd>');
+        $text = $this->replacePaths($text, $this->root, '<root>');
+        foreach ($this->normalize as [$pattern, $replacement]) {
+            $text = (string) preg_replace($pattern, $replacement, $text);
+        }
+
+        return $text;
+    }
+
+    /** Replaces every form of a path (slash and backslash) with its placeholder. */
+    private function replacePaths(string $text, string $dir, string $placeholder): string
+    {
+        return str_replace([$dir, str_replace('/', '\\', $dir)], $placeholder, $text);
+    }
+
+    /**
+     * A line diff of two outputs: `- ` for expected lines, `+ ` for actual lines, at most 20 lines.
+     *
+     * @param  list<string>  $expected
+     * @param  list<string>  $actual
+     * @return list<string>
+     */
+    private function diffLines(array $expected, array $actual): array
+    {
+        $n = count($expected);
+        $m = count($actual);
+        $dp = [];
+        for ($i = 0; $i <= $n; $i++) {
+            $dp[$i] = array_fill(0, $m + 1, 0);
+        }
+        for ($i = $n - 1; $i >= 0; $i--) {
+            for ($j = $m - 1; $j >= 0; $j--) {
+                $dp[$i][$j] = $expected[$i] === $actual[$j] ? $dp[$i + 1][$j + 1] + 1 : max($dp[$i + 1][$j], $dp[$i][$j + 1]);
+            }
+        }
+        $out = [];
+        $i = 0;
+        $j = 0;
+        while ($i < $n && $j < $m) {
+            if ($expected[$i] === $actual[$j]) {
+                $i++;
+                $j++;
+            } elseif ($dp[$i + 1][$j] >= $dp[$i][$j + 1]) {
+                $out[] = '- '.$expected[$i];
+                $i++;
+            } else {
+                $out[] = '+ '.$actual[$j];
+                $j++;
+            }
+        }
+        while ($i < $n) {
+            $out[] = '- '.$expected[$i];
+            $i++;
+        }
+        while ($j < $m) {
+            $out[] = '+ '.$actual[$j];
+            $j++;
+        }
+
+        return array_slice($out, 0, 20);
+    }
+
+    /**
+     * A fresh temp dir seeded with the examples cwd folder, when one is configured.
+     */
+    private function prepareWorkDir(): string
+    {
+        $dir = sys_get_temp_dir().'/squire-examples-'.bin2hex(random_bytes(6));
+        mkdir($dir, 0o755, true);
+        if ($this->cwd !== null) {
+            $this->copyTree($this->root.'/'.$this->cwd, $dir);
+        }
+
+        return $dir;
+    }
+
+    /** Copies a tree into another, skipping vendor folders anywhere in it. */
+    private function copyTree(string $from, string $to): void
+    {
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveCallbackFilterIterator(
+                new RecursiveDirectoryIterator($from, FilesystemIterator::SKIP_DOTS),
+                static fn (SplFileInfo $item): bool => ! ($item->isDir() && $item->getFilename() === 'vendor'),
+            ),
+        );
+        foreach ($iterator as $item) {
+            if (! $item instanceof SplFileInfo || ! $item->isFile()) {
+                continue;
+            }
+            $relative = ltrim(str_replace('\\', '/', substr($item->getPathname(), strlen($from))), '/');
+            $target = $to.'/'.$relative;
+            if (! is_dir(dirname($target)) && ! mkdir(dirname($target), 0o755, true) && ! is_dir(dirname($target))) {
+                throw new DocsSiteError('Cannot create '.dirname($target).'.');
+            }
+            if (! copy($item->getPathname(), $target)) {
+                throw new DocsSiteError("Cannot copy {$item->getPathname()} to {$target}.");
+            }
+        }
+    }
+
+    /**
+     * Removes a directory tree; a missing directory is fine. A timed-out command may still hold a file or the
+     * directory open, so failures are ignored: the leftovers expire when that command exits.
+     */
+    private static function removeDir(string $dir): void
+    {
+        if (! is_dir($dir)) {
+            return;
+        }
+        $items = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST,
+        );
+        foreach ($items as $item) {
+            if (! $item instanceof SplFileInfo) {
+                continue;
+            }
+            if ($item->isDir()) {
+                @rmdir($item->getPathname());
+            } else {
+                @unlink($item->getPathname());
+            }
+        }
+        @rmdir($dir);
+    }
+
+    /** @return list<string> the Markdown files under a folder, relative, sorted, dot and underscore files skipped */
+    private function walk(string $dir, string $extension): array
+    {
+        if (! is_dir($dir)) {
+            return [];
+        }
+        $out = [];
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveCallbackFilterIterator(
+                new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+                static function (SplFileInfo $file): bool {
+                    return ! str_starts_with($file->getFilename(), '.') && ! str_starts_with($file->getFilename(), '_');
+                },
+            ),
+        );
+        foreach ($iterator as $file) {
+            if ($file instanceof SplFileInfo && strtolower($file->getExtension()) === $extension) {
+                $out[] = str_replace('\\', '/', substr($file->getPathname(), strlen($dir) + 1));
+            }
+        }
+        sort($out);
+
+        return $out;
+    }
+
+    private function skipTotal(): int
+    {
+        $total = 0;
+        foreach ($this->skips as $entry) {
+            $total += $entry['count'];
+        }
+
+        return $total;
+    }
+
+    /** The one-line tally: Examples: N run, M skipped (reasons: label count, ...), biggest groups first. */
+    private function summary(): string
+    {
+        $total = $this->skipTotal();
+        $line = 'Examples: '.$this->runCount.' run, '.$total.' skipped';
+        if ($total === 0) {
+            return $line;
+        }
+        $ordered = [];
+        foreach ($this->skips as $entry) {
+            $ordered[] = $entry;
+        }
+        usort($ordered, static function (array $a, array $b): int {
+            $ac = (int) $a['count'];
+            $bc = (int) $b['count'];
+            if ($ac === $bc) {
+                return strcasecmp((string) $a['label'], (string) $b['label']);
+            }
+
+            return $bc - $ac;
+        });
+        $parts = [];
+        foreach ($ordered as $entry) {
+            $parts[] = $entry['label'].' '.$entry['count'];
+        }
+
+        return $line.' (reasons: '.implode(', ', $parts).')';
+    }
 }
 
 final class DocsSite
@@ -88,6 +852,9 @@ final class DocsSite
     /** @var list<string> stale generated blocks, as `docs/<path>.md (generated block "<name>" is out of date)` */
     public array $staleBlocks = [];
 
+    /** @var array<string, string> the referenced images, by path under docs/ (relative), with their bytes */
+    private array $images = [];
+
     /** @var list<array{title: string, path: string}> the nav pages, in nav order */
     private array $order = [];
 
@@ -97,7 +864,14 @@ final class DocsSite
     /** @var array<string, string>|null the rendered block content, by name, once computed */
     private ?array $computed = null;
 
+    /** @var array<string, array<string, list<string>>> the kept commands per cli name: command name to its option keys */
+    private array $commandSets = [];
+
     private bool $writeBlocks = false;
+
+    private bool $requireTag = false;
+
+    private bool $requireRelease = false;
 
     public function __construct(string $root)
     {
@@ -117,6 +891,18 @@ final class DocsSite
         $this->writeBlocks = $write;
     }
 
+    /** --require-tag: fail when the latest version tag does not match the docs stamp. Off by default. */
+    public function setRequireTag(bool $require): void
+    {
+        $this->requireTag = $require;
+    }
+
+    /** --require-release: fail when CHANGELOG.md has no released heading yet. Off by default. */
+    public function setRequireRelease(bool $require): void
+    {
+        $this->requireRelease = $require;
+    }
+
     public function rootDir(): string
     {
         return $this->root;
@@ -131,11 +917,13 @@ final class DocsSite
     {
         $this->findings = [];
         $this->staleBlocks = [];
+        $this->images = [];
         $sources = $this->sources();
         $order = $this->flattenNav();
         $this->order = $order;
         $this->checkNav($sources, $order);
         $this->checkSource();
+        $this->changelogPage();
         $this->checkBlocks($sources);
         $contents = [];
         foreach ($sources as $path => $file) {
@@ -144,7 +932,9 @@ final class DocsSite
         if ($this->writeBlocks) {
             $this->rewriteBlocks($sources, $contents);
         }
+        $this->checkCoverage($sources, $contents);
         $stamp = $this->versionStamp();
+        $this->checkStamp($stamp);
         $project = $this->projectTitle();
         $this->checkWayneUi();
         $this->checkKit();
@@ -154,17 +944,37 @@ final class DocsSite
             $files['site/docs/'.$path.'.html'] = $this->renderPage($path, $contents[$path], $sources, $stamp, $project);
         }
         ksort($files);
+        $this->checkLinks($files, $sources);
+        $this->checkImages($sources, $contents, $files);
 
         return $files;
     }
 
     /**
-     * Generated pages on disk whose source is gone.
+     * The referenced images, ready to land under site/docs/: their bytes, keyed by site/docs/<relative>.
+     *
+     * @return array<string, string>
+     */
+    public function binaryFiles(): array
+    {
+        $out = [];
+        foreach ($this->images as $relative => $bytes) {
+            $out['site/docs/'.$relative] = $bytes;
+        }
+        ksort($out);
+
+        return $out;
+    }
+
+    /**
+     * Generated pages on disk whose source is gone. Copied images are never leftovers: the builder removes only
+     * its own pages, so an image outlives the page that last referenced it.
      *
      * @param  array<string, string>  $files
+     * @param  array<string, string>  $binaries
      * @return list<string>
      */
-    public function leftovers(array $files): array
+    public function leftovers(array $files, array $binaries = []): array
     {
         $out = [];
         if (! is_dir($this->siteDocs)) {
@@ -172,7 +982,7 @@ final class DocsSite
         }
         foreach ($this->walk($this->siteDocs, 'html') as $relative) {
             $key = 'site/docs/'.$relative;
-            if (isset($files[$key])) {
+            if (isset($files[$key]) || isset($binaries[$key])) {
                 continue;
             }
             $head = (string) file_get_contents($this->siteDocs.'/'.$relative, false, null, 0, 400);
@@ -183,6 +993,204 @@ final class DocsSite
         sort($out);
 
         return $out;
+    }
+
+    /**
+     * The link gate for the built pages, run once the pages are rendered so it reads the hrefs as they will be
+     * served. Every link a person wrote in a page's article must reach something the site serves: a pure fragment
+     * must be an id on the same page, a page link with a fragment must reach a built page that carries the id, and
+     * a relative link to anything else must exist under site/. Scheme links (https:, mailto:, //) and the site's
+     * assets are skipped, and the chrome the builder writes around the article is its own, so it is not scanned.
+     *
+     * @param  array<string, string>  $files
+     * @param  array<string, string>  $sources
+     */
+    private function checkLinks(array $files, array $sources): void
+    {
+        $pages = [];
+        foreach ($files as $key => $html) {
+            $dom = $this->loadDom($html);
+            if ($dom === null) {
+                continue;
+            }
+            $pages[$key] = ['dom' => $dom, 'ids' => $this->collectIds($dom)];
+        }
+        foreach ($pages as $key => $page) {
+            $source = $this->sourceLabel($key, $sources);
+            $xpath = new DOMXPath($page['dom']);
+            $anchors = $xpath->query('//article//a[@href]');
+            if ($anchors === false) {
+                continue;
+            }
+            foreach ($anchors as $anchor) {
+                if (! $anchor instanceof DOMElement) {
+                    continue;
+                }
+                $this->checkHref((string) $anchor->getAttribute('href'), $key, $source, $files, $pages);
+            }
+        }
+    }
+
+    /**
+     * One content href against the built pages and the files under site/.
+     *
+     * @param  array<string, string>  $files
+     * @param  array<string, array{dom: DOMDocument, ids: list<string>}>  $pages
+     */
+    private function checkHref(string $href, string $key, string $source, array $files, array $pages): void
+    {
+        if ($href === '' || preg_match('/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i', $href)) {
+            return;
+        }
+        $frag = '';
+        $pathPart = $href;
+        $hash = strpos($href, '#');
+        if ($hash !== false) {
+            $pathPart = substr($href, 0, $hash);
+            $frag = substr($href, $hash + 1);
+        }
+        $pathPart = (string) preg_replace('/\?.*$/s', '', $pathPart);
+        if (preg_match('/^(?:(?:\.\.?\/)+)?assets\//', $pathPart)) {
+            return;
+        }
+        $segments = $pathPart === '' ? explode('/', $key) : explode('/', dirname($key));
+        foreach (explode('/', $pathPart) as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+            if ($segment === '..') {
+                array_pop($segments);
+            } else {
+                $segments[] = $segment;
+            }
+        }
+        $resolved = implode('/', $segments);
+        if (str_starts_with($resolved, 'site/assets/')) {
+            return;
+        }
+        if (isset($files[$resolved])) {
+            if ($frag !== '' && isset($pages[$resolved]) && ! in_array($frag, $pages[$resolved]['ids'], true)) {
+                $this->findings[] = "{$source} links to {$href} but no heading there has that id";
+            }
+
+            return;
+        }
+        if ($pathPart !== '' && ! is_file($this->root.'/'.$resolved)) {
+            $this->findings[] = "{$source} links to {$href} but the site does not serve that file";
+        }
+    }
+
+    /**
+     * The image gate for the built pages, run once the pages are rendered so it reads the srcs as they will be
+     * served. Every relative src a page's article points at (a Markdown image or an HTML <img>) must name a file
+     * under docs/, resolved against the source page's own folder; the build copies exactly those files, byte for
+     * byte, to the same relative path under site/docs/, so the built page's relative src still resolves.
+     * Unreferenced files under docs/ are never copied. Scheme links, data: URIs and / absolute paths are skipped.
+     *
+     * @param  array<string, string>  $sources
+     * @param  array<string, string>  $contents
+     * @param  array<string, string>  $files
+     */
+    private function checkImages(array $sources, array $contents, array $files): void
+    {
+        foreach ($files as $key => $html) {
+            $source = $this->sourceLabel($key, $sources);
+            $docPath = substr($key, strlen('site/docs/'), -strlen('.html'));
+            $folder = dirname($docPath) === '.' ? '' : (string) dirname($docPath);
+            $dom = $this->loadDom($html);
+            if ($dom === null) {
+                continue;
+            }
+            $xpath = new DOMXPath($dom);
+            $images = $xpath->query('//article//img[@src]');
+            if ($images === false) {
+                continue;
+            }
+            foreach ($images as $image) {
+                if (! $image instanceof DOMElement) {
+                    continue;
+                }
+                $this->checkImageSrc((string) $image->getAttribute('src'), $source, $folder);
+            }
+        }
+    }
+
+    /**
+     * One content img src against the files under docs/. A relative src resolves against the source page's folder;
+     * a file that exists is recorded for the copy into site/docs/, one that does not is a finding.
+     */
+    private function checkImageSrc(string $src, string $source, string $folder): void
+    {
+        if ($src === '' || str_starts_with($src, '#') || preg_match('/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i', $src) || str_starts_with($src, '/')) {
+            return;
+        }
+        $pathPart = (string) preg_replace('/([?#].*)$/s', '', $src);
+        if ($pathPart === '') {
+            return;
+        }
+        $segments = $folder === '' ? [] : explode('/', $folder);
+        foreach (explode('/', $pathPart) as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+            if ($segment === '..') {
+                // A path cannot climb above docs/, so an empty stack clamps instead of popping.
+                if ($segments !== []) {
+                    array_pop($segments);
+                }
+            } else {
+                $segments[] = $segment;
+            }
+        }
+        $resolved = implode('/', $segments);
+        if (! is_file($this->docs.'/'.$resolved)) {
+            $this->findings[] = "{$source} references image {$src} but docs/{$resolved} does not exist";
+
+            return;
+        }
+        $this->images[$resolved] = (string) file_get_contents($this->docs.'/'.$resolved);
+    }
+
+    /** A built page as a DOMDocument, or null when it cannot be parsed. */
+    private function loadDom(string $html): ?DOMDocument
+    {
+        $dom = new DOMDocument;
+        $keep = libxml_use_internal_errors(true);
+        $loaded = $dom->loadHTML('<?xml encoding="utf-8"?>'.$html);
+        libxml_clear_errors();
+        libxml_use_internal_errors($keep);
+
+        return $loaded ? $dom : null;
+    }
+
+    /** The id attributes of every element in the page, so a fragment can be checked against them. */
+    /** @return list<string> */
+    private function collectIds(DOMDocument $dom): array
+    {
+        $ids = [];
+        foreach ($dom->getElementsByTagName('*') as $element) {
+            $id = $element->getAttribute('id');
+            if ($id !== '') {
+                $ids[] = $id;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * The docs source behind a built page, for the finding text.
+     *
+     * @param  array<string, string>  $sources
+     */
+    private function sourceLabel(string $key, array $sources): string
+    {
+        $docPath = substr($key, strlen('site/docs/'), -strlen('.html'));
+        if (isset($sources[$docPath])) {
+            return 'docs/'.$docPath.'.md';
+        }
+
+        return $key;
     }
 
     /** @return array<string, string> doc path (no .md) => absolute file, sorted, private skipped */
@@ -320,6 +1328,81 @@ final class DocsSite
         return $out;
     }
 
+    /** Whether the nav lists the generated changelog page, in any group. */
+    private function navListsChangelog(): bool
+    {
+        foreach ($this->flattenNav() as $entry) {
+            if ($entry['path'] === 'changelog') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The generated changelog page, when the nav lists one: [path under the repo root, content]. Null when the
+     * nav does not list a changelog page, or when it does and CHANGELOG.md is missing (a finding).
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    public function changelogPage(): ?array
+    {
+        if (! $this->navListsChangelog()) {
+            return null;
+        }
+        $path = $this->root.'/CHANGELOG.md';
+        if (! is_file($path)) {
+            $this->findings[] = 'nav.json lists changelog but CHANGELOG.md does not exist';
+
+            return null;
+        }
+        $text = $this->normalise((string) file_get_contents($path));
+        $body = (string) preg_replace('/\A#[ \t]+\S[^\n]*\n+/', '', $text);
+        $body = rtrim($this->rewriteChangelogLinks($body), "\n");
+        $page = "---\ntitle: \"Changelog\"\ndescription: All notable changes to this project.\n---\n\n"
+            ."<!-- Generated from CHANGELOG.md by bin/docs-site.php. Edit CHANGELOG.md, not this file. -->\n\n"
+            .$body."\n";
+
+        return ['docs/changelog.md', $page];
+    }
+
+    /**
+     * The link rules for the generated changelog page: http(s) and other scheme links stay, a pure fragment
+     * stays, and a relative link becomes a blob link under the nav.json source, or loses its link and keeps its
+     * label when there is no source. Markdown images are left alone.
+     */
+    private function rewriteChangelogLinks(string $body): string
+    {
+        $source = $this->sourceUrl();
+
+        return (string) preg_replace_callback(
+            '/(?<!!)\[([^\]]*)\]\(([^()\n]+)\)/',
+            static function (array $m) use ($source): string {
+                $label = $m[1];
+                $target = trim($m[2]);
+                if (preg_match('/^(.*?)\s+["\'][^"\']*["\']$/', $target, $t) === 1) {
+                    $target = trim($t[1]);
+                }
+                if (str_starts_with($target, '<') && str_ends_with($target, '>')) {
+                    $target = substr($target, 1, -1);
+                }
+                if ($target === '' || str_starts_with($target, '#')) {
+                    return $m[0];
+                }
+                if (preg_match('/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i', $target) === 1) {
+                    return $m[0];
+                }
+                if ($source === null) {
+                    return $label;
+                }
+
+                return '['.$label.']('.rtrim($source, '/').'/-/blob/main/'.$target.')';
+            },
+            $body,
+        );
+    }
+
     private function versionStamp(): string
     {
         $path = $this->root.'/CHANGELOG.md';
@@ -332,6 +1415,66 @@ final class DocsSite
         }
 
         return 'unreleased';
+    }
+
+    /**
+     * The version stamp gates: composer.json's version field must agree with the stamp, and the opt-in
+     * --require-release and --require-tag flags demand a released heading and a latest tag that matches it.
+     */
+    private function checkStamp(string $stamp): void
+    {
+        $composer = $this->root.'/composer.json';
+        if (is_file($composer)) {
+            $data = json_decode((string) file_get_contents($composer), true);
+            $version = is_array($data) ? ($data['version'] ?? null) : null;
+            if (is_string($version) && $version !== '' && $version !== $stamp) {
+                $this->findings[] = "composer.json version {$version} does not match the docs stamp {$stamp}";
+            }
+        }
+        if ($this->requireRelease && $stamp === 'unreleased') {
+            $this->findings[] = 'CHANGELOG.md has no released heading';
+        }
+        if (! $this->requireTag) {
+            return;
+        }
+        $process = proc_open(['git', 'tag', '--list', '--sort=-v:refname'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $this->root);
+        if (! is_resource($process)) {
+            $this->findings[] = '--require-tag: git is not available';
+
+            return;
+        }
+        $stdout = (string) stream_get_contents($pipes[1]);
+        $stderr = (string) stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($process);
+        if ($code !== 0) {
+            $detail = trim($stderr);
+            $more = $detail === '' ? '' : ': '.$detail;
+            $this->findings[] = "--require-tag: git tag --list exited with code {$code}{$more}";
+
+            return;
+        }
+        $tag = null;
+        foreach (explode("\n", $this->normalise($stdout)) as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            if (preg_match('/^v?(\d+\.\d+\.\d+)/', $line, $m) === 1) {
+                $tag = $m[1];
+
+                break;
+            }
+        }
+        if ($tag === null) {
+            $this->findings[] = '--require-tag: the repo has no version tags';
+
+            return;
+        }
+        if ($tag !== $stamp) {
+            $this->findings[] = "the docs stamp {$stamp} does not match the latest tag {$tag}";
+        }
     }
 
     private function projectTitle(): string
@@ -504,6 +1647,125 @@ final class DocsSite
     }
 
     /**
+     * The two-way coverage gate for the symfony-commands blocks: a code span or fenced line that starts with the
+     * cli name must name a real command (help and list always pass), and every --option on it must be an option
+     * of that command or an application option; every kept command and option must appear in the docs at least
+     * once, where the generated block counts. Runs once the contents are final, before the pages render.
+     *
+     * @param  array<string, string>  $sources
+     * @param  array<string, string>  $contents
+     */
+    private function checkCoverage(array $sources, array $contents): void
+    {
+        if ($this->computed === null) {
+            $this->computed = [];
+        }
+        foreach ($this->blocks as $name => $block) {
+            if ((string) ($block['type'] ?? '') !== 'symfony-commands' || array_key_exists($name, $this->computed)) {
+                continue;
+            }
+            $this->computed[$name] = $this->renderSymfonyCommands($name, $block);
+        }
+        foreach ($this->commandSets as $cli => $set) {
+            $seen = [];
+            $all = '';
+            foreach ($sources as $path => $file) {
+                $all .= $contents[$path]."\n";
+                foreach ($this->codeRegions($contents[$path]) as $line) {
+                    $text = ltrim($line);
+                    if (str_starts_with($text, '$ ')) {
+                        $text = substr($text, 2);
+                    }
+                    if (str_starts_with($text, 'vendor/bin/')) {
+                        $text = substr($text, strlen('vendor/bin/'));
+                    }
+                    if (preg_match('/^'.preg_quote($cli, '/').'\s+([a-z][a-z:_-]*)/', $text, $m) !== 1) {
+                        continue;
+                    }
+                    $command = $m[1];
+                    if ($command !== 'help' && $command !== 'list' && ! isset($set[$command])) {
+                        $key = 'c|'.$path.'|'.$command;
+                        if (! isset($seen[$key])) {
+                            $seen[$key] = true;
+                            $this->findings[] = "docs/{$path}.md mentions \"{$cli} {$command}\" but the CLI has no command {$command}.";
+                        }
+
+                        continue;
+                    }
+                    $allowed = self::APPLICATION_OPTIONS;
+                    foreach ($set[$command] ?? [] as $option) {
+                        $allowed['--'.$option] = true;
+                    }
+                    if (preg_match_all('/--[A-Za-z][A-Za-z0-9-]*(?:=[^\s]*)?/', $text, $tokens) === 0) {
+                        continue;
+                    }
+                    foreach ($tokens[0] as $token) {
+                        $name = '--'.(string) preg_replace('/=.*$/', '', substr($token, 2));
+                        if (isset($allowed[$name])) {
+                            continue;
+                        }
+                        $key = 'o|'.$path.'|'.$command.'|'.$name;
+                        if (! isset($seen[$key])) {
+                            $seen[$key] = true;
+                            $this->findings[] = "docs/{$path}.md uses {$cli} {$command} {$name}, which {$command} does not accept.";
+                        }
+                    }
+                }
+            }
+            foreach ($set as $command => $options) {
+                if (preg_match('/(?<![\w-])'.preg_quote($cli.' '.$command, '/').'(?![\w-])/', $all) !== 1) {
+                    $this->findings[] = "command \"{$command}\" is in the CLI but not documented.";
+                }
+                foreach ($options as $option) {
+                    if (preg_match('/(?<![\w-])--'.preg_quote($option, '/').'(?![\w-])/', $all) !== 1) {
+                        $this->findings[] = "option \"--{$option}\" of {$command} is in the CLI but not documented.";
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * The code spans and fenced code lines of one page, from the CommonMark AST. Plain prose is never scanned,
+     * and the content between generated-block markers is removed first, so the builder's own regions stay out of
+     * the gate. A fence whose info string carries docs-test: skip is not scanned.
+     *
+     * @return list<string>
+     */
+    private function codeRegions(string $raw): array
+    {
+        foreach (array_reverse($this->blockRegions($raw)) as $region) {
+            if (! $region['closed']) {
+                continue;
+            }
+            $raw = substr($raw, 0, $region['start']).substr($raw, $region['end']);
+        }
+        [, $body] = $this->frontMatter($raw);
+        $env = new Environment;
+        $env->addExtension(new CommonMarkCoreExtension);
+        $env->addExtension(new GithubFlavoredMarkdownExtension);
+        $document = (new MarkdownParser($env))->parse($body);
+        $out = [];
+        foreach ($document->iterator() as $node) {
+            if ($node instanceof Code) {
+                $out[] = (string) $node->getLiteral();
+
+                continue;
+            }
+            if ($node instanceof FencedCode) {
+                if (str_contains((string) $node->getInfo(), 'docs-test: skip')) {
+                    continue;
+                }
+                foreach (explode("\n", (string) $node->getLiteral()) as $line) {
+                    $out[] = $line;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * The rendered content of the given blocks, by name; absent for a type that is not implemented yet.
      * A failed command stops the build.
      *
@@ -653,6 +1915,24 @@ final class DocsSite
                 continue;
             }
             $kept[] = $command;
+        }
+        $this->commandSets[$cli] = [];
+        foreach ($kept as $command) {
+            $keys = [];
+            $definition = $command['definition'] ?? [];
+            $options = is_array($definition) ? ($definition['options'] ?? []) : [];
+            if (is_array($options)) {
+                foreach ($options as $key => $option) {
+                    $name = is_array($option) && is_string($option['name'] ?? null) && $option['name'] !== '' ? ltrim($option['name'], '-') : '';
+                    if ($name === '' && is_string($key) && $key !== '') {
+                        $name = $key;
+                    }
+                    if ($name !== '') {
+                        $keys[] = $name;
+                    }
+                }
+            }
+            $this->commandSets[$cli][$command['name']] = $keys;
         }
         $hash = str_repeat('#', $level);
         $lines = ['| Command | What it does |', '| --- | --- |'];
@@ -874,7 +2154,7 @@ final class DocsSite
         return false;
     }
 
-    /** A cell's text: booleans print yes or no, lists print comma separated, pipes are escaped, newlines collapse to spaces. */
+    /** A cell's text: booleans print yes or no, lists print comma separated, Symfony console style tags are stripped, pipes are escaped, newlines collapse to spaces. */
     private function cellText(mixed $value): string
     {
         if ($value === null) {
@@ -899,6 +2179,9 @@ final class DocsSite
         }
         $value = str_replace(["\r\n", "\r"], "\n", $value);
         $value = (string) preg_replace('/\s*\n+\s*/', ' ', $value);
+        // Symfony console style tags would otherwise reach the table as literal angle text, so strip them before
+        // escaping. Other angle text (for example a <path> placeholder) is left alone.
+        $value = (string) preg_replace('/<\/?(?:info|comment|error|question)>|<fg=[^>]*>|<\/>/', '', $value);
 
         return str_replace('|', '\|', trim($value));
     }
@@ -1409,11 +2692,15 @@ function docs_site_require_commonmark(string $root): void
 /** @param list<string> $argv */
 function docs_site_main(array $argv): int
 {
-    $usage = "Usage: php bin/docs-site.php [--root=.] [--check]\n"
+    $usage = "Usage: php bin/docs-site.php [--root=.] [--check] [--require-tag] [--require-release]\n"
+        ."       php bin/docs-site.php [--root=.] --examples (run the tested examples; exit 1 on any finding)\n"
         ."       php bin/docs-site.php --sync-to=<repo>   (from Squire: copy the kit and this file)\n"
         ."       php bin/docs-site.php --rehash           (from Squire: record the kit's hashes)\n";
     $root = '.';
     $check = false;
+    $requireTag = false;
+    $requireRelease = false;
+    $examples = false;
     $syncTo = null;
     $rehash = false;
     foreach (array_slice($argv, 1) as $arg) {
@@ -1425,6 +2712,12 @@ function docs_site_main(array $argv): int
             $syncTo = substr($arg, 10);
         } elseif ($arg === '--check') {
             $check = true;
+        } elseif ($arg === '--require-tag') {
+            $requireTag = true;
+        } elseif ($arg === '--require-release') {
+            $requireRelease = true;
+        } elseif ($arg === '--examples') {
+            $examples = true;
         } elseif ($arg === '--help' || $arg === '-h') {
             fwrite(STDOUT, $usage);
 
@@ -1444,11 +2737,40 @@ function docs_site_main(array $argv): int
             return docs_site_sync($syncTo);
         }
         $root = rtrim($root, '/\\');
+        if ($examples) {
+            $gate = new DocsExamples($root);
+            $result = $gate->run();
+            foreach ($result['findings'] as $line) {
+                fwrite(STDERR, "example: {$line}\n");
+            }
+            fwrite(STDOUT, $result['summary']."\n");
+
+            return $result['findings'] === [] ? 0 : 1;
+        }
         docs_site_require_commonmark($root);
         $tool = new DocsSite($root);
         $tool->setWriteBlocks(! $check);
+        $tool->setRequireTag($requireTag);
+        $tool->setRequireRelease($requireRelease);
+        $changelog = $tool->changelogPage();
+        if ($changelog !== null && ! $check) {
+            [$relative, $content] = $changelog;
+            $path = $tool->rootDir().'/'.$relative;
+            $onDisk = is_file($path) ? str_replace("\r\n", "\n", (string) file_get_contents($path)) : null;
+            if ($onDisk !== $content) {
+                $dir = dirname($path);
+                if (! is_dir($dir) && ! mkdir($dir, 0o775, true) && ! is_dir($dir)) {
+                    throw new DocsSiteError("Cannot create {$dir}.");
+                }
+                if (file_put_contents($path, $content) === false) {
+                    throw new DocsSiteError("Cannot write {$path}.");
+                }
+                fwrite(STDOUT, "wrote {$relative}\n");
+            }
+        }
         $files = $tool->build();
-        $leftovers = $tool->leftovers($files);
+        $binaries = $tool->binaryFiles();
+        $leftovers = $tool->leftovers($files, $binaries);
         $drift = [];
         foreach ($files as $relative => $content) {
             $path = $tool->rootDir().'/'.$relative;
@@ -1469,6 +2791,34 @@ function docs_site_main(array $argv): int
                 throw new DocsSiteError("Cannot write {$path}.");
             }
             fwrite(STDOUT, "wrote {$relative}\n");
+        }
+        foreach ($binaries as $relative => $bytes) {
+            $path = $tool->rootDir().'/'.$relative;
+            $onDisk = is_file($path) ? (string) file_get_contents($path) : null;
+            if ($onDisk === $bytes) {
+                continue;
+            }
+            if ($check) {
+                $drift[] = $relative.($onDisk === null ? ' (missing)' : ' (out of date)');
+
+                continue;
+            }
+            $dir = dirname($path);
+            if (! is_dir($dir) && ! mkdir($dir, 0o775, true) && ! is_dir($dir)) {
+                throw new DocsSiteError("Cannot create {$dir}.");
+            }
+            if (file_put_contents($path, $bytes) === false) {
+                throw new DocsSiteError("Cannot write {$path}.");
+            }
+            fwrite(STDOUT, "wrote {$relative}\n");
+        }
+        if ($changelog !== null && $check) {
+            [$relative, $content] = $changelog;
+            $path = $tool->rootDir().'/'.$relative;
+            $onDisk = is_file($path) ? str_replace("\r\n", "\n", (string) file_get_contents($path)) : null;
+            if ($onDisk !== $content) {
+                $drift[] = $relative.($onDisk === null ? ' (missing)' : ' (out of date)');
+            }
         }
         foreach ($leftovers as $relative) {
             if ($check) {

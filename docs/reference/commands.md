@@ -138,7 +138,7 @@ Usage: `booster scan [--path PATH] [--php PHP] [--removals] [--format FORMAT] [-
 
 | Option | Meaning | Default |
 | --- | --- | --- |
-| `-h`, `--help` | Display help for the given command. When no command is given display help for the <info>list</info> command |  |
+| `-h`, `--help` | Display help for the given command. When no command is given display help for the list command |  |
 | `-q`, `--quiet` | Only errors are displayed. All other output is suppressed |  |
 | `-v|-vv|-vvv`, `--verbose` | Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug |  |
 | `-V`, `--version` | Display this application version |  |
