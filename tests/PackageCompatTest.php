@@ -337,4 +337,39 @@ final class PackageCompatTest extends TestCase
 
         self::assertSame([], $plan->packageChecks);
     }
+
+    public function test_boosters_own_scan_tools_are_never_checked(): void
+    {
+        $fetcher = $this->fetcher([
+            'waynestate/pinstripe' => $this->document('waynestate/pinstripe', '0.1.0', ['php' => '^8.3']),
+        ]);
+        $plan = $this->planWith(
+            ['require' => ['waynestate/pinstripe' => '^0.1']],
+            $fetcher,
+            new PlanOptions(fromPhp: '8.0'),
+        );
+
+        self::assertSame([], $fetcher->fetched);
+        self::assertSame([], $plan->packageChecks);
+    }
+
+    public function test_a_php_floor_above_the_hop_target_names_the_floor_not_the_cap(): void
+    {
+        $fetcher = $this->fetcher([
+            'acme/needs-eight-three' => $this->document('acme/needs-eight-three', '1.0.0', ['php' => '^8.3']),
+        ]);
+        $plan = $this->planWith(
+            ['require' => ['acme/needs-eight-three' => '^1.0']],
+            $fetcher,
+            new PlanOptions(fromPhp: '8.0'),
+        );
+
+        $check = $plan->packageChecks[0];
+        self::assertSame('1.0.0', $check->newest);
+        self::assertSame('php-80-to-81', $check->blocks);
+        self::assertContains(
+            'acme/needs-eight-three 1.0.0 needs PHP 8.3 or newer, so it blocks php-80-to-81. Replace or upgrade it first.',
+            $plan->warnings,
+        );
+    }
 }

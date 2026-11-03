@@ -270,6 +270,11 @@ final class PhpCompatScan
                 if (!is_array($message) || !is_string($message['message'] ?? null) || !is_int($message['line'] ?? null)) {
                     continue;
                 }
+                // Internal.NoCodeFound fires on plain HTML includes that carry
+                // no PHP code; it is noise, not a finding.
+                if (($message['source'] ?? '') === 'Internal.NoCodeFound') {
+                    continue;
+                }
                 $findings[] = new Finding(
                     $file,
                     $message['line'],

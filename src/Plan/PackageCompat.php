@@ -63,8 +63,10 @@ final class PackageCompat
 
     /**
      * The packages the app requires directly, require before require-dev,
-     * minus the ones Booster plans itself: PHP, extensions, Laravel, its
-     * illuminate components and PHPUnit.
+     * minus the ones Booster plans itself (PHP, extensions, Laravel, its
+     * illuminate components and PHPUnit) and the scan tools Booster ships
+     * (Pinstripe, PHPCompatibility, PHP_CodeSniffer, PHPStan and its rules,
+     * and the CodeSniffer installer plugin).
      *
      * @param array<string, mixed> $composer
      *
@@ -96,7 +98,14 @@ final class PackageCompat
             || str_starts_with($name, 'lib-')
             || $name === 'laravel/framework'
             || str_starts_with($name, 'illuminate/')
-            || $name === 'phpunit/phpunit';
+            || $name === 'phpunit/phpunit'
+            || $name === 'waynestate/pinstripe'
+            || $name === 'phpcompatibility/php-compatibility'
+            || $name === 'squizlabs/php_codesniffer'
+            || $name === 'phpstan/phpstan'
+            || $name === 'phpstan/phpstan-strict-rules'
+            || $name === 'phpstan/phpstan-deprecation-rules'
+            || $name === 'dealerdirect/phpcodesniffer-composer-installer';
     }
 
     /**
@@ -140,21 +149,23 @@ final class PackageCompat
 
         $blocks = null;
         $failed = [];
+        $blockingStep = null;
         foreach ($steps as $step) {
             $failed = $this->stepFailures($step, $phpConstraint, $laravelConstraint);
             if ($failed !== []) {
                 $blocks = $step->hop->id;
+                $blockingStep = $step;
                 break;
             }
         }
 
         $blockWarning = null;
-        if ($blocks !== null) {
+        if ($blocks !== null && $blockingStep !== null) {
             $blockWarning = sprintf(
                 '%s %s %s, so it blocks %s. Replace or upgrade it first.',
                 $name,
                 $newest,
-                $this->supportPhrase($failed, $phpConstraint, $laravelConstraint),
+                $this->supportPhrase($failed, $phpConstraint, $laravelConstraint, $blockingStep->phpAfter),
                 $blocks,
             );
         }
@@ -415,19 +426,20 @@ final class PackageCompat
     /**
      * What the package's newest release supports, naming only the dimensions
      * the blocking step fails on. A cap is printed only when the constraint
-     * really has one; a constraint with no upper bound names its floor
-     * instead.
+     * really has one and the hop's target is not below the floor; a
+     * constraint with no upper bound, or a PHP floor above the target,
+     * names its floor instead.
      *
      * @param list<'laravel'|'php'> $failed
      */
-    private function supportPhrase(array $failed, ?string $phpConstraint, ?string $laravelConstraint): string
+    private function supportPhrase(array $failed, ?string $phpConstraint, ?string $laravelConstraint, ?string $phpTarget = null): string
     {
         $parts = [];
         foreach ($failed as $dimension) {
             if ($dimension === 'laravel' && $laravelConstraint !== null) {
                 $parts[] = $this->dimensionPhrase('Laravel', $laravelConstraint, $this->laravelCap($laravelConstraint));
             } elseif ($dimension === 'php' && $phpConstraint !== null) {
-                $parts[] = $this->dimensionPhrase('PHP', $phpConstraint, $this->phpCap($phpConstraint));
+                $parts[] = $this->dimensionPhrase('PHP', $phpConstraint, $this->phpCap($phpConstraint), $phpTarget);
             }
         }
         if (count($parts) === 1) {
@@ -441,12 +453,17 @@ final class PackageCompat
     }
 
     /**
-     * One dimension of the phrase. A constraint with a real upper bound names
-     * the newest version Booster plans that it allows ("supports X up to N");
-     * one without names its floor ("needs X F or newer").
+     * One dimension of the phrase. When the hop's target sits below the
+     * constraint's floor, the floor is named ("needs X F or newer") because
+     * that is the real reason the step fails. Otherwise a constraint with a
+     * real upper bound names the newest version Booster plans that it allows
+     * ("supports X up to N"); one without names its floor.
      */
-    private function dimensionPhrase(string $component, string $constraint, ?string $cap): string
+    private function dimensionPhrase(string $component, string $constraint, ?string $cap, ?string $target = null): string
     {
+        if ($component === 'PHP' && $target !== null && $this->targetBelowFloor($target, $constraint)) {
+            return sprintf('needs PHP %s or newer', $this->floorOf($constraint));
+        }
         if ($this->hasUpperBound($constraint)) {
             return $cap !== null
                 ? sprintf('supports %s up to %s', $component, $cap)
@@ -454,6 +471,16 @@ final class PackageCompat
         }
 
         return sprintf('needs %s %s or newer', $component, $this->floorOf($constraint));
+    }
+
+    /** Whether the hop's target PHP is strictly below the constraint's floor. */
+    private function targetBelowFloor(string $target, string $constraint): bool
+    {
+        try {
+            return Semver::satisfies($target, '<' . $this->floorOf($constraint));
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**
