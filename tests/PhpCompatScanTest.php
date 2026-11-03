@@ -255,7 +255,7 @@ final class PhpCompatScanTest extends TestCase
         self::assertSame(3, $array['findings'][0]['line']);
     }
 
-    public function test_temp_probe_of_spec_rules(): void
+    public function test_oci8_declaration_edge_cases(): void
     {
         $makeJson = function (string $app): array {
             return $this->phpcsJson([
