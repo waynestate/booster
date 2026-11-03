@@ -118,14 +118,20 @@ php bin\booster plan --path=..\my-app
 ### Docker only, no PHP (Windows or any OS)
 
 ```
-docker run --rm -v "${PWD}:/booster" -w /booster composer:2 composer install --no-interaction
+git clone https://github.com/waynestate/booster.git
+cd booster
+docker run --rm -v "${PWD}:/booster" -w /booster composer:2.10.3 composer install --no-interaction
 docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-cli php bin/booster plan --path=/app
 ```
+
+Run these from inside the booster folder.
 
 This route can run `detect`, `plan`, `scan` and `run --dry-run`. A real `run` starts Docker and uses git from inside
 Booster, which the `php:8.4-cli` image lacks, so for a real run use the single-file or clone route (in WSL on Windows). When
 Booster itself runs in a container, pass `--skip-gate` to `run` and run the tests yourself. Node hops run `npm` in a
 `node:26` container, so they need the same daemon but no Node installed on the machine.
+
+Booster prints its progress lines on standard error. In Windows PowerShell they print in red, as if they were errors. They are not errors; the exit code tells you whether the run worked.
 
 Booster is also on Packagist as `waynestate/booster`: give it its own folder, not your app's `vendor/`, because it
 needs PHP 8.3 even when your app doesn't. Clone it as above, or run
@@ -164,10 +170,16 @@ command exits.
 ```
 booster detect --path=../my-app        # which of the five permutations, and which versions
 booster plan   --path=../my-app        # the ordered hops to a supported version
-booster scan   --path=../my-app --php=8.0   # what will break on that PHP; advisory, changes nothing
+booster scan   --path=../my-app --php=<target>   # what will break on that newer PHP; advisory, changes nothing
 booster run    --path=../my-app --dry-run   # the diffs Rector would make; changes nothing
 booster run    --path=../my-app        # apply the plan, one hop at a time, with a test gate
 ```
+
+Replace `<target>` with the PHP version you are heading for, for example the one `plan` shows on its last step.
+
+A real run needs git and Docker on the machine that runs Booster. If you used the Docker-only route, the first four commands above work as they are, but the last one does not: its `php:8.4-cli` image has no git. Use the single-file or clone route for `booster run` (see Install).
+
+Booster prints its progress lines on standard error. In Windows PowerShell they print in red, as if they were errors. They are not errors; the exit code tells you whether the run worked.
 
 The one-command form for a forced image upgrade:
 
@@ -347,7 +359,7 @@ directory. When none of the launchers has the standard, the scan reports a skip 
 to reinstall Booster's dependencies (`composer install` in Booster's folder) or download the PHAR again.
 
 The scan ignores `vendor/`, `node_modules/` and `storage/`, because those hold third-party code and generated files,
-not the app's. It reads the app only and changes nothing. `booster scan --path=../my-app --php=8.0` runs the same scan
+not the app's. It reads the app only and changes nothing. `booster scan --path=../my-app --php=<target>` runs the same scan
 on its own, for any PHP version Booster knows, and exits 0 even when it finds a wall of removed functions.
 
 ### The PHPStan scan
