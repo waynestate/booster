@@ -933,6 +933,38 @@ final class CliTest extends TestCase
         self::assertStringContainsString('Booster never commits or pushes.', $out);
     }
 
+    public function test_a_passing_real_run_that_changes_nothing_says_nothing_changed(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        // The app already allows the target PHP, so the hop has nothing to do.
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        $composer['require']['php'] = '^8.0';
+        file_put_contents($dir . '/composer.json', (string) json_encode($composer));
+
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            if (self::isProctorCommand($command)) {
+                return new ProcessResult(0, self::proctorFixture('pass-report.json'), '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $dir, '--today' => self::TODAY, '--goal' => 'php-74-to-80',
+        ], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('NOTHING-TO-DO', $out);
+        self::assertStringContainsString('Nothing was changed.', $out);
+        self::assertStringNotContainsString('Booster edited your files', $out);
+    }
+
     public function test_a_passing_dry_run_ends_with_the_next_step_footer(): void
     {
         $app = $this->example('raw-php');
