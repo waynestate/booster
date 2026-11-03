@@ -25,6 +25,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### Fixed
 
+- The single-file PHAR now carries the launchers for its bundled PHPStan and PHP_CodeSniffer, so `scan` and the plan no longer print "could not run" when started from the PHAR.
 - The package-block warning now says "needs PHP X or newer" when the package's PHP floor is above the hop's target, instead of naming a cap that is not the real reason the step fails.
 - Booster's own scan tools (Pinstripe, PHPCompatibility, PHP_CodeSniffer, PHPStan and its rules, and the CodeSniffer installer plugin) are no longer checked as upgrade blockers when an app has them installed.
 - The PHPCompatibility scan drops the `Internal.NoCodeFound` message, which fires on plain HTML include files that carry no PHP code.
