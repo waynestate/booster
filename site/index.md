@@ -120,7 +120,7 @@ $ bin/booster hops php-55-to-56 Move PHP 5.5 code to PHP 5.6. php-56-to-70 Move 
 
 **initWrites the coding-tab playbooks to .agents/skills**
 
-$ bin/booster init --path=../my-app Wrote 35 playbooks, 35 changed. $ bin/booster init --path=../my-app --check Playbooks are current. # exits 1 when a playbook is stale, so CI notices
+$ bin/booster init --path=../my-app Wrote 35 playbooks (one for each step Booster knows, plus a general one), 35 changed. $ bin/booster init --path=../my-app --check Playbooks are current. # exits 1 when a playbook is stale, so CI notices
 
 Get the shot
 

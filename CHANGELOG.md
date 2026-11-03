@@ -6,6 +6,9 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### Changed
 
+- The `cas-to-sesame` step now requires SESAME `^0.4` (SESAME 0.4.0 is out; a `^0.3` constraint would have stayed on 0.3.x), and the SESAME config Booster falls back on when the app has no vendor copy is SESAME 0.4.0's: it gains `gateway.public_keys`, `oauth2.require_at_jwt` and `log`. The step's own edits are unchanged; SESAME 0.4.0 only added optional settings.
+- A dry-run step with no edits prints "General notes for this step (nothing found in your app, just good to know):" before the hop's version notes, so they no longer read like findings in your app.
+- `booster init` says why it writes one more playbook than there are steps ("one for each step Booster knows, plus a general one"), and the quick start lists it as an optional line.
 - `booster --help` and `booster -h` print Booster's own overview (one plain sentence, then the command list) instead of the help of the internal `list` command; `booster plan --help` is unchanged.
 - The plan's closing line no longer says steps are "marked automatic" (nothing was ever printed that way): it reads "Booster does every numbered step above when you run it." and names the real `[manual: you do this one by hand]` marker.
 - A skipped baseline explains itself: a real run first runs your tests as they are now (the baseline), then again after every step (the gate).

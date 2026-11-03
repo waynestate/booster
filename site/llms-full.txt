@@ -174,6 +174,7 @@ booster plan   --path=../my-app        # the ordered hops to a supported version
 booster scan   --path=../my-app --php=<target>   # what will break on that newer PHP; advisory, changes nothing
 booster run    --path=../my-app --dry-run   # the diffs Rector would make; changes nothing
 booster run    --path=../my-app        # apply the plan, one hop at a time, with a test gate
+booster init   --path=../my-app        # optional: writes playbooks for AI coding tools into the app; commit them before a real run
 ```
 
 Replace `` with the PHP version you are heading for, for example the one `plan` shows on its last step.
@@ -871,7 +872,7 @@ $ bin/booster hops php-55-to-56 Move PHP 5.5 code to PHP 5.6. php-56-to-70 Move 
 
 **initWrites the coding-tab playbooks to .agents/skills**
 
-$ bin/booster init --path=../my-app Wrote 35 playbooks, 35 changed. $ bin/booster init --path=../my-app --check Playbooks are current. # exits 1 when a playbook is stale, so CI notices
+$ bin/booster init --path=../my-app Wrote 35 playbooks (one for each step Booster knows, plus a general one), 35 changed. $ bin/booster init --path=../my-app --check Playbooks are current. # exits 1 when a playbook is stale, so CI notices
 
 Get the shot
 
