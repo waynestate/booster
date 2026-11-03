@@ -1,0 +1,94 @@
+---
+title: "Booster | Booster docs"
+description: "What Booster is, and the first command to run on your app today."
+url: https://booster.apps.wayne.edu/docs/
+llms: https://booster.apps.wayne.edu/llms.txt
+generator: Squire agent-ready
+---
+
+# Booster[#](https://booster.apps.wayne.edu/docs/#booster)
+
+This page says what Booster is and where to go next. Install it on [Install](https://booster.apps.wayne.edu/docs/install.html), then follow [Quick start](https://booster.apps.wayne.edu/docs/guides/quick-start.html).
+
+**Boosts your versions.** One dose at a time, and every dose gets a stamp.
+
+> A booster shot keeps your immunity current. This one keeps your PHP current, and it stings less.
+
+Booster is WELD's upgrade tool. It plans the hops that take a WSU PHP app from the PHP or Laravel version it runs now to one the version policy still supports, and it runs them one at a time: [Rector](https://getrector.com) rewrites the code, Booster raises the constraints in `composer.json`, and the app's own tests must pass on the target PHP before the next hop starts. It stands on `rector/rector` and `driftingly/rector-laravel` and adds only the ordering, the review threshold, the gate, the advisory scans and a few WSU recipes.
+
+Booster edits your working copy and prints a report. It never commits to, pushes or opens a merge request on your app (the only merge requests it opens are its own hop-data refresh on Booster itself): a person reads the diff and merges it.
+
+**Not to be confused with:** Booster moves an app to a newer PHP or framework version; Pinstripe's Rector set only modernizes code within the PHP version the app already runs.
+
+## Where it fits in WELD[#](https://booster.apps.wayne.edu/docs/#where-it-fits-in-weld)
+
+WELD is the Wayne State application stack. Booster is its upgrade layer.
+
+| Part | Job |
+| --- | --- |
+| WayneUI (project 0) | The interface layer every other part builds on |
+| CREED | The version policy (`policy.json`) Booster reads |
+| PROCTOR | Measures an app against that policy; the gate runs it before the first hop and after the last |
+| Preflight | The CI templates |
+| SESAME | Auth; Booster can swap `wayne-cas` for it |
+| HELMET | The baseline runtime |
+| Pinstripe | The coding standard |
+| Sourdough | The starters |
+| Booster | This project: moves apps forward |
+
+It works for all five permutations of the stack: raw PHP, raw PHP with a Vue SPA, Laravel with Blade, Laravel with Blade and Vue islands, and Laravel with Inertia and Vue.
+
+## Run it today[#](https://booster.apps.wayne.edu/docs/#run-it-today)
+
+Two one-liners get Booster onto your machine:
+
+```
+curl -L -o ~/bin/booster.phar https://github.com/waynestate/booster/releases/latest/download/booster.phar
+```
+
+or, from Packagist:
+
+```
+composer create-project waynestate/booster booster ^1.0
+```
+
+Then the first command, run from inside the app you want to upgrade:
+
+```bash
+booster detect
+```
+
+```output
+path           .
+app_type       laravel-blade
+composer_json  yes
+php            8.2
+laravel        10
+phpunit        10
+vue            unknown
+node           unknown
+mix_file       no
+wayne_cas      no
+wayneui_1      no
+boost          no
+helmet         no
+
+Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version
+composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan).
+Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.
+Next: php bin/booster plan --path=.
+```
+
+Every route, per OS, is on [Install](https://booster.apps.wayne.edu/docs/install.html).
+
+## Guides[#](https://booster.apps.wayne.edu/docs/#guides)
+
+- [Quick start](https://booster.apps.wayne.edu/docs/guides/quick-start.html)
+- [The scans](https://booster.apps.wayne.edu/docs/guides/scans.html)
+- [The dependency check](https://booster.apps.wayne.edu/docs/guides/dependency-check.html)
+- [Behavior changes](https://booster.apps.wayne.edu/docs/guides/behaviour-changes.html)
+- [The baseline](https://booster.apps.wayne.edu/docs/guides/baseline.html)
+- [A smoke test for WSU apps](https://booster.apps.wayne.edu/docs/guides/smoke-test.html)
+- [What a hop does](https://booster.apps.wayne.edu/docs/guides/hops.html)
+- [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html)
+- [Deploying on Citadel](https://booster.apps.wayne.edu/docs/guides/citadel.html)

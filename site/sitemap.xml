@@ -2,4 +2,20 @@
 <!-- Written by Squire's agent-ready kit from the pages in the site folder; do not edit. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://booster.apps.wayne.edu/</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/checks.html</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/guides/baseline.html</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/guides/behaviour-changes.html</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/guides/citadel.html</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/guides/dependency-check.html</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/guides/hops.html</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/guides/quick-start.html</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/guides/scans.html</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/guides/smoke-test.html</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/install.html</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/next.html</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/reference/commands.html</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/reference/configuration.html</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/reference/hops.html</loc></url>
 </urlset>

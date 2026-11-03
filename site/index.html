@@ -628,6 +628,10 @@ docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-
             <p class="soon__label"><span class="chip chip--soon">Build the phar</span></p>
             <p>You can also build the single file from any commit with <code>scripts/build-phar.ps1</code> (PowerShell) or <code>scripts/build-phar.sh</code> (Linux, macOS). Each writes <code>build/booster.phar</code> and verifies it by printing Booster's version. Both need Docker; neither needs PHP or Composer on the host.</p>
           </div>
+          <div class="soon">
+            <p class="soon__label"><span class="chip chip--soon">The docs</span></p>
+            <p>The guides and the command reference live at <a href="https://booster.apps.wayne.edu/docs/">booster.apps.wayne.edu/docs/</a>. They are built from <code>docs/</code> by <code>bin/docs-site.php</code>, and the built pages are committed with the release.</p>
+          </div>
         </div>
       </div>
     </div>

@@ -191,6 +191,10 @@ Build the phar
 
 You can also build the single file from any commit with `scripts/build-phar.ps1` (PowerShell) or `scripts/build-phar.sh` (Linux, macOS). Each writes `build/booster.phar` and verifies it by printing Booster's version. Both need Docker; neither needs PHP or Composer on the host.
 
+The docs
+
+The guides and the command reference live at [booster.apps.wayne.edu/docs/](https://booster.apps.wayne.edu/docs/). They are built from `docs/` by `bin/docs-site.php`, and the built pages are committed with the release.
+
 For your coding agent
 
 ## Standing orders.

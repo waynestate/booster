@@ -17,6 +17,8 @@
 
 Checks: `composer ci` (the same command runs on GitLab and GitHub).
 
+Documentation: the docs live at [booster.apps.wayne.edu/docs/](https://booster.apps.wayne.edu/docs/) and are built from `docs/` by `bin/docs-site.php`.
+
 ## Where the code lives
 
 The canonical repository is on nougat: [enterprise-apps/booster](https://nougat.snu.gs/enterprise-apps/booster). git.wayne.edu and GitHub ([waynestate/booster](https://github.com/waynestate/booster)) are read-only mirrors of it.
@@ -27,6 +29,8 @@ This moves to git.wayne.edu once it has CI runners. Nougat is the shot; the mirr
 
 Front page: [`site/index.html`](site/index.html), a static page you can open in a browser or serve from `site/`.
 On Citadel it is served by the raw-PHP deploy layer in [`deploy/`](deploy/): a Squire kit whose front controller serves `site/` behind HELMET's security headers. For local development, keep serving `site/` directly.
+
+Docs: the same site serves the documentation at [`/docs/`](https://booster.apps.wayne.edu/docs/). It is built from [`docs/`](docs/) by `bin/docs-site.php` (`composer docs`), the built pages are committed, and `composer docs:check` (part of `composer ci`) fails when they drift from the sources.
 
 Booster is WELD's upgrade tool. It plans the hops that take a WSU PHP app from the PHP or Laravel version it runs now
 to one the version policy still supports, and it runs them one at a time: [Rector](https://getrector.com) rewrites the

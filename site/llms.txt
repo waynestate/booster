@@ -8,11 +8,29 @@
 
 Checks: `composer ci` (the same command runs on GitLab and GitHub).
 
+Documentation: the docs live at [booster.apps.wayne.edu/docs/](https://booster.apps.wayne.edu/docs/) and are built from `docs/` by `bin/docs-site.php`.
+
 Every page below is Markdown. The HTML pages send the same Markdown to a client that asks for `text/markdown`. Written by Squire's agent-ready kit from the README and the pages; do not edit.
 
 ## Pages
 
 - [Booster: Boosts your versions.](https://booster.apps.wayne.edu/index.md): Booster plans and runs PHP and Laravel upgrades one hop at a time on Rector, gates every hop with your tests on the target PHP, and never commits or pushes for you.
+- [Checks | Booster docs](https://booster.apps.wayne.edu/docs/checks.md): How Booster is built, tested and released, and where its proof lives.
+- [The baseline | Booster docs](https://booster.apps.wayne.edu/docs/guides/baseline.md): The test run that separates a bad hop from a suite that was already red.
+- [Behavior changes | Booster docs](https://booster.apps.wayne.edu/docs/guides/behaviour-changes.md): The silent changes between versions that Rector does not rewrite, one block per hop.
+- [Deploying on Citadel | Booster docs](https://booster.apps.wayne.edu/docs/guides/citadel.md): The deployment script Booster writes when a real run changes composer.lock.
+- [The dependency check | Booster docs](https://booster.apps.wayne.edu/docs/guides/dependency-check.md): How Booster asks Packagist whether your direct dependencies can follow the plan.
+- [What a hop does | Booster docs](https://booster.apps.wayne.edu/docs/guides/hops.md): What happens inside one hop, from the Rector dry run to the gate.
+- [Laravel hops and vendor/ | Booster docs](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.md): Why Laravel hops need the app's vendor folder, and where the hop data comes from.
+- [Quick start | Booster docs](https://booster.apps.wayne.edu/docs/guides/quick-start.md): The first commands to run, and what a plan looks like.
+- [The scans | Booster docs](https://booster.apps.wayne.edu/docs/guides/scans.md): The two advisory scans Booster runs, and how to run either one alone.
+- [A smoke test for WSU apps | Booster docs](https://booster.apps.wayne.edu/docs/guides/smoke-test.md): One small test that proves the app boots and its front door still sends guests to CAS.
+- [Booster | Booster docs](https://booster.apps.wayne.edu/docs/index.md): What Booster is, and the first command to run on your app today.
+- [Install | Booster docs](https://booster.apps.wayne.edu/docs/install.md): Every route to get Booster running, from a single file to Docker only.
+- [Next | Booster docs](https://booster.apps.wayne.edu/docs/next.md): What Booster does not do yet, and what it decided not to build.
+- [Commands | Booster docs](https://booster.apps.wayne.edu/docs/reference/commands.md): Every Booster command and option, generated from the tool itself.
+- [Configuration | Booster docs](https://booster.apps.wayne.edu/docs/reference/configuration.md): The environment variables Booster reads, and where it gets the policy.
+- [Hops | Booster docs](https://booster.apps.wayne.edu/docs/reference/hops.md): Every hop Booster knows, generated from the hop data.
 
 ## Prompts
 
