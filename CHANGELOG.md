@@ -4,6 +4,15 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- `booster --help` and `booster -h` print Booster's own overview (one plain sentence, then the command list) instead of the help of the internal `list` command; `booster plan --help` is unchanged.
+- The plan's closing line no longer says steps are "marked automatic" (nothing was ever printed that way): it reads "Booster does every numbered step above when you run it." and names the real `[manual: you do this one by hand]` marker.
+- A skipped baseline explains itself: a real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+- `booster detect` ends with a `Keys:` line saying what each yes/no key means (`wayne_cas`, `boost`, `helmet`, `mix_file`, `wayneui_1`, `composer_json`).
+- The Laravel hop note and its playbook no longer mention a "shared database server" or "database floor": they say to check an old database server's version against the minimum Laravel needs. Only the text of `notes` changed in JSON output.
+- Docs: the Docker-only route starts with the clone step and pins `composer:2.10.3`; the quick start says a real `run` needs git and Docker (the `php:8.4-cli` image has no git); the install page agrees with the README that `--path` accepts `~`; a note explains that Windows PowerShell prints Booster's progress lines in red although they are not errors; the scan example uses `--php=<target>` instead of a fixed `--php=8.0`.
+
 ## [1.8.0] - 2026-11-03
 
 ### Changed

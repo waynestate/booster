@@ -95,7 +95,7 @@ https://github.com/sebastianbergmann/phpunit/issues/6052
 
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
-Booster does every step above marked automatic when you run it.
+Booster does every numbered step above when you run it.
 Preview the edits: booster run --path=examples/laravel-blade --dry-run
 (The real run needs Docker, and your app committed in git: booster run --path=examples/laravel-blade)
 ```

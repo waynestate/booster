@@ -392,6 +392,7 @@ helmet         no
 
 Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version
 composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan).
+Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.
 Next: bin/booster plan --path=examples/vue-spa</pre>
 <pre class="out" role="tabpanel" id="out-plan" aria-labelledby="tab-plan" tabindex="0" hidden><span class="out__cmd">$ bin/booster plan --path=examples/raw-php --today=2026-10-29</span>
 BOOSTER plan for examples/raw-php
@@ -440,13 +441,13 @@ PHPStan on PHP 8.5: 3 findings (code quality hints, not upgrade blockers).
 
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
-Booster does every step above marked automatic when you run it.
+Booster does every numbered step above when you run it.
 Preview the edits: bin/booster run --path=examples/raw-php --dry-run
 (The real run needs Docker, and your app committed in git: bin/booster run --path=examples/raw-php)</pre>
 <pre class="out" role="tabpanel" id="out-run" aria-labelledby="tab-run" tabindex="0" hidden><span class="out__cmd">$ bin/booster run --path=examples/raw-php --to-php=8.2 --dry-run</span>
 BOOSTER dry run (nothing was changed)
 
-Baseline: SKIPPED (no gate in this run).
+Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
 
 1. php-74-to-80: PREVIEWED (1 file)
    Largest risk hop: loose comparison of numbers and strings changed, many warnings became thrown errors, and arithmetic on arrays throws.
