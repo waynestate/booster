@@ -261,7 +261,7 @@ Options for `run`:
 | `--image` | Run the gate in this Docker image instead of building `booster-target` (it needs `php` and `composer` on `PATH`): one name, a `{php}` template or a version map (below) |
 | `--allow-failing-baseline` | Continue when the baseline fails; later gate failures are labelled as pre-existing |
 | `--allow-dirty` | Run even when the working copy has uncommitted changes |
-| `--test-command` | What runs the app's tests in the image (default `composer test`, else `vendor/bin/phpunit`) |
+| `--test-command` | What runs the app's tests in the image (default `composer test`, else `vendor/bin/phpunit`, else the built-in `php -l` syntax check when the app has no tests) |
 | `--test-env` | Environment variable (`KEY=VALUE`) passed to the baseline and every gate container with `-e`; repeat it. The report names the keys only, never the values |
 | `--proctor-command` | An extra command run in the image after the tests, for example a PROCTOR check |
 | `--proctor-advisory` | Report the PROCTOR result but do not fail the run on it. Applied automatically when the run stops before the final target (`--until`, `--only`, or a target past security support) |
@@ -393,10 +393,11 @@ tell you what is missing.
 
 ### The baseline
 
-Before the first hop, `run` runs the app's own tests on the PHP the app is on now, in the same `booster-target:<php>`
-image the gate uses. The point is to tell "Booster broke it" from "it was already broken": a red baseline means the
-suite was red before any change, so a later red gate is not proof of a bad hop. The baseline is recorded in the report
-(`passed`, `failed` or `skipped`, with the exit code and the last 20 lines of output).
+Before the first hop, `run` runs the app's own tests (or the built-in `php -l` syntax check when the app has no
+tests) on the PHP the app is on now, in the same `booster-target:<php>` image the gate uses. The point is to tell
+"Booster broke it" from "it was already broken": a red baseline means the suite was red before any change, so a
+later red gate is not proof of a bad hop. The baseline is recorded in the report (`passed`, `failed` or `skipped`,
+with the exit code and the last 20 lines of output).
 
 - A red baseline stops the run before the first hop, with a non-zero exit. `--allow-failing-baseline` lets it go on;
   each later gate failure is then labelled "the baseline was already failing" in the text and JSON output.
@@ -404,6 +405,10 @@ suite was red before any change, so a later red gate is not proof of a bad hop. 
 - A Mix app's `public/mix-manifest.json` is a build artifact, not committed source: a fresh clone has no manifest, so
   the suite can be red before any hop. Build the assets before the baseline (the app's usual `npm ci && npm run
   build`), or pass `--allow-failing-baseline` knowing why.
+- When the app has no tests of its own, the baseline and every gate run a built-in check instead: every PHP file
+  outside `vendor/` and `node_modules/` must still parse on the target PHP (`php -l`). That proves the code loads on
+  the new PHP, not that it works: click through the app before you ship. Pass `--test-command` to run something else,
+  or add a smoke test (below) to get the real gate back.
 
 ### A smoke test for WSU apps
 

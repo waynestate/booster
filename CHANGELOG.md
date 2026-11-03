@@ -12,6 +12,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 - Changed: CI pulls its Docker Hub images through the GitLab Dependency Proxy (the group's CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX), so pipelines no longer hit Docker Hub's anonymous pull limit.
 - When the app requires `cit-web-infra/wayne-cas`, has no `vendor/`, is already on PHP 8.3 or newer, and the repository composer.json names for it cannot be reached, `cas-to-sesame` is now planned as the first step instead of waiting for the Laravel 10 to 11 hop, because the Laravel hops need composer to install and composer is blocked by that repository. The plan explains this in a warning. With the repository reachable, or with `vendor/` already installed, the plan is unchanged.
+- An app with no tests of its own is now gated by a built-in syntax check instead of dying on a missing `vendor/bin/phpunit`: when composer.json has neither a `test` script nor a PHPUnit config file or dependency, the baseline and every gate run `php -l` over every PHP file outside `vendor/` and `node_modules/`. The report says what ran: the text report names the syntax check and once explains that it proves the code loads on the new PHP, not that it works, and the JSON baseline gains a `gate` field (`tests`, `syntax` or `custom`). A red baseline now says a PHP file does not parse before any change. Apps with tests are unchanged; `--test-command` still wins and is named as yours.
 
 ### Fixed
 
