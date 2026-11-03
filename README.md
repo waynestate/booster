@@ -366,6 +366,7 @@ to reinstall Booster's dependencies (`composer install` in Booster's folder) or 
 The scan ignores `vendor/`, `node_modules/` and `storage/`, because those hold third-party code and generated files,
 not the app's. It reads the app only and changes nothing. `booster scan --path=../my-app --php=<target>` runs the same scan
 on its own, for any PHP version Booster knows, and exits 0 even when it finds a wall of removed functions.
+If the app's `composer.json` declares `ext-oci8` (in `require`, `require-dev` or `config.platform`), the scan leaves out the "`oci_*()` is removed since PHP 8.4" findings: PHP 8.4 moved oci8 out of the PHP download and into PECL, and an app that declares the extension installs the PECL one on purpose, so those lines would be false alarms. Every other finding stays.
 
 ### The PHPStan scan
 

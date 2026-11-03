@@ -41,8 +41,9 @@ the registration file that Composer's installer plugin writes cannot be trusted 
 directory. When none of the launchers has the standard, the scan reports a skip and the plan goes on; the skip says
 to reinstall Booster's dependencies (<code>composer install</code> in Booster's folder) or download the PHAR again.</p>
 <p>The scan ignores <code>vendor/</code>, <code>node_modules/</code> and <code>storage/</code>, because those hold third-party code and generated files,
-not the app's. It reads the app only and changes nothing. <code>booster scan --path=../my-app --php=8.0</code> runs the same scan
-on its own, for any PHP version Booster knows, and exits 0 even when it finds a wall of removed functions.</p>
+not the app's. It reads the app only and changes nothing. <code>booster scan --path=../my-app --php=&lt;target&gt;</code> runs the same scan
+on its own, for any PHP version Booster knows, and exits 0 even when it finds a wall of removed functions.
+If the app's <code>composer.json</code> declares <code>ext-oci8</code> (in <code>require</code>, <code>require-dev</code> or <code>config.platform</code>), the scan leaves out the &quot;<code>oci_*()</code> is removed since PHP 8.4&quot; findings: PHP 8.4 moved oci8 out of the PHP download and into PECL, and an app that declares the extension installs the PECL one on purpose, so those lines would be false alarms. Every other finding stays.</p>
 <h2 id="the-phpstan-scan">The PHPStan scan<a class="docs-heading-link" aria-label="Link to this section" href="#the-phpstan-scan">#</a></h2>
 <p><code>plan</code> ends with a second advisory scan: PHPStan runs over the app at the destination PHP version, using Pinstripe's
 <code>base.neon</code> preset. The findings are hints for the person doing the upgrade, never a gate: they do not change the
