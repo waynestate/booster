@@ -203,6 +203,35 @@ final class PhpCompatScanTest extends TestCase
         self::assertStringContainsString('exited 4', (string) $scan->error);
     }
 
+    public function test_internal_no_code_found_is_dropped_from_findings(): void
+    {
+        $app = $this->tempDir();
+        $json = $this->phpcsJson([
+            $app . '/include.html' => [
+                'errors' => 1,
+                'warnings' => 0,
+                'messages' => [
+                    ['message' => 'No code found in this file', 'source' => 'Internal.NoCodeFound', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 1, 'column' => 1],
+                ],
+            ],
+            $app . '/broken.php' => [
+                'errors' => 1,
+                'warnings' => 0,
+                'messages' => [
+                    ['message' => 'Function each() is deprecated since PHP 7.2 and removed since PHP 8.0; Use a foreach loop or ArrayIterator instead', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.eachDeprecatedRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 10, 'column' => 12],
+                ],
+            ],
+        ]);
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.0');
+
+        self::assertTrue($scan->ok);
+        self::assertCount(1, $scan->findings);
+        self::assertSame('broken.php', $scan->findings[0]->file);
+        self::assertSame('PHPCompatibility.FunctionUse.RemovedFunctions.eachDeprecatedRemoved', $scan->findings[0]->source);
+    }
+
     public function test_the_result_serialises_for_json_output(): void
     {
         $app = $this->tempDir();
