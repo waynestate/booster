@@ -16,7 +16,7 @@ Move a Laravel 7 app to Laravel 8.
 Only if the app has Laravel Boost (`booster detect` says so):
 
 - Use `search-docs` for the Laravel 8 upgrade guide and list every breaking change that touches this app's `list-routes` and `get-config` output.
-- Use `database-schema` to check the tables against the Laravel 8 database floor before you apply the hop.
+- Use `database-schema` to look at the tables, and check the database server's version against the minimum Laravel 8 needs, before you apply the hop.
 - Use `list-artisan-commands` and `list-routes` before the hop, then compare the output after it.
 - Run `last-error` and `read-log-entries` after the tests.
 
@@ -24,7 +24,7 @@ Boost is read-only help. Booster's gate stays the authority: never skip a gate b
 
 What Rector cannot do (check these by hand):
 
-- Check the shared database server against the Laravel 8 database floor before you apply this hop.
+- If your database server is old, check its version against the minimum MySQL (or other database) version Laravel 8 needs before you apply this hop.
 - Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.
 - Inertia: BOOSTER pins no inertia-laravel or @inertiajs/vue3 constraint for Laravel 8; check the Inertia docs for the versions that support it.
 
