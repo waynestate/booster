@@ -4,6 +4,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-11-03
+
 ### Changed
 
 - Synced Squire's docs builder and agent-ready kit (`bin/docs-site.php`, `bin/agent-ready.php`, `site/assets/agent-ready.js`): table cells strip Symfony console style tags, and the kit JS uses bindingless catch blocks. The command reference and docs site are rebuilt.
