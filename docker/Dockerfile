@@ -10,19 +10,30 @@ ARG COMPOSER_VERSION=2.10.3
 FROM composer:${COMPOSER_VERSION} AS composer
 
 FROM php:${PHP_VERSION}-cli
-# PHP 7.1 through 8.0 sit on Debian releases (stretch, buster, bullseye) that
-# have moved to archive.debian.org. Point apt at the archive, drop the dead
-# <release>-updates lines and stop checking Valid-Until, whose dates the
-# archive stamps long past. Newer releases keep their sources untouched.
+# PHP 5.5 through 8.0 sit on Debian releases (jessie, stretch, buster,
+# bullseye) that have moved to archive.debian.org. Point apt at the archive,
+# drop the dead <release>-updates lines and stop checking Valid-Until, whose
+# dates the archive stamps long past. Newer releases keep their sources
+# untouched. Jessie needs three more things: its os-release has no
+# VERSION_CODENAME (so the codename comes from VERSION), its sources may name
+# httpredir.debian.org or a security.debian.org with no /debian-security path,
+# and the keys that signed its archive have expired, so apt may not insist on
+# a valid signature there. Like a time machine, but for apt.
 RUN set -eux; \
-    codename="$(. /etc/os-release && printf '%s' "${VERSION_CODENAME}")"; \
+    codename="$(. /etc/os-release && printf '%s' "${VERSION_CODENAME:-}")"; \
+    if [ -z "${codename}" ]; then \
+        codename="$(. /etc/os-release && printf '%s' "${VERSION:-}" | sed -n 's/.*(\([a-z]*\)).*/\1/p')"; \
+    fi; \
     case "${codename}" in \
-        stretch|buster|bullseye) \
+        jessie|stretch|buster|bullseye) \
             for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do \
                 [ -f "${f}" ] || continue; \
                 sed -i \
+                    -e 's|http://httpredir\.debian\.org|http://archive\.debian\.org|g' \
                     -e 's|http://deb\.debian\.org|http://archive\.debian\.org|g' \
-                    -e 's|http://security\.debian\.org|http://archive\.debian\.org|g' \
+                    -e 's|http://security\.debian\.org/debian-security|http://archive\.debian\.org/debian-security|g' \
+                    -e 's|http://security\.debian\.org[[:space:]]|http://archive.debian.org/debian-security |g' \
+                    -e 's|http://security\.debian\.org/*$|http://archive.debian.org/debian-security|g' \
                     -e "/[[:space:]]${codename}-updates/d" \
                     "${f}" \
             ; done; \
@@ -34,7 +45,10 @@ RUN set -eux; \
                     -e "s/[[:space:]]${codename}-updates//g" \
                     "${f}" \
             ; done; \
-            printf 'Acquire::Check-Valid-Until "false";\n' > /etc/apt/apt.conf.d/99no-check-valid-until \
+            printf 'Acquire::Check-Valid-Until "false";\n' > /etc/apt/apt.conf.d/99no-check-valid-until; \
+            if [ "${codename}" = jessie ]; then \
+                printf 'APT::Get::AllowUnauthenticated "true";\nAcquire::AllowInsecureRepositories "true";\n' > /etc/apt/apt.conf.d/99jessie-expired-keys; \
+            fi \
         ;; \
     esac
 RUN apt-get update \
