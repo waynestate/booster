@@ -17,7 +17,12 @@
 
   function copyText(text) {
     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-      return navigator.clipboard.writeText(text);
+      // writeText resolves with undefined on success and rejects on failure: map both to the true or false below.
+      return navigator.clipboard.writeText(text).then(function () {
+        return true;
+      }, function () {
+        return false;
+      });
     }
     // Fallback for non-secure contexts: select into a throwaway field and use the legacy command.
     var field = document.createElement('textarea');
@@ -37,8 +42,23 @@
     return Promise.resolve(ok);
   }
 
+  // A code block wider than its box scrolls sideways; keyboard users can only scroll what they can focus
+  // (WCAG 2.1.1), so a block that overflows joins the tab order and one that fits leaves it.
+  function markScrollable(pre) {
+    if (pre.scrollWidth > pre.clientWidth) {
+      pre.setAttribute('tabindex', '0');
+    } else {
+      pre.removeAttribute('tabindex');
+    }
+  }
+
   function addCopyButtons() {
     var blocks = Array.prototype.slice.call(document.querySelectorAll('.docs-article pre'));
+    if (blocks.length > 0) {
+      window.addEventListener('resize', function () {
+        blocks.forEach(markScrollable);
+      });
+    }
     blocks.forEach(function (pre) {
       var wrap = document.createElement('div');
       wrap.className = 'docs-copy';
@@ -60,6 +80,7 @@
 
       wrap.appendChild(button);
       wrap.appendChild(status);
+      markScrollable(pre);
 
       var timer = null;
       button.addEventListener('click', function () {

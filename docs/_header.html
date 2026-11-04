@@ -1,0 +1,25 @@
+<!--
+  The docs pages wear the front page's masthead (site/index.html). The docs builder puts the header element below in
+  place of its generic one on every page, rewrites the relative links (written as if from site/) to the page's depth,
+  fills the version placeholder and marks the Docs link aria-current. Styles: docs/theme/booster.css.
+  Keep the links in step with the front page's masthead nav. The gold pill is the "run it today" path.
+-->
+<header class="masthead">
+  <div class="masthead__row">
+    <a class="masthead__brand" href="index.html">
+      <img src="brand/booster-avatar-256.png" width="36" height="36" alt="">
+      <span class="masthead__name">BOOSTER</span>
+      <span class="masthead__ver">{{version}}</span>
+    </a>
+    <nav class="masthead__nav" aria-label="Site">
+      <a href="index.html#record">Record</a>
+      <a href="index.html#pairs">Pairs</a>
+      <a href="index.html#commands">Commands</a>
+      <a href="index.html#agents">Agents</a>
+      <a href="docs/index.html">Docs</a>
+      <a href="proof.html">Real output</a>
+      <a href="https://proof.apps.wayne.edu/booster/">Proof</a>
+      <a class="masthead__install" href="docs/index.html#run-it-today">Run it today</a>
+    </nav>
+  </div>
+</header>

@@ -1,4 +1,8 @@
 {
+    "theme": {
+        "css": "theme/booster.css",
+        "header": "_header.html"
+    },
     "blocks": {
         "commands": {
             "type": "symfony-commands",

@@ -1,0 +1,968 @@
+/* ============================================================================
+   BOOSTER docs theme (2026-11-04).
+
+   The docs pages wear the front page (site/assets/booster.css): clinical white
+   paper, mint hairlines, green ink, one gold flame. Same masthead, same
+   Barlow Condensed caps, same install slab for the commands you type, and the
+   greenbar printout for the output you read back. Nothing new was invented
+   here; every value below comes from the front page's tokens.
+
+   How it gets onto the pages: docs/docs.json "theme" names this file and
+   docs/_header.html. The docs builder copies this file to
+   site/docs/theme/booster.css and links it after the kit's docs.css, so the
+   --dk-* tokens and the rules below win without !important. The kit's
+   docs.css stays byte for byte Squire's.
+
+   The front page has no dark mode, so the dark set is derived (deep green
+   ground, mint text, gold links), as mapped in the stack's docs theme notes.
+
+   File map: 1. fonts and tokens  2. frame  3. masthead  4. sidebar and menu
+             5. article  6. code  7. tables, notes  8. toc, pager, footer
+             9. dark  10. responsive  11. motion (no-preference only)  12. print
+   ========================================================================== */
+
+/* ---------------------------------------------------- 1. fonts and tokens */
+
+@font-face {
+  font-family: "Barlow Condensed";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../../assets/fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Barlow Condensed";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("../../assets/fonts/barlow-condensed-latin-800-normal.woff2") format("woff2");
+}
+
+:root {
+  /* The front page's palette, under the same names. */
+  --b-green: #0c5449;
+  --b-green-deep: #083d35;
+  --b-green-ink: #0a2e28;
+  --b-gold: #ffcc33;
+  --b-gold-hi: #ffd659;
+  --b-white: #ffffff;
+  --b-mint: #eaf5f0;
+  --b-mint-2: #d6ebe2;
+  --b-mint-line: #c5e0d4;
+  --b-slate-ink: #46596a;
+  --b-ink: #12241f;
+  --b-slab: #0a2e28;          /* the install block's ground */
+  --b-slab-ink: #e3f2ec;
+  --b-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif-condensed, var(--wsu-font-family-body);
+  --b-body: var(--wsu-font-family-body, Lato, Calibri, "Helvetica Neue", Arial, sans-serif);
+  --b-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --b-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --b-masthead-bg: rgba(255, 255, 255, 0.92);
+  --b-current-bg: var(--b-mint-2);
+  --b-current-bar: var(--b-green);
+  --b-paper: var(--b-white);  /* the greenbar printout */
+  --b-band: var(--b-mint);
+  --b-paper-ink: var(--b-green-ink);
+  --b-masthead-h: 64px;
+
+  /* The kit's tokens, set from the palette above. */
+  --dk-bg: var(--b-white);
+  --dk-ink: var(--b-ink);
+  --dk-muted: var(--b-slate-ink);
+  --dk-rule: var(--b-mint-line);
+  --dk-accent: var(--b-green);
+  --dk-on-accent: var(--b-white);
+  --dk-code-bg: var(--b-mint);
+  --dk-display: var(--b-display);
+  --dk-mono: var(--wsu-font-family-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  --dk-radius: 10px;
+  --dk-focus: var(--b-green);
+  --dk-focus-w: 3px;
+  --dk-focus-o: 3px;
+  --dk-sidebar: 15.5rem;
+  --dk-prose-max: 46rem;
+  --dk-gap: 1.75rem;
+
+  color-scheme: light;
+}
+
+/* ------------------------------------------------------------- 2. frame */
+
+html {
+  background: var(--dk-bg);
+  scroll-padding-top: calc(var(--b-masthead-h) + 1rem);
+}
+
+body {
+  margin: 0;
+  color: var(--dk-ink);
+  background: var(--dk-bg);
+  font-family: var(--b-body);
+}
+
+:where(a, button, summary, [tabindex]):focus-visible {
+  outline: var(--dk-focus-w) solid var(--dk-focus);
+  outline-offset: var(--dk-focus-o);
+  border-radius: 3px;
+}
+
+/* ---------------------------------------------------------- 3. masthead */
+
+.masthead {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 20;
+  background: var(--b-masthead-bg);
+  backdrop-filter: saturate(1.4) blur(8px);
+  border-block-end: 1px solid var(--dk-rule);
+}
+
+.masthead__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  box-sizing: border-box;
+  max-inline-size: 100rem;
+  min-block-size: var(--b-masthead-h);
+  margin-inline: auto;
+  padding-inline: var(--dk-gap);
+}
+
+.masthead__brand {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--b-green-ink);
+  text-decoration: none;
+}
+
+.masthead__brand img {
+  border-radius: 8px;
+}
+
+.masthead__name {
+  font-family: var(--b-display);
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.masthead__ver {
+  padding: 0.05rem 0.45rem;
+  font-family: var(--dk-mono);
+  font-size: 0.75rem;
+  color: var(--b-green);
+  border: 1px solid var(--dk-rule);
+  border-radius: 4px;
+}
+
+.masthead__nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.masthead__nav a {
+  padding: 0.5rem 0.75rem;
+  font-family: var(--b-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  color: var(--dk-muted);
+  border-radius: 4px;
+}
+
+.masthead__nav a:hover {
+  color: var(--b-green-ink);
+  background: var(--b-mint);
+}
+
+/* You are here: the Docs item, inked and underlined like a filled-in field. */
+.masthead__nav a[aria-current="page"] {
+  color: var(--b-green-ink);
+  background: var(--b-mint);
+  box-shadow: inset 0 -3px 0 var(--b-current-bar);
+}
+
+/* The one gold flame: the way to run it today, on every page. */
+.masthead__nav .masthead__install {
+  margin-inline-start: 0.35rem;
+  color: var(--b-green-ink);
+  background: var(--b-gold);
+}
+
+.masthead__nav .masthead__install:hover {
+  color: var(--b-green-ink);
+  background: var(--b-gold-hi);
+}
+
+/* --------------------------------------------------- 4. sidebar and menu */
+
+.docs-layout {
+  gap: 1.5rem clamp(1.75rem, 1rem + 2.5vw, 3.5rem);
+  padding-block: 2.25rem 3rem;
+  padding-inline: var(--dk-gap);
+}
+
+.docs-nav__label {
+  display: flex;
+  align-items: center;
+  gap: 0.55em;
+  margin: 1.4rem 0 0.35rem;
+  font-family: var(--b-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--dk-muted);
+}
+
+/* The front page's field-label bullet. */
+.docs-nav__label::before {
+  content: "";
+  flex-shrink: 0;
+  inline-size: 0.55em;
+  block-size: 0.55em;
+  border-radius: 50%;
+  background: var(--dk-accent);
+  box-shadow: 0 0 0 3px var(--b-mint-2);
+}
+
+/* Group lists are plain <ul> inside the kit's list: no bullets, no indent. */
+.docs-nav ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A group's pages hang off a hairline, so the top-level pages after it read as their own. */
+.docs-nav__group > ul {
+  margin-inline-start: 0.3rem;
+  padding-inline-start: 0.45rem;
+  border-inline-start: 1px solid var(--dk-rule);
+}
+
+.docs-nav__group + li {
+  margin-top: 1rem;
+}
+
+.docs-nav a {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.97rem;
+  line-height: 1.35;
+  color: var(--dk-ink);
+  border-radius: 6px;
+}
+
+.docs-nav a:hover {
+  color: var(--b-green-ink);
+  background: var(--b-mint);
+}
+
+.docs-nav a[aria-current="page"] {
+  font-weight: 700;
+  color: var(--b-green-ink);
+  background: var(--b-current-bg);
+  box-shadow: inset 3px 0 0 var(--b-current-bar);
+}
+
+.docs-menu summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-block-size: 44px;
+  box-sizing: border-box;
+  padding: 0.4rem 1rem;
+  font-family: var(--b-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--b-green-ink);
+  background: var(--b-mint);
+  border: 1px solid var(--dk-rule);
+  border-radius: var(--dk-radius);
+  list-style: none;
+}
+
+.docs-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.docs-menu summary::after {
+  content: "";
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-inline-end: 2px solid currentColor;
+  border-block-end: 2px solid currentColor;
+  rotate: 45deg;
+  translate: 0 -2px;
+}
+
+.docs-menu[open] summary::after {
+  rotate: 225deg;
+  translate: 0 2px;
+}
+
+.docs-menu[open] > .docs-nav {
+  padding: 0.5rem 0.25rem 0.75rem;
+}
+
+/* ------------------------------------------------------------- 5. article */
+
+.docs-article {
+  font-family: var(--b-body);
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: var(--dk-ink);
+}
+
+.docs-article h1,
+.docs-article h2,
+.docs-article h3 {
+  font-family: var(--b-display);
+  letter-spacing: 0;
+  scroll-margin-top: calc(var(--b-masthead-h) + 1rem);
+  text-wrap: balance;
+}
+
+.docs-article h1 {
+  margin: 0 0 1.5rem;
+  font-size: clamp(2.6rem, 1.9rem + 2.6vw, 3.9rem);
+  font-weight: 800;
+  line-height: 0.95;
+  text-transform: uppercase;
+  color: var(--dk-accent);
+}
+
+/* The hero's gold highlighter, under every page title. */
+.docs-article h1::after {
+  content: "";
+  display: block;
+  inline-size: 4.5rem;
+  block-size: 6px;
+  margin-block-start: 0.8rem;
+  background: var(--b-gold);
+  border-radius: 3px;
+  transform-origin: left center;
+}
+
+.docs-article h2 {
+  margin: 2.75rem 0 0.9rem;
+  padding-bottom: 0.4rem;
+  font-size: clamp(1.6rem, 1.35rem + 0.9vw, 2.05rem);
+  font-weight: 800;
+  line-height: 1.05;
+  text-transform: uppercase;
+  color: var(--b-green-ink);
+  border-bottom: 1px solid var(--dk-rule);
+}
+
+.docs-article h3 {
+  margin: 2rem 0 0.5rem;
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--b-green-ink);
+}
+
+/* Commands are case sensitive: code in a caps heading keeps its case. */
+.docs-article :is(h1, h2, h3) code {
+  font-size: 0.8em;
+  text-transform: none;
+}
+
+.docs-heading-link {
+  color: var(--dk-muted);
+}
+
+.docs-article a {
+  color: var(--dk-accent);
+  text-underline-offset: 0.18em;
+}
+
+.docs-article a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.docs-article strong {
+  color: var(--b-green-ink);
+}
+
+.docs-article :is(ul, ol) {
+  padding-inline-start: 1.4rem;
+}
+
+.docs-article li {
+  margin-block: 0.3rem;
+}
+
+.docs-article li::marker {
+  color: var(--dk-accent);
+}
+
+.docs-article img {
+  max-inline-size: 100%;
+  block-size: auto;
+}
+
+.docs-article hr {
+  margin-block: 2.5rem;
+  border: 0;
+  border-block-start: 1px solid var(--dk-rule);
+}
+
+/* ---------------------------------------------------------------- 6. code */
+
+.docs-article code {
+  padding: 0.1em 0.35em;
+  font-size: 0.88em;
+  color: var(--b-green-ink);
+  background: var(--dk-code-bg);
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+
+/* What you type: the front page's install slab. Lines keep their shape (the
+   quick start lines up its comments), so a long one scrolls instead of wrapping. */
+.docs-article pre {
+  margin: 1.1rem 0 1.4rem;
+  padding: 1.05rem 1.2rem 1.15rem;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--b-slab-ink);
+  background: var(--b-slab);
+  border: 1px solid var(--b-slab);
+  border-radius: var(--dk-radius);
+  tab-size: 4;
+  scrollbar-color: #2b6a5e transparent;
+}
+
+.docs-article pre code {
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border-radius: 0;
+  overflow-wrap: normal;
+}
+
+/* With docs.js the block sits in .docs-copy: the slab moves to the wrapper and
+   the pre stops short of a gutter, so the copy pill never covers a command. */
+.docs-copy {
+  margin: 1.1rem 0 1.4rem;
+  background: var(--b-slab);
+  border: 1px solid var(--b-slab);
+  border-radius: var(--dk-radius);
+}
+
+.docs-copy > pre {
+  margin: 0;
+  margin-inline-end: 5.75rem;
+  padding-inline-end: 0.75rem;
+  background: transparent;
+  border: 0;
+  border-radius: var(--dk-radius) 0 0 var(--dk-radius);
+}
+
+/* What you read back: the greenbar printout, a mint band every two lines,
+   under an Output label. Output keeps its columns and scrolls. */
+.docs-article pre:has(> code.language-output) {
+  padding-block-start: 2.3rem;
+  color: var(--b-paper-ink);
+  background-color: var(--b-paper);
+  background-image: repeating-linear-gradient(180deg, var(--b-band) 0 3.4em, transparent 3.4em 6.8em);
+  background-position: 0 2.3rem;
+  background-attachment: local;
+  border-color: var(--dk-rule);
+  scrollbar-color: var(--dk-rule) transparent;
+}
+
+.docs-copy:has(code.language-output) {
+  background: var(--b-paper);
+  border-color: var(--dk-rule);
+}
+
+.docs-copy:has(code.language-output) > pre {
+  margin-inline-end: 0;
+  padding-inline-end: 1.2rem;
+  border-radius: var(--dk-radius);
+}
+
+.docs-copy:has(code.language-output)::before {
+  content: "Output";
+  position: absolute;
+  z-index: 1;
+  inset-block-start: 0.75rem;
+  inset-inline-start: 1.2rem;
+  font-family: var(--b-display);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dk-muted);
+  pointer-events: none;
+}
+
+/* The copy pill, same as the install section's. */
+.docs-copy__button {
+  inset-block-start: 0.8rem;
+  inset-inline-end: 0.75rem;
+  min-block-size: 32px;
+  padding: 0.2rem 0.85rem;
+  font-family: var(--b-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--b-green-ink);
+  background: var(--b-gold);
+  border: 0;
+  border-radius: 999px;
+}
+
+.docs-copy__button:hover {
+  color: var(--b-green-ink);
+  background: var(--b-gold-hi);
+}
+
+/* On the dark slab a green ring would vanish: gold, as on the front page. */
+.docs-copy__button:focus-visible {
+  outline-color: var(--b-gold);
+}
+
+.docs-copy:has(code.language-output) .docs-copy__button {
+  color: var(--b-green-ink);
+  background: var(--b-mint-2);
+}
+
+.docs-copy:has(code.language-output) .docs-copy__button:hover {
+  background: var(--b-mint-line);
+}
+
+.docs-copy:has(code.language-output) .docs-copy__button:focus-visible {
+  outline-color: var(--dk-focus);
+}
+
+/* A block that scrolls sideways takes focus (docs.js): gold ring inside the
+   slab, green on the light printout. */
+.docs-article pre:focus-visible {
+  outline: 3px solid var(--b-gold);
+  outline-offset: -4px;
+}
+
+.docs-article pre:has(> code.language-output):focus-visible {
+  outline-color: var(--dk-focus);
+}
+
+/* ------------------------------------------------------- 7. tables, notes */
+
+.docs-table {
+  margin: 1.25rem 0 1.5rem;
+  border: 1px solid var(--dk-rule);
+  border-radius: var(--dk-radius);
+}
+
+.docs-article table {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.docs-article th {
+  font-family: var(--b-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--dk-muted);
+  background: var(--b-mint);
+}
+
+.docs-article th,
+.docs-article td {
+  padding: 0.6rem 0.9rem;
+  vertical-align: top;
+  border-bottom: 1px solid var(--dk-rule);
+}
+
+/* A hop id or command keeps its shape in a cell: the column sizes to it, and
+   it only breaks if it would spill out of the table. */
+.docs-article td code {
+  overflow-wrap: break-word;
+}
+
+.docs-article tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* A note on the chart: mint card, green margin rule. */
+.docs-article blockquote {
+  margin: 1.5rem 0;
+  padding: 0.9rem 1.2rem;
+  color: var(--dk-ink);
+  background: var(--b-mint);
+  border-inline-start: 4px solid var(--dk-accent);
+  border-radius: 0 var(--dk-radius) var(--dk-radius) 0;
+}
+
+.docs-article blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+/* ------------------------------------------------ 8. toc, pager, footer */
+
+.docs-toc__title {
+  display: flex;
+  align-items: center;
+  gap: 0.55em;
+  font-family: var(--b-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--dk-muted);
+}
+
+.docs-toc__title::before {
+  content: "";
+  inline-size: 0.55em;
+  block-size: 0.55em;
+  border-radius: 50%;
+  background: var(--b-gold);
+  box-shadow: 0 0 0 3px var(--b-mint-2);
+}
+
+.docs-toc__list {
+  border-left: 2px solid var(--dk-rule);
+}
+
+.docs-toc__item a {
+  margin-inline-start: -2px;
+  font-size: 0.93rem;
+  line-height: 1.4;
+  border-inline-start: 2px solid transparent;
+}
+
+.docs-toc__item a:hover {
+  color: var(--b-green-ink);
+  border-inline-start-color: var(--dk-accent);
+}
+
+.docs-pager {
+  margin-top: 3rem;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.docs-pager__link {
+  box-sizing: border-box;
+  flex: 1 1 0;
+  max-width: 22rem;
+  padding: 0.85rem 1.1rem 0.95rem;
+  border: 1px solid var(--dk-rule);
+  border-radius: var(--dk-radius);
+}
+
+.docs-pager__link--next {
+  margin-inline-start: auto;
+}
+
+.docs-pager__link:hover {
+  background: var(--b-mint);
+  border-color: var(--dk-accent);
+}
+
+.docs-pager__dir {
+  font-family: var(--b-display);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.docs-pager__title {
+  display: block;
+  margin-top: 0.15rem;
+  font-family: var(--b-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--dk-accent);
+  text-decoration: none;
+}
+
+.docs-footer {
+  flex-wrap: wrap;
+  padding-inline: var(--dk-gap);
+  background: var(--b-mint);
+  border-top-color: var(--dk-rule);
+  /* Full-bleed mint under a centered row. */
+  box-shadow: 0 0 0 100vmax var(--b-mint);
+  clip-path: inset(0 -100vmax);
+}
+
+.docs-footer a {
+  color: var(--dk-accent);
+}
+
+/* ---------------------------------------------------------------- 9. dark */
+
+/* Derived: the front page has no dark mode. Deep green ground (the brand's
+   darkest ink), mint text, gold where the light page uses green. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --b-masthead-bg: rgba(10, 46, 40, 0.92);
+    --b-mint: #0f3a33;
+    --b-mint-2: #164a41;
+    --b-green-ink: #eaf5f0;
+    --b-current-bg: #164a41;
+    --b-current-bar: var(--b-gold);
+    --b-slab: #061f1b;
+    --b-slab-ink: #e3f2ec;
+    --b-paper: #0f3a33;
+    --b-band: #134139;
+    --b-paper-ink: #eaf5f0;
+
+    --dk-bg: #0a2e28;
+    --dk-ink: #eaf5f0;
+    --dk-muted: #a9c4ba;
+    --dk-rule: #1f5249;
+    --dk-accent: var(--b-gold);
+    --dk-on-accent: #0a2e28;
+    --dk-code-bg: #0f3a33;
+    --dk-focus: var(--b-gold);
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --b-masthead-bg: rgba(10, 46, 40, 0.92);
+  --b-mint: #0f3a33;
+  --b-mint-2: #164a41;
+  --b-green-ink: #eaf5f0;
+  --b-current-bg: #164a41;
+  --b-current-bar: var(--b-gold);
+  --b-slab: #061f1b;
+  --b-slab-ink: #e3f2ec;
+  --b-paper: #0f3a33;
+  --b-band: #134139;
+  --b-paper-ink: #eaf5f0;
+
+  --dk-bg: #0a2e28;
+  --dk-ink: #eaf5f0;
+  --dk-muted: #a9c4ba;
+  --dk-rule: #1f5249;
+  --dk-accent: var(--b-gold);
+  --dk-on-accent: #0a2e28;
+  --dk-code-bg: #0f3a33;
+  --dk-focus: var(--b-gold);
+
+  color-scheme: dark;
+}
+
+/* The pills keep green ink on gold in both modes; green-ink flips to mint in
+   dark, so the pills name the ground color directly. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .masthead__nav .masthead__install,
+  :root:not([data-theme="light"]) .docs-copy__button {
+    color: #0a2e28;
+  }
+
+  :root:not([data-theme="light"]) .masthead__ver {
+    color: var(--dk-muted);
+  }
+
+  :root:not([data-theme="light"]) .docs-copy:has(code.language-output) .docs-copy__button {
+    color: #eaf5f0;
+    background: #1f5249;
+  }
+
+  :root:not([data-theme="light"]) .docs-pager__link:hover {
+    background: #0f3a33;
+  }
+}
+
+:root[data-theme="dark"] .masthead__nav .masthead__install,
+:root[data-theme="dark"] .docs-copy__button {
+  color: #0a2e28;
+}
+
+:root[data-theme="dark"] .masthead__ver {
+  color: var(--dk-muted);
+}
+
+:root[data-theme="dark"] .docs-copy:has(code.language-output) .docs-copy__button {
+  color: #eaf5f0;
+  background: #1f5249;
+}
+
+/* --------------------------------------------------------- 10. responsive */
+
+@media (min-width: 760px) {
+  /* The sidebar rides under the masthead while the page scrolls. */
+  .docs-nav--sidebar {
+    position: sticky;
+    top: calc(var(--b-masthead-h) + 1.25rem);
+    max-block-size: calc(100vh - var(--b-masthead-h) - 2.5rem);
+    overflow-y: auto;
+    padding-inline-end: 0.25rem;
+  }
+
+  .docs-nav--sidebar > .docs-nav__list > li:first-child > a {
+    margin-top: 0;
+  }
+}
+
+@media (min-width: 1200px) {
+  .docs-layout--toc .docs-toc {
+    top: calc(var(--b-masthead-h) + 1.25rem);
+  }
+}
+
+/* Tablet: the front page's section links give way to the docs' own. */
+@media (max-width: 1100px) {
+  .masthead__nav a[href*="index.html#"]:not(.masthead__install) {
+    display: none;
+  }
+}
+
+/* Phone: the brand and the gold pill, as on the front page. The docs menu
+   below the masthead carries the rest. */
+@media (max-width: 640px) {
+  :root {
+    --dk-gap: 1rem;
+  }
+
+  .masthead__nav a:not(.masthead__install) {
+    display: none;
+  }
+
+  .masthead__nav .masthead__install {
+    margin-inline-start: 0;
+  }
+
+  .docs-layout {
+    padding-block-start: 1rem;
+  }
+
+  /* No room for a gutter: the pill takes a band above the code instead, as
+     the front page's install block does on a phone. */
+  .docs-article pre {
+    font-size: 0.8125rem;
+  }
+
+  .docs-copy > pre {
+    margin-inline-end: 0;
+    padding-block-start: 3.1rem;
+    padding-inline-end: 1rem;
+    border-radius: var(--dk-radius);
+  }
+
+  .docs-copy:has(code.language-output) > pre {
+    padding-block-start: 3.1rem;
+    background-position: 0 3.1rem;
+  }
+
+  .docs-copy:has(code.language-output)::before {
+    inset-block-start: 1.15rem;
+  }
+
+  .docs-pager {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .docs-pager__link {
+    max-width: none;
+  }
+}
+
+@media (max-width: 400px) {
+  .masthead__ver {
+    display: none;
+  }
+
+  .masthead__name {
+    font-size: 1.35rem;
+  }
+}
+
+/* ------------------------------------------- 11. motion (no-preference) */
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  .masthead__brand img {
+    transition: translate 0.4s var(--b-ease-spring);
+  }
+
+  .masthead__brand:hover img {
+    translate: 0 -3px;
+  }
+
+  /* The highlighter strokes in once, left to right, as the page lands. */
+  .docs-article h1::after {
+    animation: dose-stroke 0.7s var(--b-ease-out) 0.15s both;
+  }
+
+  .docs-pager__link {
+    transition: translate 0.25s var(--b-ease-spring), border-color 0.2s, background-color 0.2s;
+  }
+
+  .docs-pager__link:hover {
+    translate: 0 -2px;
+  }
+
+  .docs-nav a,
+  .masthead__nav a,
+  .docs-copy__button {
+    transition: background-color 0.15s, color 0.15s;
+  }
+}
+
+@keyframes dose-stroke {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* -------------------------------------------------------------- 12. print */
+
+@media print {
+  .masthead {
+    position: static;
+    backdrop-filter: none;
+  }
+
+  .masthead__nav {
+    display: none;
+  }
+
+  .docs-article pre,
+  .docs-copy {
+    color: #12241f;
+    background: #ffffff;
+    border-color: #c5e0d4;
+  }
+
+  .docs-copy > pre {
+    margin-inline-end: 0;
+    white-space: pre-wrap;
+  }
+
+  .docs-copy__button {
+    display: none;
+  }
+
+  .docs-footer {
+    box-shadow: none;
+    clip-path: none;
+  }
+}

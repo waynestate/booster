@@ -29,6 +29,12 @@ use League\CommonMark\Renderer\HtmlRenderer;
  * referenced image exists under docs/, and the kit's files are the kit's bytes. A squire reads the map so the
  * knight can ask for directions.
  *
+ * Theme: an optional theme key in docs/docs.json wears the site's brand on the pages. Its css member names a
+ * stylesheet, copied byte for byte to site/docs/theme/<basename> and linked after docs.css on every page; its
+ * header member names an HTML partial whose single <header> element replaces the generic docs header, its relative
+ * links rewritten to the page depth, its {{project}} and {{version}} placeholders filled, and its first link to the
+ * docs home marked aria-current. Colors, fonts and dark mode live in the theme CSS, never in the builder.
+ *
  * Generated blocks: a page may hold a region between `<!-- generated:NAME -->` and `<!-- /generated -->`
  * that the builder owns. docs/docs.json defines the blocks by name and rewrites each placed region: json-table
  * runs a command (a leading `php ` means PHP_BINARY, so the same file works on Windows, macOS and Linux) and
@@ -75,7 +81,7 @@ final class DocsKit
 
     public const FILES = [
         'assets/docs.css' => '60894e7bae3c3680ef34a3a326275d8aa21b9268aa6aa71bd65f3fb42aae547a',
-        'assets/docs.js' => '6d6b437090cfa24e14439e59fc94c2deac678c292d97f681f6ae83633ee0b28f',
+        'assets/docs.js' => '5e77cc63dd81c9ddd8d0e3a9a6838e5c178ccf4d3ed523f8f2f333ba8ad4ffe9',
     ];
 }
 
@@ -867,6 +873,12 @@ final class DocsSite
     /** @var array<string, array<string, list<string>>> the kept commands per cli name: command name to its option keys */
     private array $commandSets = [];
 
+    /** @var string|null the theme stylesheet, as a path under docs/, when docs.json sets one */
+    private ?string $themeCss = null;
+
+    /** @var string|null the theme header element, guards passed, when docs.json sets one */
+    private ?string $themeHeader = null;
+
     private bool $writeBlocks = false;
 
     private bool $requireTag = false;
@@ -883,6 +895,7 @@ final class DocsSite
         $this->siteDocs = $this->root.'/site/docs';
         $this->nav = $this->loadNav();
         $this->loadBlocks();
+        $this->loadTheme();
     }
 
     /** A plain run rewrites stale block regions in the sources; --check never writes. */
@@ -961,6 +974,10 @@ final class DocsSite
         foreach ($this->images as $relative => $bytes) {
             $out['site/docs/'.$relative] = $bytes;
         }
+        // The theme stylesheet is builder-owned like a copied image: its bytes land under site/docs/theme/.
+        if ($this->themeCss !== null) {
+            $out['site/docs/theme/'.basename($this->themeCss)] = (string) file_get_contents($this->docs.'/'.$this->themeCss);
+        }
         ksort($out);
 
         return $out;
@@ -988,6 +1005,21 @@ final class DocsSite
             $head = (string) file_get_contents($this->siteDocs.'/'.$relative, false, null, 0, 400);
             if (str_contains($head, DocsKit::MARKER)) {
                 $out[] = $key;
+            }
+        }
+        // A theme stylesheet is builder-owned like a copied image: a file under site/docs/theme/ the theme no
+        // longer produces is a leftover.
+        $themeDir = $this->siteDocs.'/theme';
+        if (is_dir($themeDir)) {
+            $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($themeDir, FilesystemIterator::SKIP_DOTS));
+            foreach ($iterator as $file) {
+                if (! $file instanceof SplFileInfo || ! $file->isFile()) {
+                    continue;
+                }
+                $relative = str_replace('\\', '/', substr($file->getPathname(), strlen($themeDir) + 1));
+                if (! isset($binaries['site/docs/theme/'.$relative])) {
+                    $out[] = 'site/docs/theme/'.$relative;
+                }
             }
         }
         sort($out);
@@ -1504,7 +1536,7 @@ final class DocsSite
         }
     }
 
-    /** The optional docs/docs.json defines the generated blocks, by name. */
+    /** The optional docs/docs.json defines the generated blocks, by name, when it carries a blocks key. */
     private function loadBlocks(): void
     {
         $path = $this->docs.'/docs.json';
@@ -1512,7 +1544,13 @@ final class DocsSite
             return;
         }
         $data = json_decode((string) file_get_contents($path), true);
-        if (! is_array($data) || ! isset($data['blocks']) || ! is_array($data['blocks'])) {
+        if (! is_array($data) || array_is_list($data)) {
+            throw new DocsSiteError("{$path} must be a JSON object.");
+        }
+        if (! isset($data['blocks'])) {
+            return;
+        }
+        if (! is_array($data['blocks'])) {
             throw new DocsSiteError("{$path} needs a \"blocks\" object.");
         }
         foreach ($data['blocks'] as $name => $block) {
@@ -1522,6 +1560,101 @@ final class DocsSite
             }
             $this->blocks[$name] = $block;
         }
+    }
+
+    /**
+     * The optional theme key of docs/docs.json: a css file copied to site/docs/theme/ and linked after docs.css,
+     * and a header partial that replaces the generic docs header. Both are plain relative paths under docs/, and a
+     * broken config is a tool error naming the key.
+     */
+    private function loadTheme(): void
+    {
+        $path = $this->docs.'/docs.json';
+        if (! is_file($path)) {
+            return;
+        }
+        $data = json_decode((string) file_get_contents($path), true);
+        if (! is_array($data) || array_is_list($data) || ! array_key_exists('theme', $data)) {
+            return;
+        }
+        $theme = $data['theme'];
+        // An empty object is a no-op: every generated byte matches the unthemed build.
+        if (! is_array($theme) || ($theme !== [] && array_is_list($theme))) {
+            throw new DocsSiteError("{$path}: the \"theme\" key must be an object.");
+        }
+        foreach ($theme as $key => $value) {
+            $key = (string) $key;
+            if ($key !== 'css' && $key !== 'header') {
+                throw new DocsSiteError("{$path}: the theme key \"{$key}\" is unknown; theme takes css and header.");
+            }
+            if (! is_string($value) || $value === '') {
+                throw new DocsSiteError("{$path}: theme.{$key} must be a non-empty string.");
+            }
+            if (! $this->plainRelativePath($value)) {
+                throw new DocsSiteError("{$path}: theme.{$key} must be a plain relative path: no leading slash, no drive letter, no .. segment, no backslash.");
+            }
+            if (! is_file($this->docs.'/'.$value)) {
+                throw new DocsSiteError("{$path}: theme.{$key} points at docs/{$value}, which does not exist.");
+            }
+            if ($key === 'css') {
+                $this->themeCss = $value;
+            } else {
+                $this->themeHeader = $this->readHeaderPartial($value);
+            }
+        }
+    }
+
+    /** A plain relative path: no leading slash, no drive letter, no .. segment, no backslash. */
+    private function plainRelativePath(string $path): bool
+    {
+        if ($path === '' || str_contains($path, '\\') || str_starts_with($path, '/')) {
+            return false;
+        }
+        if (preg_match('/^[A-Za-z]:/', $path) === 1) {
+            return false;
+        }
+
+        return ! in_array('..', explode('/', $path), true);
+    }
+
+    /**
+     * The theme header partial, read and guarded: exactly one closed <header> element, no script, no main
+     * landmark, no skip link, no mobile menu, and only the {{project}} and {{version}} placeholders.
+     */
+    private function readHeaderPartial(string $relative): string
+    {
+        $html = $this->normalise((string) file_get_contents($this->docs.'/'.$relative));
+        if (preg_match_all('/<header\b/i', $html) !== 1) {
+            throw new DocsSiteError('the theme header must contain exactly one <header> element.');
+        }
+        if (preg_match('/<header\b[^>]*>.*?<\/header>/is', $html, $element) !== 1) {
+            throw new DocsSiteError('the theme header must contain one closed <header> element.');
+        }
+        foreach ([
+            '<script' => 'a <script> element',
+            'id="main"' => 'an id="main" attribute',
+            'wsu-skip-link' => 'a wsu-skip-link',
+            'docs-menu' => 'a docs-menu',
+            '<main' => 'a <main> element',
+        ] as $needle => $what) {
+            if (stripos($html, $needle) !== false) {
+                throw new DocsSiteError("the theme header carries {$what}; the builder owns that part of the page.");
+            }
+        }
+        $unknown = [];
+        if (preg_match_all('/\{\{[^}]*\}\}/', $html, $matches) > 0) {
+            foreach ($matches[0] as $placeholder) {
+                $name = trim(substr($placeholder, 2, -2));
+                if ($name !== 'project' && $name !== 'version') {
+                    $unknown[] = $placeholder;
+                }
+            }
+        }
+        if ($unknown !== []) {
+            throw new DocsSiteError('the theme header uses unknown placeholders '.implode(', ', $unknown).'; the builder fills {{project}} and {{version}}.');
+        }
+
+        return $element[0];
     }
 
     /**
@@ -2575,6 +2708,18 @@ final class DocsSite
             $parts = array_filter([$footerSource, $mirrors, "<a href=\"{$twin}\">Markdown</a>"]);
             $footerRight = '  <span>'.implode(' ', $parts)."</span>\n";
         }
+        // The theme stylesheet links after docs.css, so its rules win; with no theme the head is unchanged.
+        $themeCssLink = $this->themeCss === null
+            ? ''
+            : "<link rel=\"stylesheet\" href=\"{$up}docs/theme/".basename($this->themeCss)."\">\n";
+        if ($this->themeHeader === null) {
+            $header = "<header class=\"docs-header\">\n"
+                ."  <a class=\"docs-header__brand\" href=\"{$up}docs/index.html\">{$e($project)}</a>\n"
+                .$headerRight
+                ."</header>\n";
+        } else {
+            $header = $this->renderThemeHeader($up, $project, $stamp);
+        }
 
         return "<!DOCTYPE html>\n"
             .'<!-- '.DocsKit::MARKER." from docs/{$path}.md. Do not edit. -->\n"
@@ -2587,15 +2732,13 @@ final class DocsSite
             ."<meta name=\"docs-version\" content=\"{$e($stamp)}\">\n"
             ."<link rel=\"stylesheet\" href=\"{$up}assets/wayne-ui/wayne-ui.css\">\n"
             ."<link rel=\"stylesheet\" href=\"{$up}assets/docs.css\">\n"
+            .$themeCssLink
             ."<link rel=\"alternate\" type=\"text/markdown\" href=\"{$twin}\">\n"
             ."<script src=\"{$up}assets/docs.js\" defer></script>\n"
             ."</head>\n"
             ."<body>\n"
             ."<a class=\"wsu-skip-link\" href=\"#main\">Skip to content</a>\n"
-            ."<header class=\"docs-header\">\n"
-            ."  <a class=\"docs-header__brand\" href=\"{$up}docs/index.html\">{$e($project)}</a>\n"
-            .$headerRight
-            ."</header>\n"
+            .$header
             ."<div class=\"{$layoutClass}\">\n"
             ."  <details class=\"docs-menu\">\n"
             ."    <summary>Menu</summary>\n"
@@ -2616,6 +2759,82 @@ final class DocsSite
             ."</footer>\n"
             ."</body>\n"
             ."</html>\n";
+    }
+
+    /**
+     * The theme header for one page: {{project}} and {{version}} filled, relative links prefixed to the page
+     * depth, and aria-current on the first link to the docs home.
+     */
+    private function renderThemeHeader(string $up, string $project, string $stamp): string
+    {
+        $html = str_replace(
+            ['{{project}}', '{{version}}'],
+            [htmlspecialchars($project, ENT_QUOTES), htmlspecialchars($stamp, ENT_QUOTES)],
+            (string) $this->themeHeader
+        );
+        $html = preg_replace_callback(
+            '/(^|\s)(href|src)\s*=\s*(["\'])(.*?)\3/is',
+            static fn (array $m): string => $m[1].$m[2].'='.$m[3].self::rewriteThemeUrl($m[4], $up).$m[3],
+            $html
+        ) ?? $html;
+        $html = preg_replace_callback(
+            '/(^|\s)srcset\s*=\s*(["\'])(.*?)\2/is',
+            static fn (array $m): string => $m[1].'srcset='.$m[2].self::rewriteThemeSrcset($m[3], $up).$m[2],
+            $html
+        ) ?? $html;
+        // The first link to the docs home carries aria-current, unless it already has one.
+        if (preg_match_all('/<a\b[^>]*>/i', $html, $anchors, PREG_OFFSET_CAPTURE)) {
+            foreach ($anchors[0] as [$tag, $offset]) {
+                if (preg_match('/\bhref\s*=\s*(["\'])(.*?)\1/i', $tag, $href) !== 1) {
+                    continue;
+                }
+                // The href is already rewritten to page depth above; compare it as-is.
+                $target = $href[2];
+                if ($target !== $up.'docs/index.html' && $target !== $up.'docs/') {
+                    continue;
+                }
+                if (stripos($tag, 'aria-current') === false) {
+                    // Insert before the tag's closing >, which $at points at.
+                    $at = $offset + strlen($tag) - 1;
+                    $html = substr($html, 0, $at).' aria-current="page"'.substr($html, $at);
+                }
+
+                break;
+            }
+        }
+
+        return $html;
+    }
+
+    /** A relative URL in the theme header, prefixed to the page depth; fragment, absolute and scheme URLs stay put. */
+    private static function rewriteThemeUrl(string $url, string $up): string
+    {
+        $url = trim($url);
+        if ($url === '' || str_starts_with($url, '#') || str_starts_with($url, '/')) {
+            return $url;
+        }
+        if (preg_match('/^[A-Za-z][A-Za-z0-9+.-]*:/', $url) === 1) {
+            return $url;
+        }
+
+        return $up.$url;
+    }
+
+    /** Each url of a comma list of "url descriptor" pairs, rewritten like a plain relative URL. */
+    private static function rewriteThemeSrcset(string $srcset, string $up): string
+    {
+        $out = [];
+        foreach (explode(',', $srcset) as $entry) {
+            $entry = trim($entry);
+            if ($entry === '') {
+                continue;
+            }
+            $parts = preg_split('/\s+/', $entry, 2) ?: [];
+            $parts[0] = self::rewriteThemeUrl($parts[0], $up);
+            $out[] = count($parts) === 2 ? $parts[0].' '.$parts[1] : $parts[0];
+        }
+
+        return implode(', ', $out);
     }
 
     /** @return list<string> paths relative to $dir, forward slashes, sorted, private skipped */

@@ -10,6 +10,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### Changed
 
+- The docs pages wear Booster's own look instead of the generic builder one: the front page's masthead and main menu (Docs marked as the current item, and a gold "Run it today" pill on every page that lands on the install one-liners), Barlow Condensed titles with the hero's gold underline, the install section's green slab for commands, the greenbar printout for output, Booster's palette in light mode and a derived deep-green dark mode. It comes from the docs builder's new `theme` key (`docs/_header.html` and `docs/theme/booster.css`); the builder and kit come from Squire's theme-hook branch, which also fixes two kit bugs: the copy button said "Copy failed" after every successful copy, and code blocks that scroll sideways could not be reached by keyboard.
 - OPEN_QUESTIONS: the "Not built yet" list now says what shipped (the `&new` pre-pass in 1.0.0, the real-app `cas-to-sesame` hop in 1.6.0, the proof runs of 2026-10-28 and 2026-11-01) and what is still open.
 - The front page main menu now links to the docs site (`docs/`), between the Agents and Proof links.
 
