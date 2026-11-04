@@ -45,7 +45,9 @@ agent-ready check. Nothing needs PHP on the host:</p>
 <code>tests/ContractTest.php</code> enforces it with the real Rector, so a Rector release that changes a hop shows up in CI.</p>
 <h2 id="proof">Proof<a class="docs-heading-link" aria-label="Link to this section" href="#proof">#</a></h2>
 <p>Proof runs against real Wayne State applications are on a private site,
-<a rel="noopener" href="https://proof.apps.wayne.edu/booster/">proof.apps.wayne.edu/booster</a>, behind a Wayne State employee sign-in.</p>
+<a rel="noopener" href="https://proof.apps.wayne.edu/booster/">proof.apps.wayne.edu/booster</a>, behind a Wayne State employee sign-in. The
+<a rel="noopener" href="https://booster.apps.wayne.edu/proof.html">Real output page</a> shows Booster's own plan and dry-run output on each
+example app, and <code>composer ci</code> keeps it current.</p>
 <p>Proven how: the first full run with the gate on took a Laravel 12 app from PHP 8.2 to 8.4 in two hops, each gated by
 the app's 197-test suite, and it is written up in
 <a rel="noopener" href="https://github.com/waynestate/booster/blob/main/research/booster-e2e-gate.md">research/booster-e2e-gate.md</a>.</p>

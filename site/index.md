@@ -102,6 +102,8 @@ The commands
 
 There's also `scan`, which reports what will break on a given PHP (`--removals` for removed functions, `--phpstan` for static analysis) and always exits 0. Exit codes: **0** pass · **1** the baseline failed, or a hop was capped, errored or failed its gate · **2** bad usage or a target the policy does not know.
 
+Want to see it run? [Real output](https://booster.apps.wayne.edu/proof.html) shows the plan and the dry run for each example app, captured from the real tool.
+
 **detectWhich of the five stack shapes, and which versions**
 
 $ bin/booster detect --path=examples/vue-spa path examples/vue-spa app_type raw-php-vue composer_json yes php 8.0 laravel unknown phpunit unknown vue 2 node unknown mix_file no wayne_cas no wayneui_1 no boost no helmet no Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan). Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package. Next: bin/booster plan --path=examples/vue-spa

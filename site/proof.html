@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="en" data-theme="wsu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Cross-project links are committed as production hrefs. assets/stack-env.js
+     points them at a local stack server in dev; content: auto, production or dev. -->
+<meta name="stack-env" content="auto">
+<script src="assets/stack-env.js" defer></script>
+<title>BOOSTER proof: real output</title>
+<meta name="description" content="Booster plans and runs PHP and Laravel upgrades one hop at a time on Rector, gates every hop with your tests on the target PHP, and never commits or pushes for you.">
+<meta name="theme-color" content="#0c5449">
+<link rel="canonical" href="https://booster.apps.wayne.edu/">
+<!-- For agents (ADR-0019): this page as Markdown, written by bin/agent-ready.php from Squire's kit.
+     The front controller also sends the twin to any client that asks for text/markdown. -->
+<link rel="alternate" type="text/markdown" href="proof.md">
+<link rel="icon" href="brand/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="brand/favicon-32.png">
+<link rel="apple-touch-icon" href="brand/booster-avatar-256.png">
+<meta property="og:title" content="Booster: Boosts your versions.">
+<meta property="og:description" content="PHP and Laravel upgrades, one dose at a time.">
+<meta property="og:image" content="brand/booster-avatar-512.png">
+<!--
+  WayneUI 2.0.8, copied from its documented static path
+  (wayne-ui/apps/site/public/v2) so this page works offline. WayneUI is the
+  base (tokens, container, buttons, skip link, focus floor); booster.css
+  overrides the look. Display type is Barlow Condensed (OFL), self-hosted.
+-->
+<link rel="preload" href="assets/fonts/barlow-condensed-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/wayne-ui/wayne-ui.css">
+<link rel="stylesheet" href="assets/agent-ready.css">
+<link rel="stylesheet" href="assets/booster.css">
+<script>
+  /* Countdowns and lift-offs only for people who are happy with motion.
+     Everyone else gets the finished record: every dose already stamped. */
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: no-preference)").matches) {
+    document.documentElement.classList.add("motion");
+  }
+</script>
+</head>
+<body>
+<a class="wsu-skip-link" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="wsu-container masthead__row">
+    <a class="masthead__brand" href="#main">
+      <img src="brand/booster-avatar-256.png" width="36" height="36" alt="">
+      <span class="masthead__name">BOOSTER</span>
+      <span class="masthead__ver">1.8</span>
+    </a>
+    <nav class="masthead__nav" aria-label="Main">
+      <a href="index.html#record">Record</a>
+      <a href="index.html#pairs">Pairs</a>
+      <a href="index.html#commands">Commands</a>
+      <a href="index.html#agents">Agents</a>
+      <a href="docs/">Docs</a>
+      <a href="proof.html">Real output</a>
+      <a href="https://proof.apps.wayne.edu/booster/">Proof</a>
+      <a class="masthead__install" href="index.html#install">Install</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+<section class="wsu-container proof" aria-labelledby="proof-title">
+<h1 id="proof-title">Real output, from Booster's own example apps</h1>
+<p>Captured on 2026-11-03 with Booster 1.8.1. Each app below is one of the example apps in the <code>examples/</code> folder. A dry run changes nothing. This page is regenerated each release.</p>
+<nav aria-label="Example apps">
+<ul>
+<li><a href="#app-laravel-blade">laravel-blade</a></li>
+<li><a href="#app-laravel-blade-vue">laravel-blade-vue</a></li>
+<li><a href="#app-laravel-inertia-vue">laravel-inertia-vue</a></li>
+<li><a href="#app-laravel-wayne-cas">laravel-wayne-cas</a></li>
+<li><a href="#app-raw-php">raw-php</a></li>
+<li><a href="#app-vue-spa">vue-spa</a></li>
+</ul>
+</nav>
+<section id="app-laravel-blade" aria-labelledby="h-laravel-blade">
+<h2 id="h-laravel-blade">laravel-blade</h2>
+<h3>Plan</h3>
+<p><code>booster plan --path=examples/laravel-blade</code></p>
+<pre class="out" tabindex="0">BOOSTER plan for examples/laravel-blade
+  app type: laravel-blade
+  PHP: 8.2 -&gt; 8.5
+  Laravel: 10 -&gt; 13
+  PHPUnit: 10 -&gt; 13
+  policy: waynestate/creed 0.1.4 (today 2026-11-03)
+
+1. phpunit-10-to-11
+   Move PHPUnit 10 tests to PHPUnit 11.
+   After this step your tests run in Docker.
+2. laravel-10-to-11
+   Move a Laravel 10 app to Laravel 11.
+   After this step your tests run in Docker.
+3. laravel-11-to-12
+   Move a Laravel 11 app to Laravel 12.
+   After this step your tests run in Docker.
+   Behavior changes to check:
+   When the app does not define a local disk, its root now defaults to storage/app/private instead of storage/app (config/filesystems.php)
+     keep old: define the local disk with &#039;root&#039; =&gt; storage_path(&#039;app&#039;)
+     check: Check where Storage::disk(&#039;local&#039;) writes after the hop
+4. php-82-to-83
+   Move PHP 8.2 code to PHP 8.3.
+   After this step your tests run in Docker.
+   Removed between PHP 8.2 and PHP 8.3: none found.
+5. phpunit-11-to-12
+   Move PHPUnit 11 tests to PHPUnit 12.
+   After this step your tests run in Docker.
+6. laravel-12-to-13
+   Move a Laravel 12 app to Laravel 13.
+   After this step your tests run in Docker.
+7. php-83-to-84
+   Move PHP 8.3 code to PHP 8.4.
+   After this step your tests run in Docker.
+   Removed between PHP 8.3 and PHP 8.4: none found.
+8. phpunit-12-to-13
+   Move PHPUnit 12 tests to PHPUnit 13.
+   After this step your tests run in Docker.
+9. php-84-to-85
+   Move PHP 8.4 code to PHP 8.5.
+   After this step your tests run in Docker.
+   Removed between PHP 8.4 and PHP 8.5: none found.
+
+PHPCompatibility check for PHP 8.3: no findings.
+
+PHPStan on PHP 8.5: 5 findings (code quality hints, not upgrade blockers).
+   app/Models/Post.php:7 [class.notFound] Class App\Models\Post extends unknown class Illuminate\Database\Eloquent\Model.
+   app/Models/Post.php:9 [missingType.property] Property App\Models\Post::$casts has no type specified.
+   tests/PostTest.php:18 [property.onlyWritten] Property App\Tests\PostTest::$repository is never read, only written.
+   tests/PostTest.php:27 [staticMethod.deprecated] Call to deprecated method isType() of class PHPUnit\Framework\Assert:
+https://github.com/sebastianbergmann/phpunit/issues/6052
+   tests/PostTest.php:33 [method.alreadyNarrowedType] Call to method PHPUnit\Framework\Assert::assertNotNull() with PHPUnit\Framework\MockObject\Rule\AnyInvokedCount will always evaluate to true.
+   Hint: Laravel app without Larastan: Eloquent and facade calls show as errors. composer require --dev larastan/larastan for a cleaner scan.
+
+Nothing was changed. The numbered list above is the order Booster would do things; &quot;PHPCompatibility check&quot; and &quot;PHPStan&quot; are advice
+for you to read, not errors.
+Booster does every numbered step above when you run it.
+Preview the edits: php bin/booster run --path=examples/laravel-blade --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade)
+</pre>
+<h3>Dry run</h3>
+<p><code>booster run --path=examples/laravel-blade --dry-run</code></p>
+<pre class="out" tabindex="0">BOOSTER dry run (nothing was changed)
+
+Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+
+1. phpunit-10-to-11: PREVIEWED (1 file)
+   would run: composer update -W phpunit/phpunit
+   Run phpunit --migrate-configuration after this hop; Rector rewrites the test code but not phpunit.xml.
+   --- tests/PostTest.php
+   --- Original
+   +++ New
+   @@ -15,11 +15,14 @@
+     */
+    final class PostTest extends TestCase
+    {
+   -    private \PHPUnit\Framework\MockObject\MockObject $repository;
+   +    /**
+   +     * @var \PHPUnit\Framework\MockObject\Stub&amp;\App\Models\Post
+   +     */
+   +    private \PHPUnit\Framework\MockObject\Stub $repository;
+    
+        protected function setUp(): void
+        {
+   -        $this-&gt;repository = $this-&gt;createMock(Post::class);
+   +        $this-&gt;repository = $this-&gt;createStub(Post::class);
+        }
+    
+        public function testItFindsAPost(): void
+   
+2. laravel-10-to-11: PREVIEWED (incomplete)
+   would run: composer update -W laravel/framework
+   Preview incomplete: laravel-10-to-11 needs the app&#039;s vendor/ to recognize Laravel classes, and it is missing. Run composer install in the app, then dry-run again.
+   If your database server is old, check its version against the minimum MySQL (or other database) version Laravel 11 needs before you apply this hop.
+   Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.
+3. laravel-11-to-12: PREVIEWED (incomplete)
+   would run: composer update -W laravel/framework
+   Preview incomplete: laravel-11-to-12 needs the app&#039;s vendor/ to recognize Laravel classes, and it is missing. Run composer install in the app, then dry-run again.
+   If your database server is old, check its version against the minimum MySQL (or other database) version Laravel 12 needs before you apply this hop.
+   Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.
+   Behavior changes to check:
+   When the app does not define a local disk, its root now defaults to storage/app/private instead of storage/app (config/filesystems.php)
+     keep old: define the local disk with &#039;root&#039; =&gt; storage_path(&#039;app&#039;)
+     check: Check where Storage::disk(&#039;local&#039;) writes after the hop
+4. php-82-to-83: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+5. phpunit-11-to-12: PREVIEWED (1 file)
+   would run: composer update -W phpunit/phpunit
+   Run phpunit --migrate-configuration after this hop; Rector rewrites the test code but not phpunit.xml.
+   --- tests/PostTest.php
+   --- Original
+   +++ New
+   @@ -15,16 +15,19 @@
+     */
+    final class PostTest extends TestCase
+    {
+   -    private \PHPUnit\Framework\MockObject\MockObject $repository;
+   +    /**
+   +     * @var \PHPUnit\Framework\MockObject\Stub&amp;\App\Models\Post
+   +     */
+   +    private \PHPUnit\Framework\MockObject\Stub $repository;
+    
+        protected function setUp(): void
+        {
+   -        $this-&gt;repository = $this-&gt;createMock(Post::class);
+   +        $this-&gt;repository = $this-&gt;createStub(Post::class);
+        }
+    
+        public function testItFindsAPost(): void
+        {
+   -        $this-&gt;assertThat([new Post()], $this-&gt;isType(&#039;array&#039;));
+   +        $this-&gt;assertThat([new Post()], $this-&gt;isArray());
+        }
+    
+        public function testItAcceptsAnyInvokedCount(): void
+   
+6. laravel-12-to-13: PREVIEWED (incomplete)
+   would run: composer update -W laravel/framework
+   Preview incomplete: laravel-12-to-13 needs the app&#039;s vendor/ to recognize Laravel classes, and it is missing. Run composer install in the app, then dry-run again.
+   If your database server is old, check its version against the minimum MySQL (or other database) version Laravel 13 needs before you apply this hop.
+   Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.
+7. php-83-to-84: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   Implicitly nullable parameters (T $a = null) are deprecated; fputcsv(), fgetcsv() and str_getcsv() want an explicit escape argument.
+8. phpunit-12-to-13: PREVIEWED (1 file)
+   would run: composer update -W phpunit/phpunit
+   Run phpunit --migrate-configuration after this hop; Rector rewrites the test code but not phpunit.xml.
+   --- tests/PostTest.php
+   --- Original
+   +++ New
+   @@ -15,21 +15,24 @@
+     */
+    final class PostTest extends TestCase
+    {
+   -    private \PHPUnit\Framework\MockObject\MockObject $repository;
+   +    /**
+   +     * @var \PHPUnit\Framework\MockObject\Stub&amp;\App\Models\Post
+   +     */
+   +    private \PHPUnit\Framework\MockObject\Stub $repository;
+    
+        protected function setUp(): void
+        {
+   -        $this-&gt;repository = $this-&gt;createMock(Post::class);
+   +        $this-&gt;repository = $this-&gt;createStub(Post::class);
+        }
+    
+        public function testItFindsAPost(): void
+        {
+   -        $this-&gt;assertThat([new Post()], $this-&gt;isType(&#039;array&#039;));
+   +        $this-&gt;assertThat([new Post()], $this-&gt;isArray());
+        }
+    
+        public function testItAcceptsAnyInvokedCount(): void
+        {
+   -        $matcher = $this-&gt;any();
+   +        $matcher = new \PHPUnit\Framework\MockObject\Rule\AnyInvokedCount();
+            $this-&gt;assertNotNull($matcher);
+        }
+    }
+   
+9. php-84-to-85: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
+   PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
+
+Unique files across hops: 1. Later hops were previewed against the original tree, so the same file can appear in several hops.
+
+RESULT: PASS (previewed, no tests ran)
+
+Dry run: these changes were previewed, none were applied.
+Nothing was changed. RESULT: PASS means the preview worked; no tests ran.
+Next, if the edits look right: php bin/booster run --path=examples/laravel-blade
+(It needs Docker and a clean git folder. Commit or stash first.)
+</pre>
+</section>
+<section id="app-laravel-blade-vue" aria-labelledby="h-laravel-blade-vue">
+<h2 id="h-laravel-blade-vue">laravel-blade-vue</h2>
+<h3>Plan</h3>
+<p><code>booster plan --path=examples/laravel-blade-vue</code></p>
+<pre class="out" tabindex="0">BOOSTER plan for examples/laravel-blade-vue
+  app type: laravel-blade-vue
+  PHP: 8.3 -&gt; 8.5
+  Laravel: 12 -&gt; 13
+  policy: waynestate/creed 0.1.4 (today 2026-11-03)
+
+1. laravel-12-to-13
+   Move a Laravel 12 app to Laravel 13.
+   After this step your tests run in Docker.
+2. php-83-to-84
+   Move PHP 8.3 code to PHP 8.4.
+   After this step your tests run in Docker.
+   Removed between PHP 8.3 and PHP 8.4: none found.
+3. php-84-to-85
+   Move PHP 8.4 code to PHP 8.5.
+   After this step your tests run in Docker.
+   Removed between PHP 8.4 and PHP 8.5: none found.
+4. node-pin-24
+   Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
+   After this step your tests run in Docker.
+
+PHPCompatibility check for PHP 8.4: no findings.
+
+PHPStan scan: could not run
+   phpstan exited 1 without a JSON report.
+   [ERROR] No files found to analyse.
+
+Nothing was changed. The numbered list above is the order Booster would do things; &quot;PHPCompatibility check&quot; and &quot;PHPStan&quot; are advice
+for you to read, not errors.
+Booster does every numbered step above when you run it.
+Preview the edits: php bin/booster run --path=examples/laravel-blade-vue --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade-vue)
+</pre>
+<h3>Dry run</h3>
+<p><code>booster run --path=examples/laravel-blade-vue --dry-run</code></p>
+<pre class="out" tabindex="0">BOOSTER dry run (nothing was changed)
+
+Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+
+1. laravel-12-to-13: PREVIEWED (incomplete)
+   would run: composer update -W laravel/framework
+   Preview incomplete: laravel-12-to-13 needs the app&#039;s vendor/ to recognize Laravel classes, and it is missing. Run composer install in the app, then dry-run again.
+   If your database server is old, check its version against the minimum MySQL (or other database) version Laravel 13 needs before you apply this hop.
+   Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.
+2. php-83-to-84: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   Implicitly nullable parameters (T $a = null) are deprecated; fputcsv(), fgetcsv() and str_getcsv() want an explicit escape argument.
+3. php-84-to-85: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
+   PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
+4. node-pin-24: PREVIEWED (0 files)
+   Dry run: would set engines.node to &gt;=26 in package.json and write .nvmrc with 26.
+   The pin is a floor, not a ceiling: engines.node &quot;&gt;=26&quot; still allows newer Node majors.
+   Later front-end hops run in the same node:26 container, so this hop comes before them.
+
+RESULT: PASS (previewed, no tests ran)
+
+Nothing was changed.
+</pre>
+</section>
+<section id="app-laravel-inertia-vue" aria-labelledby="h-laravel-inertia-vue">
+<h2 id="h-laravel-inertia-vue">laravel-inertia-vue</h2>
+<h3>Plan</h3>
+<p><code>booster plan --path=examples/laravel-inertia-vue</code></p>
+<pre class="out" tabindex="0">BOOSTER plan for examples/laravel-inertia-vue
+  app type: laravel-inertia-vue
+  PHP: 8.3 -&gt; 8.5
+  Laravel: 12 -&gt; 13
+  policy: waynestate/creed 0.1.4 (today 2026-11-03)
+
+1. laravel-12-to-13
+   Move a Laravel 12 app to Laravel 13.
+   After this step your tests run in Docker.
+2. php-83-to-84
+   Move PHP 8.3 code to PHP 8.4.
+   After this step your tests run in Docker.
+   Removed between PHP 8.3 and PHP 8.4: none found.
+3. php-84-to-85
+   Move PHP 8.4 code to PHP 8.5.
+   After this step your tests run in Docker.
+   Removed between PHP 8.4 and PHP 8.5: none found.
+4. node-pin-24
+   Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
+   After this step your tests run in Docker.
+
+PHPCompatibility check for PHP 8.4: no findings.
+
+PHPStan scan: could not run
+   phpstan exited 1 without a JSON report.
+   [ERROR] No files found to analyse.
+
+Nothing was changed. The numbered list above is the order Booster would do things; &quot;PHPCompatibility check&quot; and &quot;PHPStan&quot; are advice
+for you to read, not errors.
+Booster does every numbered step above when you run it.
+Preview the edits: php bin/booster run --path=examples/laravel-inertia-vue --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-inertia-vue)
+</pre>
+<h3>Dry run</h3>
+<p><code>booster run --path=examples/laravel-inertia-vue --dry-run</code></p>
+<pre class="out" tabindex="0">BOOSTER dry run (nothing was changed)
+
+Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+
+1. laravel-12-to-13: PREVIEWED (incomplete)
+   would run: composer update -W laravel/framework
+   Preview incomplete: laravel-12-to-13 needs the app&#039;s vendor/ to recognize Laravel classes, and it is missing. Run composer install in the app, then dry-run again.
+   If your database server is old, check its version against the minimum MySQL (or other database) version Laravel 13 needs before you apply this hop.
+   Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.
+2. php-83-to-84: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   Implicitly nullable parameters (T $a = null) are deprecated; fputcsv(), fgetcsv() and str_getcsv() want an explicit escape argument.
+3. php-84-to-85: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
+   PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
+4. node-pin-24: PREVIEWED (0 files)
+   Dry run: would set engines.node to &gt;=26 in package.json and write .nvmrc with 26.
+   The pin is a floor, not a ceiling: engines.node &quot;&gt;=26&quot; still allows newer Node majors.
+   Later front-end hops run in the same node:26 container, so this hop comes before them.
+
+RESULT: PASS (previewed, no tests ran)
+
+Nothing was changed.
+</pre>
+</section>
+<section id="app-laravel-wayne-cas" aria-labelledby="h-laravel-wayne-cas">
+<h2 id="h-laravel-wayne-cas">laravel-wayne-cas</h2>
+<h3>Plan</h3>
+<p><code>booster plan --path=examples/laravel-wayne-cas</code></p>
+<pre class="out" tabindex="0">BOOSTER plan for examples/laravel-wayne-cas
+  app type: laravel-blade
+  PHP: 8.3 -&gt; 8.5
+  Laravel: 12 -&gt; 13
+  policy: waynestate/creed 0.1.4 (today 2026-11-03)
+
+1. laravel-12-to-13
+   Move a Laravel 12 app to Laravel 13.
+   After this step your tests run in Docker.
+2. php-83-to-84
+   Move PHP 8.3 code to PHP 8.4.
+   After this step your tests run in Docker.
+   Removed between PHP 8.3 and PHP 8.4: none found.
+3. php-84-to-85
+   Move PHP 8.4 code to PHP 8.5.
+   After this step your tests run in Docker.
+   Removed between PHP 8.4 and PHP 8.5: none found.
+
+Warning: The app uses wayne-cas. Add --sesame to plan the swap to SESAME.
+
+Warning: Not checked: cit-web-infra/wayne-cas (not on Packagist or unreachable).
+
+PHPCompatibility check for PHP 8.4: no findings.
+
+PHPStan on PHP 8.5: 16 findings (code quality hints, not upgrade blockers).
+   app/Http/Kernel.php:7 [missingType.property] Property App\Http\Kernel::$middlewareGroups has no type specified.
+   app/Http/Kernel.php:9 [class.notFound] Class App\Http\Middleware\EncryptCookies not found.
+   app/Http/Kernel.php:10 [class.notFound] Class Illuminate\Session\Middleware\StartSession not found.
+   app/Http/Kernel.php:15 [missingType.property] Property App\Http\Kernel::$routeMiddleware has no type specified.
+   app/Http/Kernel.php:16 [class.notFound] Class WSU\WayneCas\WayneAuthenticate not found.
+   (11 more; run `booster scan --phpstan` to see all)
+   Hint: Laravel app without Larastan: Eloquent and facade calls show as errors. composer require --dev larastan/larastan for a cleaner scan.
+
+Nothing was changed. The numbered list above is the order Booster would do things; &quot;PHPCompatibility check&quot; and &quot;PHPStan&quot; are advice
+for you to read, not errors.
+Booster does every numbered step above when you run it.
+Preview the edits: php bin/booster run --path=examples/laravel-wayne-cas --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-wayne-cas)
+</pre>
+<h3>Dry run</h3>
+<p><code>booster run --path=examples/laravel-wayne-cas --dry-run</code></p>
+<pre class="out" tabindex="0">BOOSTER dry run (nothing was changed)
+
+Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+
+1. laravel-12-to-13: PREVIEWED (incomplete)
+   would run: composer update -W laravel/framework
+   Preview incomplete: laravel-12-to-13 needs the app&#039;s vendor/ to recognize Laravel classes, and it is missing. Run composer install in the app, then dry-run again.
+   If your database server is old, check its version against the minimum MySQL (or other database) version Laravel 13 needs before you apply this hop.
+   Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.
+2. php-83-to-84: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   Implicitly nullable parameters (T $a = null) are deprecated; fputcsv(), fgetcsv() and str_getcsv() want an explicit escape argument.
+3. php-84-to-85: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
+   PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
+
+RESULT: PASS (previewed, no tests ran)
+
+Nothing was changed.
+</pre>
+</section>
+<section id="app-raw-php" aria-labelledby="h-raw-php">
+<h2 id="h-raw-php">raw-php</h2>
+<h3>Plan</h3>
+<p><code>booster plan --path=examples/raw-php</code></p>
+<pre class="out" tabindex="0">BOOSTER plan for examples/raw-php
+  app type: raw-php
+  PHP: 7.4 -&gt; 8.5
+  policy: waynestate/creed 0.1.4 (today 2026-11-03)
+
+1. php-74-to-80
+   Move PHP 7.4 code to PHP 8.0.
+   After this step your tests run in Docker.
+   Give this hop the most review time.
+   Removed between PHP 7.4 and PHP 8.0: none found.
+   Behavior changes to check:
+   Loose comparison of a number with a non-numeric string is now false: 0 == &quot;foo&quot;, 0 == &quot;&quot; and 42 == &quot;42foo&quot; flip from true to false; &lt; / &lt;= against negative numbers also flip for such strings
+     check: Audit loose comparisons of request parameters and string DB columns
+   Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output
+     keep old: error_reporting = E_ALL &amp; ~E_NOTICE &amp; ~E_DEPRECATED in php.ini
+     check: Watch error logs and rendered pages for new notices after the hop
+2. php-80-to-81
+   Move PHP 8.0 code to PHP 8.1.
+   After this step your tests run in Docker.
+   Removed between PHP 8.0 and PHP 8.1: none found.
+3. php-81-to-82
+   Move PHP 8.1 code to PHP 8.2.
+   After this step your tests run in Docker.
+   Removed between PHP 8.1 and PHP 8.2: none found.
+4. php-82-to-83
+   Move PHP 8.2 code to PHP 8.3.
+   After this step your tests run in Docker.
+   Removed between PHP 8.2 and PHP 8.3: none found.
+5. php-83-to-84
+   Move PHP 8.3 code to PHP 8.4.
+   After this step your tests run in Docker.
+   Removed between PHP 8.3 and PHP 8.4: none found.
+6. php-84-to-85
+   Move PHP 8.4 code to PHP 8.5.
+   After this step your tests run in Docker.
+   Removed between PHP 8.4 and PHP 8.5: none found.
+
+PHPCompatibility check for PHP 8.0: no findings.
+
+PHPStan on PHP 8.5: 3 findings (code quality hints, not upgrade blockers).
+   src/Legacy.php:20 [missingType.parameter] Method Example\Legacy::className() has parameter $object with no type specified.
+   src/Legacy.php:22 [return.type] Method Example\Legacy::className() should return string but returns class-string|false.
+   src/Legacy.php:25 [parameter.implicitlyNullable] Deprecated in PHP 8.4: Parameter #1 $label (string) is implicitly nullable via default value null.
+
+Nothing was changed. The numbered list above is the order Booster would do things; &quot;PHPCompatibility check&quot; and &quot;PHPStan&quot; are advice
+for you to read, not errors.
+Booster does every numbered step above when you run it.
+Preview the edits: php bin/booster run --path=examples/raw-php --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/raw-php)
+</pre>
+<h3>Dry run</h3>
+<p><code>booster run --path=examples/raw-php --dry-run</code></p>
+<pre class="out" tabindex="0">BOOSTER dry run (nothing was changed)
+
+Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+
+1. php-74-to-80: PREVIEWED (1 file)
+   Largest risk hop: loose comparison of numbers and strings changed, many warnings became thrown errors, and arithmetic on arrays throws.
+   Write or extend tests before applying this hop; only tests and review find behavior changes here.
+   Behavior changes to check:
+   Loose comparison of a number with a non-numeric string is now false: 0 == &quot;foo&quot;, 0 == &quot;&quot; and 42 == &quot;42foo&quot; flip from true to false; &lt; / &lt;= against negative numbers also flip for such strings
+     check: Audit loose comparisons of request parameters and string DB columns
+   Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output
+     keep old: error_reporting = E_ALL &amp; ~E_NOTICE &amp; ~E_DEPRECATED in php.ini
+     check: Watch error logs and rendered pages for new notices after the hop
+   --- src/Legacy.php
+   --- Original
+   +++ New
+   @@ -4,22 +4,18 @@
+    
+    class Legacy
+    {
+   -    /** @var string */
+   -    private $name;
+   -
+   -    public function __construct(string $name)
+   +    public function __construct(private string $name)
+        {
+   -        $this-&gt;name = $name;
+        }
+    
+        public function mentionsAdmin(string $text): bool
+        {
+   -        return strpos($text, &#039;admin&#039;) !== false;
+   +        return str_contains($text, &#039;admin&#039;);
+        }
+    
+        public function className($object): string
+        {
+   -        return get_class($object);
+   +        return $object::class;
+        }
+    
+        public function label(string $label = null): string
+   
+2. php-80-to-81: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   mysqli now throws on errors by default; PDO on MySQL returns native int and float types; htmlspecialchars() now escapes single quotes.
+   Passing null to a non-nullable built-in parameter is deprecated: check the log after the run.
+3. php-81-to-82: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+4. php-82-to-83: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+5. php-83-to-84: PREVIEWED (1 file)
+   Implicitly nullable parameters (T $a = null) are deprecated; fputcsv(), fgetcsv() and str_getcsv() want an explicit escape argument.
+   --- src/Legacy.php
+   --- Original
+   +++ New
+   @@ -22,7 +22,7 @@
+            return get_class($object);
+        }
+    
+   -    public function label(string $label = null): string
+   +    public function label(?string $label = null): string
+        {
+            return $label ?? $this-&gt;name;
+        }
+   
+6. php-84-to-85: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
+   PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
+
+Unique files across hops: 1. Later hops were previewed against the original tree, so the same file can appear in several hops.
+
+RESULT: PASS (previewed, no tests ran)
+
+Dry run: these changes were previewed, none were applied.
+Nothing was changed. RESULT: PASS means the preview worked; no tests ran.
+Next, if the edits look right: php bin/booster run --path=examples/raw-php
+(It needs Docker and a clean git folder. Commit or stash first.)
+</pre>
+</section>
+<section id="app-vue-spa" aria-labelledby="h-vue-spa">
+<h2 id="h-vue-spa">vue-spa</h2>
+<h3>Plan</h3>
+<p><code>booster plan --path=examples/vue-spa</code></p>
+<pre class="out" tabindex="0">BOOSTER plan for examples/vue-spa
+  app type: raw-php-vue
+  PHP: 8.0 -&gt; 8.5
+  policy: waynestate/creed 0.1.4 (today 2026-11-03)
+
+1. php-80-to-81
+   Move PHP 8.0 code to PHP 8.1.
+   After this step your tests run in Docker.
+   Removed between PHP 8.0 and PHP 8.1: none found.
+2. php-81-to-82
+   Move PHP 8.1 code to PHP 8.2.
+   After this step your tests run in Docker.
+   Removed between PHP 8.1 and PHP 8.2: none found.
+3. php-82-to-83
+   Move PHP 8.2 code to PHP 8.3.
+   After this step your tests run in Docker.
+   Removed between PHP 8.2 and PHP 8.3: none found.
+4. php-83-to-84
+   Move PHP 8.3 code to PHP 8.4.
+   After this step your tests run in Docker.
+   Removed between PHP 8.3 and PHP 8.4: none found.
+5. php-84-to-85
+   Move PHP 8.4 code to PHP 8.5.
+   After this step your tests run in Docker.
+   Removed between PHP 8.4 and PHP 8.5: none found.
+6. node-pin-24
+   Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
+   After this step your tests run in Docker.
+7. vue-27-to-compat
+   Move a Vue 2.7 front end to Vue 3 through the @vue/compat build.
+   After this step your tests run in Docker.
+8. vue-compat-codemod
+   Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists.
+   After this step your tests run in Docker.
+
+PHPCompatibility check for PHP 8.1: no findings.
+
+PHPStan on PHP 8.5: no findings.
+
+Nothing was changed. The numbered list above is the order Booster would do things; &quot;PHPCompatibility check&quot; and &quot;PHPStan&quot; are advice
+for you to read, not errors.
+Booster does every numbered step above when you run it.
+Preview the edits: php bin/booster run --path=examples/vue-spa --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/vue-spa)
+</pre>
+<h3>Dry run</h3>
+<p><code>booster run --path=examples/vue-spa --dry-run</code></p>
+<pre class="out" tabindex="0">BOOSTER dry run (nothing was changed)
+
+Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+
+1. php-80-to-81: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   mysqli now throws on errors by default; PDO on MySQL returns native int and float types; htmlspecialchars() now escapes single quotes.
+   Passing null to a non-nullable built-in parameter is deprecated: check the log after the run.
+2. php-81-to-82: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+3. php-82-to-83: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+4. php-83-to-84: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   Implicitly nullable parameters (T $a = null) are deprecated; fputcsv(), fgetcsv() and str_getcsv() want an explicit escape argument.
+5. php-84-to-85: PREVIEWED (0 files)
+   No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
+   Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
+   PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
+6. node-pin-24: PREVIEWED (0 files)
+   Dry run: would set engines.node to &gt;=26 in package.json and write .nvmrc with 26.
+   The pin is a floor, not a ceiling: engines.node &quot;&gt;=26&quot; still allows newer Node majors.
+   Later front-end hops run in the same node:26 container, so this hop comes before them.
+7. vue-27-to-compat: PREVIEWED (0 files)
+   Dry run: would set vue to ^3.5 in package.json, set @vue/compat to ^3.5 in package.json, set @vue/compiler-sfc to ^3.5 in package.json, set vue-loader to ^17.4 in package.json if it is listed and remove vue-template-compiler from package.json.
+   Point the bundler at @vue/compat instead of vue (an alias in webpack or resolve.alias in Vite) and start with compat MODE 2 so the build warns instead of breaking.
+   Fix every migration warning the build prints, then switch MODE to 3 to turn compat off, and remove @vue/compat from package.json.
+   Move Vuex to Pinia and Vue Router 3 to 4 by hand; the compat build does not rewrite your store or routes.
+8. vue-compat-codemod: PREVIEWED (0 files)
+   Dry run: Refusing to run the codemod: package.json does not list @vue/compat, so the app needs vue-27-to-compat first. Run that hop, then run this hop again.
+   vue-upgrade-tool is lightly maintained; review every change it makes before you trust the diff.
+   The tool lists the items it cannot fix; Booster keeps them in the hop result, so work through that list before you switch @vue/compat MODE to 3.
+   The codemod needs @vue/compat in package.json, which the vue-27-to-compat hop installs; run that hop first.
+
+RESULT: PASS (previewed, no tests ran)
+
+Nothing was changed.
+</pre>
+</section>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wsu-container foot__row">
+    <p class="foot__joke">Side effects may include passing tests.</p>
+    <p class="foot__weld">Part of <a href="https://weld.apps.wayne.edu/">WELD</a>, the Wayne State app stack.</p>
+    <p class="foot__org">Wayne State University · Enterprise Applications · MIT license</p>
+  </div>
+</footer>
+
+<script src="assets/agent-ready.js" defer></script>
+<script src="assets/booster.js" defer></script>
+</body>
+</html>
