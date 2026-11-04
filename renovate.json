@@ -2,5 +2,12 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "local>enterprise-apps/preflight//renovate/default"
+  ],
+  "packageRules": [
+    {
+      "description": "Rector bundles its own phpdoc-parser and must match PHPStan's, so the two always update together (Booster 1.8.1 shipped Rector 2.8.1 with PHPStan 2.3.4 and Rector died on every closure).",
+      "matchPackageNames": ["rector/rector", "phpstan/phpstan"],
+      "groupName": "rector and phpstan"
+    }
   ]
 }

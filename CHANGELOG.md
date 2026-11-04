@@ -16,6 +16,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### Fixed
 
+- `booster run` (dry or real) no longer stops a hop with "Rector reported errors" and `PHPStan\PhpDocParser\Ast\Type\CallableTypeNode::__construct(): Argument #1 ($identifier) must be of type ... IdentifierTypeNode, ... FullyQualifiedNameNode given` on any app that has a closure (an `array_map(function ...)`, a route closure). 1.8.0 and 1.8.1 locked Rector 2.8.1 next to PHPStan 2.3.4, and the two load different copies of phpdoc-parser in one process. The lock now pairs Rector 2.8.4 with PHPStan 2.3.5, a new test runs the real Rector (not the fake runner) on a tiny app with a closure so `composer ci` fails if the pair splits again, and Renovate updates the two packages together.
 - The Real output page's Markdown twin link points at proof.md, so the agent-ready check passes.
 
 ## [1.8.1] - 2026-11-03
