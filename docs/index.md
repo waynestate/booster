@@ -90,6 +90,7 @@ Every route, per OS, is on [Install](install.md).
 ## Guides
 
 - [Quick start](guides/quick-start.md)
+- [How do I...](recipes.md)
 - [The scans](guides/scans.md)
 - [The dependency check](guides/dependency-check.md)
 - [Behavior changes](guides/behaviour-changes.md)

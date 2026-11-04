@@ -8,7 +8,7 @@ generator: Squire agent-ready
 
 # Commands[#](https://booster.apps.wayne.edu/docs/reference/commands.html#commands)
 
-This page lists every command and option Booster takes; the table is generated from the tool by the docs build.
+This page lists every command and option Booster takes; the table is generated from the tool by the docs build. With no flags, `detect`, `plan` and `run` start from what Booster finds in the app and climb to the newest PHP and Laravel the policy supports; see [What a run does by default](https://booster.apps.wayne.edu/docs/guides/quick-start.html#what-a-run-does-by-default).
 
 | Command | What it does |
 | --- | --- |

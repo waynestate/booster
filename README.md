@@ -186,6 +186,43 @@ A real run needs git and Docker on the machine that runs Booster. If you used th
 
 Booster prints its progress lines on standard error. In Windows PowerShell they print in red, as if they were errors. They are not errors; the exit code tells you whether the run worked.
 
+### What a run does by default
+
+You can run `detect`, `plan` and `run` on an app with nothing after `--path`. Booster then goes as far as it safely can on its own: it climbs to the newest PHP and Laravel that CREED's policy supports today, which is PHP 8.5 and Laravel 13 as of this writing (the policy file is the source of truth, not this page).
+
+| Command | With no other flags |
+| --- | --- |
+| `booster detect` | Reads `composer.json` and `composer.lock`, and reports PHP, Laravel, PHPUnit and the front-end setup. Changes nothing. |
+| `booster plan` | Starts from what `detect` found and plans every hop up to the newest PHP, Laravel and PHPUnit the policy supports. Changes nothing. |
+| `booster run` | Does the whole plan in one go, in order. |
+
+How many hops? One for every step on the way, never a jump:
+
+- one hop per PHP minor (8.1 to 8.2 is a hop, 8.2 to 8.3 is another),
+- one hop per Laravel major,
+- one hop per PHPUnit major.
+
+Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel supports at every step: a Laravel step as soon as the current PHP allows it, a PHPUnit step when the PHP allows it, a PHP step otherwise. Two real examples: a Laravel 10 app on PHP 8.1 plans 11 hops, and a PHP 5.5 app with no framework plans 12 hops to PHP 8.5.
+
+Some hops come along by default, and some only when you ask:
+
+- The front-end Node hops (Mix to Vite, Tailwind, Vue) are in the plan by default. Pass any target (`--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php`, `--from-laravel`) and they drop out with a warning, unless you add `--with-node`.
+- An app on PHPUnit 8 or older gets a manual PHPUnit 9 step before the first PHP 8 hop.
+- The SESAME move (`--sesame`) and the WayneUI move (`--wayneui`) are opt-in only.
+- `--skip <hop id>` drops a hop you do not want.
+- If a target is past security support, the plan stops at the policy limit and warns. If Rector has no ruleset for a step yet, the plan stops short and warns.
+
+`run` handles each hop the same way: a Rector preview, then the edits (if a hop would change more than 200 files it asks first, or stops when it cannot ask; `--max-changes` sets a hard limit), then the Composer constraints, then your tests in the target PHP image. That last part is the gate. The first hop that fails stops the run, and the hops after it are reported as "not run". Booster never commits; the changes sit in your working copy for you to review. Progress prints one line per hop, like `hop 3/11 <hop id>: <status>, 12 files, 41 s`, and ends with `run finished: 11 of 11 hops run, 0 stopped, ...`.
+
+Looking for a specific situation (only PHP, one hop at a time, backend only, a big app, no tests)? See [How do I...](docs/recipes.md).
+
+Want less than the whole climb (we will not judge, it is a long way up)?
+
+- `--dry-run` previews every hop and changes nothing.
+- `--until <hop id>` keeps that hop and everything before it.
+- `--only <hop id>` runs just that one hop.
+- `--to-php` and `--to-laravel` pick a lower target.
+
 The one-command form for a forced image upgrade:
 
 ```

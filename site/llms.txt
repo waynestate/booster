@@ -28,6 +28,7 @@ Every page below is Markdown. The HTML pages send the same Markdown to a client 
 - [Booster | Booster docs](https://booster.apps.wayne.edu/docs/index.md): What Booster is, and the first command to run on your app today.
 - [Install | Booster docs](https://booster.apps.wayne.edu/docs/install.md): Every route to get Booster running, from a single file to Docker only.
 - [Next | Booster docs](https://booster.apps.wayne.edu/docs/next.md): What Booster does not do yet, and what it decided not to build.
+- [How do I... | Booster docs](https://booster.apps.wayne.edu/docs/recipes.md): Recipes for the situations people actually ask about, with the exact command, what Booster does, and when not to use it.
 - [Commands | Booster docs](https://booster.apps.wayne.edu/docs/reference/commands.md): Every Booster command and option, generated from the tool itself.
 - [Configuration | Booster docs](https://booster.apps.wayne.edu/docs/reference/configuration.md): The environment variables Booster reads, and where it gets the policy.
 - [Hops | Booster docs](https://booster.apps.wayne.edu/docs/reference/hops.md): Every hop Booster knows, generated from the hop data.

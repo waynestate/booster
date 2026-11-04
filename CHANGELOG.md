@@ -4,6 +4,11 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- Docs: a new "How do I..." page (`docs/recipes.md`) with 14 recipes: look first, go all the way, PHP only, a specific Laravel, one hop at a time, dry run, backend only, skipping a hop, big apps, tests and the gate, offline and dirty trees, SESAME and WayneUI, other dates and policies, and what to do after a stop. Linked from the docs menu, the front page of the docs, the quick start and the README.
+- Docs: the quick start and README gain "What a run does by default": what `detect`, `plan` and `run` do with no flags, the hop-count rule (one hop per PHP minor, Laravel major and PHPUnit major), the extras that come by default or only on request, what a run does per hop, and the ways to stop early. The command reference points to it.
+
 ## [1.8.2] - 2026-11-04
 
 ### Added

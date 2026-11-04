@@ -84,6 +84,7 @@ Every route, per OS, is on [Install](https://booster.apps.wayne.edu/docs/install
 ## Guides[#](https://booster.apps.wayne.edu/docs/#guides)
 
 - [Quick start](https://booster.apps.wayne.edu/docs/guides/quick-start.html)
+- [How do I...](https://booster.apps.wayne.edu/docs/recipes.html)
 - [The scans](https://booster.apps.wayne.edu/docs/guides/scans.html)
 - [The dependency check](https://booster.apps.wayne.edu/docs/guides/dependency-check.html)
 - [Behavior changes](https://booster.apps.wayne.edu/docs/guides/behaviour-changes.html)

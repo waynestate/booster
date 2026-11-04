@@ -5,7 +5,7 @@ description: Every Booster command and option, generated from the tool itself.
 
 # Commands
 
-This page lists every command and option Booster takes; the table is generated from the tool by the docs build.
+This page lists every command and option Booster takes; the table is generated from the tool by the docs build. With no flags, `detect`, `plan` and `run` start from what Booster finds in the app and climb to the newest PHP and Laravel the policy supports; see [What a run does by default](../guides/quick-start.md#what-a-run-does-by-default).
 
 <!-- generated:commands -->
 | Command | What it does |

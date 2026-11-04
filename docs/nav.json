@@ -18,6 +18,10 @@
           "path": "guides/quick-start"
         },
         {
+          "title": "How do I...",
+          "path": "recipes"
+        },
+        {
           "title": "The scans",
           "path": "guides/scans"
         },
