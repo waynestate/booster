@@ -35,6 +35,7 @@
                 "BOOSTER_CLASS_RENAMES",
                 "BOOSTER_PHP_TARGET",
                 "BOOSTER_RECTOR_CACHE",
+                "BOOSTER_RECTOR_CONTAINER_CACHE",
                 "BOOSTER_RECTOR_SETS",
                 "BOOSTER_RECTOR_SKIP_DIRS",
                 "BOOSTER_RECTOR_SKIP_FILES"

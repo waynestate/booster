@@ -8,6 +8,7 @@ use Composer\InstalledVersions;
 use Waynestate\Booster\Hop\Hop;
 use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Packaging\PharFiles;
+use Waynestate\Booster\Packaging\RunScratch;
 use Waynestate\Booster\ToolError;
 
 /**
@@ -87,10 +88,14 @@ final class RectorRunner
             'BOOSTER_RECTOR_SETS' => json_encode($hop->rectorSets, JSON_THROW_ON_ERROR),
             'BOOSTER_CLASS_RENAMES' => json_encode((object) $hop->classRenames, JSON_THROW_ON_ERROR),
             'BOOSTER_PHP_TARGET' => $phpTarget,
-            'BOOSTER_RECTOR_CACHE' => sys_get_temp_dir() . '/booster-rector-' . $hop->id,
+            // Every cache Rector and its PHPStan keep lives in this run's scratch
+            // directory: they store absolute paths into the phar's temp copy, which
+            // the next run does not have, so a shared cache kills run two.
+            'BOOSTER_RECTOR_CACHE' => RunScratch::dir('rector-cache/' . $hop->id),
+            'BOOSTER_RECTOR_CONTAINER_CACHE' => RunScratch::dir('rector-container'),
             'BOOSTER_RECTOR_SKIP_DIRS' => json_encode(array_map(static fn(string $d): string => $appPath . '/' . $d, $vendored), JSON_THROW_ON_ERROR),
             'BOOSTER_RECTOR_SKIP_FILES' => json_encode(array_map(static fn(string $f): string => $appPath . '/' . $f, $invalid), JSON_THROW_ON_ERROR),
-        ];
+        ] + RunScratch::tempEnv();
 
         // Laravel rules need Laravel's classes to recognise a Model or a Controller, so a Laravel
         // hop loads the app's own autoloader when vendor/ exists. PHP hops never do: an old

@@ -7,8 +7,10 @@ namespace Waynestate\Booster\Tests;
 use Rector\Config\RectorConfig;
 use Rector\Configuration\Option;
 use Rector\Configuration\Parameter\SimpleParameterProvider;
+use Rector\Php80\Rector\Switch_\ChangeSwitchToMatchRector;
 use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Packaging\PharFiles;
+use Waynestate\Booster\Packaging\RunScratch;
 use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\Run\RectorResult;
 use Waynestate\Booster\Run\RectorRunner;
@@ -379,6 +381,77 @@ final class RectorRunnerTest extends TestCase
             // when Booster names it.
             self::assertNotContains($app . '/vendor', $skip);
             self::assertNotContains($app . '/node_modules', $skip);
+        } finally {
+            foreach ($saved as $name => $value) {
+                $value === false ? putenv($name) : putenv("{$name}={$value}");
+            }
+        }
+    }
+
+    public function test_every_rector_cache_and_temp_dir_is_inside_this_runs_scratch_directory(): void
+    {
+        // 1.8.2: Rector's PHPStan cached its container in sys_get_temp_dir(), with
+        // absolute paths into the phar copy that was deleted at exit, so the second
+        // run on any machine died on hop 1. Nothing may be shared between runs.
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, '{"file_diffs": [], "errors": []}', ''));
+        (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), $this->tempDir(), true, '8.0');
+
+        $env = $fake->calls[0]['env'];
+        $root = RunScratch::root();
+        self::assertNotSame(rtrim(sys_get_temp_dir(), '/'), $root);
+        self::assertStringStartsWith(sys_get_temp_dir() . '/booster-run-', $root);
+        foreach (['BOOSTER_RECTOR_CACHE', 'BOOSTER_RECTOR_CONTAINER_CACHE', 'TMPDIR', 'TMP', 'TEMP'] as $key) {
+            self::assertArrayHasKey($key, $env);
+            self::assertStringStartsWith($root . '/', $env[$key], $key . ' must live in the run scratch directory');
+            self::assertDirectoryExists($env[$key]);
+        }
+    }
+
+    public function test_the_shared_config_points_phpstans_container_cache_at_the_directory_booster_names(): void
+    {
+        $saved = [];
+        foreach (['BOOSTER_APP_PATH', 'BOOSTER_RECTOR_SETS', 'BOOSTER_CLASS_RENAMES', 'BOOSTER_PHP_TARGET', 'BOOSTER_BOOTSTRAP', 'BOOSTER_RECTOR_CONTAINER_CACHE'] as $name) {
+            $saved[$name] = getenv($name);
+        }
+        $container = $this->tempDir();
+        putenv('BOOSTER_APP_PATH=' . $this->tempDir());
+        putenv('BOOSTER_RECTOR_SETS=');
+        putenv('BOOSTER_CLASS_RENAMES=');
+        putenv('BOOSTER_PHP_TARGET=');
+        putenv('BOOSTER_BOOTSTRAP=');
+        putenv('BOOSTER_RECTOR_CONTAINER_CACHE=' . $container);
+
+        try {
+            $configure = require PharFiles::path('config/rector.php');
+            $configure(new RectorConfig());
+
+            self::assertSame($container, SimpleParameterProvider::provideStringParameter(Option::CONTAINER_CACHE_DIRECTORY));
+        } finally {
+            foreach ($saved as $name => $value) {
+                $value === false ? putenv($name) : putenv("{$name}={$value}");
+            }
+        }
+    }
+
+    public function test_the_shared_config_never_turns_a_loose_switch_into_a_strict_match(): void
+    {
+        // switch ($_GET['column']) { case 1: } matches the string "1"; the match
+        // Rector would write does not, so every request falls to default.
+        $saved = [];
+        foreach (['BOOSTER_APP_PATH', 'BOOSTER_RECTOR_SETS', 'BOOSTER_CLASS_RENAMES', 'BOOSTER_PHP_TARGET', 'BOOSTER_BOOTSTRAP'] as $name) {
+            $saved[$name] = getenv($name);
+        }
+        putenv('BOOSTER_APP_PATH=' . $this->tempDir());
+        putenv('BOOSTER_RECTOR_SETS=');
+        putenv('BOOSTER_CLASS_RENAMES=');
+        putenv('BOOSTER_PHP_TARGET=');
+        putenv('BOOSTER_BOOTSTRAP=');
+
+        try {
+            $configure = require PharFiles::path('config/rector.php');
+            $configure(new RectorConfig());
+
+            self::assertContains(ChangeSwitchToMatchRector::class, SimpleParameterProvider::provideArrayParameter(Option::SKIP));
         } finally {
             foreach ($saved as $name => $value) {
                 $value === false ? putenv($name) : putenv("{$name}={$value}");

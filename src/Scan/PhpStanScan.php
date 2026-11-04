@@ -6,6 +6,7 @@ namespace Waynestate\Booster\Scan;
 
 use Throwable;
 use Waynestate\Booster\Packaging\PharFiles;
+use Waynestate\Booster\Packaging\RunScratch;
 use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\Run\ProcessRunner;
 
@@ -399,6 +400,10 @@ final class PhpStanScan
         }
         $lines[] = 'parameters:';
         $lines[] = '    phpVersion: ' . $phpVersionId;
+        // PHPStan's container and result cache default to sys_get_temp_dir()/phpstan,
+        // shared by every run, and they hold absolute paths into the phar copy that
+        // wrote them. A per-run directory keeps the next run from reading them.
+        $lines[] = '    tmpDir: ' . $this->neonQuote(RunScratch::dir('phpstan-scan'));
         $lines[] = '    excludePaths:';
         foreach (self::EXCLUDE_PATHS as $pattern) {
             $lines[] = '        - ' . $pattern;

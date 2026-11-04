@@ -58,8 +58,24 @@ $skip[] = '*.blade.php';
 // patterns match at any depth.
 $skip[] = '*_ide_helper*.php';
 $skip[] = '*.phpstorm.meta.php';
+// Rules that change what the code does, never applied: a hop must keep
+// behavior. ChangeSwitchToMatchRector (in the PHP 8.0 set) turns a loose
+// switch into a strict match, so switch ($_GET['col']) with case 1: stops
+// matching the string "1" every query string carries, and every request falls
+// to default without a word. A person may convert a switch they have checked.
+foreach (['Rector\Php80\Rector\Switch_\ChangeSwitchToMatchRector'] as $rule) {
+    if (class_exists($rule)) {
+        $skip[] = $rule;
+    }
+}
 
 $cache = getenv('BOOSTER_RECTOR_CACHE');
+// PHPStan's DI container and reflection cache inside Rector. Rector's default is
+// sys_get_temp_dir() itself, shared by every run on the machine, and the cached
+// container holds absolute paths into the phar copy that built it, so the next
+// run (with a new copy) would die reading it. Booster passes a per-run directory.
+$containerCache = getenv('BOOSTER_RECTOR_CONTAINER_CACHE');
+$containerCache = is_string($containerCache) && $containerCache !== '' && is_dir($containerCache) ? $containerCache : null;
 
 // Rector reads the app's old PHP constraint from composer.json and would skip
 // every rule for the version we are moving to. Tell it the target instead.
@@ -95,7 +111,10 @@ if ($renames !== []) {
 // RectorConfig::sets() rather than the builder's withSets(): Rector 2 prints a
 // deprecation banner on stdout for per-version PHP sets, which would corrupt the
 // JSON report. A hop is exactly one version's rules, which withPhpSets() cannot give.
-return static function (RectorConfig $rectorConfig) use ($config, $sets): void {
+return static function (RectorConfig $rectorConfig) use ($config, $sets, $containerCache): void {
     $config($rectorConfig);
     $rectorConfig->sets($sets);
+    if ($containerCache !== null) {
+        $rectorConfig->containerCacheDirectory($containerCache);
+    }
 };
