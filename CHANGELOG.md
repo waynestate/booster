@@ -4,6 +4,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- The front page main menu now links to the docs site (`docs/`), between the Agents and Proof links.
+
 ## [1.8.1] - 2026-11-03
 
 ### Changed
