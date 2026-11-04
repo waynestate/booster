@@ -581,7 +581,10 @@ under `Pre-pass fixes:`.
    change more than 200 files, unless an interactive run confirms it after showing the per-rule summary; an explicit
    `--max-changes` is a hard limit that never asks. An empty Rector report usually means the process ran out of memory,
    and the message points at `--memory-limit`.
-2. Rector runs for real, with only that hop's rules.
+2. Rector runs for real, with only that hop's rules. A rule that would change what the code does is never applied:
+   the PHP 8.0 set's switch-to-match rewrite is skipped, because `match` compares strictly and would stop a
+   `case 1:` from matching the string `"1"` a query string carries. Every run keeps Rector's and PHPStan's caches in
+   its own temp directory, removed at exit, so one run never reads another's.
 3. `composer.json` is edited: the `php` or `laravel/framework` constraint is raised, and `config.platform.php` moves
    with it when the app already pins it. Booster never creates that key.
 4. The gate runs the app's tests inside `booster-target:<php>-<stamp>`, a container built from `docker/Dockerfile`
@@ -628,7 +631,7 @@ The `--image` value names the image the baseline and every gate run in, and it t
 Booster never builds a `--image` image: it must exist locally or be pullable, and each resolved image is pulled at
 most once per run. On an arm64 Mac, Citadel's published images such as `citadel/php-apache:8.5r3` are amd64 only:
 pass an arm64 build via `--image`, or set `DOCKER_DEFAULT_PLATFORM=linux/amd64` and let Docker emulate.
-`booster-target` itself builds natively on arm64. And the old-PHP images (7.1 through 8.0) point apt at
+`booster-target` itself builds natively on arm64. And the old-PHP images (5.5 through 8.0) point apt at
 archive.debian.org, so they get no security updates: they exist to run the app's tests on the way up, not to serve
 traffic.
 

@@ -9,6 +9,13 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - Docs: a new "How do I..." page (`docs/recipes.md`) with 14 recipes: look first, go all the way, PHP only, a specific Laravel, one hop at a time, dry run, backend only, skipping a hop, big apps, tests and the gate, offline and dirty trees, SESAME and WayneUI, other dates and policies, and what to do after a stop. Linked from the docs menu, the front page of the docs, the quick start and the README.
 - Docs: the quick start and README gain "What a run does by default": what `detect`, `plan` and `run` do with no flags, the hop-count rule (one hop per PHP minor, Laravel major and PHPUnit major), the extras that come by default or only on request, what a run does per hop, and the ways to stop early. The command reference points to it.
 
+### Fixed
+
+- The second Booster run on a machine no longer dies on hop 1 with `"phar:///tmp/booster-phar-.../phpstan.phar/.../standard_10.stub" is not a file`. The phar unpacks into a new temp directory each run and removes it at exit, but Rector's PHPStan cached its container (and the PHPStan scan its result cache) in the shared temp directory, with absolute paths into the first run's deleted copy. Every Rector cache, PHPStan container, PHPStan scan `tmpDir` and the child processes' `TMPDIR` now live in a per-run scratch directory (`booster-run-<random>`) that is removed at exit, so no run reads another's cache. Tests prove each path is per-run and that the real Rector writes its container there.
+- The `php-74-to-80` hop no longer turns a loose `switch` into a strict `match`. Rector's `ChangeSwitchToMatchRector` rewrote `switch ($get['order'][0]['column'])` with `case 1:` into `match (...) { 1 => ... }`, which never matches the string `"1"` from a query string, so every request silently fell to `default`. The rule is skipped for every hop; a test runs the real Rector on a string subject and asserts no `match` appears.
+- The gate image builds for PHP 5.5 and 5.6 (Debian jessie): the archive.debian.org rewrite now covers jessie, reads the codename from `VERSION` when `VERSION_CODENAME` is missing, maps `httpredir.debian.org` and a bare `security.debian.org` to the archive, and lets apt use the archive whose signing keys have expired.
+- When the gate image cannot be built, `booster run` exits non-zero and says so: "Could not build booster-target:<php>-<stamp> (docker build exit N), so the gate cannot run", with the ways out (`--image`, `--skip-gate`) and the last 40 lines of the build output instead of BuildKit's whole log.
+
 ## [1.8.2] - 2026-11-04
 
 ### Added

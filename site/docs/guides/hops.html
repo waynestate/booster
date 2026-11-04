@@ -51,7 +51,10 @@ under <code>Pre-pass fixes:</code>.</p>
 change more than 200 files, unless an interactive run confirms it after showing the per-rule summary; an explicit
 <code>--max-changes</code> is a hard limit that never asks. An empty Rector report usually means the process ran out of memory,
 and the message points at <code>--memory-limit</code>.</li>
-<li>Rector runs for real, with only that hop's rules.</li>
+<li>Rector runs for real, with only that hop's rules. A rule that would change what the code does is never applied:
+the PHP 8.0 set's switch-to-match rewrite is skipped, because <code>match</code> compares strictly and would stop a
+<code>case 1:</code> from matching the string <code>&quot;1&quot;</code> a query string carries. Every run keeps Rector's and PHPStan's caches in
+its own temp directory, removed at exit, so one run never reads another's.</li>
 <li><code>composer.json</code> is edited: the <code>php</code> or <code>laravel/framework</code> constraint is raised, and <code>config.platform.php</code> moves
 with it when the app already pins it. Booster never creates that key.</li>
 <li>The gate runs the app's tests inside <code>booster-target:&lt;php&gt;-&lt;stamp&gt;</code>, a container built from <code>docker/Dockerfile</code>
@@ -95,7 +98,7 @@ stops the run before the first hop and names the fix; a template never misses.</
 <p>Booster never builds a <code>--image</code> image: it must exist locally or be pullable, and each resolved image is pulled at
 most once per run. On an arm64 Mac, Citadel's published images such as <code>citadel/php-apache:8.5r3</code> are amd64 only:
 pass an arm64 build via <code>--image</code>, or set <code>DOCKER_DEFAULT_PLATFORM=linux/amd64</code> and let Docker emulate.
-<code>booster-target</code> itself builds natively on arm64. And the old-PHP images (7.1 through 8.0) point apt at
+<code>booster-target</code> itself builds natively on arm64. And the old-PHP images (5.5 through 8.0) point apt at
 archive.debian.org, so they get no security updates: they exist to run the app's tests on the way up, not to serve
 traffic.</p>
 <p><code>run</code> refuses to start on a working copy that is not under git or has uncommitted changes, so the upgrade diff stands
