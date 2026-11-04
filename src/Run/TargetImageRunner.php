@@ -175,7 +175,15 @@ final class TargetImageRunner
         $dir = $this->dockerDir ?? PharFiles::path('docker');
         $build = $this->processes->run([$this->docker, 'build', '--build-arg', 'PHP_VERSION=' . $php, '--build-arg', 'COMPOSER_VERSION=' . $composer, '-t', $tag, $dir], null, [], 1800);
         if (!$build->successful()) {
-            throw new ToolError(sprintf("Could not build %s.\n%s", $tag, trim($build->stderr)));
+            // BuildKit prints its whole progress log on stderr; the failing step is at the end.
+            $lines = preg_split('/\R/', trim($build->stderr . "\n" . $build->stdout)) ?: [];
+            $tail = implode("\n", array_slice($lines, -40));
+            throw new ToolError(sprintf(
+                "Could not build %s (docker build exit %d), so the gate cannot run. Fix the build (the end of its output is below), pass --image to use your own image, or pass --skip-gate and run the tests yourself.\n%s",
+                $tag,
+                $build->exitCode,
+                $tail,
+            ));
         }
     }
 

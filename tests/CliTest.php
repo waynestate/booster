@@ -864,6 +864,35 @@ final class CliTest extends TestCase
         self::assertStringContainsString('--max-changes is 2', $out);
     }
 
+    public function test_run_exits_non_zero_and_says_so_when_the_gate_image_cannot_be_built(): void
+    {
+        // 1.8.2 on a PHP 5.5 app: "Could not build booster-target..." and exit 0.
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && in_array('inspect', $command, true)) {
+                return new ProcessResult(1, '', 'No such image');
+            }
+            if ($command[0] === 'docker' && in_array('build', $command, true)) {
+                return new ProcessResult(1, '', 'E: Failed to fetch http://deb.debian.org/debian/dists/jessie/main');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '27.0.0', '');
+            }
+
+            return new ProcessResult(2, '{"file_diffs": [], "errors": []}', '');
+        });
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--goal' => 'php-74-to-84', '--no-interaction' => true,
+        ], $fake);
+
+        self::assertNotSame(0, $exit, $out);
+        self::assertStringContainsString('Could not build booster-target:7.4', $out);
+        self::assertStringContainsString('--skip-gate', $out);
+    }
+
     public function test_run_exits_1_when_a_hop_is_over_the_review_threshold_and_not_interactive(): void
     {
         [$exit, $out] = $this->booster([
