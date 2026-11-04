@@ -761,6 +761,8 @@ docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install
 
 Proof runs against real Wayne State applications are on a private site, [proof.apps.wayne.edu/booster](https://proof.apps.wayne.edu/booster/), behind a Wayne State employee sign-in.
 
+The [Real output page](https://booster.apps.wayne.edu/proof.html) shows `booster plan` and `booster run --dry-run` on each example app, captured from the real tool and rebuilt with `composer proof`; `composer ci` fails when it is stale.
+
 Proven how: the first full run with the gate on took a Laravel 12 app from PHP 8.2 to 8.4 in two hops, each gated by
 the app's 197-test suite, and it is written up in [research/booster-e2e-gate.md](research/booster-e2e-gate.md).
 

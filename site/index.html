@@ -54,6 +54,7 @@
       <a href="#commands">Commands</a>
       <a href="#agents">Agents</a>
       <a href="docs/">Docs</a>
+      <a href="proof.html">Real output</a>
       <a href="https://proof.apps.wayne.edu/booster/">Proof</a>
       <a class="masthead__install" href="#install">Install</a>
     </nav>
@@ -368,6 +369,7 @@ Warning: PHP 8.1 is past security support since 2025-12-31. Use it only as a sto
           <button class="cmd" role="tab" id="tab-init" aria-controls="out-init" aria-selected="false" tabindex="-1"><span class="cmd__name">init</span><span class="cmd__does">Writes the coding-tab playbooks to <code>.agents/skills</code></span></button>
         </div>
         <p class="commands__exits">There's also <code>scan</code>, which reports what will break on a given PHP (<code>--removals</code> for removed functions, <code>--phpstan</code> for static analysis) and always exits 0. Exit codes: <strong>0</strong> pass · <strong>1</strong> the baseline failed, or a hop was capped, errored or failed its gate · <strong>2</strong> bad usage or a target the policy does not know.</p>
+        <p class="commands__exits">Want to see it run? <a href="proof.html">Real output</a> shows the plan and the dry run for each example app, captured from the real tool.</p>
       </div>
 
       <!-- A greenbar printout, tractor-feed holes and all. Output is real
