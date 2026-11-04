@@ -43,8 +43,12 @@ Booster holds no secrets and calls no API.
 
 ## Not built yet
 
-- **Custom WSU Rector rules** beyond the CAS rename (for example the legacy patterns in the oldest apps).
-- **Rector pilot numbers on real apps.** The examples prove the plumbing, not the hit rate.
-- **A `cas-to-sesame` run against a real app.** The hop renames the classes, swaps the Composer requirement, writes
-  `config/sesame.php` from the old config and rewrites the model trait; Duo two-factor stays manual work, and the hop
-  has not been run against a real app yet.
+- **Custom WSU Rector rules** beyond the CAS rename. Shipped in 1.0.0: a pre-pass that rewrites PHP 4 era
+  `$a = &new Foo();` before Rector (the one legacy pattern the proof corpus showed in four apps). The proof's
+  legacy-failure ranking found no other pattern worth a rule (no `mysql_*`, `mcrypt_*` or `ereg` hits; generic syntax
+  errors and invalid numeric literals are listed for a person to fix). Open until a corpus shows another pattern.
+- **Rector pilot numbers on real apps.** Measured: the proof ran Booster over 95 Wayne State units on 2026-10-28 and
+  again on 2026-11-01 (1.6.0). The aggregates are on the private proof site. Open: a re-run on the current release.
+- **A `cas-to-sesame` run against a real app.** Shipped in 1.6.0: the hop finishes the job on a real app's shape
+  (config values moved into `config/sesame.php`, user-model trait rewritten, SESAME required). Duo two-factor stays
+  manual work. Open: a signed-in run of the swapped app, which the proof sandbox cannot do.

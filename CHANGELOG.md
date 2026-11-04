@@ -10,6 +10,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### Changed
 
+- OPEN_QUESTIONS: the "Not built yet" list now says what shipped (the `&new` pre-pass in 1.0.0, the real-app `cas-to-sesame` hop in 1.6.0, the proof runs of 2026-10-28 and 2026-11-01) and what is still open.
 - The front page main menu now links to the docs site (`docs/`), between the Agents and Proof links.
 
 ### Fixed
