@@ -104,9 +104,9 @@ final class ProofPage
     }
 
     /**
-     * The chrome's three rewrites: the title, page-local anchors pointed back
-     * at the front page (the #main skip link stays where it is), and the
-     * masthead nav's aria-label.
+     * The chrome's four rewrites: the title, page-local anchors pointed back
+     * at the front page (the #main skip link stays where it is), the masthead
+     * nav's aria-label, and the Markdown twin link pointed at proof.md.
      */
     private static function rewriteChrome(string $chunk): string
     {
@@ -118,8 +118,9 @@ final class ProofPage
         if ($anchors === null) {
             throw new ToolError('Could not rewrite the index page chrome.');
         }
+        $twin = str_replace('href="index.md"', 'href="proof.md"', $anchors);
 
-        return str_replace('aria-label="On this page"', 'aria-label="Main"', $anchors);
+        return str_replace('aria-label="On this page"', 'aria-label="Main"', $twin);
     }
 
     /**

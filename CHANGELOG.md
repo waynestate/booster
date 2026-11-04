@@ -12,6 +12,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 - The front page main menu now links to the docs site (`docs/`), between the Agents and Proof links.
 
+### Fixed
+
+- The Real output page's Markdown twin link points at proof.md, so the agent-ready check passes.
+
 ## [1.8.1] - 2026-11-03
 
 ### Changed

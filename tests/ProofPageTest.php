@@ -80,6 +80,19 @@ final class ProofPageTest extends TestCase
         self::assertStringContainsString('class="foot"', $page);
     }
 
+    public function test_the_markdown_twin_link_points_at_proof(): void
+    {
+        $index = $this->indexHtml();
+        if (strpos($index, 'href="index.md"') === false) {
+            $index = str_replace('</head>', '<link rel="alternate" type="text/markdown" href="index.md">' . "\n</head>", $index, 1);
+        }
+
+        $page = ProofPage::render(self::DATA_DIR, $index);
+
+        self::assertStringContainsString('<link rel="alternate" type="text/markdown" href="proof.md">', $page);
+        self::assertStringNotContainsString('href="index.md"', $page);
+    }
+
     public function test_ids_are_unique(): void
     {
         $page = ProofPage::render(self::DATA_DIR, $this->indexHtml());
@@ -117,17 +130,23 @@ final class ProofPageTest extends TestCase
 
     public function test_check_returns_null_for_the_rendered_page(): void
     {
-        $page = ProofPage::render(self::DATA_DIR, $this->indexHtml());
+        // A temp copy stamped with the running version, like a fresh capture.
+        $dir = $this->copyDataToTemp();
+        file_put_contents($dir . '/meta.json', sprintf('{"version":"%s","captured":"2026-11-03"}', BoosterApplication::VERSION));
+        $page = ProofPage::render($dir, $this->indexHtml());
 
-        self::assertNull(ProofPage::check(self::DATA_DIR, $this->indexHtml(), $page, BoosterApplication::VERSION));
-        self::assertNull(ProofPage::check(self::DATA_DIR, $this->indexHtml(), $page, BoosterApplication::VERSION, false));
+        self::assertNull(ProofPage::check($dir, $this->indexHtml(), $page, BoosterApplication::VERSION));
+        self::assertNull(ProofPage::check($dir, $this->indexHtml(), $page, BoosterApplication::VERSION, false));
     }
 
     public function test_check_names_an_out_of_date_page(): void
     {
-        $page = ProofPage::render(self::DATA_DIR, $this->indexHtml());
+        // A temp copy stamped with the running version, like a fresh capture.
+        $dir = $this->copyDataToTemp();
+        file_put_contents($dir . '/meta.json', sprintf('{"version":"%s","captured":"2026-11-03"}', BoosterApplication::VERSION));
+        $page = ProofPage::render($dir, $this->indexHtml());
 
-        $message = ProofPage::check(self::DATA_DIR, $this->indexHtml(), $page . "tampered\n", BoosterApplication::VERSION);
+        $message = ProofPage::check($dir, $this->indexHtml(), $page . "tampered\n", BoosterApplication::VERSION);
 
         self::assertIsString($message);
         self::assertStringContainsString('out of date', $message);
