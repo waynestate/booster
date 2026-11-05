@@ -1,8 +1,9 @@
 /* docs.js: progressive enhancement for the shared docs site, owned by Squire (kit/docs/).
  *
- * The pages are complete without this file. It adds two conveniences: a copy button on every code block
- * and a mobile menu that closes when you pick a page. No dependencies, no globals, nothing that breaks
- * the reading of a single page if it fails to load.
+ * The pages are complete without this file. It adds three conveniences: a copy button on every code block,
+ * an accessible tablist on every code tab set (with the choice remembered per set key), and a mobile menu
+ * that closes when you pick a page. No dependencies, no globals, nothing that breaks the reading of a single
+ * page if it fails to load.
  */
 (function () {
   'use strict';
@@ -43,8 +44,12 @@
   }
 
   // A code block wider than its box scrolls sideways; keyboard users can only scroll what they can focus
-  // (WCAG 2.1.1), so a block that overflows joins the tab order and one that fits leaves it.
+  // (WCAG 2.1.1), so a block that overflows joins the tab order and one that fits leaves it. A block in a
+  // hidden tab panel has no box to measure (both widths read 0), so it keeps what it had until its tab shows.
   function markScrollable(pre) {
+    if (pre.closest('[hidden]')) {
+      return;
+    }
     if (pre.scrollWidth > pre.clientWidth) {
       pre.setAttribute('tabindex', '0');
     } else {
@@ -100,6 +105,156 @@
     });
   }
 
+  function wireTabs() {
+    var sets = Array.prototype.slice.call(document.querySelectorAll('.docs-tabs'));
+    if (sets.length === 0) {
+      return;
+    }
+
+    // Storage can throw in private mode or embedded contexts; treat it as absent, not fatal.
+    function readStored(key) {
+      try {
+        return window.localStorage.getItem(key);
+      } catch (err) {
+        return null;
+      }
+    }
+    function writeStored(key, value) {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch (err) {
+        // No storage: the choice simply does not outlive this visit.
+      }
+    }
+
+    var groups = {}; // data-tabs key -> the wired sets that share it
+    var seq = 0;
+
+    sets.forEach(function (set) {
+      var key = set.getAttribute('data-tabs') || '';
+      var panels = [];
+      for (var i = 0; i < set.children.length; i++) {
+        if (set.children[i].className === 'docs-tabs__panel') {
+          panels.push(set.children[i]);
+        }
+      }
+      if (panels.length === 0) {
+        return;
+      }
+
+      var tablist = document.createElement('div');
+      tablist.className = 'docs-tabs__tablist';
+      tablist.setAttribute('role', 'tablist');
+      tablist.setAttribute('aria-label', 'Code examples');
+      set.insertBefore(tablist, set.firstChild);
+
+      var state = {
+        key: key,
+        tablist: tablist,
+        buttons: [],
+        panels: panels,
+        labels: [],
+        selected: -1,
+        select: null,
+        selectByLabel: null
+      };
+
+      panels.forEach(function (panel, index) {
+        var label = panel.getAttribute('data-tab-label') || 'Example ' + (index + 1);
+        state.labels.push(label);
+
+        var heading = panel.querySelector('.docs-tabs__label');
+        if (heading) {
+          heading.hidden = true; // the tab carries the name now
+        }
+
+        var tabId = 'docs-tab-' + seq;
+        var panelId = 'docs-tab-panel-' + seq;
+        seq += 1;
+
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'docs-tabs__tab';
+        button.setAttribute('role', 'tab');
+        button.id = tabId;
+        button.textContent = label;
+        button.setAttribute('aria-controls', panelId);
+
+        panel.id = panelId;
+        panel.setAttribute('role', 'tabpanel');
+        panel.setAttribute('tabindex', '0');
+        panel.setAttribute('aria-labelledby', tabId);
+
+        tablist.appendChild(button);
+        state.buttons.push(button);
+      });
+
+      state.select = function (index, persist) {
+        if (index === state.selected) {
+          return;
+        }
+        state.selected = index;
+        state.buttons.forEach(function (button, i) {
+          button.setAttribute('aria-selected', i === index ? 'true' : 'false');
+          button.tabIndex = i === index ? 0 : -1;
+        });
+        state.panels.forEach(function (panel, i) {
+          panel.hidden = i !== index;
+        });
+        // The shown panel's code now has a box: measure it, so a block that scrolls is keyboard reachable.
+        Array.prototype.forEach.call(state.panels[index].querySelectorAll('pre'), markScrollable);
+        if (persist) {
+          writeStored('squire-docs-tab:' + key, state.labels[index]);
+          // Keep every other set that shares this key in step.
+          (groups[key] || []).forEach(function (other) {
+            if (other !== state) {
+              other.selectByLabel(state.labels[index], false);
+            }
+          });
+        }
+      };
+
+      state.selectByLabel = function (label, persist) {
+        var index = state.labels.indexOf(label);
+        if (index !== -1) {
+          state.select(index, persist);
+        }
+      };
+
+      state.buttons.forEach(function (button, index) {
+        button.addEventListener('click', function () {
+          state.select(index, true);
+        });
+      });
+
+      state.tablist.addEventListener('keydown', function (event) {
+        var count = state.buttons.length;
+        var next = null;
+        if (event.key === 'ArrowRight') {
+          next = (state.selected + 1) % count;
+        } else if (event.key === 'ArrowLeft') {
+          next = (state.selected - 1 + count) % count;
+        } else if (event.key === 'Home') {
+          next = 0;
+        } else if (event.key === 'End') {
+          next = count - 1;
+        }
+        if (next === null) {
+          return;
+        }
+        event.preventDefault();
+        state.select(next, true);
+        state.buttons[next].focus();
+      });
+
+      // The stored choice for this key wins when it names one of the tabs; otherwise the first tab.
+      var start = state.labels.indexOf(readStored('squire-docs-tab:' + key));
+      state.select(start === -1 ? 0 : start, false);
+
+      (groups[key] || (groups[key] = [])).push(state);
+    });
+  }
+
   function closeMenuOnNavigate() {
     var menus = Array.prototype.slice.call(document.querySelectorAll('.docs-menu'));
     menus.forEach(function (menu) {
@@ -118,6 +273,7 @@
 
   ready(function () {
     addCopyButtons();
+    wireTabs();
     closeMenuOnNavigate();
   });
 })();

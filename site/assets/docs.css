@@ -3,15 +3,27 @@
  * Layout only. Every color and type choice comes from a WayneUI token, held behind a --dk-* alias so a
  * repo can retheme without touching this file. The builder stamps one page per doc; this file makes those
  * pages read like a book instead of a form. No gradients, no glow, one hairline where a line is enough.
+ *
+ * Theme resolution mirrors WayneUI: the :root block is the light default, :root[data-theme="dark"] serves an
+ * explicit dark choice (WayneUI writes data-theme from the reader's saved preference), and the
+ * prefers-color-scheme query below serves readers who never chose, unless the root element carries
+ * data-theme="light". Each block declares color-scheme so form controls and scrollbars follow the theme.
+ * The hex fallbacks apply only when WayneUI is absent, and every text pair meets WCAG AA contrast in both
+ * themes.
  */
 
 :root {
+  color-scheme: light;
   --dk-bg: var(--wsu-surface, #ffffff);
   --dk-ink: var(--wsu-text, #18181b);
   --dk-muted: var(--wsu-text-muted, #3f3f46);
   --dk-rule: var(--wsu-border, #d4d4d8);
   --dk-accent: var(--wsu-brand, #0c5449);
   --dk-on-accent: var(--wsu-on-brand, #ffffff);
+  --dk-note: var(--wsu-info, #0e5a7d);
+  --dk-tip: var(--wsu-success, #0f5132);
+  --dk-warning: var(--wsu-warning, #634d00);
+  --dk-danger: var(--wsu-danger, #9b1c2e);
   --dk-code-bg: var(--wsu-surface-sunken, #fafafa);
   --dk-display: var(--wsu-font-family-display, Georgia, "Times New Roman", serif);
   --dk-mono: var(--wsu-font-family-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
@@ -22,6 +34,42 @@
   --dk-sidebar: 16rem;
   --dk-prose-max: 46rem;
   --dk-gap: var(--wsu-space-6, 1.5rem);
+}
+
+/* Dark fallbacks for the color aliases, in the same order WayneUI resolves them. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --dk-bg: var(--wsu-surface, #18181b);
+  --dk-ink: var(--wsu-text, #f4f4f5);
+  --dk-muted: var(--wsu-text-muted, #a1a1aa);
+  --dk-rule: var(--wsu-border, #3f3f46);
+  --dk-accent: var(--wsu-brand, #5eead4);
+  --dk-on-accent: var(--wsu-on-brand, #18181b);
+  --dk-note: var(--wsu-info, #7dd3fc);
+  --dk-tip: var(--wsu-success, #86efac);
+  --dk-warning: var(--wsu-warning, #fcd34d);
+  --dk-danger: var(--wsu-danger, #fca5a5);
+  --dk-code-bg: var(--wsu-surface-sunken, #27272a);
+  --dk-focus: var(--wsu-focus-ring, #5eead4);
+}
+
+/* Readers who never chose a theme: follow the system setting, unless the root element says light. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --dk-bg: var(--wsu-surface, #18181b);
+    --dk-ink: var(--wsu-text, #f4f4f5);
+    --dk-muted: var(--wsu-text-muted, #a1a1aa);
+    --dk-rule: var(--wsu-border, #3f3f46);
+    --dk-accent: var(--wsu-brand, #5eead4);
+    --dk-on-accent: var(--wsu-on-brand, #18181b);
+    --dk-note: var(--wsu-info, #7dd3fc);
+    --dk-tip: var(--wsu-success, #86efac);
+    --dk-warning: var(--wsu-warning, #fcd34d);
+    --dk-danger: var(--wsu-danger, #fca5a5);
+    --dk-code-bg: var(--wsu-surface-sunken, #27272a);
+    --dk-focus: var(--wsu-focus-ring, #5eead4);
+  }
 }
 
 .docs-header,
@@ -224,6 +272,116 @@
   padding: 0;
 }
 
+.docs-callout {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid var(--dk-rule);
+  border-radius: var(--dk-radius);
+  background: var(--dk-code-bg);
+}
+
+.docs-callout__label {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.docs-callout p:last-child {
+  margin-bottom: 0;
+}
+
+.docs-callout--note {
+  border-left-color: var(--dk-note);
+}
+
+.docs-callout--note .docs-callout__label {
+  color: var(--dk-note);
+}
+
+.docs-callout--tip {
+  border-left-color: var(--dk-tip);
+}
+
+.docs-callout--tip .docs-callout__label {
+  color: var(--dk-tip);
+}
+
+.docs-callout--warning {
+  border-left-color: var(--dk-warning);
+}
+
+.docs-callout--warning .docs-callout__label {
+  color: var(--dk-warning);
+}
+
+.docs-callout--danger {
+  border-left-color: var(--dk-danger);
+}
+
+.docs-callout--danger .docs-callout__label {
+  color: var(--dk-danger);
+}
+
+/* Code tabs: without JavaScript every panel stays visible under its label; the kit adds a tablist above. */
+.docs-tabs {
+  margin: 0 0 1rem;
+}
+
+.docs-tabs__tablist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.docs-tabs__tab {
+  min-height: 44px;
+  padding: 0.4rem 0.9rem;
+  font-family: var(--dk-mono);
+  font-size: 0.85rem;
+  color: var(--dk-muted);
+  background: var(--dk-code-bg);
+  border: 1px solid var(--dk-rule);
+  border-radius: calc(var(--dk-radius) / 2);
+  cursor: pointer;
+}
+
+.docs-tabs__tab:hover {
+  color: var(--dk-accent);
+  border-color: var(--dk-accent);
+}
+
+.docs-tabs__tab[aria-selected="true"] {
+  color: var(--dk-ink);
+  font-weight: 700;
+  background: var(--dk-bg);
+  border-color: var(--dk-accent);
+  box-shadow: inset 0 -2px 0 var(--dk-accent);
+}
+
+.docs-tabs__label {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dk-muted);
+}
+
+.docs-tabs__panel {
+  margin-bottom: 1rem;
+}
+
+.docs-tabs__panel:last-child {
+  margin-bottom: 0;
+}
+
+.docs-tabs [hidden] {
+  display: none;
+}
+
 .docs-table {
   overflow-x: auto;
   margin: 1rem 0;
@@ -263,14 +421,17 @@
   border-left: 1px solid var(--dk-rule);
 }
 
-.docs-toc__item a {
+/* A page built before sub-items carried the base class still styles them: --sub alone matches too. */
+.docs-toc__item a,
+.docs-toc__item--sub a {
   display: block;
   padding: 0.25rem 0.75rem;
   color: var(--dk-muted);
   text-decoration: none;
 }
 
-.docs-toc__item a:hover {
+.docs-toc__item a:hover,
+.docs-toc__item--sub a:hover {
   color: var(--dk-accent);
 }
 
@@ -393,8 +554,15 @@
   .docs-toc,
   .docs-pager,
   .docs-header__home,
-  .docs-heading-link {
+  .docs-heading-link,
+  .docs-tabs__tablist {
     display: none !important;
+  }
+
+  /* A printed page shows every tab's example, labeled, like the no-JavaScript view. */
+  .docs-tabs__panel[hidden],
+  .docs-tabs__label[hidden] {
+    display: block !important;
   }
 
   .docs-layout {
