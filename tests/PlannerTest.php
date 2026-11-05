@@ -492,6 +492,43 @@ final class PlannerTest extends TestCase
         self::assertCount(1, array_keys($ids, 'wayneui-1-to-2'));
     }
 
+    public function test_wayneui_move_sits_after_the_last_laravel_hop_and_before_the_first_vue_hop(): void
+    {
+        // A Laravel app that also carries a Vue 2 front end and WayneUI 1.x.
+        // The default plan climbs to the policy top (Laravel 13 here), so the
+        // WayneUI move lands and the Vue hops stay in the plan.
+        $dir = $this->copyExample('laravel-blade-vue');
+        $package = json_decode((string) file_get_contents($dir . '/package.json'), true);
+        self::assertIsArray($package);
+        $package['dependencies']['vue'] = '^2.7.16';
+        file_put_contents($dir . '/package.json', (string) json_encode($package));
+
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertIsArray($composer);
+        $composer['require']['cit-web-infra/wayne-ui'] = '^1.0';
+        file_put_contents($dir . '/composer.json', (string) json_encode($composer));
+
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(wayneui: true), $this->today());
+        $ids = $this->ids($plan);
+
+        // Guard against a vacuous pass: the plan must really carry a Laravel
+        // hop and a Vue hop for the ordering claim to mean anything.
+        $laravelHops = array_filter($ids, static fn(string $id): bool => str_starts_with($id, 'laravel-') && str_contains($id, '-to-'));
+        $vueHops = array_filter($ids, static fn(string $id): bool => str_starts_with($id, 'vue-'));
+        self::assertNotSame([], $laravelHops, 'Expected at least one Laravel hop in the plan.');
+        self::assertNotSame([], $vueHops, 'Expected at least one Vue hop in the plan.');
+        self::assertContains('wayneui-1-to-2', $ids);
+
+        $wayneui = array_search('wayneui-1-to-2', $ids, true);
+        self::assertIsInt($wayneui);
+        foreach ($laravelHops as $i => $id) {
+            self::assertGreaterThan($i, $wayneui, "wayneui-1-to-2 should sit after {$id}.");
+        }
+        $firstVue = (int) array_key_first($vueHops);
+        self::assertLessThan($firstVue, $wayneui, 'wayneui-1-to-2 should sit before the first Vue hop.');
+    }
+
     /** @return list<array{string, string}> */
     public static function wayneuiLaravelTargets(): array
     {

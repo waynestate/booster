@@ -308,6 +308,47 @@ final class WayneUiMigrationTest extends TestCase
         self::assertContains('composer.json: remove the wayne-ui repository entry; if the URL carries a deploy token, rotate the token, which Booster cannot do', $result->manual);
     }
 
+    public function test_a_repository_url_with_a_token_gets_a_manual_line_and_is_left_unchanged(): void
+    {
+        // A composer-type repository whose URL carries a deploy token. The
+        // hop must flag the entry for a person, leave the URL byte for byte
+        // alone, and never echo the token into the report.
+        $url = 'https://git.example.edu/wayne-ui/-/packages/composer/packages.json?token=SECRET123';
+        $dir = $this->tempDir();
+        $composer = [
+            'name' => 'example/token-repository',
+            'repositories' => [
+                ['type' => 'composer', 'url' => $url],
+            ],
+            'require' => [
+                'php' => '^8.3',
+                'cit-web-infra/wayne-ui' => '^1.0',
+            ],
+        ];
+        file_put_contents($dir . '/composer.json', (string) json_encode($composer));
+
+        $result = $this->migrate($dir);
+
+        // A manual line names the repository entry, asserted on a stable
+        // fragment of the real message rather than the whole sentence.
+        $manual = implode("\n", $result->manual);
+        self::assertStringContainsString('remove the wayne-ui repository entry', $manual);
+
+        // The repositories URL is left byte-identical.
+        $after = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertIsArray($after);
+        self::assertSame($url, $after['repositories'][0]['url']);
+
+        // The token never leaks into the report text or any result message.
+        $report = implode("\n", [
+            ...$result->changes,
+            ...$result->manual,
+            $result->summary(),
+            ...array_map(static fn(array $f): string => $f['file'] . ' ' . $f['diff'], $result->files),
+        ]);
+        self::assertStringNotContainsString('SECRET123', $report);
+    }
+
     public function test_the_php_fixture_totals(): void
     {
         $dir = $this->fixture('php');
