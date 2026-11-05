@@ -109,6 +109,46 @@ final class BehaviourScanTest extends TestCase
         self::assertSame([], $fromDisk->entries);
     }
 
+    public function test_the_wayne_ui_package_rows_fire_only_below_major_two(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', (string) json_encode(['require' => ['cit-web-infra/wayne-ui' => '^1.0']]));
+        file_put_contents($dir . '/composer.lock', (string) json_encode([
+            'packages' => [['name' => 'cit-web-infra/wayne-ui', 'version' => '1.4.0']],
+            'packages-dev' => [],
+        ]));
+        $data = $this->tempDir() . '/entries.json';
+        file_put_contents($data, (string) json_encode([
+            'schema_version' => 1,
+            'changes' => [
+                $this->entry('wayneui-bootstrap-data-hooks', 'package:cit-web-infra/wayne-ui@2', ['kind' => 'package']),
+                $this->entry('wayneui-nav-active-prefix', 'package:cit-web-infra/wayne-ui@2', ['kind' => 'package']),
+            ],
+        ]));
+        $scanner = new BehaviourScan($data);
+        $require = BehaviourScan::composerRequire($dir);
+
+        $below = $scanner->scan($dir, 'php-80-to-81', $require);
+        self::assertSame(
+            ['wayneui-bootstrap-data-hooks', 'wayneui-nav-active-prefix'],
+            array_map(static fn($e): string => $e->id, $below->entries),
+        );
+
+        file_put_contents($dir . '/composer.lock', (string) json_encode([
+            'packages' => [['name' => 'cit-web-infra/wayne-ui', 'version' => '2.0.0']],
+            'packages-dev' => [],
+        ]));
+        self::assertSame([], $scanner->scan($dir, 'php-80-to-81', $require)->entries);
+
+        $other = $this->tempDir();
+        file_put_contents($other . '/composer.json', (string) json_encode(['require' => ['acme/other' => '^1.0']]));
+        file_put_contents($other . '/composer.lock', (string) json_encode([
+            'packages' => [['name' => 'acme/other', 'version' => '1.0.0']],
+            'packages-dev' => [],
+        ]));
+        self::assertSame([], $scanner->scan($other, 'php-80-to-81', BehaviourScan::composerRequire($other))->entries);
+    }
+
     public function test_matched_entries_carry_their_parity_row_or_null(): void
     {
         $dir = $this->tempDir();
