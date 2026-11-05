@@ -443,7 +443,7 @@ final class PhpCompatScanTest extends TestCase
         }
     }
 
-    public function test_temp_oracle_source_matching_is_case_insensitive_and_prefix_based(): void
+    public function test_oracle_source_matching_is_case_insensitive_and_prefix_based(): void
     {
         $app = $this->tempDir();
         $json = $this->phpcsJson([
@@ -451,7 +451,7 @@ final class PhpCompatScanTest extends TestCase
                 'errors' => 5,
                 'warnings' => 0,
                 'messages' => [
-                    ['message' => "Extension 'oracle' is removed since PHP 5.1; use oci8 or pdo_oci instead", 'source' => 'phpcompatibility.extensions.removedextensions.oraclemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 1, 'column' => 9],
+                    ['message' => "Extension 'oracle' is removed since PHP 5.1; use oci8 or pdo_oci instead", 'source' => 'phpcompatibility.extensions.removedextensions.oracleremoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 1, 'column' => 9],
                     ['message' => "Extension 'oracle' is removed since PHP 5.1; use oci8 or pdo_oci instead", 'source' => 'PHPCOMPATIBILITY.EXTENSIONS.REMOVEDEXTENSIONS.ORACLEREMOVED', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 2, 'column' => 9],
                     ['message' => "Extension 'mysql' is removed since PHP 7.0; use mysqli instead", 'source' => 'PHPCompatibility.Extensions.RemovedExtensions.mysqlRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 3, 'column' => 9],
                     ['message' => 'Function mssql_connect() is removed since PHP 7.0', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.mssql_connectRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 4, 'column' => 9],
