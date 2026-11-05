@@ -317,12 +317,20 @@ final class PhpCompatScan
                 if ($oci8Declared && preg_match('/^Function (oci\w*)\(\) is removed since PHP/i', $message['message']) === 1) {
                     continue;
                 }
+                $source = is_string($message['source'] ?? null) ? $message['source'] : '';
+                // The RemovedExtensions.oracle sniff matches class names such as
+                // OracleSessionInit, while the removed extension's functions are
+                // all named ora_* and it never matches those, so every oracle
+                // finding is a false positive. Drop them and keep the rest.
+                if (str_starts_with(strtolower($source), 'phpcompatibility.extensions.removedextensions.oracle')) {
+                    continue;
+                }
                 $findings[] = new Finding(
                     $file,
                     $message['line'],
                     $message['message'],
                     ($message['type'] ?? 'ERROR') === 'WARNING' ? 'warning' : 'error',
-                    is_string($message['source'] ?? null) ? $message['source'] : '',
+                    $source,
                 );
             }
         }

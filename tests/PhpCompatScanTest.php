@@ -413,4 +413,62 @@ final class PhpCompatScanTest extends TestCase
         self::assertSame('PHPCompatibility.FunctionUse.RemovedFunctions.oci_errorRemoved', $scan->findings[0]->source);
         self::assertSame('PHPCompatibility.FunctionUse.RemovedFunctions.mysql_connectRemoved', $scan->findings[1]->source);
     }
+
+    public function test_oracle_removed_extension_finding_is_dropped_but_mysql_stays(): void
+    {
+        $app = $this->tempDir();
+        $json = $this->phpcsJson([
+            $app . '/index.php' => [
+                'errors' => 2,
+                'warnings' => 0,
+                'messages' => [
+                    ['message' => "Extension 'oracle' is removed since PHP 5.1; use oci8 or pdo_oci instead", 'source' => 'PHPCompatibility.Extensions.RemovedExtensions.oracleRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 120, 'column' => 9],
+                    ['message' => "Extension 'mysql' is removed since PHP 7.0; use mysqli instead", 'source' => 'PHPCompatibility.Extensions.RemovedExtensions.mysqlRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 200, 'column' => 9],
+                ],
+            ],
+        ]);
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.4');
+
+        self::assertTrue($scan->ok);
+        self::assertCount(1, $scan->findings);
+        self::assertSame('index.php', $scan->findings[0]->file);
+        self::assertSame(200, $scan->findings[0]->line);
+        self::assertSame('PHPCompatibility.Extensions.RemovedExtensions.mysqlRemoved', $scan->findings[0]->source);
+        self::assertSame(1, $scan->errorCount());
+        self::assertSame(0, $scan->warningCount());
+        foreach ($scan->findings as $finding) {
+            self::assertNotSame('PHPCompatibility.Extensions.RemovedExtensions.oracleRemoved', $finding->source);
+        }
+    }
+
+    public function test_temp_oracle_source_matching_is_case_insensitive_and_prefix_based(): void
+    {
+        $app = $this->tempDir();
+        $json = $this->phpcsJson([
+            $app . '/index.php' => [
+                'errors' => 5,
+                'warnings' => 0,
+                'messages' => [
+                    ['message' => "Extension 'oracle' is removed since PHP 5.1; use oci8 or pdo_oci instead", 'source' => 'phpcompatibility.extensions.removedextensions.oraclemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 1, 'column' => 9],
+                    ['message' => "Extension 'oracle' is removed since PHP 5.1; use oci8 or pdo_oci instead", 'source' => 'PHPCOMPATIBILITY.EXTENSIONS.REMOVEDEXTENSIONS.ORACLEREMOVED', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 2, 'column' => 9],
+                    ['message' => "Extension 'mysql' is removed since PHP 7.0; use mysqli instead", 'source' => 'PHPCompatibility.Extensions.RemovedExtensions.mysqlRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 3, 'column' => 9],
+                    ['message' => 'Function mssql_connect() is removed since PHP 7.0', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.mssql_connectRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 4, 'column' => 9],
+                    ['message' => 'Something without a source', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 5, 'column' => 9],
+                ],
+            ],
+        ]);
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.4');
+
+        self::assertTrue($scan->ok);
+        self::assertCount(3, $scan->findings);
+        self::assertSame('PHPCompatibility.Extensions.RemovedExtensions.mysqlRemoved', $scan->findings[0]->source);
+        self::assertSame('PHPCompatibility.FunctionUse.RemovedFunctions.mssql_connectRemoved', $scan->findings[1]->source);
+        self::assertSame('', $scan->findings[2]->source);
+        self::assertSame(3, $scan->errorCount());
+        self::assertSame(0, $scan->warningCount());
+    }
 }
