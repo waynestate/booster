@@ -494,7 +494,13 @@
       "label": "Toast close time no longer follows the global timer key (SWEET_ALERT_TIMER); v8 toasts read the new toast.auto_close key (SWEET_ALERT_TOAST_AUTO_CLOSE) instead. Default value unchanged (5000 ms in both), so an app that tuned toast lifetime through the old key, including disabling it, silently reverts toasts to 5000 ms; modals still follow the global timer",
       "keep_old": "set 'auto_close' => <old value> in the toast config section (or SWEET_ALERT_TOAST_AUTO_CLOSE in .env)",
       "check": "Fire a flashed toast and time how long it stays open",
-      "source": "https://raw.githubusercontent.com/realrashid/sweet-alert/v7.3.2/src/config/sweetalert.php"
+      "source": "https://raw.githubusercontent.com/realrashid/sweet-alert/v7.3.2/src/config/sweetalert.php",
+      "parity": {
+        "what": "How long a flashed toast stays open",
+        "before": "The timer value the app sets today (SWEET_ALERT_TIMER in .env or 'timer' in config/sweetalert.php)",
+        "after": "SWEET_ALERT_TOAST_AUTO_CLOSE (or 'toast.auto_close') must equal that value",
+        "how": "Fire a toast and time it with a stopwatch"
+      }
     },
     {
       "id": "swal-toast-progress-bar",

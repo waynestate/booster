@@ -28,7 +28,7 @@ final class BehaviourScan
     /** Directories that never hold app code. */
     private const SKIPPED_DIRECTORIES = ['vendor', 'node_modules', 'storage', '.git'];
 
-    /** @var list<array{id: string, hop: string, kind: string, match: ?string, file: ?string, key: ?string, package: ?string, package_major: ?int, label: string, keep_old: ?string, check: string, source: string}> */
+    /** @var list<array{id: string, hop: string, kind: string, match: ?string, file: ?string, key: ?string, package: ?string, package_major: ?int, label: string, keep_old: ?string, check: string, source: string, parity: array{what: string, before: string, after: string, how: string}|null}> */
     private readonly array $entries;
 
     public function __construct(?string $dataPath = null)
@@ -173,6 +173,7 @@ final class BehaviourScan
                 $entry['source'],
                 $hits[$entry['id']] ?? [],
                 $totals[$entry['id']],
+                $entry['parity'],
             );
         }
 
@@ -201,7 +202,7 @@ final class BehaviourScan
      * Every curated PHP-level change found in one source string, as entry id
      * to the line numbers it was found on, in source order.
      *
-     * @param list<array{id: string, hop: string, kind: string, match: ?string, file: ?string, key: ?string, package: ?string, package_major: ?int, label: string, keep_old: ?string, check: string, source: string}> $entries
+     * @param list<array{id: string, hop: string, kind: string, match: ?string, file: ?string, key: ?string, package: ?string, package_major: ?int, label: string, keep_old: ?string, check: string, source: string, parity: array{what: string, before: string, after: string, how: string}|null}> $entries
      *
      * @return array<string, list<int>>
      */
@@ -275,7 +276,7 @@ final class BehaviourScan
      * Every blade literal found in one template, as entry id to the line
      * numbers it was found on, in source order.
      *
-     * @param list<array{id: string, hop: string, kind: string, match: ?string, file: ?string, key: ?string, package: ?string, package_major: ?int, label: string, keep_old: ?string, check: string, source: string}> $entries
+     * @param list<array{id: string, hop: string, kind: string, match: ?string, file: ?string, key: ?string, package: ?string, package_major: ?int, label: string, keep_old: ?string, check: string, source: string, parity: array{what: string, before: string, after: string, how: string}|null}> $entries
      *
      * @return array<string, list<int>>
      */
@@ -299,7 +300,7 @@ final class BehaviourScan
      * The config file a config row fires on, or null when the key is present.
      * A missing file fires too: the key is certainly absent there.
      *
-     * @param array{id: string, hop: string, kind: string, match: ?string, file: ?string, key: ?string, package: ?string, package_major: ?int, label: string, keep_old: ?string, check: string, source: string} $entry
+     * @param array{id: string, hop: string, kind: string, match: ?string, file: ?string, key: ?string, package: ?string, package_major: ?int, label: string, keep_old: ?string, check: string, source: string, parity: array{what: string, before: string, after: string, how: string}|null} $entry
      */
     private function configHit(string $appPath, array $entry): ?string
     {
@@ -321,7 +322,7 @@ final class BehaviourScan
      * Whether a package row fires: the app requires the package and its locked
      * major is below the row's major, so the upgrade is about to cross it.
      *
-     * @param array{id: string, hop: string, kind: string, match: ?string, file: ?string, key: ?string, package: ?string, package_major: ?int, label: string, keep_old: ?string, check: string, source: string} $entry
+     * @param array{id: string, hop: string, kind: string, match: ?string, file: ?string, key: ?string, package: ?string, package_major: ?int, label: string, keep_old: ?string, check: string, source: string, parity: array{what: string, before: string, after: string, how: string}|null} $entry
      * @param array<string, string>|null $composerRequire
      * @param array<string, string> $locked
      */
@@ -476,7 +477,7 @@ final class BehaviourScan
     /**
      * Loads and validates the behaviour-changes data file.
      *
-     * @return list<array{id: string, hop: string, kind: string, match: ?string, file: ?string, key: ?string, package: ?string, package_major: ?int, label: string, keep_old: ?string, check: string, source: string}>
+     * @return list<array{id: string, hop: string, kind: string, match: ?string, file: ?string, key: ?string, package: ?string, package_major: ?int, label: string, keep_old: ?string, check: string, source: string, parity: array{what: string, before: string, after: string, how: string}|null}>
      */
     private static function load(string $path): array
     {
@@ -550,6 +551,28 @@ final class BehaviourScan
             if (!str_starts_with((string) $entry['source'], 'https://')) {
                 throw new ToolError(sprintf('Behavior change %d in "%s" has source "%s"; expected an https URL.', $index, $path, $entry['source']));
             }
+            $parity = null;
+            if (isset($entry['parity'])) {
+                // Optional: one observable thing, read before the hop and
+                // compared after it, so the report can carry a before/after row.
+                $valid = is_array($entry['parity']);
+                if ($valid) {
+                    foreach (['what', 'before', 'after', 'how'] as $key) {
+                        if (!is_string($entry['parity'][$key] ?? null) || $entry['parity'][$key] === '') {
+                            $valid = false;
+                        }
+                    }
+                }
+                if (!$valid) {
+                    throw new ToolError(sprintf('Behavior change %d in "%s" has a parity row that needs non-empty string "what", "before", "after" and "how".', $index, $path));
+                }
+                $parity = [
+                    'what' => $entry['parity']['what'],
+                    'before' => $entry['parity']['before'],
+                    'after' => $entry['parity']['after'],
+                    'how' => $entry['parity']['how'],
+                ];
+            }
             if ($kind === 'always') {
                 $always++;
                 if ($always > self::MAX_ALWAYS) {
@@ -569,6 +592,7 @@ final class BehaviourScan
                 'keep_old' => $entry['keep_old'],
                 'check' => $entry['check'],
                 'source' => $entry['source'],
+                'parity' => $parity,
             ];
         }
 

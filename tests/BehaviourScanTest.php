@@ -109,6 +109,43 @@ final class BehaviourScanTest extends TestCase
         self::assertSame([], $fromDisk->entries);
     }
 
+    public function test_matched_entries_carry_their_parity_row_or_null(): void
+    {
+        $dir = $this->tempDir();
+        mkdir($dir . '/src', 0777, true);
+        file_put_contents($dir . '/src/function.php', "<?php\n\nlegacy_call();\n");
+        file_put_contents($dir . '/composer.json', (string) json_encode(['require' => ['acme/widget' => '^1.0']]));
+        file_put_contents($dir . '/composer.lock', (string) json_encode([
+            'packages' => [['name' => 'acme/widget', 'version' => '1.0.0']],
+            'packages-dev' => [],
+        ]));
+        $data = $this->tempDir() . '/entries.json';
+        $withParity = $this->entry('with-parity', 'php-80-to-81', ['kind' => 'function', 'match' => 'legacy_call']);
+        $withParity['parity'] = [
+            'what' => 'How long a flashed toast stays open',
+            'before' => 'The timer value the app sets today',
+            'after' => 'SWEET_ALERT_TOAST_AUTO_CLOSE must equal that value',
+            'how' => 'Fire a toast and time it with a stopwatch',
+        ];
+        file_put_contents($data, (string) json_encode([
+            'schema_version' => 1,
+            'changes' => [
+                $withParity,
+                $this->entry('without-parity', 'package:acme/widget@2', ['kind' => 'package']),
+            ],
+        ]));
+        $result = (new BehaviourScan($data))->scan($dir, 'php-80-to-81', BehaviourScan::composerRequire($dir));
+
+        self::assertSame(['with-parity', 'without-parity'], array_map(static fn($e): string => $e->id, $result->entries));
+        self::assertSame([
+            'what' => 'How long a flashed toast stays open',
+            'before' => 'The timer value the app sets today',
+            'after' => 'SWEET_ALERT_TOAST_AUTO_CLOSE must equal that value',
+            'how' => 'Fire a toast and time it with a stopwatch',
+        ], $result->entries[0]->parity);
+        self::assertNull($result->entries[1]->parity);
+    }
+
     public function test_without_packages_drops_only_the_package_entries(): void
     {
         $app = $this->dataFile('app');

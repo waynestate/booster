@@ -13,6 +13,7 @@ final class BehaviourEntry
 {
     /**
      * @param list<string> $hits file:line locations, capped at BehaviourScan::MAX_HITS; 'composer.json' for package rows, the config file for config rows, empty for always rows
+     * @param array{what: string, before: string, after: string, how: string}|null $parity the optional before/after row for one observable thing, when the data file carries it
      */
     public function __construct(
         public readonly string $id,
@@ -23,14 +24,15 @@ final class BehaviourEntry
         public readonly string $source,
         public readonly array $hits,
         public readonly int $total,
+        public readonly ?array $parity = null,
     ) {}
 
     /**
-     * @return array{id: string, label: string, keep_old: string|null, check: string, source: string, hits: list<string>, total: int}
+     * @return array{id: string, label: string, keep_old: string|null, check: string, source: string, hits: list<string>, total: int, parity?: array{what: string, before: string, after: string, how: string}}
      */
     public function toArray(): array
     {
-        return [
+        $array = [
             'id' => $this->id,
             'label' => $this->label,
             'keep_old' => $this->keepOld,
@@ -39,5 +41,10 @@ final class BehaviourEntry
             'hits' => $this->hits,
             'total' => $this->total,
         ];
+        if ($this->parity !== null) {
+            $array['parity'] = $this->parity;
+        }
+
+        return $array;
     }
 }
