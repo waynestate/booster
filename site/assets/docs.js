@@ -63,6 +63,13 @@
       window.addEventListener('resize', function () {
         blocks.forEach(markScrollable);
       });
+      // Web fonts often settle after the first measure, and they change block widths: measure once more
+      // when they do, so a block that overflows only with the final font still joins the tab order.
+      if (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function') {
+        document.fonts.ready.then(function () {
+          blocks.forEach(markScrollable);
+        });
+      }
     }
     blocks.forEach(function (pre) {
       var wrap = document.createElement('div');

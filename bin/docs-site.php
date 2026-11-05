@@ -100,7 +100,7 @@ final class DocsKit
 
     public const FILES = [
         'assets/docs.css' => '2e7010c6b86fca95309ed834ccccedade299bbe1e071bb0ed83acbc12bf99b75',
-        'assets/docs.js' => 'c59aa8cbedfff3707c9048caf95cda5d1d01f2f68d12d8ae2267d11872bccfc8',
+        'assets/docs.js' => '780020d1497616ca84aed5f186fb16c8fac741d922b13b27ec1252ddbf836265',
     ];
 }
 
@@ -1427,6 +1427,7 @@ final class DocsSite
         $body = rtrim($this->rewriteChangelogLinks($body), "\n");
         $page = "---\ntitle: \"Changelog\"\ndescription: All notable changes to this project.\n---\n\n"
             ."<!-- Generated from CHANGELOG.md by bin/docs-site.php. Edit CHANGELOG.md, not this file. -->\n\n"
+            ."# Changelog\n\n"
             .$body."\n";
 
         return ['docs/changelog.md', $page];
@@ -2462,8 +2463,9 @@ final class DocsSite
     }
 
     /**
-     * Code tabs: every fenced block whose info string carries a valid tab="LABEL" word (double quotes, label up to
-     * 40 characters) drops the tab="..." word from its info, so a language class never carries it. Every run of two
+     * Code tabs: every fenced block whose info string carries a valid tab="LABEL" token (double quotes, label up to
+     * 40 characters after trimming, spaces allowed) drops the tab="..." token from its info, so a language class
+     * never carries it. Every run of two
      * or more such siblings is marked as one set: each member is flagged, the first carries the set key and the last
      * a close marker, so the fence renderer wraps the run in one labeled set, every panel visible and named. Blocks
      * separated by anything are separate sets.
@@ -2528,24 +2530,27 @@ final class DocsSite
     }
 
     /**
-     * Splits a fence info string into its language, its tab label and the info without the tab="..." word. The
-     * label is null when no word is a double-quoted tab="..." of at most 40 characters.
+     * Splits a fence info string into its language, its tab label and the info without the tab="..." token. The
+     * first tab="..." anywhere in the info names the label, which may hold spaces but no double quote and must be
+     * 1 to 40 characters after trimming; the label is null otherwise (the token is dropped either way). The rest
+     * splits on whitespace exactly as before, the first remaining word being the language.
      *
      * @return array{0: string, 1: string|null, 2: string}
      */
     private function tabInfo(string $info): array
     {
-        $language = '';
         $label = null;
-        $kept = [];
-        foreach (preg_split('/\s+/', trim($info)) ?: [] as $word) {
-            if (preg_match('/^tab="([^"]*)"$/', $word, $match) === 1) {
-                if ($label === null && strlen($match[1]) >= 1 && strlen($match[1]) <= 40) {
-                    $label = $match[1];
-                }
-
-                continue;
+        $rest = $info;
+        if (preg_match('/tab="([^"]*)"/', $info, $match) === 1) {
+            $label = trim($match[1]);
+            if (strlen($label) < 1 || strlen($label) > 40) {
+                $label = null;
             }
+            $rest = (string) preg_replace('/tab="[^"]*"/', '', $info, 1);
+        }
+        $language = '';
+        $kept = [];
+        foreach (preg_split('/\s+/', trim($rest)) ?: [] as $word) {
             if ($language === '') {
                 $language = $word;
             }
