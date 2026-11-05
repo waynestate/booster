@@ -26,6 +26,22 @@ location for rows that apply everywhere. It is advisory, like the scans: it neve
 prints when nothing matches. In JSON output the entries land under `behaviour_changes`, per step, with the fields
 `id`, `label`, `keep_old`, `check`, `source`, `hits` and `total`.
 
+An entry may also carry an optional `parity` object: one observable thing, how to read it before the hop, what it
+must equal after, and how to measure it. When a matched entry has one, the block gains a `Parity checks` section
+under the same step, one `[ ]` row per entry, so you can write down the before value now and compare it after the
+hop. The field is optional; entries without it print exactly as before.
+
+```json
+{
+  "parity": {
+    "what": "How long a flashed toast stays open",
+    "before": "The timer value the app sets today (SWEET_ALERT_TIMER in .env or 'timer' in config/sweetalert.php)",
+    "after": "SWEET_ALERT_TOAST_AUTO_CLOSE (or 'toast.auto_close') must equal that value",
+    "how": "Fire a toast and time it with a stopwatch"
+  }
+}
+```
+
 The list lives in `data/behaviour-changes.json`, bundled with the phar. An entry names the hop it applies to
 (`php-80-to-81`, `laravel-10-to-11`, or `package:vendor/name@2` for a floor a package raises), how to find it
 (`detect`: a `function`, `method`, `class`, `property`, string `token`, blade snippet, config `file` and `key`,

@@ -7,6 +7,7 @@ namespace Waynestate\Booster\Tests;
 use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Packaging\PharFiles;
 use Waynestate\Booster\Scan\BehaviourScan;
+use Waynestate\Booster\ToolError;
 
 /**
  * Guards the bundled data/behaviour-changes.json itself: it must load through
@@ -63,5 +64,96 @@ final class BehaviourDataTest extends TestCase
                 self::assertTrue($registry->has($hop), 'unregistered hop ' . $hop . ' of ' . $entry['id']);
             }
         }
+    }
+
+    public function test_the_sweet_alert_toast_timer_entry_carries_the_parity_row(): void
+    {
+        $byId = [];
+        foreach ($this->changes as $entry) {
+            $byId[$entry['id']] = $entry;
+        }
+        self::assertSame([
+            'what' => 'How long a flashed toast stays open',
+            'before' => "The timer value the app sets today (SWEET_ALERT_TIMER in .env or 'timer' in config/sweetalert.php)",
+            'after' => "SWEET_ALERT_TOAST_AUTO_CLOSE (or 'toast.auto_close') must equal that value",
+            'how' => 'Fire a toast and time it with a stopwatch',
+        ], $byId['swal-toast-timer-key']['parity'] ?? null);
+        foreach ($this->changes as $entry) {
+            if ($entry['id'] === 'swal-toast-timer-key') {
+                continue;
+            }
+            self::assertArrayNotHasKey('parity', $entry, 'parity of ' . $entry['id']);
+        }
+    }
+
+    public function test_a_full_parity_row_loads(): void
+    {
+        $path = $this->tempDir() . '/behaviour-changes.json';
+        file_put_contents($path, (string) json_encode(['schema_version' => 1, 'changes' => [$this->parityEntry([
+            'what' => 'How long a flashed toast stays open',
+            'before' => 'The timer value the app sets today',
+            'after' => 'SWEET_ALERT_TOAST_AUTO_CLOSE must equal that value',
+            'how' => 'Fire a toast and time it with a stopwatch',
+        ])]]));
+
+        new BehaviourScan($path);
+    }
+
+    public function test_a_parity_row_missing_how_is_rejected(): void
+    {
+        $this->expectLoadError(['schema_version' => 1, 'changes' => [$this->parityEntry([
+            'what' => 'w',
+            'before' => 'b',
+            'after' => 'a',
+        ])]], 'has a parity row that needs non-empty string');
+    }
+
+    public function test_a_parity_row_with_an_integer_what_is_rejected(): void
+    {
+        $this->expectLoadError(['schema_version' => 1, 'changes' => [$this->parityEntry([
+            'what' => 5,
+            'before' => 'b',
+            'after' => 'a',
+            'how' => 'h',
+        ])]], 'has a parity row that needs non-empty string');
+    }
+
+    public function test_a_string_parity_is_rejected(): void
+    {
+        $entry = $this->parityEntry([]);
+        $entry['parity'] = 'not an object';
+        $this->expectLoadError(['schema_version' => 1, 'changes' => [$entry]], 'has a parity row that needs non-empty string');
+    }
+
+    /**
+     * @param array<string, mixed> $content
+     */
+    private function expectLoadError(array $content, string $needle): void
+    {
+        $path = $this->tempDir() . '/behaviour-changes.json';
+        file_put_contents($path, (string) json_encode($content));
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage($needle);
+
+        new BehaviourScan($path);
+    }
+
+    /**
+     * @param array<string, mixed> $parity
+     *
+     * @return array<string, mixed>
+     */
+    private function parityEntry(array $parity): array
+    {
+        return [
+            'id' => 'parity-row',
+            'hop' => 'php-80-to-81',
+            'detect' => ['kind' => 'function', 'match' => 'a'],
+            'label' => 'Label for parity-row',
+            'keep_old' => null,
+            'check' => 'Check it.',
+            'source' => 'https://example.com/',
+            'parity' => $parity,
+        ];
     }
 }

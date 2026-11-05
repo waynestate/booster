@@ -67,6 +67,72 @@ final class BehaviourReportTest extends TestCase
         self::assertSame([], (new TextWriter())->behaviour(new BehaviourResult('php-80-to-81', [], 2, 0)));
     }
 
+    /** One entry with a parity row and one without, so both shapes are covered. */
+    private function parityResult(): BehaviourResult
+    {
+        return new BehaviourResult('laravel-10-to-11', [
+            new BehaviourEntry('e-pkg', 'package', 'Toast close time changed', null, 'Fire a flashed toast and time it.', 'https://example.com/', ['composer.json'], 1, [
+                'what' => 'How long a flashed toast stays open',
+                'before' => "The timer value the app sets today (SWEET_ALERT_TIMER in .env or 'timer' in config/sweetalert.php)",
+                'after' => "SWEET_ALERT_TOAST_AUTO_CLOSE (or 'toast.auto_close') must equal that value",
+                'how' => 'Fire a toast and time it with a stopwatch',
+            ]),
+            new BehaviourEntry('e-fn', 'function', 'Legacy call removed', 'legacy_call();', 'Confirm nothing calls it.', 'https://example.com/', ['src/a.php:3'], 1),
+        ], 1, 0);
+    }
+
+    public function test_behaviour_block_prints_the_parity_checks_after_the_entries(): void
+    {
+        self::assertSame([
+            'Behavior changes to check:',
+            'Toast close time changed (composer.json)',
+            '  check: Fire a flashed toast and time it.',
+            'Legacy call removed (1 in 1 file: src/a.php:3)',
+            '  keep old: legacy_call();',
+            '  check: Confirm nothing calls it.',
+            'Parity checks (record the before value now, compare after the hop):',
+            '  [ ] How long a flashed toast stays open',
+            "      before: The timer value the app sets today (SWEET_ALERT_TIMER in .env or 'timer' in config/sweetalert.php)",
+            "      after: SWEET_ALERT_TOAST_AUTO_CLOSE (or 'toast.auto_close') must equal that value",
+            '      how: Fire a toast and time it with a stopwatch',
+        ], (new TextWriter())->behaviour($this->parityResult()));
+    }
+
+    public function test_to_array_includes_parity_only_for_the_entry_that_has_it(): void
+    {
+        self::assertSame([
+            'hop' => 'laravel-10-to-11',
+            'files_scanned' => 1,
+            'files_skipped' => 0,
+            'entries' => [
+                [
+                    'id' => 'e-pkg',
+                    'label' => 'Toast close time changed',
+                    'keep_old' => null,
+                    'check' => 'Fire a flashed toast and time it.',
+                    'source' => 'https://example.com/',
+                    'hits' => ['composer.json'],
+                    'total' => 1,
+                    'parity' => [
+                        'what' => 'How long a flashed toast stays open',
+                        'before' => "The timer value the app sets today (SWEET_ALERT_TIMER in .env or 'timer' in config/sweetalert.php)",
+                        'after' => "SWEET_ALERT_TOAST_AUTO_CLOSE (or 'toast.auto_close') must equal that value",
+                        'how' => 'Fire a toast and time it with a stopwatch',
+                    ],
+                ],
+                [
+                    'id' => 'e-fn',
+                    'label' => 'Legacy call removed',
+                    'keep_old' => 'legacy_call();',
+                    'check' => 'Confirm nothing calls it.',
+                    'source' => 'https://example.com/',
+                    'hits' => ['src/a.php:3'],
+                    'total' => 1,
+                ],
+            ],
+        ], $this->parityResult()->toArray());
+    }
+
     public function test_plan_text_prints_the_behaviour_block_under_its_step(): void
     {
         $dir = $this->tempDir();

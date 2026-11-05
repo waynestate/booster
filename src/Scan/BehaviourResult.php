@@ -32,7 +32,7 @@ final class BehaviourResult
     }
 
     /**
-     * @return array{hop: string, files_scanned: int, files_skipped: int, entries: list<array{id: string, label: string, keep_old: string|null, check: string, source: string, hits: list<string>, total: int}>}
+     * @return array{hop: string, files_scanned: int, files_skipped: int, entries: list<array{id: string, label: string, keep_old: string|null, check: string, source: string, hits: list<string>, total: int, parity?: array{what: string, before: string, after: string, how: string}}>}
      */
     public function toArray(): array
     {

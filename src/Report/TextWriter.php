@@ -268,6 +268,20 @@ final class TextWriter
             }
             $lines[] = '  check: ' . $entry->check;
         }
+        // One observable thing per row: record the before value now, then
+        // compare it after the hop, so the change is visible or not.
+        $parityEntries = array_values(array_filter($result->entries, static fn(BehaviourEntry $entry): bool => $entry->parity !== null));
+        if ($parityEntries !== []) {
+            $lines[] = 'Parity checks (record the before value now, compare after the hop):';
+            foreach ($parityEntries as $entry) {
+                /** @var array{what: string, before: string, after: string, how: string} $parity */
+                $parity = $entry->parity;
+                $lines[] = '  [ ] ' . self::clean($parity['what']);
+                $lines[] = '      before: ' . self::clean($parity['before']);
+                $lines[] = '      after: ' . self::clean($parity['after']);
+                $lines[] = '      how: ' . self::clean($parity['how']);
+            }
+        }
 
         return $lines;
     }
