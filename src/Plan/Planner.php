@@ -11,6 +11,7 @@ use Waynestate\Booster\Policy\Policy;
 use Waynestate\Booster\Policy\PolicyException;
 use Waynestate\Booster\Project\Project;
 use Waynestate\Booster\Refresh\HopDataRefresher;
+use Waynestate\Booster\Scan\VendoredLibraries;
 use Waynestate\Booster\ToolError;
 use Waynestate\Creed\State;
 
@@ -330,7 +331,10 @@ final class Planner
             $packageChecks = $report->checks;
         }
 
-        return new Plan($project, $today->format('Y-m-d'), $this->policy->origin(), $toPhp, $toLaravel, $toPhpunit, $steps, $warnings, $packageChecks, $stopsEarly);
+        // The hand-copied libraries are reported by the writer as their own
+        // block, so they travel on the plan without a warning entry of their
+        // own.
+        return new Plan($project, $today->format('Y-m-d'), $this->policy->origin(), $toPhp, $toLaravel, $toPhpunit, $steps, $warnings, $packageChecks, $stopsEarly, VendoredLibraries::find($project->path), $fromPhp);
     }
 
     /**

@@ -40,7 +40,7 @@ final class TextWriter
         $lines = [
             sprintf('BOOSTER plan for %s', self::clean($p->path)),
             sprintf('  app type: %s', $p->type->value),
-            sprintf('  PHP: %s -> %s', $p->phpVersion ?? 'unknown', $plan->targetPhp ?? '?'),
+            sprintf('  PHP: %s -> %s', $plan->fromPhp ?? $p->phpVersion ?? 'unknown', $plan->targetPhp ?? '?'),
         ];
         if ($plan->targetLaravel !== null) {
             $lines[] = sprintf('  Laravel: %s -> %s', $p->laravelMajor ?? 'unknown', $plan->targetLaravel);
@@ -79,12 +79,46 @@ final class TextWriter
         if ($plan->steps === []) {
             $lines[] = '(no steps)';
         }
+        $vendored = $this->vendoredLibraries($plan);
+        if ($vendored !== []) {
+            $lines[] = '';
+            foreach ($vendored as $line) {
+                $lines[] = $line;
+            }
+        }
         foreach ($plan->warnings as $warning) {
             $lines[] = '';
             $lines[] = 'Warning: ' . $warning;
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * The hand-copied libraries block: BOOSTER names the cargo it refuses to
+     * rewrite, the Composer package that would carry the same load, and why
+     * the app still has to prove the copies run on the new PHP itself. Empty
+     * when the plan found none.
+     *
+     * @return list<string>
+     */
+    public function vendoredLibraries(Plan $plan): array
+    {
+        if ($plan->vendoredLibraries === []) {
+            return [];
+        }
+        $target = $plan->targetPhp !== null ? self::clean($plan->targetPhp) : 'the target PHP';
+        $lines = [sprintf('Warning: hand-copied libraries found. BOOSTER never rewrites them and cannot show they run on PHP %s:', $target)];
+        foreach ($plan->vendoredLibraries as $library) {
+            $name = self::clean($library->name);
+            $version = $library->version !== null ? self::clean($library->version) : 'version unknown';
+            $label = $library->version !== null ? $name . ' ' . $version : $name . ', ' . $version;
+            $replace = $library->replaceWith !== null ? ': replace with the Composer package ' . self::clean($library->replaceWith) : '';
+            $lines[] = sprintf('  - %s (%s)%s', $label, self::clean($library->path), $replace);
+        }
+        $lines[] = "Libraries copied in by hand are often written for an older PHP and can crash even when BOOSTER's changes to your own code are clean. Replace them with Composer packages, then run your tests on the new PHP.";
+
+        return $lines;
     }
 
     /**
@@ -369,6 +403,13 @@ final class TextWriter
         if ($report->deployScript !== null) {
             $lines[] = 'Added deployments/' . $report->deployScript . ': Citadel runs it once, first, so existing deployments install the upgraded vendor/.';
             $lines[] = 'Undo with: rm deployments/' . $report->deployScript . ' (inside the app).';
+        }
+        $vendored = $this->vendoredLibraries($report->plan);
+        if ($vendored !== []) {
+            $lines[] = '';
+            foreach ($vendored as $line) {
+                $lines[] = $line;
+            }
         }
         if ($report->dryRun && !$report->failed()) {
             // A dry run never runs the gate, so a green preview is not a green app.
