@@ -680,7 +680,7 @@ no `vendor/` and that repository cannot be reached the swap goes first instead, 
 composer to install and composer is blocked by that repository; this applies to an app already on PHP 8.3 or newer
 (SESAME needs 8.3, so below that the PHP hops still go first); the plan says so in a warning; `wayneui-1-to-2`
 (planned with `--wayneui` for an app that requires
-`cit-web-infra/wayne-ui`, after the last Laravel hop, on Laravel 11 or newer: swaps the Composer requirement for
+`cit-web-infra/wayne-ui`, after the last Laravel hop and before the Vue hops, on Laravel 11 or newer: swaps the Composer requirement for
 `waynestate/wayne-ui ^2.0`, rewrites the one-to-one rows (class tokens, icon names, the mapped brand hexes in style
 blocks and CSS, the `Breadcrumbs` calls and the `config/wayne-ui.php` keys) and lists the rest as manual lines; it
 leaves forked views under `resources/views/vendor/wayne-ui` and `public/vendor/wayne-ui` in place for a person to

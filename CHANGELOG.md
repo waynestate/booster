@@ -106,7 +106,7 @@ WayneUI joins the stack: a hop for the 1.x to 2.x move, and ten more behavior-ch
 
 ### Added
 
-- The `wayneui-1-to-2` hop, opt-in with `--wayneui`, for apps that require `cit-web-infra/wayne-ui`. It runs after the last Laravel hop and only when the plan reaches Laravel 11 or later (WayneUI 2.x supports 11 and newer); a plan that ends lower warns and leaves the hop out, and an app that uses WayneUI 1.x without the flag gets a nudge.
+- The `wayneui-1-to-2` hop, opt-in with `--wayneui`, for apps that require `cit-web-infra/wayne-ui`. It runs after the last Laravel hop and before the Vue hops and only when the plan reaches Laravel 11 or later (WayneUI 2.x supports 11 and newer); a plan that ends lower warns and leaves the hop out, and an app that uses WayneUI 1.x without the flag gets a nudge.
 - The hop rewrites only the one-to-one items of WayneUI's `MIGRATING.md`, about 57 percent of the mapping: Bootstrap 3 class tokens in class attributes (whole tokens only), Font Awesome icons without size modifiers, five brand colors in CSS and Blade, the Breadcrumbs renames and three `config/wayne-ui.php` keys. It swaps the Composer requirement to `waynestate/wayne-ui` `^2.0`.
 - Everything else is listed in the report as `file:line` manual items: layout and component markup that has no one-to-one class, `Breadcrumbs::push(` (its argument order changed, a silent break), `navActive` prefix semantics, jQuery and Bootstrap script hooks, and the old publish tags.
 - The hop never deletes forked `resources/views/vendor/wayne-ui` or `public/vendor/wayne-ui`, never edits a `repositories` credential, and says that rotating a deploy token is a person's job.
