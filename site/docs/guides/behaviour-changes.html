@@ -58,6 +58,19 @@ verify (<code>check:</code>), and where the app touches it: <code>file:line</cod
 location for rows that apply everywhere. It is advisory, like the scans: it never changes the exit code, and nothing
 prints when nothing matches. In JSON output the entries land under <code>behaviour_changes</code>, per step, with the fields
 <code>id</code>, <code>label</code>, <code>keep_old</code>, <code>check</code>, <code>source</code>, <code>hits</code> and <code>total</code>.</p>
+<p>An entry may also carry an optional <code>parity</code> object: one observable thing, how to read it before the hop, what it
+must equal after, and how to measure it. When a matched entry has one, the block gains a <code>Parity checks</code> section
+under the same step, one <code>[ ]</code> row per entry, so you can write down the before value now and compare it after the
+hop. The field is optional; entries without it print exactly as before.</p>
+<pre><code class="language-json">{
+  &quot;parity&quot;: {
+    &quot;what&quot;: &quot;How long a flashed toast stays open&quot;,
+    &quot;before&quot;: &quot;The timer value the app sets today (SWEET_ALERT_TIMER in .env or 'timer' in config/sweetalert.php)&quot;,
+    &quot;after&quot;: &quot;SWEET_ALERT_TOAST_AUTO_CLOSE (or 'toast.auto_close') must equal that value&quot;,
+    &quot;how&quot;: &quot;Fire a toast and time it with a stopwatch&quot;
+  }
+}
+</code></pre>
 <p>The list lives in <code>data/behaviour-changes.json</code>, bundled with the phar. An entry names the hop it applies to
 (<code>php-80-to-81</code>, <code>laravel-10-to-11</code>, or <code>package:vendor/name@2</code> for a floor a package raises), how to find it
 (<code>detect</code>: a <code>function</code>, <code>method</code>, <code>class</code>, <code>property</code>, string <code>token</code>, blade snippet, config <code>file</code> and <code>key</code>,
