@@ -4,6 +4,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- Vendored libraries: `plan` and `run` find the libraries copied into `vendor/` (a name and version from its `composer.json` or `VERSION` file, or `version unknown`) and list each with the Composer package that replaces it. The plan text and the run report get a block for them, and the JSON gains `vendored_libraries` and `from_php` (the PHP version the run starts from, when it differs from the app's own).
+
 ## [1.8.3] - 2026-11-04
 
 ### Changed
