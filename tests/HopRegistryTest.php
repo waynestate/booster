@@ -94,6 +94,18 @@ final class HopRegistryTest extends PhpUnitTestCase
         }
     }
 
+    /** Found on WELD, 2026-11-06: Pest 4 holds PHPUnit at 12, so the hop to 13 never resolved. */
+    public function test_each_phpunit_hop_pins_the_pest_major_it_pairs_with(): void
+    {
+        $registry = new HopRegistry();
+
+        self::assertSame(['pestphp/pest' => '^2.0', 'pestphp/pest-plugin-laravel' => '^2.0'], $registry->get('phpunit-9-to-10')->composerSetIfPresent);
+        self::assertSame(['pestphp/pest' => '^3.0', 'pestphp/pest-plugin-laravel' => '^3.0'], $registry->get('phpunit-10-to-11')->composerSetIfPresent);
+        self::assertSame(['pestphp/pest' => '^4.0', 'pestphp/pest-plugin-laravel' => '^4.0'], $registry->get('phpunit-11-to-12')->composerSetIfPresent);
+        self::assertSame(['pestphp/pest' => '^5.0', 'pestphp/pest-plugin-laravel' => '^5.0'], $registry->get('phpunit-12-to-13')->composerSetIfPresent);
+        self::assertSame([], $registry->phpunitCompanionPins('9'));
+    }
+
     public function test_the_laravel_9_hop_drops_fideloper_proxy(): void
     {
         $hop = (new HopRegistry())->get('laravel-8-to-9');

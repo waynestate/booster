@@ -124,6 +124,31 @@ final class HopDataRefresher
         ],
     ];
 
+    /**
+     * npm packages the TypeScript major hop raises when the app lists them
+     * below these floors, because their peer range refuses the vue-tsc the
+     * hop installs: prettier-plugin-organize-imports before 4.2 asks for
+     * vue-tsc ^2, so the next npm install fails with ERESOLVE (found on WELD,
+     * 2026-11-06). No feed drives it.
+     */
+    public const FIXED_TYPESCRIPT_COMPANION_PINS = [
+        'prettier-plugin-organize-imports' => '^4.2',
+    ];
+
+    /**
+     * Companion composer constraints a PHPUnit hop raises alongside
+     * phpunit/phpunit, keyed by the PHPUnit major the hop moves to: Pest and
+     * its Laravel plugin, whose majors pair one to one with PHPUnit's. No feed
+     * drives it; null means BOOSTER pins nothing there.
+     */
+    public const FIXED_PHPUNIT_COMPANION_PINS = [
+        '9' => null,
+        '10' => ['pestphp/pest' => '^2.0', 'pestphp/pest-plugin-laravel' => '^2.0'],
+        '11' => ['pestphp/pest' => '^3.0', 'pestphp/pest-plugin-laravel' => '^3.0'],
+        '12' => ['pestphp/pest' => '^4.0', 'pestphp/pest-plugin-laravel' => '^4.0'],
+        '13' => ['pestphp/pest' => '^5.0', 'pestphp/pest-plugin-laravel' => '^5.0'],
+    ];
+
     public function __construct(private readonly Policy $policy) {}
 
     /**
@@ -178,6 +203,8 @@ final class HopDataRefresher
             'inertia_laravel_next' => $this->fixedScalar($existing, 'inertia_laravel_next', self::FIXED_INERTIA_LARAVEL_NEXT),
             'inertia_vue3_next' => $this->fixedScalar($existing, 'inertia_vue3_next', self::FIXED_INERTIA_VUE3_NEXT),
             'laravel_companion_pins' => $this->fixedCompanionPins($existing, 'laravel_companion_pins', $laravelChain, self::FIXED_LARAVEL_COMPANION_PINS),
+            'typescript_companion_pins' => $this->fixedPackageMap($existing, 'typescript_companion_pins', self::FIXED_TYPESCRIPT_COMPANION_PINS),
+            'phpunit_companion_pins' => $this->fixedCompanionPins($existing, 'phpunit_companion_pins', $phpunitChain, self::FIXED_PHPUNIT_COMPANION_PINS),
         ];
     }
 
@@ -237,6 +264,7 @@ final class HopDataRefresher
         $this->tableCoverage($problems, $data, 'inertia_laravel', $laravelChain);
         $this->tableCoverage($problems, $data, 'inertia_vue3', $laravelChain);
         $this->tableCoverage($problems, $data, 'laravel_companion_pins', $laravelChain);
+        $this->tableCoverage($problems, $data, 'phpunit_companion_pins', $phpunitChain);
 
         return $problems;
     }
@@ -632,6 +660,45 @@ final class HopDataRefresher
         }
 
         return $seed;
+    }
+
+    /**
+     * A package-to-constraint map no feed computes: the map on file when it is
+     * one, the seed otherwise.
+     *
+     * @param array<string, mixed> $existing
+     * @param array<string, string> $seed
+     *
+     * @return array<string, string>
+     */
+    private function fixedPackageMap(array $existing, string $key, array $seed): array
+    {
+        $current = $existing[$key] ?? null;
+        if ($current === null) {
+            return $seed;
+        }
+        if (!self::isPackageMap($current) || $current === []) {
+            throw new ToolError(sprintf('Hop data key "%s" must be a non-empty map of package names to constraints.', $key));
+        }
+
+        /** @var array<string, string> $current */
+        return $current;
+    }
+
+    /**
+     * True when the lowest version $current allows sits below the lowest
+     * version $target allows ("^4.1.0" against "^4.2"). False when either
+     * does not parse, so an unusual range is left alone.
+     */
+    public static function floorsBelow(string $current, string $target): bool
+    {
+        $have = self::lowerBound($current);
+        $want = self::lowerBound($target);
+        if ($have === null || $want === null) {
+            return false;
+        }
+
+        return version_compare(str_replace('-dev', '', $have), str_replace('-dev', '', $want), '<');
     }
 
     /**

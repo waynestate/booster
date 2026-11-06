@@ -106,6 +106,25 @@ final class InertiaThreeHopTest extends TestCase
         $all = $this->commandsBlob($fake);
         self::assertStringContainsString(NodeRunner::imageTag(24) . ' npm install', $all);
         self::assertStringContainsString('composer update -W --no-interaction --no-progress inertiajs/inertia-laravel', $all);
+
+        // The new client must build: without it public/build kept the Inertia 2 client (WELD, 2026-11-06).
+        self::assertStringContainsString(NodeRunner::imageTag(24) . ' npm ci', $all);
+        self::assertStringContainsString(NodeRunner::imageTag(24) . ' npm run build', $all);
+        self::assertStringContainsString('Build gate passed: npm ci and npm run build are green with the Inertia 3 client.', $messages);
+        self::assertTrue((new HopRegistry())->get(HopRegistry::INERTIA_3_ID)->buildGate);
+    }
+
+    public function test_a_front_end_that_does_not_build_on_inertia_3_fails_the_step_before_the_composer_gate(): void
+    {
+        $dir = $this->app();
+        $fake = $this->fake(buildExit: 1);
+        $report = $this->runInertia($fake, new RunOptions(), $dir);
+
+        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
+        $messages = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('Build gate failed: "npm run build" exited 1 in the Node container.', $messages);
+        self::assertStringContainsString('Could not resolve "@inertiajs/vue3"', $messages);
+        self::assertStringNotContainsString('composer update -W', $this->commandsBlob($fake));
     }
 
     public function test_the_dry_run_changes_nothing(): void
@@ -294,12 +313,13 @@ final class InertiaThreeHopTest extends TestCase
      * git answers clean; docker answers from $npmExit for the npm install call, from
      * $gateExit for every gate container after the baseline, and with exit 0
      * for everything else (docker version, image inspect, the baseline itself).
+     * $buildExit answers npm run build.
      */
-    private function fake(int $npmExit = 0, int $gateExit = 0): FakeProcessRunner
+    private function fake(int $npmExit = 0, int $gateExit = 0, int $buildExit = 0): FakeProcessRunner
     {
         $gateRuns = 0;
 
-        return new FakeProcessRunner(static function (array $command) use ($npmExit, $gateExit, &$gateRuns): ProcessResult {
+        return new FakeProcessRunner(static function (array $command) use ($npmExit, $gateExit, $buildExit, &$gateRuns): ProcessResult {
             if ($command[0] === 'git') {
                 return new ProcessResult(0, '', '');
             }
@@ -309,6 +329,9 @@ final class InertiaThreeHopTest extends TestCase
             if (($command[1] ?? '') !== 'run') {
                 // docker version and docker image inspect always succeed.
                 return new ProcessResult(0, '', '');
+            }
+            if (in_array('npm', $command, true) && in_array('build', $command, true)) {
+                return new ProcessResult($buildExit, $buildExit !== 0 ? 'Could not resolve "@inertiajs/vue3"' : '', '');
             }
             if (in_array('npm', $command, true)) {
                 return new ProcessResult($npmExit, $npmExit !== 0 ? 'npm install exploded' : '', '');

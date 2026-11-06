@@ -47,6 +47,10 @@ on a Laravel 12 app generated from the public Laravel Vue starter kit, with ever
 bugs, each fixed with a test, and the upgraded app then built, passed its tests on PHP 8.5 and registered a user in a
 browser. The private proof site has the hop-by-hop table.
 
+The same day, the whole chain ran on a copy of WELD's own site app with every gate and the replay gate on: PHP 8.3
+to 8.5, PHPUnit 12 to 13 with Pest 4 to 5, Node 26, Vite 8, TypeScript 6 and Inertia 3, seven hops, ten recorded
+pages matching after each one. That run found eight more bugs, each fixed with a test and listed in the changelog.
+
 ## Status
 
 See [CHANGELOG.md](https://github.com/waynestate/booster/blob/main/CHANGELOG.md) for what changed,

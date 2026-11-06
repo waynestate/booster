@@ -115,6 +115,12 @@ final class HopRegistry
     /** @var array<string, array<string, string>|null> */
     private readonly array $laravelCompanionPins;
 
+    /** @var array<string, array<string, string>|null> */
+    private readonly array $phpunitCompanionPins;
+
+    /** @var array<string, string> */
+    private readonly array $typescriptCompanionPins;
+
     /** @var array<string, Hop> */
     private array $hops = [];
 
@@ -144,6 +150,13 @@ final class HopRegistry
         $this->inertiaLaravelNext = self::scalar($data, 'inertia_laravel_next');
         $this->inertiaVue3Next = self::scalar($data, 'inertia_vue3_next');
         $this->laravelCompanionPins = self::companionPinTable($data, 'laravel_companion_pins');
+        $this->phpunitCompanionPins = self::companionPinTable($data, 'phpunit_companion_pins');
+        $typescriptPins = $data['typescript_companion_pins'] ?? null;
+        if (!self::isPackageMap($typescriptPins)) {
+            throw new ToolError('Hop data key "typescript_companion_pins" must map npm package names to constraints.');
+        }
+        /** @var array<mixed> $typescriptPins */
+        $this->typescriptCompanionPins = self::packageMap($typescriptPins);
 
         $this->addPhpHops();
         $this->addLaravelHops();
@@ -396,6 +409,34 @@ final class HopRegistry
         $pins = $this->laravelCompanionPins[$laravelTo] ?? null;
 
         return is_array($pins) ? $pins : [];
+    }
+
+    /**
+     * The companion composer constraints a PHPUnit hop moving to $phpunitTo
+     * raises alongside phpunit/phpunit: Pest and its Laravel plugin, whose
+     * majors pair one to one with PHPUnit's (Pest 4 runs on PHPUnit 12, Pest
+     * 5 on 13). A Pest app that kept its old Pest could never resolve the new
+     * PHPUnit (found on WELD, 2026-11-06). Raised only where the app lists them.
+     *
+     * @return array<string, string>
+     */
+    public function phpunitCompanionPins(string $phpunitTo): array
+    {
+        $pins = $this->phpunitCompanionPins[$phpunitTo] ?? null;
+
+        return is_array($pins) ? $pins : [];
+    }
+
+    /**
+     * The npm packages the TypeScript major hop raises when the app lists
+     * them below these floors, because an older release's peer range refuses
+     * the vue-tsc the hop installs.
+     *
+     * @return array<string, string>
+     */
+    public function typescriptCompanionPins(): array
+    {
+        return $this->typescriptCompanionPins;
     }
 
     /** The PHP version Booster can move to from $from, or null at the end of the chain. */
@@ -748,6 +789,7 @@ final class HopRegistry
                 summary: sprintf('Move PHPUnit %s tests to PHPUnit %s.', $from, $to),
                 rectorSets: ['Rector\PHPUnit\Set\PHPUnitSetList::COMPOSER_BASED'],
                 composerSet: ['phpunit/phpunit' => '^' . $to . '.0'],
+                composerSetIfPresent: $this->phpunitCompanionPins($to),
                 notes: [
                     'Run phpunit --migrate-configuration after this hop; Rector rewrites the test code but not phpunit.xml.',
                 ],
@@ -941,8 +983,9 @@ final class HopRegistry
             from: '2',
             to: '3',
             summary: sprintf('Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to %s and @inertiajs/vue3 to %s.', $this->inertiaLaravelNext, $this->inertiaVue3Next),
+            buildGate: true,
             notes: [
-                'Booster pins inertiajs/inertia-laravel to ' . $this->inertiaLaravelNext . ' and @inertiajs/vue3 to ' . $this->inertiaVue3Next . ', runs npm install when package.json moves, and runs the composer gate; the manual lines below are the code changes.',
+                'Booster pins inertiajs/inertia-laravel to ' . $this->inertiaLaravelNext . ' and @inertiajs/vue3 to ' . $this->inertiaVue3Next . ', runs npm install and the build gate (npm ci, npm run build) when package.json moves, and runs the composer gate; the manual lines below are the code changes.',
                 'MANUAL: Axios is no longer part of the core; the router ships a built-in XHR client, and Axios comes back only through an adapter.',
                 'MANUAL: qs and lodash-es are no longer bundled; install them yourself if your code imports them.',
                 'MANUAL: the invalid event is now httpException and the exception event is now networkError; rename the handlers you register.',

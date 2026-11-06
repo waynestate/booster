@@ -585,7 +585,8 @@ under `Pre-pass fixes:`.
    `case 1:` from matching the string `"1"` a query string carries. Every run keeps Rector's and PHPStan's caches in
    its own temp directory, removed at exit, so one run never reads another's.
 3. `composer.json` is edited: the `php` or `laravel/framework` constraint is raised, and `config.platform.php` moves
-   with it when the app already pins it. Booster never creates that key.
+   with it when the app already pins it, to the first released patch of the new PHP (8.4.1 for 8.4, because 8.4.0
+   never shipped; x.y.0 otherwise). Booster never creates that key.
 4. The gate runs the app's tests inside `booster-target:-`, a container built from `docker/Dockerfile`
    on the PHP the hop moves to. The stamp is a short hash of the recipe, so an edited `docker/Dockerfile` rebuilds
    the image instead of reusing a stale one. The image carries the extension set Citadel's apps run with: intl,
@@ -596,9 +597,12 @@ under `Pre-pass fixes:`.
     `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and
     verifies its extension list; it needs Docker and a few minutes per version, so it is not part of `composer ci`.
 5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package
-   the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. Every other hop, and
-   the baseline, run a plain `composer install`. The two phases report separately: a Composer failure names the
-   Composer phase and Composer's own output, because the tests never ran.
+   the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. A PHP hop on an app
+   that pins `config.platform.php` (every Sourdough app does) runs `composer update --lock`: no package moves, but
+   the lock's `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check
+   the raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain
+   `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's
+   own output, because the tests never ran.
 
 Composer 2.10 refuses to load tagged releases Packagist has flagged with a security advisory, and hops that move
 onto Laravel 9 or 10 most often meet that block. The refusal has two faces. The loud one fails the install phase
@@ -1303,6 +1307,8 @@ Proven how: the first full run with the gate on took a Laravel 12 app from PHP 8
 
 The front-end hops (`vite-major`, `tailwind-3-to-4`, `typescript-major`, `inertia-2-to-3`) were proven on 2026-11-06 on a Laravel 12 app generated from the public Laravel Vue starter kit, with every gate on: the first pass found four bugs, each fixed with a test, and the upgraded app then built, passed its tests on PHP 8.5 and registered a user in a browser. The private proof site has the hop-by-hop table.
 
+The same day, the whole chain ran on a copy of WELD's own site app with every gate and the replay gate on: PHP 8.3 to 8.5, PHPUnit 12 to 13 with Pest 4 to 5, Node 26, Vite 8, TypeScript 6 and Inertia 3, seven hops, ten recorded pages matching after each one. That run found eight more bugs, each fixed with a test and listed in the changelog.
+
 ### Status[#](https://booster.apps.wayne.edu/docs/checks.html#status)
 
 See [CHANGELOG.md](https://github.com/waynestate/booster/blob/main/CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](https://github.com/waynestate/booster/blob/main/OPEN_QUESTIONS.md) for what stays open, and [BEST_PRACTICES.md](https://github.com/waynestate/booster/blob/main/BEST_PRACTICES.md) for the rules Booster follows.
@@ -1426,9 +1432,9 @@ On PHP hops a pre-pass runs first: PHP 4 era `$a = &new Foo();` becomes a plain 
 
 1. Rector runs as a dry run. If it reports errors, the run stops before anything is written. So does a hop that would change more than 200 files, unless an interactive run confirms it after showing the per-rule summary; an explicit `--max-changes` is a hard limit that never asks. An empty Rector report usually means the process ran out of memory, and the message points at `--memory-limit`.
 2. Rector runs for real, with only that hop's rules. A rule that would change what the code does is never applied: the PHP 8.0 set's switch-to-match rewrite is skipped, because `match` compares strictly and would stop a `case 1:` from matching the string `"1"` a query string carries. Every run keeps Rector's and PHPStan's caches in its own temp directory, removed at exit, so one run never reads another's.
-3. `composer.json` is edited: the `php` or `laravel/framework` constraint is raised, and `config.platform.php` moves with it when the app already pins it. Booster never creates that key.
+3. `composer.json` is edited: the `php` or `laravel/framework` constraint is raised, and `config.platform.php` moves with it when the app already pins it, to the first released patch of the new PHP (8.4.1 for 8.4, because 8.4.0 never shipped; x.y.0 otherwise). Booster never creates that key.
 4. The gate runs the app's tests inside `booster-target:<php>-<stamp>`, a container built from `docker/Dockerfile` on the PHP the hop moves to. The stamp is a short hash of the recipe, so an edited `docker/Dockerfile` rebuilds the image instead of reusing a stale one. The image carries the extension set Citadel's apps run with: intl, ldap, soap, zip, gd, pdo_mysql, mysqli, bcmath, pcntl, exif, redis, imagick and oci8. The first build downloads Oracle Instant Client for oci8, so it takes a few minutes; later hops reuse the image. Pass `--image` to run the gate in your own image instead (below). A red gate stops the run and leaves the changes in place so you can read them (`git checkout .` undoes them). With `--replay`, the gate also replays the requests recorded before the first hop and fails on a changed answer: see [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html). To check the image itself, `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and verifies its extension list; it needs Docker and a few minutes per version, so it is not part of `composer ci`.
-5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. Every other hop, and the baseline, run a plain `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's own output, because the tests never ran.
+5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. A PHP hop on an app that pins `config.platform.php` (every Sourdough app does) runs `composer update --lock`: no package moves, but the lock's `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check the raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's own output, because the tests never ran.
 
 Composer 2.10 refuses to load tagged releases Packagist has flagged with a security advisory, and hops that move onto Laravel 9 or 10 most often meet that block. The refusal has two faces. The loud one fails the install phase and names the advisories. The quiet one happens when the app allows dev stability: Composer does not fail at all, it locks the branch instead, `9.x-dev` where the hop asks for `^9.0`. Booster reads the refreshed lock back and treats a branch version behind a tagged range like the block. Either way it writes a temporary entry to `config.policy.advisories.ignore` in `composer.json`: scoped to the package and the constraint Composer refused, kept visible to `composer audit`, and carrying a reason PROCTOR can find and report until the app removes it. The gate then retries once. If the retry still fails, the run stops with the unblock and the failure both in the report, and the entry stays in `composer.json`.
 
@@ -1650,7 +1656,7 @@ booster run --path=<app> --replay          # record, then replay after every hop
    ```
    Replay: recorded 11 answers on PHP 7.4 from booster-replay.json.
    ```
-   If the baseline cannot be recorded (the setup command failed, the server never answered, an answer missed its `expect`), the upgrade does not start, and nothing is changed.
+   When a later hop runs the build gate (`vite-major`, `tailwind-3-to-4`, `typescript-major` and the other front-end hops), Booster first runs `npm ci` and `npm run build` in the Node container, so the baseline serves the built front end the hops will rebuild, not a missing or stub `public/build/manifest.json`. If the baseline cannot be recorded (the front end does not build, the setup command failed, the server never answered, an answer missed its `expect`), the upgrade does not start, and nothing is changed.
 2. After each hop's tests pass, Booster serves the changed app on the new PHP, sends the same requests, and compares. A match adds `Replay passed: all 11 answers match the baseline from PHP 7.4.` to the hop. A difference fails the hop like a red test, leaves the changes in place, and shows the first difference:
    ```
    Replay failed on PHP 8.0: 1 of 2 answers differ from the baseline from PHP 7.4.
@@ -1716,7 +1722,11 @@ A normalizer rewrites the volatile parts of an answer before it is compared and 
 | `csrf` | CSRF tokens in hidden form fields and meta tags (`_token`, `csrf_token`, `authenticity_token` and friends) |
 | `session-id` | session ids in links, forms and scripts (`PHPSESSID=...`, `laravel_session=...`) |
 | `timestamps` | dates with a time of day, and Unix times from 2020 to 2033 |
-| `asset-hash` | content hashes in built asset names (`app.3f9a1c2b.js`, `app.js?id=3f9a1c`) |
+| `asset-hash` | content hashes in built asset names (`app.3f9a1c2b.js`, Vite's `app-L1fqnEWe.js`, `app.js?id=3f9a1c`) |
+| `preload-hints` | `<link rel="modulepreload">` tags, which list the chunks the bundler split out and change with any build; the tags that load the page stay compared |
+| `inertia` | the Inertia page object's asset `version`, the fields Inertia 3 changed (`clearHistory` and `encryptHistory` when false, `sharedProps`) and its devtools id; component, props and url stay compared |
+
+`booster replay init` lists `asset-hash` and `preload-hints` when the app builds with Vite, and `inertia` when it requires `inertiajs/inertia-laravel`. Without them the first front-end hop fails the replay on a sound change: on WELD, `inertia-2-to-3` changed only these parts of every page.
 
 Anything else is an object: `{"name": "request id", "pattern": "req-[0-9a-f]{12}", "replace": "req-<ID>", "in": "body"}`, where `in` is `body` (the default), `headers` or `all`. The patterns are PCRE without delimiters. Normalizers are not part of the recording's fingerprint, so adding one after a failed check does not mean recording again; changing a request does, and `check` says so.
 
@@ -2507,6 +2517,12 @@ The hop id `node-pin-24` is a stable id and now pins Node 26.
 Booster plans any target the policy knows. A target past security support is allowed as a stop on the way up, with a plan warning that names the date its security support ended. A version the policy does not list at all is still refused by name.
 
 A Laravel major hop also raises the companion packages its target major pairs with (for Laravel 13, laravel/tinker to ^3.0), but only where the app already lists them in require or require-dev; absent packages are never added, and a constraint that already floors at or above the pin's floor is left alone.
+
+A PHPUnit major hop does the same for Pest, whose majors pair one to one with PHPUnit's: PHPUnit 10, 11, 12 and 13 take `pestphp/pest` and `pestphp/pest-plugin-laravel` to ^2.0, ^3.0, ^4.0 and ^5.0, again only where the app lists them. Other Pest plugins are not raised; when one holds the old Pest back, Composer's answer in the gate names it.
+
+`typescript-major` raises the npm packages in `typescript_companion_pins` when the app lists an older release: today `prettier-plugin-organize-imports` to ^4.2, the first release whose peer range accepts vue-tsc 3. Without it, npm only warns during the hop and the next `npm install` refuses the tree.
+
+`inertia-2-to-3` runs `npm install` (the lock still names Inertia 2, so `npm ci` would refuse it), then the build gate (`npm ci`, `npm run build`), then the composer gate. `--skip-gate` skips both gates; the install still runs.
 
 ---
 

@@ -204,6 +204,68 @@ final class HopExecutorTest extends TestCase
     }
 
     /**
+     * Found on WELD, 2026-11-06: an app that pins config.platform.php (every
+     * Sourdough app does) keeps the old pin in composer.lock's
+     * platform-overrides, and `composer install` checks against that, so the
+     * PHP hop's gate refused its own raised require.php. The gate refreshes
+     * the lock with `composer update --lock` instead.
+     */
+    public function test_a_php_hop_on_a_platform_pinned_app_refreshes_the_lock_in_the_gate(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        $composer['require']['php'] = '^8.1';
+        $composer['config'] = ['platform' => ['php' => '8.1.0']];
+        file_put_contents($dir . '/composer.json', json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        file_put_contents($dir . '/composer.lock', json_encode(['packages' => [], 'platform-overrides' => ['php' => '8.1.0']]));
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.1', toPhp: '8.2'), $this->today());
+        $fake = $this->fake();
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        $scripts = array_map(static fn(array $run): string => $run['command'][count($run['command']) - 1], $this->dockerRuns($fake));
+        self::assertCount(2, $scripts);
+        // The baseline still installs the lock as it stands.
+        self::assertStringContainsString('composer install --no-interaction --no-progress --prefer-dist', $scripts[0]);
+        self::assertStringContainsString('composer update --lock --no-interaction --no-progress --prefer-dist', $scripts[1]);
+        self::assertStringNotContainsString('composer install', $scripts[1]);
+        self::assertStringNotContainsString('-W', $scripts[1]);
+        $messages = implode(' ', $report->results[0]->messages);
+        self::assertStringContainsString('Set config.platform.php to 8.2.0.', $messages);
+        self::assertStringContainsString('The gate refreshed composer.lock (composer update --lock).', $messages);
+    }
+
+    public function test_a_php_hop_without_a_platform_pin_keeps_the_plain_install(): void
+    {
+        $fake = $this->fake();
+        $this->execute($fake, new RunOptions());
+
+        foreach ($this->dockerRuns($fake) as $run) {
+            $script = $run['command'][count($run['command']) - 1];
+            self::assertStringContainsString('composer install --no-interaction --no-progress --prefer-dist', $script);
+            self::assertStringNotContainsString('composer update', $script);
+        }
+    }
+
+    public function test_a_failed_lock_refresh_is_named_as_such(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        $composer['require']['php'] = '^8.1';
+        $composer['config'] = ['platform' => ['php' => '8.1.0']];
+        file_put_contents($dir . '/composer.json', json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        file_put_contents($dir . '/composer.lock', json_encode(['packages' => []]));
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.1', toPhp: '8.2'), $this->today());
+        $fake = $this->fake(gateExit: 2, gateStdout: "Your lock file does not contain a compatible set of packages.\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=2");
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
+        self::assertStringContainsString('Gate failed: composer update --lock failed (exit 2) on PHP 8.2.', implode(' ', $report->results[0]->messages));
+    }
+
+    /**
      * The stamped image tag the gate builds for a PHP version.
      */
     private function gateTag(string $php): string

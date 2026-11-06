@@ -501,7 +501,7 @@ final class HopExecutor
                     ), ...self::summaryLines($prepass, $preview)] : [];
                     // A real run's gate refreshes the lock for these hops; say so now.
                     $update = $this->lockUpdatePackages($step, $path);
-                    $wouldRun = $update === [] ? [] : [sprintf('would run: composer update -W %s', implode(' ', $update))];
+                    $wouldRun = $update === [] ? [] : ['would run: ' . self::lockCommand($update)];
                     if ($incomplete) {
                         $messages = [...$threshold, ...$wouldRun, sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognize Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$inertiaChanges, ...$hop->notes, ...$notes];
                     } elseif ($files === []) {
@@ -581,7 +581,7 @@ final class HopExecutor
                     $messages[] = $this->gatePassedLine($step->phpAfter, $baseline->gateKind);
                     $update = $this->lockUpdatePackages($step, $path);
                     if ($update !== []) {
-                        $messages[] = sprintf('The gate refreshed composer.lock (composer update -W %s).', implode(' ', $update));
+                        $messages[] = sprintf('The gate refreshed composer.lock (%s).', self::lockCommand($update));
                     }
                     $unblocked = $this->composer->temporaryUnblocks($path);
                     if ($unblocked !== []) {
@@ -820,14 +820,23 @@ final class HopExecutor
      * packages, and because the app is mounted at /app the refreshed lock
      * lands in the app itself. A Laravel hop also refreshes each companion
      * package the app actually lists, so the lock moves with composer.json.
-     * PHP hops only move the platform requirement, which Composer resolves
-     * from the lock, so they keep the plain install.
+     * PHP hops only move the platform requirement, so they keep the plain
+     * install, except when the app pins config.platform.php: the lock keeps
+     * the old pin in its platform-overrides and `composer install` checks
+     * against that, so it refuses the raised require.php (found on WELD,
+     * 2026-11-06; every Sourdough app pins it). Those get `composer update
+     * --lock`, which moves no package but rewrites the hash and overrides.
      *
      * @return list<string>
      */
     private function lockUpdatePackages(PlanStep $step, string $path): array
     {
         $hop = $step->hop;
+        if ($hop->kind === HopKind::Php) {
+            return self::pinsPlatformPhp($path) && is_file(rtrim($path, '/\\') . '/composer.lock')
+                ? [TargetImageRunner::LOCK_REFRESH]
+                : [];
+        }
         if ($hop->kind !== HopKind::Laravel && $hop->kind !== HopKind::Phpunit) {
             return [];
         }
@@ -839,6 +848,42 @@ final class HopExecutor
         }
 
         return $packages;
+    }
+
+    /**
+     * The Composer command the gate runs for a non-empty update list, as the
+     * person would type it: `composer update --lock` for a lock refresh,
+     * `composer update -W <packages>` otherwise.
+     *
+     * @param list<string> $update
+     */
+    private static function lockCommand(array $update): string
+    {
+        return $update === [TargetImageRunner::LOCK_REFRESH]
+            ? 'composer update --lock'
+            : 'composer update -W ' . implode(' ', $update);
+    }
+
+    /** True when a step of the plan runs the build gate (npm ci, npm run build). */
+    private static function planBuildsFrontEnd(Plan $plan): bool
+    {
+        foreach ($plan->steps as $step) {
+            if ($step->hop->buildGate) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** True when the app's composer.json sets config.platform.php. */
+    private static function pinsPlatformPhp(string $path): bool
+    {
+        $file = rtrim($path, '/\\') . '/composer.json';
+        $raw = is_file($file) ? file_get_contents($file) : false;
+        $data = $raw === false ? null : json_decode($raw, true);
+
+        return is_array($data) && is_string($data['config']['platform']['php'] ?? null);
     }
 
     /**
@@ -914,11 +959,29 @@ final class HopExecutor
         if ($php === null) {
             return new ReplayOutcome(ReplayOutcome::FAILED, null, ['Replay baseline could not be recorded: Booster could not tell which PHP the app runs on. Pass --from-php.'], $name);
         }
+        // A hop with a build gate rebuilds public/build, so the pages it serves
+        // afterwards name the built assets. Record the baseline on a built front
+        // end too, or every page differs from a baseline that served no build
+        // or a test stub manifest (found on WELD, 2026-11-06).
+        $built = null;
+        if ($this->node !== null && self::planBuildsFrontEnd($plan)) {
+            $buildFailure = $this->runBuildGate($path);
+            if ($buildFailure !== null) {
+                return new ReplayOutcome(ReplayOutcome::FAILED, $php, [
+                    'Replay baseline could not be recorded: the front end does not build before any change, and a later hop rebuilds it.',
+                    ...array_slice($buildFailure, 0, 2),
+                ], $name);
+            }
+            $built = 'Replay: built the front end first (npm ci, npm run build), because a later hop rebuilds it.';
+        }
         $runner = $this->replayRunner ?? new ReplayRunner($this->gate, $this->processes);
         $this->replayGate = new ReplayGate($runner, $file, $path, $options->replayOut ?? ReplayGate::defaultOutDir($path), $options->gateImage);
 
         try {
             $outcome = $this->replayGate->record($php);
+            if ($built !== null) {
+                $outcome = new ReplayOutcome($outcome->status, $outcome->php, [$built, ...$outcome->lines], $outcome->file, $outcome->outDir, $outcome->transcript, $outcome->requests, $outcome->differences);
+            }
         } catch (ToolError $e) {
             $outcome = new ReplayOutcome(ReplayOutcome::FAILED, $php, ['Replay baseline could not be recorded: ' . $e->getMessage()], $name);
         }
@@ -1019,6 +1082,7 @@ final class HopExecutor
         $what = match (true) {
             $outcome->phase !== GateOutcome::PHASE_INSTALL => sprintf('"%s" exited %d', $test, $outcome->exitCode),
             $update === [] => sprintf('composer install failed (exit %d)', $outcome->exitCode),
+            $update === [TargetImageRunner::LOCK_REFRESH] => sprintf('%s failed (exit %d)', self::lockCommand($update), $outcome->exitCode),
             default => sprintf('composer update -W %s failed (exit %d)', implode(' ', $update), $outcome->exitCode),
         };
         $messages = [
@@ -1600,7 +1664,7 @@ final class HopExecutor
         $typescript = $this->registry()->typescriptVersion();
         if ($options->dryRun) {
             return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [], [
-                sprintf('Dry run: would pin typescript to %s in package.json (and vue-tsc to %s when the app has it), then gate on the build and the tests.', $typescript, $this->registry()->vueTscVersion()),
+                sprintf('Dry run: would pin typescript to %s in package.json (and vue-tsc to %s when the app has it), raise %s when the app lists an older one, then gate on the build and the tests.', $typescript, $this->registry()->vueTscVersion(), implode(', ', array_map(static fn(string $name, string $pin): string => $name . ' to ' . $pin, array_keys($this->registry()->typescriptCompanionPins()), $this->registry()->typescriptCompanionPins()))),
                 ...$hop->notes,
             ]);
         }
@@ -2170,6 +2234,7 @@ final class HopExecutor
         $vueTsc = $this->registry()->vueTscVersion();
         $edited = false;
         $vueTscPinned = false;
+        $companions = [];
         foreach (['dependencies', 'devDependencies'] as $section) {
             if (!is_array($package[$section] ?? null)) {
                 continue;
@@ -2185,12 +2250,26 @@ final class HopExecutor
                 $edited = true;
                 $vueTscPinned = true;
             }
+            // Companions whose older releases refuse the new vue-tsc as a peer:
+            // npm install only warns once, and the next hop's install fails.
+            foreach ($this->registry()->typescriptCompanionPins() as $name => $pin) {
+                $current = $package[$section][$name] ?? null;
+                if (is_string($current) && HopDataRefresher::floorsBelow($current, $pin)) {
+                    $package[$section][$name] = $pin;
+                    $changes[] = 'package.json: ' . $section . ' ' . $name . ' to ' . $pin . ' (older releases refuse the new vue-tsc as a peer).';
+                    $edited = true;
+                    $companions[] = $name . ' to ' . $pin;
+                }
+            }
         }
         if ($edited) {
             file_put_contents($packageFile, json_encode($package, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
             $diff = 'pinned typescript to ' . $typescript;
             if ($vueTscPinned) {
                 $diff .= ' and vue-tsc to ' . $vueTsc;
+            }
+            if ($companions !== []) {
+                $diff .= ', raised ' . implode(', ', $companions);
             }
             $files[] = ['file' => 'package.json', 'diff' => $diff];
         }
@@ -2415,6 +2494,17 @@ final class HopExecutor
         }
 
         if (!$options->skipGate) {
+            // The client moved a major (ESM only, removed APIs, a new page
+            // payload), so the front end must build before the tests count;
+            // otherwise public/build keeps the Inertia 2 client while the
+            // server prints the Inertia 3 page (found on WELD, 2026-11-06).
+            if ($this->node !== null && self::fileTouched($files, 'package.json')) {
+                $buildFailure = $this->runBuildGate($path);
+                if ($buildFailure !== null) {
+                    return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$buildFailure]);
+                }
+                $changes[] = 'Build gate passed: npm ci and npm run build are green with the Inertia 3 client.';
+            }
             $gate = $this->runGate($step, $path, $options, $baseline, $this->inertiaUpdatePackages($path));
             if (!$gate->passed) {
                 return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);

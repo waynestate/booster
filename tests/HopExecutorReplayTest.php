@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Tests;
 
 use Waynestate\Booster\Hop\HopRegistry;
+use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanOptions;
+use Waynestate\Booster\Plan\PlanStep;
 use Waynestate\Booster\Plan\Planner;
 use Waynestate\Booster\Project\ProjectDetector;
 use Waynestate\Booster\Replay\ReplayFile;
@@ -13,6 +15,7 @@ use Waynestate\Booster\Replay\ReplayOutcome;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\ComposerEditor;
 use Waynestate\Booster\Run\HopExecutor;
+use Waynestate\Booster\Run\NodeRunner;
 use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\Run\RectorRunner;
 use Waynestate\Booster\Run\RunOptions;
@@ -134,6 +137,97 @@ final class HopExecutorReplayTest extends TestCase
         self::assertSame(ReplayOutcome::SKIPPED, $report->replay?->status);
         self::assertFalse($report->failed());
         self::assertSame([], array_filter($fake->calls, static fn(array $c): bool => in_array('--network', $c['command'], true)));
+    }
+
+    /**
+     * Found on WELD, 2026-11-06: the baseline served a front end nobody had
+     * built (a test stub manifest), the vite-major hop's build gate built it,
+     * and every page then differed. A plan with a build-gated hop builds first.
+     */
+    public function test_the_front_end_is_built_before_the_baseline_when_a_hop_rebuilds_it(): void
+    {
+        $fake = $this->nodeFake([self::answers(true), self::answers(true)]);
+
+        $report = $this->executeViteMajor($fake, new RunOptions(replay: $this->replayFile(), replayOut: $this->tempDir()));
+
+        self::assertFalse($report->failed());
+        self::assertSame(ReplayOutcome::RECORDED, $report->replay?->status);
+        self::assertSame('Replay: built the front end first (npm ci, npm run build), because a later hop rebuilds it.', $report->replay->lines[0]);
+        $order = [];
+        foreach ($fake->calls as $call) {
+            $command = $call['command'];
+            if (in_array('--network', $command, true)) {
+                $order[] = 'replay';
+            } elseif (in_array('npm', $command, true)) {
+                $order[] = implode(' ', array_slice($command, array_search('npm', $command, true)));
+            }
+        }
+        // npm ci and the build come before the first recording.
+        self::assertSame(['npm ci', 'npm run build', 'replay'], array_slice($order, 0, 3));
+    }
+
+    public function test_a_front_end_that_does_not_build_before_any_change_stops_the_replay_baseline(): void
+    {
+        $fake = $this->nodeFake([], buildExit: 1);
+
+        $report = $this->executeViteMajor($fake, new RunOptions(replay: $this->replayFile(), replayOut: $this->tempDir()));
+
+        self::assertTrue($report->failed());
+        self::assertSame(ReplayOutcome::FAILED, $report->replay?->status);
+        self::assertSame('Replay baseline could not be recorded: the front end does not build before any change, and a later hop rebuilds it.', $report->replay->lines[0]);
+        self::assertSame(StepResult::NOT_RUN, $report->results[0]->status);
+        self::assertSame([], array_filter($fake->calls, static fn(array $c): bool => in_array('--network', $c['command'], true)));
+    }
+
+    public function test_a_plan_without_a_build_gated_hop_does_not_build_for_the_replay(): void
+    {
+        $fake = $this->fake([self::answers(true), self::answers(true), self::answers(true)]);
+
+        $report = $this->execute($fake, new RunOptions(replay: $this->replayFile(), replayOut: $this->tempDir()));
+
+        self::assertFalse($report->failed());
+        self::assertStringNotContainsString('built the front end', implode(' ', $report->replay?->lines ?? []));
+    }
+
+    /**
+     * @param list<list<array{0: int, 1: string, 2?: list<array{string, string}>}>|string> $replays
+     */
+    private function nodeFake(array $replays, int $buildExit = 0): FakeProcessRunner
+    {
+        $docker = ReplayFake::runner($replays);
+
+        return new FakeProcessRunner(static function (array $command) use ($docker, $buildExit): ProcessResult {
+            if ($command[0] === 'docker' && in_array('npm', $command, true)) {
+                return new ProcessResult(in_array('build', $command, true) ? $buildExit : 0, '', '');
+            }
+
+            return $docker->run($command);
+        });
+    }
+
+    private function executeViteMajor(FakeProcessRunner $fake, RunOptions $options): RunReport
+    {
+        $dir = $this->tempDir();
+        $this->copyFixture(__DIR__ . '/fixtures/vite6', $dir);
+        $step = new PlanStep(1, (new HopRegistry())->get(HopRegistry::VITE_MAJOR_ID), '8.3', '8.3', '12', '12', null, null, [Planner::GATE_TESTS]);
+        $plan = new Plan((new ProjectDetector())->detect($dir), self::TODAY, 'test', '8.3', null, null, [$step], []);
+
+        return (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake, dirname(__DIR__) . '/docker'), $fake, new NodeRunner($fake)))->execute($plan, $options);
+    }
+
+    private function copyFixture(string $from, string $to): void
+    {
+        foreach (scandir($from) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            if (is_dir($from . '/' . $entry)) {
+                mkdir($to . '/' . $entry, 0775, true);
+                $this->copyFixture($from . '/' . $entry, $to . '/' . $entry);
+            } else {
+                copy($from . '/' . $entry, $to . '/' . $entry);
+            }
+        }
     }
 
     public function test_without_replay_the_run_and_its_json_are_unchanged(): void

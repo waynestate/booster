@@ -66,6 +66,24 @@ final class ComposerEditorTest extends TestCase
         self::assertSame('8.3.0', $after['config']['platform']['php']);
     }
 
+    public function test_the_php_84_hop_pins_the_first_released_patch_because_840_never_shipped(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        $data = $this->read($dir);
+        $data['require']['php'] = '^8.3';
+        $data['config']['platform']['php'] = '8.3.0';
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        $changes = (new ComposerEditor())->apply((new HopRegistry())->get('php-83-to-84'), $dir);
+
+        // PHPUnit 13 and Symfony 8 require php >=8.4.1, so a pin of 8.4.0 stopped phpunit-12-to-13 on WELD (2026-11-06).
+        self::assertContains('Set config.platform.php to 8.4.1.', $changes);
+        self::assertSame('8.4.1', $this->read($dir)['config']['platform']['php']);
+
+        (new ComposerEditor())->apply((new HopRegistry())->get('php-84-to-85'), $dir);
+        self::assertSame('8.5.0', $this->read($dir)['config']['platform']['php']);
+    }
+
     public function test_the_laravel_13_hop_raises_a_listed_companion_package_with_the_framework(): void
     {
         $dir = $this->copyExample('laravel-blade');
@@ -83,6 +101,33 @@ final class ComposerEditorTest extends TestCase
         $after = $this->read($dir);
         self::assertSame('^13.0', $after['require']['laravel/framework']);
         self::assertSame('^3.0', $after['require']['laravel/tinker']);
+    }
+
+    public function test_the_phpunit_13_hop_raises_pest_with_phpunit_and_adds_nothing_else(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        $data = $this->read($dir);
+        $data['require-dev'] = ['phpunit/phpunit' => '^12.5', 'pestphp/pest' => '^4.0', 'pestphp/pest-plugin-laravel' => '^4.0'];
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        $changes = (new ComposerEditor())->apply((new HopRegistry())->get('phpunit-12-to-13'), $dir);
+
+        self::assertSame(
+            [
+                'Set phpunit/phpunit to ^13.0 in require-dev.',
+                'Set pestphp/pest to ^5.0 in require-dev.',
+                'Set pestphp/pest-plugin-laravel to ^5.0 in require-dev.',
+            ],
+            $changes,
+        );
+
+        // A PHPUnit-only app gets no Pest.
+        $plain = $this->copyExample('laravel-blade');
+        $data = $this->read($plain);
+        $data['require-dev'] = ['phpunit/phpunit' => '^12.5'];
+        file_put_contents($plain . '/composer.json', json_encode($data));
+        (new ComposerEditor())->apply((new HopRegistry())->get('phpunit-12-to-13'), $plain);
+        self::assertSame(['phpunit/phpunit' => '^13.0'], $this->read($plain)['require-dev']);
     }
 
     public function test_the_laravel_13_hop_never_adds_a_companion_package_the_app_does_not_list(): void

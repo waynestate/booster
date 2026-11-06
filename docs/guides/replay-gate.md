@@ -37,7 +37,10 @@ them, or check a hand-made change with `booster replay check --php=8.4`. `--repl
 
        Replay: recorded 11 answers on PHP 7.4 from booster-replay.json.
 
-   If the baseline cannot be recorded (the setup command failed, the server never answered, an answer missed its
+   When a later hop runs the build gate (`vite-major`, `tailwind-3-to-4`, `typescript-major` and the other front-end
+   hops), Booster first runs `npm ci` and `npm run build` in the Node container, so the baseline serves the built
+   front end the hops will rebuild, not a missing or stub `public/build/manifest.json`. If the baseline cannot be
+   recorded (the front end does not build, the setup command failed, the server never answered, an answer missed its
    `expect`), the upgrade does not start, and nothing is changed.
 2. After each hop's tests pass, Booster serves the changed app on the new PHP, sends the same requests, and compares.
    A match adds `Replay passed: all 11 answers match the baseline from PHP 7.4.` to the hop. A difference fails the
@@ -122,7 +125,13 @@ A normalizer rewrites the volatile parts of an answer before it is compared and 
 | `csrf` | CSRF tokens in hidden form fields and meta tags (`_token`, `csrf_token`, `authenticity_token` and friends) |
 | `session-id` | session ids in links, forms and scripts (`PHPSESSID=...`, `laravel_session=...`) |
 | `timestamps` | dates with a time of day, and Unix times from 2020 to 2033 |
-| `asset-hash` | content hashes in built asset names (`app.3f9a1c2b.js`, `app.js?id=3f9a1c`) |
+| `asset-hash` | content hashes in built asset names (`app.3f9a1c2b.js`, Vite's `app-L1fqnEWe.js`, `app.js?id=3f9a1c`) |
+| `preload-hints` | `<link rel="modulepreload">` tags, which list the chunks the bundler split out and change with any build; the tags that load the page stay compared |
+| `inertia` | the Inertia page object's asset `version`, the fields Inertia 3 changed (`clearHistory` and `encryptHistory` when false, `sharedProps`) and its devtools id; component, props and url stay compared |
+
+`booster replay init` lists `asset-hash` and `preload-hints` when the app builds with Vite, and `inertia` when it
+requires `inertiajs/inertia-laravel`. Without them the first front-end hop fails the replay on a sound change: on WELD,
+`inertia-2-to-3` changed only these parts of every page.
 
 Anything else is an object: `{"name": "request id", "pattern": "req-[0-9a-f]{12}", "replace": "req-<ID>", "in": "body"}`,
 where `in` is `body` (the default), `headers` or `all`. The patterns are PCRE without delimiters. Normalizers are

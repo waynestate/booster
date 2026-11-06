@@ -327,6 +327,14 @@ refused by name.</p>
 <p>A Laravel major hop also raises the companion packages its target major pairs with (for Laravel 13, laravel/tinker to
 ^3.0), but only where the app already lists them in require or require-dev; absent packages are never added, and a
 constraint that already floors at or above the pin's floor is left alone.</p>
+<p>A PHPUnit major hop does the same for Pest, whose majors pair one to one with PHPUnit's: PHPUnit 10, 11, 12 and 13
+take <code>pestphp/pest</code> and <code>pestphp/pest-plugin-laravel</code> to ^2.0, ^3.0, ^4.0 and ^5.0, again only where the app lists
+them. Other Pest plugins are not raised; when one holds the old Pest back, Composer's answer in the gate names it.</p>
+<p><code>typescript-major</code> raises the npm packages in <code>typescript_companion_pins</code> when the app lists an older release: today
+<code>prettier-plugin-organize-imports</code> to ^4.2, the first release whose peer range accepts vue-tsc 3. Without it, npm
+only warns during the hop and the next <code>npm install</code> refuses the tree.</p>
+<p><code>inertia-2-to-3</code> runs <code>npm install</code> (the lock still names Inertia 2, so <code>npm ci</code> would refuse it), then the build gate
+(<code>npm ci</code>, <code>npm run build</code>), then the composer gate. <code>--skip-gate</code> skips both gates; the install still runs.</p>
 </article>
     </main>
     <nav class="docs-pager" aria-label="Pages"><a class="docs-pager__link" href="../../docs/reference/configuration.html"><span class="docs-pager__dir">Previous</span><span class="docs-pager__title">Configuration</span></a><a class="docs-pager__link docs-pager__link--next" href="../../docs/checks.html"><span class="docs-pager__dir">Next</span><span class="docs-pager__title">Checks</span></a></nav>

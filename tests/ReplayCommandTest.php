@@ -152,6 +152,23 @@ final class ReplayCommandTest extends TestCase
         self::assertSame(['artisan', 'route:list', '--json'], array_slice($fake->calls[0]['command'], 1));
         self::assertSame('public', $file->docroot);
         self::assertSame(['GET /', 'GET /notes/{note}', 'GET /booster-replay-no-such-page', 'POST /notes'], array_map(static fn($r): string => $r->method . ' ' . $r->path, $file->requests));
+        // No front end: only the presets every app needs.
+        self::assertSame(['csrf', 'session-id'], json_decode($draft['json'], true)['normalize']);
+    }
+
+    public function test_the_drafter_lists_the_front_end_presets_for_a_vite_and_inertia_app(): void
+    {
+        $app = $this->tempDir();
+        mkdir($app . '/public');
+        file_put_contents($app . '/public/index.php', "<?php\n\$app->get('/', 'home');\n");
+        file_put_contents($app . '/package.json', (string) json_encode(['devDependencies' => ['vite' => '^6.0', '@inertiajs/vue3' => '^2.0']]));
+        file_put_contents($app . '/composer.json', (string) json_encode(['require' => ['inertiajs/inertia-laravel' => '^2.0']]));
+
+        $draft = (new ReplayDrafter())->draft($app);
+
+        // Without these, every build-gated hop failed the replay on WELD (2026-11-06).
+        self::assertSame(['csrf', 'session-id', 'asset-hash', 'preload-hints', 'inertia'], json_decode($draft['json'], true)['normalize']);
+        ReplayFile::fromArray((array) json_decode($draft['json'], true));
     }
 
     public function test_run_refuses_replay_with_skip_gate(): void

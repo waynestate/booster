@@ -102,6 +102,45 @@ final class TypescriptMajorTest extends TestCase
         self::assertStringContainsString('npm install ran in the Node container: package-lock.json and node_modules now match the pins.', $messages);
     }
 
+    /**
+     * Found on WELD, 2026-11-06: prettier-plugin-organize-imports ^4.1.0 (every
+     * Sourdough Inertia app lists it) asks for vue-tsc ^2, so after this hop the
+     * next npm install (the Inertia hop's) failed with ERESOLVE.
+     */
+    public function test_the_hop_raises_a_listed_companion_whose_old_release_refuses_the_new_vue_tsc(): void
+    {
+        $dir = $this->app();
+        $package = json_decode((string) file_get_contents($dir . '/package.json'), true);
+        $package['devDependencies']['prettier-plugin-organize-imports'] = '^4.1.0';
+        file_put_contents($dir . '/package.json', (string) json_encode($package, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+
+        $report = $this->runTypescript($this->fake($dir), new RunOptions(), $dir);
+
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        $after = json_decode((string) file_get_contents($dir . '/package.json'), true);
+        self::assertSame('^4.2', $after['devDependencies']['prettier-plugin-organize-imports']);
+        self::assertStringContainsString('package.json: devDependencies prettier-plugin-organize-imports to ^4.2 (older releases refuse the new vue-tsc as a peer).', implode("\n", $report->results[0]->messages));
+        self::assertStringEndsWith(', raised prettier-plugin-organize-imports to ^4.2', $report->results[0]->files[0]['diff']);
+        self::assertSame(['prettier-plugin-organize-imports' => '^4.2'], (new HopRegistry())->typescriptCompanionPins());
+    }
+
+    public function test_a_companion_already_at_its_floor_or_absent_is_left_alone(): void
+    {
+        $dir = $this->app();
+        $package = json_decode((string) file_get_contents($dir . '/package.json'), true);
+        $package['devDependencies']['prettier-plugin-organize-imports'] = '^4.3.0';
+        file_put_contents($dir . '/package.json', (string) json_encode($package, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+        $this->runTypescript($this->fake($dir), new RunOptions(), $dir);
+        $after = json_decode((string) file_get_contents($dir . '/package.json'), true);
+        self::assertSame('^4.3.0', $after['devDependencies']['prettier-plugin-organize-imports']);
+
+        $plain = $this->app();
+        $this->runTypescript($this->fake($plain), new RunOptions(), $plain);
+        $after = json_decode((string) file_get_contents($plain . '/package.json'), true);
+        self::assertArrayNotHasKey('prettier-plugin-organize-imports', $after['devDependencies']);
+        self::assertArrayNotHasKey('prettier-plugin-organize-imports', $after['dependencies'] ?? []);
+    }
+
     public function test_vue_tsc_is_not_added_when_the_app_does_not_list_it(): void
     {
         $dir = $this->app();

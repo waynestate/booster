@@ -60,3 +60,14 @@ refused by name.
 A Laravel major hop also raises the companion packages its target major pairs with (for Laravel 13, laravel/tinker to
 ^3.0), but only where the app already lists them in require or require-dev; absent packages are never added, and a
 constraint that already floors at or above the pin's floor is left alone.
+
+A PHPUnit major hop does the same for Pest, whose majors pair one to one with PHPUnit's: PHPUnit 10, 11, 12 and 13
+take `pestphp/pest` and `pestphp/pest-plugin-laravel` to ^2.0, ^3.0, ^4.0 and ^5.0, again only where the app lists
+them. Other Pest plugins are not raised; when one holds the old Pest back, Composer's answer in the gate names it.
+
+`typescript-major` raises the npm packages in `typescript_companion_pins` when the app lists an older release: today
+`prettier-plugin-organize-imports` to ^4.2, the first release whose peer range accepts vue-tsc 3. Without it, npm
+only warns during the hop and the next `npm install` refuses the tree.
+
+`inertia-2-to-3` runs `npm install` (the lock still names Inertia 2, so `npm ci` would refuse it), then the build gate
+(`npm ci`, `npm run build`), then the composer gate. `--skip-gate` skips both gates; the install still runs.

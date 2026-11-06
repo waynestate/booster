@@ -20,6 +20,9 @@ final class TargetImageRunner
 {
     public const IMAGE_PREFIX = 'booster-target:';
 
+    /** The update list that means "refresh the lock only" (composer update --lock). */
+    public const LOCK_REFRESH = '--lock';
+
     /** Composer 2.3 and later require PHP 7.2.5, so PHP below 7.2 builds get the 2.2 LTS line. */
     public const COMPOSER_VERSION_LEGACY = '2.2';
 
@@ -75,13 +78,20 @@ final class TargetImageRunner
      * hold the old lock (or fail on its stale content hash). The app is
      * mounted at /app, so the refreshed lock lands in the app itself.
      *
+     * $updatePackages === [self::LOCK_REFRESH] runs `composer update --lock`
+     * instead: no package moves, but the lock's content hash and its
+     * platform-overrides catch up with composer.json (a PHP hop that moved
+     * config.platform.php needs exactly that; see HopExecutor).
+     *
      * @param list<string> $updatePackages
      */
     public static function containerScript(string $testCommand, ?string $extraCommand, array $updatePackages = []): string
     {
-        $composerPhase = $updatePackages === []
-            ? 'composer install --no-interaction --no-progress --prefer-dist'
-            : sprintf('composer update -W --no-interaction --no-progress %s', implode(' ', $updatePackages));
+        $composerPhase = match (true) {
+            $updatePackages === [] => 'composer install --no-interaction --no-progress --prefer-dist',
+            $updatePackages === [self::LOCK_REFRESH] => 'composer update --lock --no-interaction --no-progress --prefer-dist',
+            default => sprintf('composer update -W --no-interaction --no-progress %s', implode(' ', $updatePackages)),
+        };
         $lines = [
             'install_log=/tmp/booster-gate-install.log',
             $composerPhase . ' >"$install_log" 2>&1',

@@ -31,6 +31,20 @@ final class ComposerEditor
     private const WAYNE_CAS = 'cit-web-infra/wayne-cas';
 
     /**
+     * PHP minors whose x.y.0 was tagged but never released. 8.4.0 was skipped
+     * and 8.4.1 was the first 8.4 release, so packages floor at 8.4.1
+     * (PHPUnit 13, Symfony 8) and a platform pin of 8.4.0 refuses them (found
+     * on WELD, 2026-11-06: phpunit-12-to-13 could not resolve).
+     */
+    private const FIRST_RELEASES = ['8.4' => '8.4.1'];
+
+    /** The first released patch of a PHP minor, for config.platform.php. */
+    public static function firstRelease(string $minor): string
+    {
+        return self::FIRST_RELEASES[$minor] ?? $minor . '.0';
+    }
+
+    /**
      * @return list<string> human-readable lines about what changed
      */
     public function apply(Hop $hop, string $appPath): array
@@ -71,8 +85,9 @@ final class ComposerEditor
             $changes = [...$changes, ...$this->ensureHttpClient($data)];
         }
         if ($hop->kind === HopKind::Php && isset($data['config']['platform']['php'])) {
-            $data['config']['platform']['php'] = $hop->to . '.0';
-            $changes[] = sprintf('Set config.platform.php to %s.0.', $hop->to);
+            $pin = self::firstRelease($hop->to);
+            $data['config']['platform']['php'] = $pin;
+            $changes[] = sprintf('Set config.platform.php to %s.', $pin);
         }
 
         if ($changes === []) {

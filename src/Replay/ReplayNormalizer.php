@@ -41,9 +41,39 @@ final readonly class ReplayNormalizer
             ['/\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?/', '<TIMESTAMP>'],
             ['/\b(?:1[6-9]|20)\d{8}(?:\d{3})?\b/', '<TIMESTAMP>'],
         ]],
-        'asset-hash' => ['content hashes in built asset names (app.3f9a1c2b.js, app.js?id=3f9a1c)', [
+        'asset-hash' => ['content hashes in built asset names (app.3f9a1c2b.js, Vite\'s app-L1fqnEWe.js, app.js?id=3f9a1c)', [
             ['/([.\-])[0-9a-f]{8,}(\.(?:js|mjs|css|map|png|jpe?g|gif|svg|webp|woff2?|ttf))\b/i', '$1<HASH>$2'],
+            // Vite (Rollup 4, Rolldown) hashes are 8 base64url characters after a
+            // dash, and may hold a dash themselves (AppHeader-DK7UwdK-.css). The
+            // lookahead wants a digit, a capital, "_" or "-" in the eight, so a
+            // plain word such as app-settings.js is left alone (found on WELD,
+            // 2026-11-06: the hex-only rule matched no Vite asset at all).
+            ['/-(?=[A-Za-z0-9_\-]{0,7}[0-9A-Z_\-])[A-Za-z0-9_\-]{8}(\.(?:js|mjs|css|map|png|jpe?g|gif|svg|webp|woff2?|ttf))\b/', '-<HASH>$1'],
             ['/(\.(?:js|mjs|css)\?(?:id|v|ver|version|h)=)[A-Za-z0-9_\-.]+/i', '$1<HASH>'],
+        ]],
+        // A bundler may split a shared module into its own chunk after any
+        // dependency moves (Inertia 3 split WayneUI's Vue kit out on WELD,
+        // 2026-11-06). The hint only warms the cache; the script and
+        // stylesheet tags that load the page are still compared.
+        'preload-hints' => ['<link rel="modulepreload"> hints, which list the chunks the bundler split out and change with any build', [
+            // Quoted values are skipped whole: the server's own address is
+            // already "<app>" by now, and its ">" must not end the tag.
+            ['/<link\s+rel\s*=\s*["\']modulepreload["\'](?:[^>"\']|"[^"]*"|\'[^\']*\')*>/i', ''],
+        ]],
+        // The Inertia page object: its asset version changes with every build,
+        // and its protocol fields changed between Inertia 2 and 3 (2 always
+        // printed clearHistory and encryptHistory, 3 omits them when false and
+        // adds sharedProps, the names of the shared props). Local apps on
+        // Inertia 3 also print a devtools id that is new on every request.
+        // Component, props and url are never touched. Each rule covers the
+        // JSON answer and the HTML-escaped data-page attribute.
+        'inertia' => ['the Inertia page object\'s asset version, its protocol fields that changed in Inertia 3 (clearHistory and encryptHistory when false, sharedProps) and the devtools id', [
+            ['/((&quot;|")version\2:\2)[0-9a-f]{32}/', '$1<VERSION>'],
+            ['/,(&quot;|")(?:clearHistory|encryptHistory)\1:false\b/', ''],
+            ['/(?<=\{)(&quot;|")(?:clearHistory|encryptHistory)\1:false,/', ''],
+            ['/,(&quot;|")sharedProps\1:\[[^\]]*\]/', ''],
+            ['/(?<=\{)(&quot;|")sharedProps\1:\[[^\]]*\],/', ''],
+            ['/<script\s+data-inertia-devtools-id\b[^>]*>[^<]*<\/script>/i', ''],
         ]],
     ];
 

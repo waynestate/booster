@@ -20,7 +20,8 @@ under `Pre-pass fixes:`.
    `case 1:` from matching the string `"1"` a query string carries. Every run keeps Rector's and PHPStan's caches in
    its own temp directory, removed at exit, so one run never reads another's.
 3. `composer.json` is edited: the `php` or `laravel/framework` constraint is raised, and `config.platform.php` moves
-   with it when the app already pins it. Booster never creates that key.
+   with it when the app already pins it, to the first released patch of the new PHP (8.4.1 for 8.4, because 8.4.0
+   never shipped; x.y.0 otherwise). Booster never creates that key.
 4. The gate runs the app's tests inside `booster-target:<php>-<stamp>`, a container built from `docker/Dockerfile`
    on the PHP the hop moves to. The stamp is a short hash of the recipe, so an edited `docker/Dockerfile` rebuilds
    the image instead of reusing a stale one. The image carries the extension set Citadel's apps run with: intl,
@@ -32,9 +33,12 @@ under `Pre-pass fixes:`.
    `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and
    verifies its extension list; it needs Docker and a few minutes per version, so it is not part of `composer ci`.
 5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package
-   the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. Every other hop, and
-   the baseline, run a plain `composer install`. The two phases report separately: a Composer failure names the
-   Composer phase and Composer's own output, because the tests never ran.
+   the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. A PHP hop on an app
+   that pins `config.platform.php` (every Sourdough app does) runs `composer update --lock`: no package moves, but
+   the lock's `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check
+   the raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain
+   `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's
+   own output, because the tests never ran.
 
 Composer 2.10 refuses to load tagged releases Packagist has flagged with a security advisory, and hops that move
 onto Laravel 9 or 10 most often meet that block. The refusal has two faces. The loud one fails the install phase

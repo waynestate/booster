@@ -36,6 +36,8 @@ Proven how: the first full run with the gate on took a Laravel 12 app from PHP 8
 
 The front-end hops (`vite-major`, `tailwind-3-to-4`, `typescript-major`, `inertia-2-to-3`) were proven on 2026-11-06 on a Laravel 12 app generated from the public Laravel Vue starter kit, with every gate on: the first pass found four bugs, each fixed with a test, and the upgraded app then built, passed its tests on PHP 8.5 and registered a user in a browser. The private proof site has the hop-by-hop table.
 
+The same day, the whole chain ran on a copy of WELD's own site app with every gate and the replay gate on: PHP 8.3 to 8.5, PHPUnit 12 to 13 with Pest 4 to 5, Node 26, Vite 8, TypeScript 6 and Inertia 3, seven hops, ten recorded pages matching after each one. That run found eight more bugs, each fixed with a test and listed in the changelog.
+
 ## Status[#](https://booster.apps.wayne.edu/docs/checks.html#status)
 
 See [CHANGELOG.md](https://github.com/waynestate/booster/blob/main/CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](https://github.com/waynestate/booster/blob/main/OPEN_QUESTIONS.md) for what stays open, and [BEST_PRACTICES.md](https://github.com/waynestate/booster/blob/main/BEST_PRACTICES.md) for the rules Booster follows.

@@ -110,6 +110,59 @@ final class ReplayComparisonTest extends TestCase
         self::assertSame('<script src="/build/app.<HASH>.js"></script> <link href="/css/app.css?id=<HASH>">', ReplayNormalizer::preset('asset-hash')->apply('<script src="/build/app.3f9a1c2b7e.js"></script> <link href="/css/app.css?id=4c1d2e">'));
     }
 
+    /** Found on WELD, 2026-11-06: Vite's base64url hashes slipped past the hex-only rule. */
+    public function test_asset_hash_hides_vite_hashes_and_leaves_plain_names_alone(): void
+    {
+        $preset = ReplayNormalizer::preset('asset-hash');
+
+        self::assertSame(
+            '<link href="/build/assets/app-<HASH>.css"><script src="/build/assets/app-<HASH>.js"></script>',
+            $preset->apply('<link href="/build/assets/app-CCXBMKGl.css"><script src="/build/assets/app-L1fqnEWe.js"></script>'),
+        );
+        // A hash may hold a dash or an underscore itself.
+        self::assertSame('/build/assets/AppHeader-<HASH>.css /build/assets/wsu-shield-<HASH>.svg', $preset->apply('/build/assets/AppHeader-DK7UwdK-.css /build/assets/wsu-shield-C3_lVA08.svg'));
+        // Plain lowercase words are names, not hashes.
+        self::assertSame('/js/app-settings.js /js/my-dashboard.css', $preset->apply('/js/app-settings.js /js/my-dashboard.css'));
+    }
+
+    public function test_the_inertia_preset_matches_an_inertia_2_page_with_its_inertia_3_answer(): void
+    {
+        // The two answers WELD's home page gave before and after inertia-2-to-3 (2026-11-06), shortened.
+        $two = '<div id="app" data-page="{&quot;component&quot;:&quot;Welcome&quot;,&quot;props&quot;:{&quot;errors&quot;:{}},&quot;url&quot;:&quot;\/&quot;,&quot;version&quot;:&quot;0123456789abcdef0123456789abcdef&quot;,&quot;clearHistory&quot;:false,&quot;encryptHistory&quot;:false}"></div> </body>';
+        $three = '<div id="app" data-page="{&quot;component&quot;:&quot;Welcome&quot;,&quot;props&quot;:{&quot;errors&quot;:{}},&quot;url&quot;:&quot;\/&quot;,&quot;version&quot;:&quot;fedcba9876543210fedcba9876543210&quot;,&quot;sharedProps&quot;:[&quot;errors&quot;]}"></div> <script data-inertia-devtools-id type="application/json">"01M6SADF0YG6RSS5JEQ35YQGJ5"</script></body>';
+
+        self::assertNotSame([], ReplayComparison::differences($this->file(), [self::answer($two)], [self::answer($three)]));
+        self::assertSame([], ReplayComparison::differences($this->file(['inertia']), [self::answer($two)], [self::answer($three)]));
+
+        // The JSON answer of a client visit, with the fields first or last.
+        $preset = ReplayNormalizer::preset('inertia');
+        self::assertSame(
+            '{"component":"Profile","props":{},"version":"<VERSION>"}',
+            $preset->apply('{"clearHistory":false,"component":"Profile","props":{},"version":"0123456789abcdef0123456789abcdef","encryptHistory":false,"sharedProps":["auth","name"]}'),
+        );
+        // A history flag that is on, a changed prop or a changed component still differs.
+        self::assertSame('{"clearHistory":true}', $preset->apply('{"clearHistory":true}'));
+        self::assertNotSame(
+            $preset->apply(str_replace('Welcome', 'Dashboard', $three)),
+            $preset->apply($two),
+        );
+    }
+
+    public function test_preload_hints_hides_modulepreload_links_and_keeps_the_tags_that_load_the_page(): void
+    {
+        $preset = ReplayNormalizer::preset('preload-hints');
+
+        self::assertSame(
+            '<link rel="stylesheet" href="/build/app.css" /><script type="module" src="/build/app.js"></script>',
+            $preset->apply('<link rel="modulepreload" as="script" href="/build/app.js" /><link rel="modulepreload" as="script" href="/build/wayne-ui-vue.js" nonce="x" /><link rel="stylesheet" href="/build/app.css" /><script type="module" src="/build/app.js"></script>'),
+        );
+
+        // In a real comparison the server's address is already "<app>", whose ">" must not end the tag (WELD, 2026-11-06).
+        $old = self::answer('<link rel="modulepreload" as="script" href="http://localhost:8765/build/app-L1fqnEWe.js" /><script type="module" src="http://localhost:8765/build/app-L1fqnEWe.js"></script>');
+        $new = self::answer('<link rel="modulepreload" as="script" href="http://localhost:8765/build/app-L1fqnEWe.js" /><link rel="modulepreload" as="script" href="http://localhost:8765/build/wayne-ui-vue-DK7UwdK-.js" /><script type="module" src="http://localhost:8765/build/app-L1fqnEWe.js"></script>');
+        self::assertSame([], ReplayComparison::differences($this->file(['preload-hints']), [$old], [$new]));
+    }
+
     public function test_a_declared_normalizer_hides_a_volatile_part_that_would_otherwise_differ(): void
     {
         $old = self::answer('<footer>Page built at 2026-11-05 20:00:00</footer>');

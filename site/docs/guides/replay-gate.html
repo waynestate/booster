@@ -68,7 +68,10 @@ them, or check a hand-made change with <code>booster replay check --php=8.4</cod
 the answers to <code>baseline-php&lt;old&gt;.txt</code>. The run says so next to the baseline:</p>
 <pre><code>Replay: recorded 11 answers on PHP 7.4 from booster-replay.json.
 </code></pre>
-<p>If the baseline cannot be recorded (the setup command failed, the server never answered, an answer missed its
+<p>When a later hop runs the build gate (<code>vite-major</code>, <code>tailwind-3-to-4</code>, <code>typescript-major</code> and the other front-end
+hops), Booster first runs <code>npm ci</code> and <code>npm run build</code> in the Node container, so the baseline serves the built
+front end the hops will rebuild, not a missing or stub <code>public/build/manifest.json</code>. If the baseline cannot be
+recorded (the front end does not build, the setup command failed, the server never answered, an answer missed its
 <code>expect</code>), the upgrade does not start, and nothing is changed.</p>
 </li>
 <li>
@@ -166,10 +169,21 @@ difference. <code>&quot;compare&quot;: {&quot;whitespace&quot;: &quot;exact&quot
 </tr>
 <tr>
 <td><code>asset-hash</code></td>
-<td>content hashes in built asset names (<code>app.3f9a1c2b.js</code>, <code>app.js?id=3f9a1c</code>)</td>
+<td>content hashes in built asset names (<code>app.3f9a1c2b.js</code>, Vite's <code>app-L1fqnEWe.js</code>, <code>app.js?id=3f9a1c</code>)</td>
+</tr>
+<tr>
+<td><code>preload-hints</code></td>
+<td><code>&lt;link rel=&quot;modulepreload&quot;&gt;</code> tags, which list the chunks the bundler split out and change with any build; the tags that load the page stay compared</td>
+</tr>
+<tr>
+<td><code>inertia</code></td>
+<td>the Inertia page object's asset <code>version</code>, the fields Inertia 3 changed (<code>clearHistory</code> and <code>encryptHistory</code> when false, <code>sharedProps</code>) and its devtools id; component, props and url stay compared</td>
 </tr>
 </tbody>
 </table></div>
+<p><code>booster replay init</code> lists <code>asset-hash</code> and <code>preload-hints</code> when the app builds with Vite, and <code>inertia</code> when it
+requires <code>inertiajs/inertia-laravel</code>. Without them the first front-end hop fails the replay on a sound change: on WELD,
+<code>inertia-2-to-3</code> changed only these parts of every page.</p>
 <p>Anything else is an object: <code>{&quot;name&quot;: &quot;request id&quot;, &quot;pattern&quot;: &quot;req-[0-9a-f]{12}&quot;, &quot;replace&quot;: &quot;req-&lt;ID&gt;&quot;, &quot;in&quot;: &quot;body&quot;}</code>,
 where <code>in</code> is <code>body</code> (the default), <code>headers</code> or <code>all</code>. The patterns are PCRE without delimiters. Normalizers are
 not part of the recording's fingerprint, so adding one after a failed check does not mean recording again; changing a

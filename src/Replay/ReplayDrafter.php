@@ -109,7 +109,7 @@ final class ReplayDrafter
             '$comment' => 'Booster replay request file, drafted by booster replay init from ' . ($source === '' ? 'nothing' : $source) . '. Each sequence starts with an empty cookie jar; requests in it share cookies like one browser. See the Booster docs, "The replay gate".',
             'version' => 1,
             'serve' => $serve,
-            'normalize' => ['csrf', 'session-id'],
+            'normalize' => ['csrf', 'session-id', ...self::frontEndPresets($appPath)],
             'sequences' => $sequences,
         ];
         $json = json_encode($draft, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n";
@@ -119,6 +119,31 @@ final class ReplayDrafter
         }
 
         return ['json' => $json, 'source' => $source, 'requests' => count($pages) + count($writes), 'todos' => $todos];
+    }
+
+    /**
+     * The presets a built front end needs: a Vite app's asset names and
+     * preload hints change with every build, and an Inertia app's page object
+     * carries the build's version (and changed shape in Inertia 3). Without
+     * them the first front-end hop fails the replay on a sound change.
+     *
+     * @return list<string>
+     */
+    private static function frontEndPresets(string $appPath): array
+    {
+        $package = is_file($appPath . '/package.json') ? json_decode((string) file_get_contents($appPath . '/package.json'), true) : null;
+        $composer = is_file($appPath . '/composer.json') ? json_decode((string) file_get_contents($appPath . '/composer.json'), true) : null;
+        $npm = is_array($package) ? [...(array) ($package['dependencies'] ?? []), ...(array) ($package['devDependencies'] ?? [])] : [];
+        $presets = [];
+        if (isset($npm['vite'])) {
+            $presets[] = 'asset-hash';
+            $presets[] = 'preload-hints';
+        }
+        if (is_array($composer) && isset($composer['require']['inertiajs/inertia-laravel'])) {
+            $presets[] = 'inertia';
+        }
+
+        return $presets;
     }
 
     /**
