@@ -32,7 +32,7 @@ final class TypescriptMajorTest extends TestCase
         $dir = $this->app();
         $plan = $this->planner()->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '13', withNode: true), $this->today());
 
-        self::assertSame([HopRegistry::laravelHopId('12', '13'), HopRegistry::NODE_PIN_ID, HopRegistry::TYPESCRIPT_MAJOR_ID], $this->ids($plan));
+        self::assertSame([HopRegistry::laravelHopId('12', '13'), HopRegistry::NODE_PIN_ID, HopRegistry::VITE_MAJOR_ID, HopRegistry::TYPESCRIPT_MAJOR_ID], $this->ids($plan));
     }
 
     public function test_the_planner_skips_typescript_when_it_already_floors_at_the_target_major(): void
@@ -41,7 +41,7 @@ final class TypescriptMajorTest extends TestCase
         $this->setTypescript($dir, '^6.0');
         $plan = $this->planner()->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '13', withNode: true), $this->today());
 
-        self::assertSame([HopRegistry::laravelHopId('12', '13'), HopRegistry::NODE_PIN_ID], $this->ids($plan));
+        self::assertSame([HopRegistry::laravelHopId('12', '13'), HopRegistry::NODE_PIN_ID, HopRegistry::VITE_MAJOR_ID], $this->ids($plan));
     }
 
     public function test_the_planner_skips_typescript_without_a_package_json(): void

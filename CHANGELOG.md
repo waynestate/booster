@@ -6,6 +6,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### Added
 
+- The `vite-major` hop: for an app whose `package.json` lists `vite` below the hop data's Vite major, it pins `vite` to the hop data's version wherever it sits, pins `laravel-vite-plugin` and `@vitejs/plugin-vue` to the hop data's versions when they are already listed, runs `npm install` in the Node container and asks for a build gate. The planner offers it after `node-pin-24` and ahead of `tailwind-3-to-4`, and never alongside `mix-to-vite`, which installs the new Vite itself. It reuses the existing `vite_version`, `laravel_vite_plugin_version` and `vue_plugin_version` keys in `data/versions.json`.
 - A new hop, `typescript-major`: for an app whose `typescript` constraint in `package.json` floors below major 6, it pins `typescript` to `^6.0` wherever it sits, and `vue-tsc` to `^3.0` when the app lists it, then runs the build gate (`npm ci`, `npm run build`) and the tests. Offered after `node-pin-24`, `mix-to-vite` and `tailwind-3-to-4`; running the type check and fixing what the new major flags stay manual work, and the hop says so.
 - Vendored libraries: `plan` and `run` find the libraries copied into `vendor/` (a name and version from its `composer.json` or `VERSION` file, or `version unknown`) and list each with the Composer package that replaces it. The plan text and the run report get a block for them, and the JSON gains `vendored_libraries` and `from_php` (the PHP version the run starts from, when it differs from the app's own).
 

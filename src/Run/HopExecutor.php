@@ -394,6 +394,7 @@ final class HopExecutor
             if ($hop->kind === HopKind::Node) {
                 return match ($hop->id) {
                     HopRegistry::MIX_TO_VITE_ID => $this->runMixHop($step, $path, $plan, $options, $baseline),
+                    HopRegistry::VITE_MAJOR_ID => $this->runViteMajorHop($step, $path, $options, $baseline),
                     HopRegistry::TAILWIND_ID => $this->runTailwindHop($step, $path, $options, $baseline),
                     HopRegistry::TYPESCRIPT_MAJOR_ID => $this->runTypescriptMajorHop($step, $path, $options, $baseline),
                     HopRegistry::VUE_COMPAT_CODEMOD_ID => $this->runVueCompatCodemodHop($step, $path, $options),
@@ -1384,6 +1385,60 @@ final class HopExecutor
     }
 
     /**
+     * The Vite major hop. It pins vite wherever it sits and raises the
+     * Laravel and Vue plugin pins the app already carries to the majors in
+     * the data file, then runs npm install in the Node container so the lock
+     * and node_modules catch up.
+     */
+    private function runViteMajorHop(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): StepResult
+    {
+        $hop = $step->hop;
+        if ($this->node === null) {
+            throw new ToolError('The Vite major hop needs a Node runner, but this BOOSTER has none configured.');
+        }
+        [$changes, $files] = $this->applyViteMajorPackages($path, $options->dryRun);
+        if ($options->dryRun) {
+            if ($changes === []) {
+                $changes[] = 'Dry run: nothing to pin: package.json already matches the Vite pins.';
+            }
+            return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $files, [...$changes, ...$hop->notes]);
+        }
+
+        if ($changes === []) {
+            return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
+                'Nothing to do: package.json already matches the Vite pins, so the gate was skipped.',
+                ...$hop->notes,
+            ]);
+        }
+
+        $install = $this->node->run($path, ['npm', 'install']);
+        if (!$install->successful()) {
+            return new StepResult($step->number, $hop->id, StepResult::ERROR, $files, [
+                sprintf('npm install failed: it exited %d in the Node container. The working copy keeps the pins, so you can read them.', $install->exitCode),
+                trim($install->stdout . "\n" . $install->stderr),
+                $this->undoHint($path),
+            ]);
+        }
+        $changes[] = 'npm install ran in the Node container: package-lock.json and node_modules now match the pins.';
+
+        if (!$options->skipGate) {
+            $buildFailure = $this->runBuildGate($path);
+            if ($buildFailure !== null) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$buildFailure]);
+            }
+            $gate = $this->runGate($step, $path, $options, $baseline);
+            if (!$gate->passed) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
+            }
+            $changes = [...$changes, ...$gate->lines, 'Gate passed: npm ci, npm run build and the tests are green.'];
+        } else {
+            $changes[] = 'Gate skipped. Run npm ci, npm run build and the tests before the next step.';
+        }
+
+        return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$changes, ...$hop->notes]);
+    }
+
+    /**
      * The TypeScript major hop. It pins typescript (and vue-tsc, when the app
      * has it) to the majors in the hop data, then gates on the build and the
      * tests like the Tailwind hop; the type check is a person's job.
@@ -1422,6 +1477,59 @@ final class HopExecutor
         }
 
         return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$changes, ...$hop->notes]);
+    }
+
+    /**
+     * Pins vite wherever it sits and raises the Laravel and Vue plugin pins
+     * the app already carries, reporting each change. A constraint that
+     * already floors at or above the target stays; in a dry run nothing is
+     * written and each pin is reported as what it would be.
+     *
+     * @return array{0: list<string>, 1: list<array{file: string, diff: string}>} what changed and which files
+     */
+    private function applyViteMajorPackages(string $path, bool $dryRun): array
+    {
+        $changes = [];
+        $files = [];
+        $packageFile = $path . '/package.json';
+        if (!is_file($packageFile)) {
+            return [$changes, $files];
+        }
+        $package = json_decode((string) file_get_contents($packageFile), true);
+        if (!is_array($package)) {
+            throw new ToolError(sprintf('package.json is not valid JSON: %s', $packageFile));
+        }
+        $registry = $this->registry();
+        $pins = [
+            'vite' => $registry->viteVersion(),
+            'laravel-vite-plugin' => $registry->laravelVitePluginVersion(),
+            '@vitejs/plugin-vue' => $registry->vuePluginVersion(),
+        ];
+        $edited = false;
+        foreach (['dependencies', 'devDependencies'] as $section) {
+            if (!is_array($package[$section] ?? null)) {
+                continue;
+            }
+            foreach ($pins as $name => $pin) {
+                $current = $package[$section][$name] ?? null;
+                if (!is_string($current) || self::atOrAboveFloor($current, $pin)) {
+                    continue;
+                }
+                if ($dryRun) {
+                    $changes[] = sprintf('Dry run: would set package.json %s %s to %s.', $section, $name, $pin);
+                } else {
+                    $package[$section][$name] = $pin;
+                    $changes[] = sprintf('package.json: %s %s to %s.', $section, $name, $pin);
+                    $edited = true;
+                }
+                $files[] = ['file' => 'package.json', 'diff' => $name . ' to ' . $pin];
+            }
+        }
+        if (!$dryRun && $edited) {
+            file_put_contents($packageFile, json_encode($package, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+        }
+
+        return [$changes, $files];
     }
 
     /**

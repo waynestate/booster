@@ -32,7 +32,8 @@ final class TailwindUpgradeTest extends TestCase
         $dir = $this->app();
         $plan = $this->planner()->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '13', withNode: true), $this->today());
 
-        self::assertSame([HopRegistry::laravelHopId('12', '13'), HopRegistry::NODE_PIN_ID, HopRegistry::TAILWIND_ID], $this->ids($plan));
+        // The fixture carries vite ^6.0.0, so the plan also pins Vite before Tailwind runs.
+        self::assertSame([HopRegistry::laravelHopId('12', '13'), HopRegistry::NODE_PIN_ID, HopRegistry::VITE_MAJOR_ID, HopRegistry::TAILWIND_ID], $this->ids($plan));
     }
 
     public function test_the_planner_skips_tailwind_when_it_already_floors_at_4(): void
@@ -41,7 +42,7 @@ final class TailwindUpgradeTest extends TestCase
         $this->setTailwind($dir, '^4.0');
         $plan = $this->planner()->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.3', toPhp: '8.3', toLaravel: '13', withNode: true), $this->today());
 
-        self::assertSame([HopRegistry::laravelHopId('12', '13'), HopRegistry::NODE_PIN_ID], $this->ids($plan));
+        self::assertSame([HopRegistry::laravelHopId('12', '13'), HopRegistry::NODE_PIN_ID, HopRegistry::VITE_MAJOR_ID], $this->ids($plan));
     }
 
     public function test_the_planner_skips_tailwind_without_a_package_json(): void

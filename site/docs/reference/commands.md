@@ -73,7 +73,7 @@ Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today 
 | `--from-laravel=VALUE` | The Laravel major the app runs on. |  |
 | `--to-laravel=VALUE` | Target Laravel major (default: the newest the policy supports). |  |
 | `--to-phpunit=VALUE` | Target PHPUnit major (default: the newest that runs on the target PHP). |  |
-| `--with-node` | Include the Node front-end hops (Node pin, Mix to Vite, Tailwind, Vue) even when you passed a target version |  |
+| `--with-node` | Include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version |  |
 | `--sesame` | Include the wayne-cas to SESAME swap. |  |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move. |  |
 | `--skip=VALUE` | Hop id to leave out (repeatable). |  |
@@ -101,7 +101,7 @@ Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today T
 | `--from-laravel=VALUE` | The Laravel major the app runs on. |  |
 | `--to-laravel=VALUE` | Target Laravel major (default: the newest the policy supports). |  |
 | `--to-phpunit=VALUE` | Target PHPUnit major (default: the newest that runs on the target PHP). |  |
-| `--with-node` | Include the Node front-end hops (Node pin, Mix to Vite, Tailwind, Vue) even when you passed a target version |  |
+| `--with-node` | Include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version |  |
 | `--sesame` | Include the wayne-cas to SESAME swap. |  |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move. |  |
 | `--skip=VALUE` | Hop id to leave out (repeatable). |  |

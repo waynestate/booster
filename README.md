@@ -206,7 +206,7 @@ Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel 
 
 Some hops come along by default, and some only when you ask:
 
-- The front-end Node hops (Mix to Vite, Tailwind, TypeScript, Vue) are in the plan by default. Pass any target (`--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php`, `--from-laravel`) and they drop out with a warning, unless you add `--with-node`.
+- The front-end Node hops (Mix to Vite, Vite major, Tailwind, TypeScript, Vue) are in the plan by default. Pass any target (`--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php`, `--from-laravel`) and they drop out with a warning, unless you add `--with-node`.
 - An app on PHPUnit 8 or older gets a manual PHPUnit 9 step before the first PHP 8 hop.
 - The SESAME move (`--sesame`) and the WayneUI move (`--wayneui`) are opt-in only.
 - `--skip <hop id>` drops a hop you do not want.
@@ -345,7 +345,7 @@ Options shared by `plan` and `run`:
 | `--no-package-check` | Skip the Packagist dependency check (for offline use) |
 | `--until` | Cut the plan after this hop id: that step and everything before it stay, and the plan's targets move to where it lands |
 | `--only` | Plan and run just this one hop id. The app must sit on the hop's starting versions, and `--until` and `--only` are never combined |
-| `--with-node` | include the Node front-end hops (Node pin, Mix to Vite, Tailwind, TypeScript, Vue) even when you passed a target version. Without it, any of `--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php` or `--from-laravel` leaves those hops out, and the plan prints: "Node front-end hops were left out because you passed a target version: <hop ids>. Add --with-node to include them." |
+| `--with-node` | include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version. Without it, any of `--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php` or `--from-laravel` leaves those hops out, and the plan prints: "Node front-end hops were left out because you passed a target version: <hop ids>. Add --with-node to include them." |
 
 Example: an app moving from Laravel 8 to 13 takes the climb in parts. `booster plan --path=../my-app --until=laravel-8-to-9` keeps every hop up to and including the move to Laravel 9, and `booster run` with the same flag applies exactly those hops.
 
@@ -650,7 +650,10 @@ run. They go to standard error so the report on standard output is untouched and
 Four hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`,
 then the app's usual gate applies. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (below) and asks for a
 build gate, which runs `npm ci` and `npm run build` in the `node:26` container before the app's tests.
-`tailwind-3-to-4` runs the official `@tailwindcss/upgrade` tool in the Node container, then pins `tailwindcss` to
+`vite-major` moves a Vite front end onto the Vite major in the hop data: it pins `vite` wherever it sits in
+`package.json`, pins `laravel-vite-plugin` and `@vitejs/plugin-vue` to the hop data's versions when they are already
+listed, runs `npm install` in the Node container and asks for a build gate. `tailwind-3-to-4` runs the official
+`@tailwindcss/upgrade` tool in the Node container, then pins `tailwindcss` to
 `^4.1`, adds the matching Vite or PostCSS plugin, and removes `autoprefixer` and `postcss-import`, which Tailwind 4
 folds in; plugins listed in `tailwind.config.js` and `@apply` inside Vue SFC `<style>` blocks stay manual work, and
 the hop says so. `typescript-major` pins `typescript` to `^6.0` wherever it sits in `package.json`, and `vue-tsc` to
@@ -664,7 +667,7 @@ three: skipping it skips them, and a person finishes the job, because Rector doe
 
 ### Hops Booster knows
 
-Thirty-five hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
+Thirty-six hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
 major at a time from 9 to 13, each list read from `data/versions.json` and trimmed to the majors whose Rector ruleset
 is installed ([Hop data](#hop-data)). An app whose PHPUnit is below 9 gets `phpunit-to-9-manual`, a manual move to
 `^9.5` placed before the first hop that targets PHP 8.0 (PHPUnit 7 and 8 do not run on PHP 8), and the regular
@@ -696,7 +699,11 @@ newer, after `node-pin-24`: writes `vite.config.js`, swaps `laravel-mix` for `vi
 simple shape only: `mix.js`, `.vue()`, `.sass()`, `.postCss()`, `.version()` and `if (mix.inProduction()) {
 mix.version(); }` (dropped with a note, since Vite hashes production assets), anything else is refused by name, a
 Vue 2 front end must take `vue-2-to-3` first, and `withoutMix()` calls are listed for a manual rename to
-`withoutVite()`); `tailwind-3-to-4` (planned when `package.json` carries `tailwindcss` below 4, after `node-pin-24`
+`withoutVite()`); `vite-major` (planned when `package.json` lists `vite` whose lowest major is below the hop data's
+major, after `node-pin-24` and ahead of `tailwind-3-to-4`; never planned alongside `mix-to-vite`, which installs the
+new Vite itself: pins `vite` to the hop data's version wherever it sits, pins `laravel-vite-plugin` and
+`@vitejs/plugin-vue` to the hop data's versions when they are already listed, and runs `npm install` in the Node
+container); `tailwind-3-to-4` (planned when `package.json` carries `tailwindcss` below 4, after `node-pin-24`
 and `mix-to-vite`: runs the official `@tailwindcss/upgrade` tool, pins `tailwindcss` to `^4.1`, adds the matching
 Vite or PostCSS plugin and removes `autoprefixer` and `postcss-import`); `typescript-major` (planned when
 `package.json` lists `typescript` below major 6, after `tailwind-3-to-4`: pins `typescript` to `^6.0` wherever it
@@ -742,8 +749,8 @@ nothing and says so, because the hop data carries no constraint there.
 
 `data/versions.json` holds the version facts Booster plans against: the PHP, Laravel and PHPUnit chains, the PHP range
 each Laravel major supports, the PHPUnit floor each Laravel major ships, the Node floor the `node-pin-24` hop writes,
-and the fixed Tailwind, TypeScript and vue-tsc pins and the Inertia constraint tables the front-end hops use. The file
-ships inside the PHAR. A new
+the Vite major and plugin pins the `vite-major` hop uses, and the fixed Tailwind, TypeScript and vue-tsc pins and
+the Inertia constraint tables the front-end hops use. The file ships inside the PHAR. A new
 major appears in the file as soon as its feed says so; Booster offers a hop for it only once Rector ships a ruleset
 for it, and a plan toward a major without one stops there with a warning instead of failing.
 

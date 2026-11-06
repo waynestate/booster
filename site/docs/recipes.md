@@ -103,7 +103,7 @@ Not for: proving the app still works. A preview never runs your tests.
 
 ## 7. Backend only, or front end too[#](https://booster.apps.wayne.edu/docs/recipes.html#7-backend-only-or-front-end-too)
 
-Node front-end hops (the Node pin, Mix to Vite, Tailwind, the Vue steps) are in the plan only when you pass no target at all. Two ways to leave them out:
+Node front-end hops (the Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, the Vue steps) are in the plan only when you pass no target at all. Two ways to leave them out:
 
 ```
 booster run --path=../my-app --to-php=8.5          # any target drops them, with a warning
@@ -116,7 +116,7 @@ booster run --path=../my-app --skip=mix-to-vite    # or drop them by id
 booster run --path=../my-app --to-php=8.5 --with-node
 ```
 
-The ids are `node-pin-24`, `mix-to-vite`, `tailwind-3-to-4` and the Vue steps; `booster hops` lists every id. Skipping `vue-2-to-3` skips all the Vue steps.
+The ids are `node-pin-24`, `mix-to-vite`, `vite-major`, `tailwind-3-to-4`, `typescript-major` and the Vue steps; `booster hops` lists every id. Skipping `vue-2-to-3` skips all the Vue steps.
 
 Not for: skipping the Node hops and then keeping a Mix build around forever. That is a choice, not a plan.
 

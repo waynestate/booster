@@ -351,7 +351,7 @@ Warning: PHP 8.1 is past security support since 2025-12-31. Use it only as a sto
           <p>Before the first hop your tests run once on the app's current PHP as the baseline; a red one stops the run unless you pass <code>--allow-failing-baseline</code>. An app with no tests of its own gets a built-in syntax check (php -l on every PHP file outside vendor/ and node_modules/) instead, and the report says so: it proves the code loads on the new PHP, not that it works. After each hop they run inside <code>booster-target:&lt;php&gt;</code>, built from <code>docker/Dockerfile</code> on the PHP the hop moves to. On Laravel and PHPUnit hops the gate refreshes <code>composer.lock</code> for the package the hop moved, so the lock lands on the new major version; if Packagist's security advisories block those releases, whether the install fails outright or Composer quietly locks a branch version where the hop asked for a tag, the gate writes a scoped temporary ignore, retries once, and tells you what it did. The plan's last step then fails until that entry is out of <code>composer.json</code>, so the upgrade never finishes with the unblock still in place. After the last hop PROCTOR checks the upgraded app against CREED's policy, blocking only on findings the upgrade introduced. If a red baseline names a missing Mix or Vite manifest, build the front-end assets first. A failure stops the run and leaves the changes for you to read. <code>git checkout .</code> undoes them.</p>
         </li>
       </ol>
-      <p class="sequence__after">Not every hop is Rector. <code>node-pin-24</code> pins Node 26 in <code>package.json</code> and writes <code>.nvmrc</code>; <code>mix-to-vite</code> converts a simple <code>webpack.mix.js</code> and moves the build to Vite. The Vue 2 to 3 move is staged: <code>vue-26-to-27</code>, <code>vue-27-to-compat</code> and <code>vue-compat-codemod</code>, with the <code>vue-2-to-3</code> playbook standing in for all three. Rector doesn't read Vue, so a person works those steps. The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.</p>
+      <p class="sequence__after">Not every hop is Rector. <code>node-pin-24</code> pins Node 26 in <code>package.json</code> and writes <code>.nvmrc</code>; <code>mix-to-vite</code> converts a simple <code>webpack.mix.js</code> and moves the build to Vite; <code>vite-major</code> pins <code>vite</code> and the plugin packages in <code>package.json</code> to the hop data's versions. The Vue 2 to 3 move is staged: <code>vue-26-to-27</code>, <code>vue-27-to-compat</code> and <code>vue-compat-codemod</code>, with the <code>vue-2-to-3</code> playbook standing in for all three. Rector doesn't read Vue, so a person works those steps. The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.</p>
     </div>
   </section>
 
@@ -536,6 +536,7 @@ cas-to-sesame      Swap the wayne-cas package for SESAME using its compatibility
 wayneui-1-to-2     Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest.
 node-pin-24        Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
 mix-to-vite        Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only).
+vite-major         Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions.
 tailwind-3-to-4    Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool.
 typescript-major   Move the app to TypeScript 6: pin typescript in package.json, and vue-tsc too when the app has it.
 vue-26-to-27       Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API.
@@ -739,7 +740,7 @@ Read first:
 
 Task:
 1. With Booster cloned beside the app, run bin/booster detect --path=../my-app and confirm the shape is raw-php-vue, with the Vue and Node versions.
-2. Run bin/booster plan --path=../my-app and sort the hops: PHP hops (Rector), node-pin-24 (pins Node 26 in package.json and writes .nvmrc), and the staged Vue hops if the app is on Vue 2: vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
+2. Run bin/booster plan --path=../my-app and sort the hops: PHP hops (Rector), node-pin-24 (pins Node 26 in package.json and writes .nvmrc), vite-major (pins vite and the plugin packages to the hop data's versions), and the staged Vue hops if the app is on Vue 2: vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
 3. Run bin/booster run --path=../my-app --dry-run and summarize the diffs.
 4. For the Vue hops, list the playbook steps for this app: the compat build, then the codemod, keeping every manual item the codemod lists. Rector does not read Vue, so Booster changes nothing there: a person does that work.
 
@@ -792,13 +793,13 @@ Output: the plan with the reason for its order, the SESAME notes if any, the dry
           <pre class="ar-prompt__text"><code>You are a coding agent upgrading a Laravel app with Blade views and Vue islands at Wayne State University with Booster, the upgrade tool of WELD, the Wayne State application stack.
 
 Read first:
-- https://booster.apps.wayne.edu/llms.txt, then the README in llms-full.txt beside it: Hops Booster knows (node-pin-24, mix-to-vite, vue-26-to-27, vue-27-to-compat, vue-compat-codemod) and Laravel hops and vendor.
+- https://booster.apps.wayne.edu/llms.txt, then the README in llms-full.txt beside it: Hops Booster knows (node-pin-24, mix-to-vite, vite-major, vue-26-to-27, vue-27-to-compat, vue-compat-codemod) and Laravel hops and vendor.
 - ADVISOR, the stack's MCP server, if it is connected: upgrade_path for this app, policy_lookup for Laravel and Node, and list_stack_rules with permutation laravel-blade-vue. If it is not connected, say so and work from the pages.
 - package.json, its lock file, and webpack.mix.js if there is one.
 
 Task:
 1. Run `composer install` in the app, then, with Booster cloned beside it, bin/booster plan --path=../my-app.
-2. If the plan has mix-to-vite, say whether this webpack.mix.js is the simple shape Booster converts (mix.js, .vue(), .sass(), .postCss(), .version(), and if (mix.inProduction()) { mix.version(); }) or which call it will refuse by name. A Vue 2 front end takes the staged Vue hops first: vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
+2. If the plan has mix-to-vite, say whether this webpack.mix.js is the simple shape Booster converts (mix.js, .vue(), .sass(), .postCss(), .version(), and if (mix.inProduction()) { mix.version(); }) or which call it will refuse by name. If the plan has vite-major, list the packages it will pin in package.json. A Vue 2 front end takes the staged Vue hops first: vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
 3. Run bin/booster run --path=../my-app --dry-run and summarize the diffs, Blade layouts included.
 4. List any withoutMix() calls for me to rename to withoutVite() by hand.
 
@@ -828,7 +829,7 @@ Read first:
 
 Task:
 1. Run `composer install` in the app, then, with Booster cloned beside it, bin/booster detect --path=../my-app and bin/booster plan --path=../my-app.
-2. Sort the hops: Laravel and PHP (Rector), node-pin-24, and the staged Vue hops if the app is on Vue 2 (playbooks, not code changes): vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
+2. Sort the hops: Laravel and PHP (Rector), node-pin-24, vite-major, and the staged Vue hops if the app is on Vue 2 (playbooks, not code changes): vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
 3. For each Laravel hop, list what to check by hand on the Inertia side: Booster has no Inertia checks per Laravel hop yet.
 4. Run bin/booster run --path=../my-app --dry-run and summarize the diffs per hop.
 

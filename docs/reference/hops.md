@@ -39,7 +39,9 @@ This page lists every hop Booster knows; the list is generated from the hop data
 | `wayneui-1-to-2` | wayneui | 1 | 2 | Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. |
 | `node-pin-24` | node | any | 26 | Pin the app to Node 26: set engines.node in package.json and write .nvmrc. |
 | `mix-to-vite` | node | laravel-mix | vite | Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). |
+| `vite-major` | node | any | 8 | Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions. |
 | `tailwind-3-to-4` | node | 3 | 4 | Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool. |
+| `typescript-major` | node | any | 6 | Move the app to TypeScript 6: pin typescript in package.json, and vue-tsc too when the app has it. |
 | `vue-26-to-27` | node | 2.6 | 2.7 | Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API. |
 | `vue-27-to-compat` | node | 2.7 | 3 | Move a Vue 2.7 front end to Vue 3 through the @vue/compat build. |
 | `vue-compat-codemod` | node | 3-compat | 3 | Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists. |
