@@ -81,10 +81,13 @@ A run prints one line per hop to standard error while it works: the hop's positi
 the number of files it changed and the seconds it took, and a final line totals the hops run, the stops and the whole
 run. They go to standard error so the report on standard output is untouched and `--format json` stays valid JSON.
 
-Three hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`,
+Four hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`,
 then the app's usual gate applies. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (see [the hop list](../reference/hops.md)) and asks for a
 build gate, which runs `npm ci` and `npm run build` in the `node:26` container before the app's tests.
-`tailwind-3-to-4` runs the official `@tailwindcss/upgrade` tool in the Node container, then pins `tailwindcss` to
+`vite-major` moves a Vite front end onto the Vite major in the hop data: it pins `vite` wherever it sits in
+`package.json`, pins `laravel-vite-plugin` and `@vitejs/plugin-vue` to the hop data's versions when they are already
+listed, runs `npm install` in the Node container and asks for a build gate. `tailwind-3-to-4` runs the official
+`@tailwindcss/upgrade` tool in the Node container, then pins `tailwindcss` to
 `^4.1`, adds the matching Vite or PostCSS plugin, and removes `autoprefixer` and `postcss-import`, which Tailwind 4
 folds in; plugins listed in `tailwind.config.js` and `@apply` inside Vue SFC `<style>` blocks stay manual work, and
 the hop says so.

@@ -1,8 +1,8 @@
 # MAINTAINING: refuelling the rocket
 
 How to build, test, release and keep Booster current. Booster plans and runs upgrade hops (PHP and Laravel versions,
-PHPUnit, Node pins, Mix to Vite, old CAS clients to SESAME) on top of Rector, using CREED's policy to know where an app
-must land. Rockets need fuel, and this one runs on fresh version data and working recipes.
+PHPUnit, Node pins, Mix to Vite, Vite major, old CAS clients to SESAME) on top of Rector, using CREED's policy to know
+where an app must land. Rockets need fuel, and this one runs on fresh version data and working recipes.
 
 ## What Booster is and what it depends on
 

@@ -105,7 +105,7 @@ git -C ../my-app add -A &amp;&amp; git -C ../my-app commit -m &quot;&lt;hop id&g
 <p>Rector shows the diffs it would make, hop by hop, and nothing is written. No git or Docker is needed, and the baseline and gate are skipped. The limit: a Laravel hop needs the app's own <code>vendor/</code> to see Laravel's classes. With no <code>vendor/</code>, that hop's preview is marked incomplete (run <code>composer install</code> first). With a <code>vendor/</code> from an older Laravel, a later Laravel hop reports &quot;Can't preview&quot; because it needs the earlier hops applied. Preview one hop at a time with <code>--only</code>, or apply the earlier hops for real and dry-run again.</p>
 <p>Not for: proving the app still works. A preview never runs your tests.</p>
 <h2 id="7-backend-only-or-front-end-too">7. Backend only, or front end too<a class="docs-heading-link" aria-label="Link to this section" href="#7-backend-only-or-front-end-too">#</a></h2>
-<p>Node front-end hops (the Node pin, Mix to Vite, Tailwind, the Vue steps) are in the plan only when you pass no target at all. Two ways to leave them out:</p>
+<p>Node front-end hops (the Node pin, Mix to Vite, Vite major, Tailwind, the Vue steps) are in the plan only when you pass no target at all. Two ways to leave them out:</p>
 <!-- docs-test: skip run on your own app -->
 <pre><code>booster run --path=../my-app --to-php=8.5          # any target drops them, with a warning
 booster run --path=../my-app --skip=mix-to-vite    # or drop them by id
@@ -114,7 +114,7 @@ booster run --path=../my-app --skip=mix-to-vite    # or drop them by id
 <!-- docs-test: skip run on your own app -->
 <pre><code>booster run --path=../my-app --to-php=8.5 --with-node
 </code></pre>
-<p>The ids are <code>node-pin-24</code>, <code>mix-to-vite</code>, <code>tailwind-3-to-4</code> and the Vue steps; <code>booster hops</code> lists every id. Skipping <code>vue-2-to-3</code> skips all the Vue steps.</p>
+<p>The ids are <code>node-pin-24</code>, <code>mix-to-vite</code>, <code>vite-major</code>, <code>tailwind-3-to-4</code> and the Vue steps; <code>booster hops</code> lists every id. Skipping <code>vue-2-to-3</code> skips all the Vue steps.</p>
 <p>Not for: skipping the Node hops and then keeping a Mix build around forever. That is a choice, not a plan.</p>
 <h2 id="8-skip-a-hop-you-will-do-by-hand">8. Skip a hop you will do by hand<a class="docs-heading-link" aria-label="Link to this section" href="#8-skip-a-hop-you-will-do-by-hand">#</a></h2>
 <!-- docs-test: skip run on your own app -->

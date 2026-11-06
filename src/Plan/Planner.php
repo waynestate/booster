@@ -602,8 +602,44 @@ final class Planner
     }
 
     /**
+     * The app lists vite in package.json and its constraint floors below the
+     * Vite major in the hop data. Offered after node-pin-24 and mix-to-vite,
+     * so the pin lands on the pinned Node and tailwind-3-to-4 sees the new
+     * Vite. Never offered with mix-to-vite: a Mix app has no vite yet.
+     */
+    private function needsViteMajor(Project $project): bool
+    {
+        if (!$project->hasPackageJson) {
+            return false;
+        }
+        $file = $project->path . '/package.json';
+        if (!is_file($file)) {
+            return false;
+        }
+        $package = json_decode((string) file_get_contents($file), true);
+        if (!is_array($package)) {
+            return false;
+        }
+        $target = HopDataRefresher::lowestMajor($this->registry->viteVersion());
+        if ($target === null) {
+            return false;
+        }
+        foreach (['dependencies', 'devDependencies'] as $section) {
+            $constraint = $package[$section]['vite'] ?? null;
+            if (is_string($constraint)) {
+                $floor = HopDataRefresher::lowestMajor($constraint);
+                if ($floor !== null && version_compare($floor, $target, '<')) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * The Node front-end hops that land before the SESAME swap, in run order:
-     * the Node pin, Mix to Vite, Tailwind.
+     * the Node pin, Mix to Vite, Vite major, Tailwind.
      *
      * @return list<string>
      */
@@ -613,8 +649,12 @@ final class Planner
         if ($this->needsNodePin($project)) {
             $ids[] = HopRegistry::NODE_PIN_ID;
         }
-        if ($this->needsMixToVite($project, $laravel)) {
+        $mix = $this->needsMixToVite($project, $laravel);
+        if ($mix) {
             $ids[] = HopRegistry::MIX_TO_VITE_ID;
+        }
+        if (!$mix && $this->needsViteMajor($project)) {
+            $ids[] = HopRegistry::VITE_MAJOR_ID;
         }
         if ($this->needsTailwind($project)) {
             $ids[] = HopRegistry::TAILWIND_ID;

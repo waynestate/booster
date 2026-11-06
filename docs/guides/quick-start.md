@@ -43,7 +43,7 @@ Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel 
 
 Some hops come along by default, and some only when you ask:
 
-- The front-end Node hops (Mix to Vite, Tailwind, Vue) are in the plan by default. Pass any target (`--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php`, `--from-laravel`) and they drop out with a warning, unless you add `--with-node`.
+- The front-end Node hops (Mix to Vite, Vite major, Tailwind, Vue) are in the plan by default. Pass any target (`--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php`, `--from-laravel`) and they drop out with a warning, unless you add `--with-node`.
 - An app on PHPUnit 8 or older gets a manual PHPUnit 9 step before the first PHP 8 hop.
 - The SESAME move (`--sesame`) and the WayneUI move (`--wayneui`) are opt-in only.
 - `--skip <hop id>` drops a hop you do not want.
