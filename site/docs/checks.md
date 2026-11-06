@@ -34,6 +34,8 @@ Proof runs against real Wayne State applications are on a private site, [proof.a
 
 Proven how: the first full run with the gate on took a Laravel 12 app from PHP 8.2 to 8.4 in two hops, each gated by the app's 197-test suite, and it is written up in [research/booster-e2e-gate.md](https://github.com/waynestate/booster/blob/main/research/booster-e2e-gate.md).
 
+The front-end hops (`vite-major`, `tailwind-3-to-4`, `typescript-major`, `inertia-2-to-3`) were proven on 2026-11-06 on a Laravel 12 app generated from the public Laravel Vue starter kit, with every gate on: the first pass found four bugs, each fixed with a test, and the upgraded app then built, passed its tests on PHP 8.5 and registered a user in a browser. The private proof site has the hop-by-hop table.
+
 ## Status[#](https://booster.apps.wayne.edu/docs/checks.html#status)
 
 See [CHANGELOG.md](https://github.com/waynestate/booster/blob/main/CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](https://github.com/waynestate/booster/blob/main/OPEN_QUESTIONS.md) for what stays open, and [BEST_PRACTICES.md](https://github.com/waynestate/booster/blob/main/BEST_PRACTICES.md) for the rules Booster follows.

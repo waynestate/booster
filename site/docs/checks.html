@@ -66,6 +66,10 @@ example app, and <code>composer ci</code> keeps it current.</p>
 <p>Proven how: the first full run with the gate on took a Laravel 12 app from PHP 8.2 to 8.4 in two hops, each gated by
 the app's 197-test suite, and it is written up in
 <a rel="noopener" href="https://github.com/waynestate/booster/blob/main/research/booster-e2e-gate.md">research/booster-e2e-gate.md</a>.</p>
+<p>The front-end hops (<code>vite-major</code>, <code>tailwind-3-to-4</code>, <code>typescript-major</code>, <code>inertia-2-to-3</code>) were proven on 2026-11-06
+on a Laravel 12 app generated from the public Laravel Vue starter kit, with every gate on: the first pass found four
+bugs, each fixed with a test, and the upgraded app then built, passed its tests on PHP 8.5 and registered a user in a
+browser. The private proof site has the hop-by-hop table.</p>
 <h2 id="status">Status<a class="docs-heading-link" aria-label="Link to this section" href="#status">#</a></h2>
 <p>See <a rel="noopener" href="https://github.com/waynestate/booster/blob/main/CHANGELOG.md">CHANGELOG.md</a> for what changed,
 <a rel="noopener" href="https://github.com/waynestate/booster/blob/main/OPEN_QUESTIONS.md">OPEN_QUESTIONS.md</a> for what stays open, and

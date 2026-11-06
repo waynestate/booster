@@ -42,6 +42,11 @@ Proven how: the first full run with the gate on took a Laravel 12 app from PHP 8
 the app's 197-test suite, and it is written up in
 [research/booster-e2e-gate.md](https://github.com/waynestate/booster/blob/main/research/booster-e2e-gate.md).
 
+The front-end hops (`vite-major`, `tailwind-3-to-4`, `typescript-major`, `inertia-2-to-3`) were proven on 2026-11-06
+on a Laravel 12 app generated from the public Laravel Vue starter kit, with every gate on: the first pass found four
+bugs, each fixed with a test, and the upgraded app then built, passed its tests on PHP 8.5 and registered a user in a
+browser. The private proof site has the hop-by-hop table.
+
 ## Status
 
 See [CHANGELOG.md](https://github.com/waynestate/booster/blob/main/CHANGELOG.md) for what changed,
