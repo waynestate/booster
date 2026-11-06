@@ -2,7 +2,7 @@ BOOSTER plan for examples/laravel-inertia-vue
   app type: laravel-inertia-vue
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.4 (today 2026-11-04)
+  policy: waynestate/creed 0.1.4 (today 2026-11-06)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
@@ -17,6 +17,9 @@ BOOSTER plan for examples/laravel-inertia-vue
    Removed between PHP 8.4 and PHP 8.5: none found.
 4. node-pin-24
    Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
+   After this step your tests run in Docker.
+5. inertia-2-to-3
+   Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0.
    After this step your tests run in Docker.
 
 PHPCompatibility check for PHP 8.4: no findings.

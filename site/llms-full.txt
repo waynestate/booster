@@ -2506,7 +2506,7 @@ Source: https://booster.apps.wayne.edu/proof.html
 
 ## Real output, from Booster's own example apps
 
-Captured on 2026-11-04 with Booster 1.8.3. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
+Captured on 2026-11-06 with Booster 1.9.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
 
 ### laravel-blade
 
@@ -2520,7 +2520,7 @@ BOOSTER plan for examples/laravel-blade
   PHP: 8.2 -> 8.5
   Laravel: 10 -> 13
   PHPUnit: 10 -> 13
-  policy: waynestate/creed 0.1.4 (today 2026-11-04)
+  policy: waynestate/creed 0.1.4 (today 2026-11-06)
 
 1. phpunit-10-to-11
    Move PHPUnit 10 tests to PHPUnit 11.
@@ -2726,7 +2726,7 @@ BOOSTER plan for examples/laravel-blade-vue
   app type: laravel-blade-vue
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.4 (today 2026-11-04)
+  policy: waynestate/creed 0.1.4 (today 2026-11-06)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
@@ -2800,7 +2800,7 @@ BOOSTER plan for examples/laravel-inertia-vue
   app type: laravel-inertia-vue
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.4 (today 2026-11-04)
+  policy: waynestate/creed 0.1.4 (today 2026-11-06)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
@@ -2815,6 +2815,9 @@ BOOSTER plan for examples/laravel-inertia-vue
    Removed between PHP 8.4 and PHP 8.5: none found.
 4. node-pin-24
    Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
+   After this step your tests run in Docker.
+5. inertia-2-to-3
+   Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0.
    After this step your tests run in Docker.
 
 PHPCompatibility check for PHP 8.4: no findings.
@@ -2857,10 +2860,36 @@ Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests a
    Dry run: would set engines.node to >=26 in package.json and write .nvmrc with 26.
    The pin is a floor, not a ceiling: engines.node ">=26" still allows newer Node majors.
    Later front-end hops run in the same node:26 container, so this hop comes before them.
+5. inertia-2-to-3: PREVIEWED (2 files)
+   Dry run: would set inertiajs/inertia-laravel to ^3.0 in require.
+   Dry run: would set package.json dependencies @inertiajs/vue3 to ^3.0.
+   Dry run: would install the new Inertia versions (npm install, composer update -W inertiajs/inertia-laravel).
+   Booster pins inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0, runs npm install when package.json moves, and runs the composer gate; the manual lines below are the code changes.
+   MANUAL: Axios is no longer part of the core; the router ships a built-in XHR client, and Axios comes back only through an adapter.
+   MANUAL: qs and lodash-es are no longer bundled; install them yourself if your code imports them.
+   MANUAL: the invalid event is now httpException and the exception event is now networkError; rename the handlers you register.
+   MANUAL: router.cancel() is gone; call router.cancelAll() instead.
+   MANUAL: the future config is removed; its options are always on now.
+   MANUAL: the head attribute inertia is now data-inertia.
+   MANUAL: hideProgress() and revealProgress() are removed; use the progress object instead.
+   MANUAL: Inertia::lazy() and LazyProp are removed; use Inertia::optional() instead.
+   MANUAL: the config file is restructured; republish it if you published it before.
+   MANUAL: run php artisan view:clear on every machine that serves the app: compiled Blade views still print the Inertia 2 page data, and the Inertia 3 client shows a blank page.
+   MANUAL: the packages are ESM only; CommonJS require() calls stop working.
+   MANUAL: the build targets ES2022; add @vitejs/plugin-legacy if you must serve older browsers.
+   --- composer.json
+   inertiajs/inertia-laravel to ^3.0
+   --- package.json
+   @inertiajs/vue3 to ^3.0
+
+Unique files across hops: 2. Later hops were previewed against the original tree, so the same file can appear in several hops.
 
 RESULT: PASS (previewed, no tests ran)
 
-Nothing was changed.
+Dry run: these changes were previewed, none were applied.
+Nothing was changed. RESULT: PASS means the preview worked; no tests ran.
+Next, if the edits look right: php bin/booster run --path=examples/laravel-inertia-vue
+(It needs Docker and a clean git folder. Commit or stash first.)
 ```
 
 ### laravel-wayne-cas
@@ -2874,7 +2903,7 @@ BOOSTER plan for examples/laravel-wayne-cas
   app type: laravel-blade
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.4 (today 2026-11-04)
+  policy: waynestate/creed 0.1.4 (today 2026-11-06)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
@@ -2949,7 +2978,7 @@ Nothing was changed.
 BOOSTER plan for examples/raw-php
   app type: raw-php
   PHP: 7.4 -> 8.5
-  policy: waynestate/creed 0.1.4 (today 2026-11-04)
+  policy: waynestate/creed 0.1.4 (today 2026-11-06)
 
 1. php-74-to-80
    Move PHP 7.4 code to PHP 8.0.
@@ -3095,7 +3124,7 @@ Next, if the edits look right: php bin/booster run --path=examples/raw-php
 BOOSTER plan for examples/vue-spa
   app type: raw-php-vue
   PHP: 8.0 -> 8.5
-  policy: waynestate/creed 0.1.4 (today 2026-11-04)
+  policy: waynestate/creed 0.1.4 (today 2026-11-06)
 
 1. php-80-to-81
    Move PHP 8.0 code to PHP 8.1.
