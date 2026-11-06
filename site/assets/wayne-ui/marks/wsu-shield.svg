@@ -1,0 +1,11 @@
+<!--
+  Wayne State University shield.
+
+  Used in the compact application bar, where the full lockup would eat the
+  width an internal tool needs for its own navigation. The shield alone is an
+  approved mark per the Identity Style Guide, which also specifies that the
+  full-colour shield always carries a solid white W.
+
+  Wayne State trademark, not covered by this package's MIT licence.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 65" role="img" aria-label="Wayne State University"><title>Wayne State University</title><path fill="#ffe3a4" d="M69.5 8S52.7 1.7 35.8 1.7 2 8 2 8s-4.7 32.2 33.7 55.3C74.2 40.1 69.5 8 69.5 8z"/><path fill="#ffc843" d="M35.8 1.7C52.7 1.7 69.5 8 69.5 8s4.7 32.2-33.7 55.3V1.7z"/><path fill="#4b8076" d="M64.6 11.5s-15.7-5-28.8-5c-13.1 0-28.8 5-28.8 5S6 39 35.7 56.9v.1-.1C65.5 39 64.6 11.5 64.6 11.5z"/><path fill="#00594d" d="M35.8 6.5c13.1 0 28.9 5 28.9 5s.8 27.6-28.9 45.5V6.5z"/><path fill="none" d="M64.7 11.5s-15.8-5-28.9-5c-13.1 0-28.9 5-28.9 5S6 39.1 35.8 57c29.7-17.9 28.9-45.5 28.9-45.5z"/><path fill="#FFFFFF" d="M41.7 21.8l-2.1 4.8 2.1 4.7c7.4-5.3 8.7-10.7 8.7-10.7l-4.2-4.8h11.9c0 8.2-5.3 17.8-18.1 28.1l-4.3-11-4.3 11c-12.7-10.2-18-19.8-18-28h11.9L21 20.7s1.3 5.4 8.7 10.7l2.1-4.7-2.1-4.8h12v-.1z"/></svg>

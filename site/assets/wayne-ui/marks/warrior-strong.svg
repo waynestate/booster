@@ -1,0 +1,14 @@
+<!--
+  Wayne State University Warrior Strong mark.
+
+  Extracted from the 1.x package, where it lived as raw path data inlined
+  directly into a Blade template and duplicated per layout. Fills that were
+  driven by global .wm* CSS classes are now baked in, so the file is
+  self-contained; the wordmark lettering uses currentColor so it can sit on
+  either a green bar or a light footer.
+
+  This is a Wayne State trademark and is NOT covered by the package's MIT
+  licence. It should be refreshed from the Digital Asset Management Library
+  rather than inherited from a 2017 copy, see docs/open-questions.md.
+-->
+<svg fill="#0C5449" role="img" aria-label="Warrior Strong" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 30"  preserveAspectRatio="xMaxYMax"><title>Warrior Strong</title><title>Warrior strong</title><path d="M13.4 2.9H18l4.1 15 1.7-15H29L25.3 27H20l-4.3-15.8L11.5 27H6.2L2.5 2.9h5.1l1.7 15 4.1-15zm44.2 24.2h-5.4l-1.5-4.8h-7.4l-1.4 4.8h-5.4L44.4 3h5.3l7.9 24.1zm-12.7-9.5h4.3l-2.2-8-2.1 8zm31.3.6h-3.6v8.9h-5.3V2.9h13.4c2.2 0 4 1.8 4 4v7.3c0 1.8-1.2 3.3-2.9 3.8l4.3 9h-5.8l-4.1-8.8zM72.6 7.7v5.7h6.6c.2 0 .4-.1.4-.4V8c0-.2-.1-.4-.4-.4h-6.6zm33.2 10.5h-3.6v8.9H97V2.9h13.4c2.2 0 4 1.8 4 4v7.3c0 1.8-1.2 3.3-2.9 3.8l4.3 9H110l-4.2-8.8zm-3.6-10.5v5.7h6.6c.2 0 .4-.1.4-.4V8c0-.2-.1-.4-.4-.4h-6.6zm29.7 19.4h-5.3V2.9h5.3v24.2zm25.1 0h-9c-2.2 0-4-1.8-4-4V6.9c0-2.2 1.8-4 4-4h8.9c2.2 0 4 1.8 4 4v16.2c0 2.2-1.7 4-3.9 4zm-1.7-19.4h-5.7c-.2 0-.4.1-.4.4v13.8c0 .2.1.4.4.4h5.7c.2 0 .4-.1.4-.4V8.1c0-.2-.2-.4-.4-.4zm26.6 10.5h-3.6v8.9H173V2.9h13.4c2.2 0 4 1.8 4 4v7.3c0 1.8-1.2 3.3-2.9 3.8l4.3 9H186l-4.1-8.8zm-3.6-10.5v5.7h6.6c.2 0 .4-.1.4-.4V8c0-.2-.1-.4-.4-.4h-6.6zm55.3 15.4c0 2.2-1.8 4-4 4h-8.2c-2.2 0-4-1.8-4-4v-2.7l5.1-.9v2.4c0 .2.1.4.4.4h5.1c.2 0 .4-.1.4-.4v-3.4c0-.3-.2-.4-.5-.5-.6-.2-2.5-.7-7-2-2.1-.6-3.4-1.6-3.4-3.8V6.9c0-2.2 1.8-4 4-4h8c2.2 0 4 1.8 4 4v2.5l-5.1.9V8.1c0-.2-.1-.4-.4-.4h-4.9c-.2 0-.4.1-.4.4v3.1c0 .3.2.4.4.5.4.1 2.4.7 7.2 2 2.1.6 3.3 1.6 3.3 3.8v5.6zm10.2-20.2h17.7v4.8h-6.2v19.4H250V7.7h-6.2V2.9zM281 18.2h-3.6v8.9h-5.3V2.9h13.4c2.2 0 4 1.8 4 4v7.3c0 1.8-1.2 3.3-2.9 3.8l4.3 9h-5.8l-4.1-8.8zm-3.6-10.5v5.7h6.6c.2 0 .4-.1.4-.4V8c0-.2-.1-.4-.4-.4h-6.6zm37.2 19.4h-8.9c-2.2 0-4-1.8-4-4V6.9c0-2.2 1.8-4 4-4h8.9c2.2 0 4 1.8 4 4v16.2c0 2.2-1.8 4-4 4zm-1.7-19.4h-5.7c-.2 0-.4.1-.4.4v13.8c0 .2.1.4.4.4h5.7c.2 0 .4-.1.4-.4V8.1c0-.2-.1-.4-.4-.4zm36 19.4h-5.1l-8-14.1v14.1h-5.1V2.9h5.1l8 14.1V2.9h5.1v24.2zm19.8-13.2h8.8v9.2c0 2.2-1.8 4-4 4H365c-2.2 0-4-1.8-4-4V6.9c0-2.2 1.8-4 4-4h8.5c2.2 0 4 1.8 4 4v2.9l-5.1.9V8.1c0-.2-.1-.4-.4-.4h-5.3c-.2 0-.4.1-.4.4v13.8c0 .2.1.4.4.4h5.4c.2 0 .4-.1.4-.4v-3.4h-3.7v-4.6z"/></svg>
