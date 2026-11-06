@@ -102,18 +102,19 @@ final class PackageCompatTest extends TestCase
         self::assertSame('fideloper/proxy', $check->package);
         self::assertSame('4.4.2', $check->newest);
         // The app sits on Laravel 10, already past the package's ceiling of 9,
-        // so its newest release cannot follow the plan at all: the very first
-        // hop is the one it blocks. Its PHP constraint has no ceiling, so the
+        // so its newest release cannot follow the plan at all: the first hop
+        // into a newer Laravel major is the one it blocks, not the PHPUnit hop
+        // that happens to run first. Its PHP constraint has no ceiling, so the
         // warning names the Laravel cap alone.
-        self::assertSame('phpunit-10-to-11', $check->blocks);
+        self::assertSame('laravel-10-to-11', $check->blocks);
         self::assertFalse($check->abandoned);
         self::assertTrue($check->checked);
         self::assertContains(
-            'fideloper/proxy 4.4.2 supports Laravel up to 9, so it blocks phpunit-10-to-11. Replace or upgrade it first.',
+            'fideloper/proxy 4.4.2 supports Laravel up to 9, so it blocks laravel-10-to-11. Replace or upgrade it first.',
             $plan->warnings,
         );
         self::assertSame([
-            ['package' => 'fideloper/proxy', 'newest' => '4.4.2', 'blocks' => 'phpunit-10-to-11', 'abandoned' => false, 'checked' => true],
+            ['package' => 'fideloper/proxy', 'newest' => '4.4.2', 'blocks' => 'laravel-10-to-11', 'abandoned' => false, 'checked' => true],
         ], $plan->toArray()['package_checks']);
     }
 
@@ -141,14 +142,14 @@ final class PackageCompatTest extends TestCase
 
         $check = $plan->packageChecks[0];
         self::assertSame('v6.2.1', $check->newest);
-        // The app sits on Laravel 10, past the package's ceiling of 8, so it
-        // blocks from the first hop, exactly like a package that is already
-        // out of reach.
-        self::assertSame('phpunit-10-to-11', $check->blocks);
+        // The app sits on Laravel 10, past the package's ceiling of 8, so the
+        // first hop into a newer Laravel major is the one it blocks, not the
+        // PHPUnit hop that happens to run first.
+        self::assertSame('laravel-10-to-11', $check->blocks);
         self::assertTrue($check->abandoned);
         self::assertSame('spatie/ssh', $check->replacement);
         self::assertContains(
-            'laravelcollective/remote v6.2.1 supports Laravel up to 8, so it blocks phpunit-10-to-11. Replace or upgrade it first.',
+            'laravelcollective/remote v6.2.1 supports Laravel up to 8, so it blocks laravel-10-to-11. Replace or upgrade it first.',
             $plan->warnings,
         );
         self::assertContains('laravelcollective/remote is abandoned (use spatie/ssh instead).', $plan->warnings);
@@ -231,17 +232,19 @@ final class PackageCompatTest extends TestCase
 
         // The plan does contain the hop into PHP 8.2 ...
         self::assertContains('php-81-to-82', $this->stepIds($plan));
-        // ... and >=8.2.5 allows plenty of 8.2.x releases, so the hop into 8.2
-        // is not the one the package blocks. The first block is the very first
-        // step, because the app's starting PHP 8.1 is already below the floor.
-        // A constraint with no upper bound has no cap to name, so the warning
-        // names its floor instead.
-        self::assertNotSame('php-81-to-82', $plan->packageChecks[0]->blocks);
-        self::assertSame('laravel-9-to-10', $plan->packageChecks[0]->blocks);
+        // ... and >=8.2.5 allows plenty of 8.2.x releases, so no hop is the
+        // one the package blocks: every PHP destination the plan reaches is
+        // fine. The app's starting PHP 8.1 is already below the floor, and no
+        // hop is to blame for where the plan starts, so it is reported as its
+        // own finding naming the version the plan reaches.
+        self::assertNull($plan->packageChecks[0]->blocks);
         self::assertContains(
-            'acme/patch-floor 1.0.0 needs PHP 8.2.5 or newer, so it blocks laravel-9-to-10. Replace or upgrade it first.',
+            'acme/patch-floor 1.0.0 needs PHP 8.2.5 or newer, but the plan starts from PHP 8.1; it installs once the plan reaches PHP 8.2.',
             $plan->warnings,
         );
+        foreach ($plan->warnings as $warning) {
+            self::assertStringNotContainsString('so it blocks', $warning);
+        }
     }
 
     public function test_a_package_capped_on_both_dimensions_names_both(): void

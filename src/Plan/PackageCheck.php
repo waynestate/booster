@@ -6,9 +6,10 @@ namespace Waynestate\Booster\Plan;
 
 /**
  * What the dependency check learned about one direct dependency: its newest
- * stable release, whether that release blocks a planned hop, and whether the
- * project is abandoned. checked=false means the question could not be asked
- * (offline, or the package lives in a VCS repository).
+ * stable release, whether that release blocks a planned hop, whether it is
+ * already out of reach at the plan's starting point, and whether the project
+ * is abandoned. checked=false means the question could not be asked (offline,
+ * or the package lives in a VCS repository).
  */
 final readonly class PackageCheck
 {
@@ -22,6 +23,7 @@ final readonly class PackageCheck
         public ?string $reason,
         public ?string $blockWarning,
         public ?string $abandonedWarning,
+        public ?string $startWarning = null,
     ) {}
 
     /**

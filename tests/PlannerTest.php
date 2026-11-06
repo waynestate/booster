@@ -144,6 +144,55 @@ final class PlannerTest extends TestCase
         );
     }
 
+    public function test_a_lock_floor_above_the_manifest_is_a_finding_not_a_block_on_the_node_pin(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', (string) json_encode([
+            'require' => ['php' => '^8.2', 'acme/db-driver' => '^1.0'],
+        ]));
+        file_put_contents($dir . '/composer.lock', (string) json_encode([
+            'packages' => [
+                ['name' => 'acme/db-driver', 'version' => '1.4.0', 'require' => ['php' => '>=8.4']],
+            ],
+        ]));
+        file_put_contents($dir . '/package.json', '{"name": "example"}');
+
+        $fetcher = new FixturePackageFetcher([
+            'https://repo.packagist.org/p2/acme/db-driver.json' => [
+                'minified' => 'composer/2.0',
+                'packages' => [
+                    'acme/db-driver' => [
+                        ['name' => 'acme/db-driver', 'version' => '1.5.0', 'type' => 'library', 'require' => ['php' => '^8.5']],
+                    ],
+                ],
+            ],
+        ]);
+
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry(), $fetcher))
+            ->plan($project, new PlanOptions(toPhp: '8.4', withNode: true), $this->today());
+
+        // The lock floor lifts the plan's starting point ...
+        self::assertSame('8.4', $plan->project->phpVersion);
+        self::assertContains(
+            'composer.json allows PHP 8.2, but the lock needs PHP 8.4 or newer (acme/db-driver requires >=8.4). Planning from PHP 8.4.',
+            $plan->warnings,
+        );
+        // ... and with the target pinned at 8.4 the only hop left is the Node
+        // pin. The driver's newest release needs PHP 8.5, which the plan never
+        // reaches: that is a finding about where the plan starts, not a block
+        // on the Node hop, which moves nothing in PHP.
+        self::assertSame(['node-pin-24'], $this->ids($plan));
+        self::assertNull($plan->packageChecks[0]->blocks);
+        self::assertContains(
+            'acme/db-driver 1.5.0 needs PHP 8.5 or newer, but the plan ends at PHP 8.4.',
+            $plan->warnings,
+        );
+        foreach ($plan->warnings as $warning) {
+            self::assertStringNotContainsString('block node-pin-24', $warning);
+        }
+    }
+
     public function test_the_lock_ceiling_warns_when_the_first_php_hop_leaves_its_range(): void
     {
         $dir = $this->tempDir();

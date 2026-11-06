@@ -12,7 +12,10 @@ use Waynestate\Booster\Project\Project;
 /**
  * Asks Packagist what the app's direct dependencies allow, and reports the
  * first planned hop each one blocks. This is advisory: a blocked hop stays in
- * the plan, with a warning that names the package to replace or upgrade.
+ * the plan, with a warning that names the package to replace or upgrade. A
+ * package whose newest release is out of reach before the first hop runs (a
+ * floor above the plan's starting version, or a ceiling below it) gets its own
+ * finding instead: no hop is to blame for where the plan starts.
  *
  * Only the newest stable release of each package counts. The dev aliases
  * Packagist lists first (the v9.99.x entries) say nothing about what a
@@ -42,7 +45,7 @@ final class PackageCompat
 
         $checks = [];
         foreach ($this->directDependencies($composer) as $name) {
-            $checks[] = $this->checkOne($name, $composer, $steps);
+            $checks[] = $this->checkOne($name, $composer, $steps, $project);
         }
 
         return new PackageReport($checks);
@@ -112,7 +115,7 @@ final class PackageCompat
      * @param array<string, mixed> $composer
      * @param list<PlanStep>       $steps
      */
-    private function checkOne(string $name, array $composer, array $steps): PackageCheck
+    private function checkOne(string $name, array $composer, array $steps, Project $project): PackageCheck
     {
         $document = $this->fetchDocument($name, $composer);
         if ($document === null) {
@@ -147,6 +150,11 @@ final class PackageCompat
         $isAbandoned = $abandoned === true || (is_string($abandoned) && $abandoned !== '');
         $replacement = is_string($abandoned) && $abandoned !== '' ? $abandoned : null;
 
+        // Where the plan starts: the first step carries the running versions,
+        // and an empty plan sits where the detector found the app.
+        $startPhp = $steps !== [] ? $steps[0]->phpBefore : $project->phpVersion;
+        $startLaravel = $steps !== [] ? $steps[0]->laravelBefore : $project->laravelMajor;
+
         $blocks = null;
         $failed = [];
         $blockingStep = null;
@@ -159,15 +167,42 @@ final class PackageCompat
             }
         }
 
+        // Dimensions the newest release is out of reach on before any hop
+        // runs: a floor above the starting version, or a ceiling below it. No
+        // hop is to blame for those, because no hop put the app there.
+        $outOfReach = [];
+        if ($startPhp !== null && $phpConstraint !== null && !$this->intersects($startPhp . '.*', $phpConstraint)) {
+            $outOfReach[] = 'php';
+        }
+        if ($startLaravel !== null && $laravelConstraint !== null
+            && !$this->intersects(sprintf('^%s.0', $startLaravel), $laravelConstraint)) {
+            $outOfReach[] = 'laravel';
+        }
+
         $blockWarning = null;
-        if ($blocks !== null && $blockingStep !== null) {
+        $startWarning = null;
+        if ($blockingStep !== null) {
+            $phraseFailed = [];
+            foreach (['laravel', 'php'] as $dimension) {
+                if (in_array($dimension, $failed, true) || in_array($dimension, $outOfReach, true)) {
+                    $phraseFailed[] = $dimension;
+                }
+            }
             $blockWarning = sprintf(
                 '%s %s %s, so it blocks %s. Replace or upgrade it first.',
                 $name,
                 $newest,
-                $this->supportPhrase($failed, $phpConstraint, $laravelConstraint, $blockingStep->phpAfter),
+                $this->supportPhrase($phraseFailed, $phpConstraint, $laravelConstraint, $blockingStep->phpAfter),
                 $blocks,
             );
+        } else {
+            $findings = [];
+            foreach (['laravel', 'php'] as $dimension) {
+                if (in_array($dimension, $outOfReach, true)) {
+                    $findings[] = $this->startFinding($dimension, $name, $newest, $phpConstraint, $laravelConstraint, $startPhp, $startLaravel, $steps);
+                }
+            }
+            $startWarning = $findings === [] ? null : implode(' ', $findings);
         }
         $abandonedWarning = null;
         if ($isAbandoned) {
@@ -176,7 +211,7 @@ final class PackageCompat
                 : sprintf('%s is abandoned with no replacement.', $name);
         }
 
-        return new PackageCheck($name, $newest, $blocks, $isAbandoned, $replacement, true, null, $blockWarning, $abandonedWarning);
+        return new PackageCheck($name, $newest, $blocks, $isAbandoned, $replacement, true, null, $blockWarning, $abandonedWarning, $startWarning);
     }
 
     /**
@@ -318,29 +353,115 @@ final class PackageCompat
     }
 
     /**
-     * Which dimensions the step's destination violates: 'laravel' when the
-     * package's newest release cannot be installed at the step's Laravel
-     * target, 'php' when it cannot be installed at the step's PHP. Empty when
-     * the step passes. The destination major or minor is probed as a whole
-     * (any X.y.z of it), so a constraint that allows any version of the
-     * destination passes, even when it floors above the range's start:
-     * "^10.1" still allows plenty of Laravel 10, and ">=8.2.5" still allows
-     * plenty of PHP 8.2.
+     * Which dimensions the step's destination violates, among the dimensions
+     * the step actually moves: 'laravel' when the package's newest release
+     * cannot be installed at the step's Laravel target, 'php' when it cannot
+     * be installed at the step's PHP. A hop that leaves a dimension untouched
+     * cannot fail on it: a Node pin moves nothing in PHP, so a PHP floor does
+     * not block it. Empty when the step passes. The destination major or
+     * minor is probed as a whole (any X.y.z of it), so a constraint that
+     * allows any version of the destination passes, even when it floors above
+     * the range's start: "^10.1" still allows plenty of Laravel 10, and
+     * ">=8.2.5" still allows plenty of PHP 8.2.
      *
      * @return list<'laravel'|'php'>
      */
     private function stepFailures(PlanStep $step, ?string $phpConstraint, ?string $laravelConstraint): array
     {
         $failed = [];
-        if ($step->laravelAfter !== null && $laravelConstraint !== null
+        if ($this->stepMoves($step, 'laravel') && $laravelConstraint !== null
             && !$this->intersects(sprintf('^%s.0', $step->laravelAfter), $laravelConstraint)) {
             $failed[] = 'laravel';
         }
-        if ($phpConstraint !== null && !$this->intersects($step->phpAfter . '.*', $phpConstraint)) {
+        if ($this->stepMoves($step, 'php') && $phpConstraint !== null
+            && !$this->intersects($step->phpAfter . '.*', $phpConstraint)) {
             $failed[] = 'php';
         }
 
         return $failed;
+    }
+
+    /** Whether the step moves the given dimension at all. */
+    private function stepMoves(PlanStep $step, string $dimension): bool
+    {
+        if ($dimension === 'php') {
+            return $step->phpBefore !== null && $step->phpBefore !== $step->phpAfter;
+        }
+
+        return $step->laravelBefore !== null && $step->laravelBefore !== $step->laravelAfter;
+    }
+
+    /**
+     * The finding for a dimension the package's newest release is out of
+     * reach on at the plan's starting point, reported on its own because no
+     * hop is to blame for where the plan starts. A floor above the start
+     * names the version the plan reaches, when it ever does; a ceiling below
+     * the start names the ceiling and the version the app already sits on.
+     *
+     * @param list<PlanStep> $steps
+     */
+    private function startFinding(
+        string $dimension,
+        string $name,
+        string $newest,
+        ?string $phpConstraint,
+        ?string $laravelConstraint,
+        ?string $startPhp,
+        ?string $startLaravel,
+        array $steps,
+    ): string {
+        $component = $dimension === 'php' ? 'PHP' : 'Laravel';
+        $constraint = $dimension === 'php' ? (string) $phpConstraint : (string) $laravelConstraint;
+        $start = $dimension === 'php' ? (string) $startPhp : (string) $startLaravel;
+        $allows = $dimension === 'php'
+            ? fn(string $version): bool => $this->intersects($version . '.*', $constraint)
+            : fn(string $version): bool => $this->intersects(sprintf('^%s.0', $version), $constraint);
+
+        if ($this->targetBelowFloor($start, $constraint)) {
+            $reached = null;
+            foreach ($steps as $step) {
+                if (!$this->stepMoves($step, $dimension)) {
+                    continue;
+                }
+                $after = $dimension === 'php' ? $step->phpAfter : $step->laravelAfter;
+                if ($after !== null && $allows($after)) {
+                    $reached = $after;
+                    break;
+                }
+            }
+            if ($reached !== null) {
+                return sprintf(
+                    '%s %s needs %s %s or newer, but the plan starts from %s %s; it installs once the plan reaches %s %s.',
+                    $name,
+                    $newest,
+                    $component,
+                    $this->floorOf($constraint),
+                    $component,
+                    $start,
+                    $component,
+                    $reached,
+                );
+            }
+            $last = $steps !== [] ? $steps[count($steps) - 1] : null;
+            $end = $last === null ? null : ($dimension === 'php' ? $last->phpAfter : $last->laravelAfter);
+
+            return sprintf(
+                '%s %s needs %s %s or newer, but the plan ends at %s %s.',
+                $name,
+                $newest,
+                $component,
+                $this->floorOf($constraint),
+                $component,
+                $end ?? $start,
+            );
+        }
+
+        $cap = $dimension === 'php' ? $this->phpCap($constraint) : $this->laravelCap($constraint);
+        $phrase = $cap !== null
+            ? sprintf('supports %s up to %s', $component, $cap)
+            : sprintf('supports no %s version Booster plans', $component);
+
+        return sprintf('%s %s %s, but the app already sits on %s %s.', $name, $newest, $phrase, $component, $start);
     }
 
     /**
@@ -424,11 +545,12 @@ final class PackageCompat
     }
 
     /**
-     * What the package's newest release supports, naming only the dimensions
-     * the blocking step fails on. A cap is printed only when the constraint
-     * really has one and the hop's target is not below the floor; a
-     * constraint with no upper bound, or a PHP floor above the target,
-     * names its floor instead.
+     * What the package's newest release supports, naming the dimensions it
+     * cannot be installed on after the blocking step: the hop's own failures
+     * plus anything it already missed at the plan's starting point. A cap is
+     * printed only when the constraint really has one and the hop's target is
+     * not below the floor; a constraint with no upper bound, or a PHP floor
+     * above the target, names its floor instead.
      *
      * @param list<'laravel'|'php'> $failed
      */

@@ -49,6 +49,8 @@ This page lists every hop Booster knows; the list is generated from the hop data
 | `inertia-2-to-3` | node | 2 | 3 | Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0. |
 <!-- /generated -->
 
+The hop id `node-pin-24` is a stable id and now pins Node 26.
+
 > Every other hop lifts the engine; `wayneui-1-to-2` is the one that repaints the bodywork.
 
 Booster plans any target the policy knows. A target past security support is allowed as a stop on the way up, with a

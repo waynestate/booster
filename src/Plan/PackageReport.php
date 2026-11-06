@@ -6,8 +6,9 @@ namespace Waynestate\Booster\Plan;
 
 /**
  * Every per-package result plus the plan warnings they add: one line per
- * blocked hop, one per abandoned package, and one summary line naming the
- * packages the check could not reach.
+ * blocked hop, one per package already out of reach at the plan's starting
+ * point, one per abandoned package, and one summary line naming the packages
+ * the check could not reach.
  */
 final readonly class PackageReport
 {
@@ -26,6 +27,9 @@ final readonly class PackageReport
         foreach ($this->checks as $check) {
             if ($check->blockWarning !== null) {
                 $warnings[] = $check->blockWarning;
+            }
+            if ($check->startWarning !== null) {
+                $warnings[] = $check->startWarning;
             }
             if ($check->abandonedWarning !== null) {
                 $warnings[] = $check->abandonedWarning;
