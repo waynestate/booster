@@ -93,6 +93,12 @@ final class HopDataRefresher
         '13' => '^2.0',
     ];
 
+    /** Fixed inertia-laravel pin for the Inertia 2 to 3 hop; no feed drives it. */
+    public const FIXED_INERTIA_LARAVEL_NEXT = '^3.0';
+
+    /** Fixed @inertiajs/vue3 pin for the Inertia 2 to 3 hop; no feed drives it. */
+    public const FIXED_INERTIA_VUE3_NEXT = '^3.0';
+
     public function __construct(private readonly Policy $policy) {}
 
     /**
@@ -142,6 +148,8 @@ final class HopDataRefresher
             'laravel_php' => $this->laravelPhp($existing, $laravelChain, $feeds[self::FEED_LARAVEL_FRAMEWORK], $feeds[self::FEED_ENDOFLIFE]),
             'inertia_laravel' => $this->fixedTable($existing, 'inertia_laravel', $laravelChain, self::FIXED_INERTIA_LARAVEL),
             'inertia_vue3' => $this->fixedTable($existing, 'inertia_vue3', $laravelChain, self::FIXED_INERTIA_VUE3),
+            'inertia_laravel_next' => $this->fixedScalar($existing, 'inertia_laravel_next', self::FIXED_INERTIA_LARAVEL_NEXT),
+            'inertia_vue3_next' => $this->fixedScalar($existing, 'inertia_vue3_next', self::FIXED_INERTIA_VUE3_NEXT),
         ];
     }
 

@@ -29,6 +29,9 @@ final class HopRegistry
     /** The Tailwind 3 to 4 hop. The tool and pin versions live in the data file. */
     public const TAILWIND_ID = 'tailwind-3-to-4';
 
+    /** The Inertia 2 to 3 hop. The package pins live in the data file. */
+    public const INERTIA_3_ID = 'inertia-2-to-3';
+
     /** The staged hop that moves a Vue 2.6 front end onto Vue 2.7. */
     public const VUE_26_TO_27_ID = 'vue-26-to-27';
 
@@ -94,6 +97,10 @@ final class HopRegistry
     /** @var array<string, string|null> */
     private readonly array $inertiaVue3;
 
+    private readonly string $inertiaLaravelNext;
+
+    private readonly string $inertiaVue3Next;
+
     /** @var array<string, Hop> */
     private array $hops = [];
 
@@ -118,6 +125,8 @@ final class HopRegistry
         $this->laravelPhp = self::rangeTable($data, 'laravel_php');
         $this->inertiaLaravel = self::nullableStringTable($data, 'inertia_laravel');
         $this->inertiaVue3 = self::nullableStringTable($data, 'inertia_vue3');
+        $this->inertiaLaravelNext = self::scalar($data, 'inertia_laravel_next');
+        $this->inertiaVue3Next = self::scalar($data, 'inertia_vue3_next');
 
         $this->addPhpHops();
         $this->addLaravelHops();
@@ -131,6 +140,7 @@ final class HopRegistry
         foreach ($this->vueHops() as $hop) {
             $this->add($hop);
         }
+        $this->add($this->inertiaThreeHop());
     }
 
     public static function phpHopId(string $from, string $to): string
@@ -289,6 +299,18 @@ final class HopRegistry
         return $this->inertiaVue3;
     }
 
+    /** The inertia-laravel constraint the Inertia 2 to 3 hop pins. */
+    public function inertiaLaravelNext(): string
+    {
+        return $this->inertiaLaravelNext;
+    }
+
+    /** The @inertiajs/vue3 constraint the Inertia 2 to 3 hop pins. */
+    public function inertiaVue3Next(): string
+    {
+        return $this->inertiaVue3Next;
+    }
+
     /**
      * The Inertia constraints a Laravel hop should raise for an Inertia/Vue
      * app moving to $laravelTo: composer and npm maps (empty where BOOSTER
@@ -315,6 +337,22 @@ final class HopRegistry
         }
 
         return ['composer' => $composer, 'npm' => $npm, 'notes' => $notes];
+    }
+
+    /**
+     * The Inertia constraints the Inertia 2 to 3 hop raises an app to: the
+     * same shape as inertiaChanges(), pinned at Inertia 3 instead of the
+     * constraint a Laravel major pairs with.
+     *
+     * @return array{composer: array<string, string>, npm: array<string, string>, notes: list<string>}
+     */
+    public function inertiaChangesNext(): array
+    {
+        return [
+            'composer' => ['inertiajs/inertia-laravel' => $this->inertiaLaravelNext],
+            'npm' => ['@inertiajs/vue3' => $this->inertiaVue3Next],
+            'notes' => [],
+        ];
     }
 
     /** The PHP version Booster can move to from $from, or null at the end of the chain. */
@@ -751,6 +789,37 @@ final class HopRegistry
                 'Tailwind 4 raises the browser floor: Safari 16.4+, Chrome 111+, Firefox 128+. Check the app\'s supported browsers before you ship.',
             ],
             links: ['https://tailwindcss.com/docs/upgrade-guide'],
+        );
+    }
+
+    /**
+     * The Inertia 2 to 3 hop. It pins both Inertia packages at 3 and lets the
+     * installs prove the app still loads; the upgrade guide's breaking changes
+     * are the person's work, listed as manual lines.
+     */
+    private function inertiaThreeHop(): Hop
+    {
+        return new Hop(
+            id: self::INERTIA_3_ID,
+            kind: HopKind::Node,
+            from: '2',
+            to: '3',
+            summary: sprintf('Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to %s and @inertiajs/vue3 to %s.', $this->inertiaLaravelNext, $this->inertiaVue3Next),
+            notes: [
+                'Booster pins inertiajs/inertia-laravel to ' . $this->inertiaLaravelNext . ' and @inertiajs/vue3 to ' . $this->inertiaVue3Next . ', runs npm ci when package.json moves, and runs the composer gate; the manual lines below are the code changes.',
+                'MANUAL: Axios is no longer part of the core; the router ships a built-in XHR client, and Axios comes back only through an adapter.',
+                'MANUAL: qs and lodash-es are no longer bundled; install them yourself if your code imports them.',
+                'MANUAL: the invalid event is now httpException and the exception event is now networkError; rename the handlers you register.',
+                'MANUAL: router.cancel() is gone; call router.cancelAll() instead.',
+                'MANUAL: the future config is removed; its options are always on now.',
+                'MANUAL: the head attribute inertia is now data-inertia.',
+                'MANUAL: hideProgress() and revealProgress() are removed; use the progress object instead.',
+                'MANUAL: Inertia::lazy() and LazyProp are removed; use Inertia::optional() instead.',
+                'MANUAL: the config file is restructured; republish it, then run php artisan view:clear.',
+                'MANUAL: the packages are ESM only; CommonJS require() calls stop working.',
+                'MANUAL: the build targets ES2022; add @vitejs/plugin-legacy if you must serve older browsers.',
+            ],
+            links: ['https://inertiajs.com/docs/v3/getting-started/upgrade-guide'],
         );
     }
 

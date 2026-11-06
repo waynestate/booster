@@ -50,7 +50,7 @@
             "php": "8.3",
             "laravel": "12",
             "vue": "3",
-            "plan": ["laravel-12-to-13", "php-83-to-84", "php-84-to-85", "node-pin-24"],
+            "plan": ["laravel-12-to-13", "php-83-to-84", "php-84-to-85", "node-pin-24", "inertia-2-to-3"],
             "rector": {}
         },
         "laravel-wayne-cas": {

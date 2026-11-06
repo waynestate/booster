@@ -700,7 +700,7 @@ final class PlannerTest extends TestCase
     {
         $plan = $this->plan('laravel-inertia-vue', new PlanOptions(fromPhp: '8.5', toPhp: '8.5', fromLaravel: '13', toLaravel: '13', withNode: true));
 
-        self::assertSame([HopRegistry::NODE_PIN_ID], $this->ids($plan));
+        self::assertSame([HopRegistry::NODE_PIN_ID, HopRegistry::INERTIA_3_ID], $this->ids($plan));
     }
 
     public function test_bound_targets_leave_out_the_node_hops_with_a_warning(): void

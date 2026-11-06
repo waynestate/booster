@@ -395,6 +395,7 @@ final class HopExecutor
                 return match ($hop->id) {
                     HopRegistry::MIX_TO_VITE_ID => $this->runMixHop($step, $path, $plan, $options, $baseline),
                     HopRegistry::TAILWIND_ID => $this->runTailwindHop($step, $path, $options, $baseline),
+                    HopRegistry::INERTIA_3_ID => $this->runInertiaHop($step, $path, $options, $baseline),
                     HopRegistry::VUE_COMPAT_CODEMOD_ID => $this->runVueCompatCodemodHop($step, $path, $options),
                     default => $this->runNodeHop($step, $path, $options, $baseline),
                 };
@@ -814,12 +815,16 @@ final class HopExecutor
      * phase at all, it locks the branch instead, so the refreshed lock is read
      * back and a branch version behind a tagged range is treated like the
      * block.
+     *
+     * @param list<string>|null $update packages for composer update -W; the
+     *        hop's composer set by default, or the hop's own list when it
+     *        changes packages outside that set
      */
-    private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): GateReport
+    private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, ?array $update = null): GateReport
     {
         $php = $step->phpAfter ?? '';
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
-        $update = $this->lockUpdatePackages($step);
+        $update = $update ?? $this->lockUpdatePackages($step);
         $unblock = [];
         $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update, $options->testEnv);
         $outcome = TargetImageRunner::gateOutcome($result);
@@ -1880,20 +1885,19 @@ final class HopExecutor
             return [[], []];
         }
 
-        return $this->applyInertiaChanges($plan->project->path, $step->laravelAfter, $dryRun);
+        return $this->applyInertiaChanges($plan->project->path, $this->registry()->inertiaChanges($step->laravelAfter), $dryRun);
     }
 
     /**
-     * Raises the Inertia constraints an app already carries toward the ones
-     * its new Laravel major pairs with. Only packages the app has are touched:
-     * a Vue 2 app never gains @inertiajs/vue3, and a fresh add is a human
-     * decision.
+     * Raises the Inertia constraints an app already carries toward $wanted.
+     * Only packages the app has are touched: a Vue 2 app never gains
+     * @inertiajs/vue3, and a fresh add is a human decision.
      *
+     * @param array{composer: array<string, string>, npm: array<string, string>} $wanted
      * @return array{0: list<string>, 1: list<array{file: string, diff: string}>}
      */
-    private function applyInertiaChanges(string $path, string $laravelTo, bool $dryRun): array
+    private function applyInertiaChanges(string $path, array $wanted, bool $dryRun): array
     {
-        $wanted = $this->registry()->inertiaChanges($laravelTo);
         $changes = [];
         $files = [];
 
@@ -1949,6 +1953,108 @@ final class HopExecutor
         }
 
         return [$changes, $files];
+    }
+
+    /**
+     * The Inertia 2 to 3 hop. It pins both Inertia packages at 3, installs
+     * the new front end with npm ci, and lets the composer gate prove the app
+     * still loads; the upgrade guide's breaking changes stay manual lines in
+     * the hop's notes.
+     */
+    private function runInertiaHop(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): StepResult
+    {
+        $hop = $step->hop;
+        [$changes, $files] = $this->applyInertiaChanges($path, $this->registry()->inertiaChangesNext(), $options->dryRun);
+
+        if ($options->dryRun) {
+            if ($files === []) {
+                $changes[] = 'Dry run: nothing to change; the Inertia constraints already floor at 3.';
+            } else {
+                $installs = [];
+                if (self::fileTouched($files, 'package.json')) {
+                    $installs[] = 'npm ci';
+                }
+                if (self::fileTouched($files, 'composer.json')) {
+                    $installs[] = 'composer update -W inertiajs/inertia-laravel';
+                }
+                $changes[] = 'Dry run: would install the new Inertia versions (' . implode(', ', $installs) . ').';
+            }
+
+            return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $files, [...$changes, ...$hop->notes]);
+        }
+
+        if ($files === []) {
+            return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
+                'Nothing to do: the Inertia constraints already floor at 3, so the gate was skipped.',
+                ...$hop->notes,
+            ]);
+        }
+
+        if (self::fileTouched($files, 'package.json')) {
+            if ($this->node === null) {
+                $changes[] = 'No Node runner configured, so npm ci did not run; run it yourself before relying on the front end.';
+            } else {
+                $install = $this->node->run($path, ['npm', 'ci']);
+                if (!$install->successful()) {
+                    return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [
+                        ...$changes,
+                        sprintf('npm ci failed (exit %d) in the Node container. The working copy keeps the changes so you can read them.', $install->exitCode),
+                        trim($install->stdout . "\n" . $install->stderr),
+                        $this->undoHint($path),
+                    ]);
+                }
+                $changes[] = 'npm ci is green in the Node container.';
+            }
+        }
+
+        if (!$options->skipGate) {
+            $gate = $this->runGate($step, $path, $options, $baseline, $this->inertiaUpdatePackages($path));
+            if (!$gate->passed) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
+            }
+            $changes = [...$changes, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $baseline->gateKind)];
+        } else {
+            $changes[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
+        }
+
+        return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$changes, ...$hop->notes]);
+    }
+
+    /**
+     * The packages the Inertia 3 hop must refresh in the lock: the
+     * inertia-laravel pin when the app requires it, empty otherwise so a
+     * plain install keeps the unchanged lock honest.
+     *
+     * @return list<string>
+     */
+    private function inertiaUpdatePackages(string $path): array
+    {
+        $composerFile = $path . '/composer.json';
+        if (!is_file($composerFile)) {
+            return [];
+        }
+        $composer = json_decode((string) file_get_contents($composerFile), true);
+        if (is_array($composer) && array_key_exists('inertiajs/inertia-laravel', $composer['require'] ?? [])) {
+            return ['inertiajs/inertia-laravel'];
+        }
+
+        return [];
+    }
+
+    /**
+     * Whether $files names $file among the files a change touched.
+     *
+     * @param list<array{file: string, diff: string}> $files
+     */
+    private static function fileTouched(array $files, string $name): bool
+    {
+        foreach ($files as $entry) {
+            if ($entry['file'] === $name) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

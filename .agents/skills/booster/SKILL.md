@@ -55,4 +55,5 @@ Playbooks:
 - `booster-vue-27-to-compat`: Move a Vue 2.7 front end to Vue 3 through the @vue/compat build.
 - `booster-vue-compat-codemod`: Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists.
 - `booster-vue-2-to-3`: Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue).
+- `booster-inertia-2-to-3`: Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0.
 

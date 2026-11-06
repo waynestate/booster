@@ -255,7 +255,8 @@ final class Planner
 
         $frontEndHops = $this->frontEndHopIds($project, $laravel);
         $vueHops = $this->vueHopIds($project);
-        $nodeHops = array_merge($frontEndHops, $vueHops);
+        $inertiaHops = $this->needsInertiaThree($project, $laravel, $php) ? [HopRegistry::INERTIA_3_ID] : [];
+        $nodeHops = array_merge($frontEndHops, $vueHops, $inertiaHops);
         $nodeLeftOut = $nodeHops !== [] && $this->targetsBound($options) && !$options->withNode;
         if ($nodeLeftOut) {
             $warnings[] = sprintf(
@@ -292,6 +293,9 @@ final class Planner
 
         if (!$nodeLeftOut) {
             foreach ($vueHops as $id) {
+                $steps[] = $this->step(++$n, $this->registry->get($id), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+            }
+            foreach ($inertiaHops as $id) {
                 $steps[] = $this->step(++$n, $this->registry->get($id), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
             }
         }
@@ -593,6 +597,58 @@ final class Planner
             if (is_string($constraint)) {
                 $floor = HopDataRefresher::lowestMajor($constraint);
                 if ($floor !== null && version_compare($floor, '4', '<')) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The app runs Inertia 2: inertiajs/inertia-laravel in composer.json or
+     * @inertiajs/vue3 in package.json with a constraint that floors below 3,
+     * and the plan lands on Laravel 11 or newer on PHP 8.2 or newer, where
+     * Inertia 3 runs. Offered last, after every Composer and Node hop.
+     */
+    private function needsInertiaThree(Project $project, ?string $laravel, string $php): bool
+    {
+        if ($laravel === null || version_compare($laravel, '11', '<') || version_compare($php, '8.2', '<')) {
+            return false;
+        }
+
+        if ($project->hasComposer && $this->constraintFloorsBelowThree($project->path . '/composer.json', 'require', 'inertiajs/inertia-laravel')) {
+            return true;
+        }
+
+        if ($project->hasPackageJson && $this->constraintFloorsBelowThree($project->path . '/package.json', ['dependencies', 'devDependencies'], '@inertiajs/vue3')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether $packageFile lists $package under one of $sections with a
+     * constraint that floors below 3. Open-ended constraints such as "*" do
+     * not count: they already allow 3, so there is nothing to move.
+     *
+     * @param list<string>|string $sections
+     */
+    private function constraintFloorsBelowThree(string $packageFile, string|array $sections, string $package): bool
+    {
+        if (!is_file($packageFile)) {
+            return false;
+        }
+        $data = json_decode((string) file_get_contents($packageFile), true);
+        if (!is_array($data)) {
+            return false;
+        }
+        foreach ((array) $sections as $section) {
+            $constraint = $data[$section][$package] ?? null;
+            if (is_string($constraint)) {
+                $floor = HopDataRefresher::lowestMajor($constraint);
+                if ($floor !== null && version_compare($floor, '3', '<')) {
                     return true;
                 }
             }

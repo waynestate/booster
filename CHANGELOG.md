@@ -7,6 +7,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 ### Added
 
 - Vendored libraries: `plan` and `run` find the libraries copied into `vendor/` (a name and version from its `composer.json` or `VERSION` file, or `version unknown`) and list each with the Composer package that replaces it. The plan text and the run report get a block for them, and the JSON gains `vendored_libraries` and `from_php` (the PHP version the run starts from, when it differs from the app's own).
+- An `inertia-2-to-3` hop for apps that require `inertiajs/inertia-laravel` or carry `@inertiajs/vue3` below 3, planned last when the plan lands on Laravel 11 or newer on PHP 8.2 or newer: it pins `inertiajs/inertia-laravel` to `^3.0` and `@inertiajs/vue3` to `^3.0`, runs the composer and npm installs, and lists the Inertia 3 breaking changes (Axios out of the core, `qs` and `lodash-es` no longer bundled, renamed events, `router.cancelAll()`, the restructured config, ESM only, ES2022) as manual lines.
 
 ## [1.8.3] - 2026-11-04
 
