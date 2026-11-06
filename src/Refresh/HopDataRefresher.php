@@ -61,8 +61,14 @@ final class HopDataRefresher
     /** The oldest Laravel majors BOOSTER plans upgrades from, kept ahead of the policy. */
     public const LARAVEL_FLOOR_PREFIX = ['5.8', '6', '7'];
 
-    /** Fixed Tailwind pin BOOSTER uses for the @tailwindcss/upgrade tool; no feed drives it. */
-    public const FIXED_TAILWIND_UPGRADE_VERSION = '^4.1';
+    /**
+     * Exact @tailwindcss/upgrade release BOOSTER runs; no feed drives it. Exact on
+     * purpose: 4.3.4 added tree-sitter, a native module that needs Python and a
+     * compiler to install, so npx fails silently in the slim Node image
+     * (found on a real app, 2026-11-06). Move it only after trying the new
+     * release in node:<major>-bookworm-slim.
+     */
+    public const FIXED_TAILWIND_UPGRADE_VERSION = '4.3.3';
 
     /** Fixed Tailwind pin BOOSTER writes into the app's package.json; no feed drives it. */
     public const FIXED_TAILWIND_VERSION = '^4.1';

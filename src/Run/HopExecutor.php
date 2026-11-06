@@ -1443,18 +1443,31 @@ final class HopExecutor
         $package = '@tailwindcss/upgrade@' . $toolVersion;
         if ($options->dryRun) {
             return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [], [
-                sprintf('Dry run: would run npx -y %s in the Node container, then normalize package.json (pin tailwindcss to %s, add the matching Vite or PostCSS plugin, remove autoprefixer and postcss-import).', $package, $this->registry()->tailwindVersion()),
+                sprintf('Dry run: would run npx -y %s --force in the Node container, then normalize package.json (pin tailwindcss to %s, add the matching Vite or PostCSS plugin, remove autoprefixer and postcss-import).', $package, $this->registry()->tailwindVersion()),
                 ...$hop->notes,
             ]);
         }
 
-        $tool = $this->node->run($path, ['npx', '-y', $package]);
+        // --force: the tool refuses a dirty tree, and its check needs git, which the
+        // slim Node image lacks. BOOSTER started from a clean tree and never commits,
+        // so earlier hops' edits are expected here and the undo line covers them all.
+        $tool = $this->node->run($path, ['npx', '-y', $package, '--force']);
         if (!$tool->successful()) {
-            return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [
-                sprintf('The Tailwind upgrade tool failed: "npx -y %s" exited %d. The working copy keeps whatever it wrote, so you can read it.', $package, $tool->exitCode),
-                trim($tool->stdout . "\n" . $tool->stderr),
-                $this->undoHint($path),
-            ]);
+            $output = trim($tool->stdout . "\n" . $tool->stderr);
+            $messages = [sprintf('The Tailwind upgrade tool failed: "npx -y %s --force" exited %d. The working copy keeps whatever it wrote, so you can read it.', $package, $tool->exitCode)];
+            if (self::onlyNpmNotices($output)) {
+                $messages[] = sprintf(
+                    'The tool printed nothing, which usually means npx could not install it in the Node container. Try it by hand: docker run --rm -v "<app>:/app" -w /app %s npx -y %s --force',
+                    NodeRunner::imageTag((int) $this->registry()->nodePinTarget()),
+                    $package,
+                );
+            }
+            if ($output !== '') {
+                $messages[] = $output;
+            }
+            $messages[] = $this->undoHint($path);
+
+            return new StepResult($step->number, $hop->id, StepResult::ERROR, [], $messages);
         }
 
         [$changes, $files] = $this->applyTailwindPackages($path);
@@ -2622,6 +2635,22 @@ final class HopExecutor
         }
 
         return 'Undo with: git checkout . && git clean -fd -- ' . implode(' ', $created) . ' (inside the app).';
+    }
+
+    /**
+     * True when a tool's output is empty or only npm's own notices, which is how
+     * npx looks when it never managed to install the package it was asked for.
+     */
+    private static function onlyNpmNotices(string $output): bool
+    {
+        foreach (preg_split('/\R/', $output) ?: [] as $line) {
+            $line = trim($line);
+            if ($line !== '' && !str_starts_with($line, 'npm notice')) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

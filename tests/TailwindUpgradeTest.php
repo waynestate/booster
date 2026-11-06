@@ -82,7 +82,8 @@ final class TailwindUpgradeTest extends TestCase
         $command = $npx[0]['command'];
         $imageAt = array_search(NodeRunner::imageTag(24), $command, true);
         self::assertNotFalse($imageAt);
-        self::assertSame(['npx', '-y', '@tailwindcss/upgrade@' . $registry->tailwindUpgradeVersion()], array_slice($command, $imageAt + 1));
+        // --force: the tool's clean-tree check needs git, which the slim Node image lacks.
+        self::assertSame(['npx', '-y', '@tailwindcss/upgrade@' . $registry->tailwindUpgradeVersion(), '--force'], array_slice($command, $imageAt + 1));
     }
 
     public function test_the_postcss_plugin_is_pinned_when_the_app_has_no_vite(): void
@@ -111,7 +112,7 @@ final class TailwindUpgradeTest extends TestCase
 
         self::assertSame([StepResult::PREVIEWED], $this->statuses($report));
         $messages = implode("\n", $report->results[0]->messages);
-        self::assertStringContainsString('Dry run: would run npx -y @tailwindcss/upgrade@' . (new HopRegistry())->tailwindUpgradeVersion(), $messages);
+        self::assertStringContainsString('Dry run: would run npx -y @tailwindcss/upgrade@' . (new HopRegistry())->tailwindUpgradeVersion() . ' --force', $messages);
         self::assertSame($before, $this->snapshot($dir, $names));
         self::assertSame([], array_filter($fake->calls, static fn(array $c): bool => $c['command'][0] === 'docker'));
     }
@@ -129,6 +130,41 @@ final class TailwindUpgradeTest extends TestCase
         self::assertStringContainsString('The Tailwind upgrade tool failed', $messages);
         self::assertStringContainsString('git checkout .', $messages);
         self::assertSame($before, $this->snapshot($dir, $names));
+    }
+
+    public function test_a_tool_that_never_installed_says_so_instead_of_printing_only_npm_notices(): void
+    {
+        $dir = $this->app();
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'docker' && in_array('npx', $command, true)) {
+                return new ProcessResult(1, '', "npm notice\nnpm notice New major version of npm available!\nnpm notice\n");
+            }
+
+            return new ProcessResult(0, '', '');
+        });
+        $report = $this->runTailwind($fake, new RunOptions(), $dir);
+
+        self::assertSame([StepResult::ERROR], $this->statuses($report));
+        $messages = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('The tool printed nothing, which usually means npx could not install it in the Node container.', $messages);
+        self::assertStringContainsString('npx -y @tailwindcss/upgrade@' . (new HopRegistry())->tailwindUpgradeVersion() . ' --force', $messages);
+        self::assertStringContainsString('git checkout .', $messages);
+    }
+
+    public function test_a_tool_that_explains_its_failure_gets_no_install_hint(): void
+    {
+        $dir = $this->app();
+        $report = $this->runTailwind($this->fake($dir, toolExit: 1), new RunOptions(), $dir);
+
+        $messages = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('@tailwindcss/upgrade exploded', $messages);
+        self::assertStringNotContainsString('The tool printed nothing', $messages);
+    }
+
+    public function test_the_upgrade_tool_is_pinned_to_one_exact_release(): void
+    {
+        // A range let npx pick 4.3.4, which cannot install in the slim Node image.
+        self::assertMatchesRegularExpression('/^\d+\.\d+\.\d+$/', (new HopRegistry())->tailwindUpgradeVersion());
     }
 
     public function test_a_failing_build_gate_fails_the_step_but_keeps_the_changes(): void

@@ -16,6 +16,14 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - Vendored libraries: `plan` and `run` find the libraries copied into `vendor/` (a name and version from its `composer.json` or `VERSION` file, or `version unknown`) and list each with the Composer package that replaces it. The plan text and the run report get a block for them, and the JSON gains `vendored_libraries` and `from_php` (the PHP version the run starts from, when it differs from the app's own).
 - An `inertia-2-to-3` hop for apps that require `inertiajs/inertia-laravel` or carry `@inertiajs/vue3` below 3, planned last when the plan lands on Laravel 11 or newer on PHP 8.2 or newer: it pins `inertiajs/inertia-laravel` to `^3.0` and `@inertiajs/vue3` to `^3.0`, runs the composer and npm installs, and lists the Inertia 3 breaking changes (Axios out of the core, `qs` and `lodash-es` no longer bundled, renamed events, `router.cancelAll()`, the restructured config, ESM only, ES2022) as manual lines.
 
+### Changed
+
+- Docs theme: the docs read as the front page's own. Dark mode is no longer a deep green page: it is the record room after hours (graphite ground, cream type, pale mint links and titles, gold for focus and the current page), with every kit dark token set by the theme. The hero's graph paper lies under the top of each page and fades out before the reading; the footer is the front page's deep green band, with the version stamped on it like a dose that passed its gate (the stamp lands once, only without reduced motion); pager cards wear the record card's green and gold top edge; wide tables shade the edge that scrolls.
+
+### Fixed
+
+- `tailwind-3-to-4` on a real app: the upgrade tool is pinned to one exact release (`4.3.3`) instead of `^4.1`, because 4.3.4 needs a compiler and Python to install and npx failed silently in the slim Node image. The tool now runs with `--force`, since its clean-tree check needs git, which that image lacks, and earlier hops have already edited the tree. When the tool fails having printed only npm notices, the step says it likely never installed and gives the `docker run` line to try it by hand.
+
 ## [1.8.3] - 2026-11-04
 
 ### Changed

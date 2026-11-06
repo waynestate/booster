@@ -37,7 +37,7 @@
     "vite_version": "^8.3",
     "laravel_vite_plugin_version": "^3.2",
     "vue_plugin_version": "^6.0",
-    "tailwind_upgrade_version": "^4.1",
+    "tailwind_upgrade_version": "4.3.3",
     "tailwind_version": "^4.1",
     "typescript_version": "^6.0",
     "vue_tsc_version": "^3.0",

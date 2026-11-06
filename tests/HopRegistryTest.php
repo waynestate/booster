@@ -136,7 +136,7 @@ final class HopRegistryTest extends PhpUnitTestCase
         self::assertSame('4', $hop->to);
         self::assertTrue($hop->buildGate);
         self::assertFalse($hop->isManual());
-        self::assertSame('^4.1', $registry->tailwindUpgradeVersion());
+        self::assertSame('4.3.3', $registry->tailwindUpgradeVersion());
         self::assertSame('^4.1', $registry->tailwindVersion());
         self::assertContains('https://tailwindcss.com/docs/upgrade-guide', $hop->links);
     }
