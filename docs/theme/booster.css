@@ -13,8 +13,17 @@
    --dk-* tokens and the rules below win without !important. The kit's
    docs.css stays byte for byte Squire's.
 
-   The front page has no dark mode, so the dark set is derived (deep green
-   ground, mint text, gold links), as mapped in the stack's docs theme notes.
+   Two things carried over from the front page, and only two: the hero's
+   graph paper (the telemetry sheet) lies under the top of every page and
+   fades out before the reading starts, and the record card's "Gate passed"
+   rubber stamp lands once on the footer's version line. The footer itself is
+   the front page's deep green band; green is not the page.
+
+   The front page has no dark mode, so the dark set is derived (2026-11-06):
+   the record room after hours. A graphite desk (#141a19), the same graph
+   paper drawn in faint mint, cream type, a pale mint for links and titles,
+   gold for the highlighter, focus and the current page. Green stays where the
+   front page keeps it: the install slab, the footer band and the mark.
 
    File map: 1. fonts and tokens  2. frame  3. masthead  4. sidebar and menu
              5. article  6. code  7. tables, notes  8. toc, pager, footer
@@ -65,6 +74,10 @@
   --b-band: var(--b-mint);
   --b-paper-ink: var(--b-green-ink);
   --b-masthead-h: 64px;
+  --b-grid: var(--b-mint-2);  /* the hero's graph paper */
+  --b-foot-bg: #0a2e28;       /* the front page's footer band, both modes */
+  --b-foot-ink: #d3e9e1;
+  --b-edge: rgba(10, 46, 40, 0.2); /* scroll-edge shade on wide tables */
 
   /* The kit's tokens, set from the palette above. */
   --dk-bg: var(--b-white);
@@ -74,6 +87,10 @@
   --dk-accent: var(--b-green);
   --dk-on-accent: var(--b-white);
   --dk-code-bg: var(--b-mint);
+  --dk-note: #0e5a7d;
+  --dk-tip: var(--b-green);
+  --dk-warning: #634d00;
+  --dk-danger: #c2341f;       /* the front page's coral, as text */
   --dk-display: var(--b-display);
   --dk-mono: var(--wsu-font-family-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
   --dk-radius: 10px;
@@ -95,10 +112,31 @@ html {
 }
 
 body {
+  position: relative;
+  isolation: isolate; /* the graph paper paints above the body's own ground */
   margin: 0;
   color: var(--dk-ink);
   background: var(--dk-bg);
   font-family: var(--b-body);
+}
+
+/* The hero's graph paper: the same 32px telemetry grid, under the masthead
+   and the top of the page only. It fades out before the first paragraph, so
+   the reading sits on plain paper. Decoration, so it never takes a click. */
+body::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset-block-start: 0;
+  inset-inline: 0;
+  block-size: 30rem;
+  background-image:
+    linear-gradient(var(--b-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--b-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: -1px -1px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9) 0, rgba(0, 0, 0, 0.45) 10rem, transparent 100%);
+  pointer-events: none;
 }
 
 :where(a, button, summary, [tabindex]):focus-visible {
@@ -562,10 +600,19 @@ body {
 
 /* ------------------------------------------------------- 7. tables, notes */
 
+/* A table wider than the page scrolls in its frame; a soft shade on the edge
+   that has more says so (the covers scroll with the content, the shades stay
+   put, so a shade shows only while there is more to see). */
 .docs-table {
   margin: 1.25rem 0 1.5rem;
   border: 1px solid var(--dk-rule);
   border-radius: var(--dk-radius);
+  background:
+    linear-gradient(90deg, var(--dk-bg) 40%, transparent) left center / 2.5rem 100% no-repeat local,
+    linear-gradient(270deg, var(--dk-bg) 40%, transparent) right center / 2.5rem 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--b-edge), transparent) left center / 0.9rem 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--b-edge), transparent) right center / 0.9rem 100% no-repeat scroll;
+  background-color: var(--dk-bg);
 }
 
 .docs-article table {
@@ -659,13 +706,27 @@ body {
   border-top: 0;
 }
 
+/* Pager cards wear the record card's top edge: green ink, then the gold
+   last dose. */
 .docs-pager__link {
+  position: relative;
+  overflow: hidden;
   box-sizing: border-box;
   flex: 1 1 0;
   max-width: 22rem;
-  padding: 0.85rem 1.1rem 0.95rem;
+  padding: 1.05rem 1.1rem 0.95rem;
+  background: var(--dk-bg);
   border: 1px solid var(--dk-rule);
   border-radius: var(--dk-radius);
+}
+
+.docs-pager__link::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  block-size: 5px;
+  background: linear-gradient(90deg, var(--b-bar, var(--b-green)) 0 70%, var(--b-gold) 70% 100%);
 }
 
 .docs-pager__link--next {
@@ -696,45 +757,99 @@ body {
   text-decoration: none;
 }
 
+/* The front page's footer: a deep green band, light type, white links that
+   turn gold. The same in both modes. */
 .docs-footer {
   flex-wrap: wrap;
+  align-items: center;
+  padding-block: 1.75rem;
   padding-inline: var(--dk-gap);
-  background: var(--b-mint);
-  border-top-color: var(--dk-rule);
-  /* Full-bleed mint under a centered row. */
-  box-shadow: 0 0 0 100vmax var(--b-mint);
+  color: var(--b-foot-ink);
+  background: var(--b-foot-bg);
+  border-top: 0;
+  /* Full-bleed band under a centered row. */
+  box-shadow: 0 0 0 100vmax var(--b-foot-bg);
   clip-path: inset(0 -100vmax);
 }
 
 .docs-footer a {
-  color: var(--dk-accent);
+  color: #ffffff;
+  text-underline-offset: 0.15em;
+}
+
+.docs-footer a:hover {
+  color: var(--b-gold);
+}
+
+.docs-footer a:focus-visible {
+  outline-color: var(--b-gold);
+}
+
+/* The record card's rubber stamp, in gold on the band: the version these
+   pages document, stamped like a dose that passed its gate. */
+.docs-footer > span:first-child {
+  display: inline-grid;
+  justify-items: center;
+  padding: 0.3rem 0.7rem 0.35rem;
+  font-family: var(--b-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--b-gold);
+  border: 2.5px solid currentcolor;
+  outline: 1px solid currentcolor;
+  outline-offset: 2px;
+  border-radius: 5px;
+  rotate: -4deg;
+}
+
+.docs-footer [data-docs-version] {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 /* ---------------------------------------------------------------- 9. dark */
 
-/* Derived: the front page has no dark mode. Deep green ground (the brand's
-   darkest ink), mint text, gold where the light page uses green. */
+/* Derived: the front page has no dark mode. The record room after hours: a
+   graphite desk, the graph paper in faint mint, cream type, a pale mint for
+   links and titles, gold for the highlighter, focus and the current page.
+   Green keeps the places the front page gives it (install slab, footer band,
+   mark). Every kit --dk-* token is restated here, because the kit's own dark
+   block would otherwise fall back to WayneUI's dark green surface. The two
+   blocks below are the same list: one for readers who never chose, one for
+   an explicit dark choice. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --b-masthead-bg: rgba(10, 46, 40, 0.92);
-    --b-mint: #0f3a33;
-    --b-mint-2: #164a41;
-    --b-green-ink: #eaf5f0;
-    --b-current-bg: #164a41;
+    --b-masthead-bg: rgba(20, 26, 25, 0.9);
+    --b-mint: #1b2321;
+    --b-mint-2: #26312f;
+    --b-mint-line: #2e3b38;
+    --b-green-ink: #eef3f0;
+    --b-current-bg: #222c2a;
     --b-current-bar: var(--b-gold);
-    --b-slab: #061f1b;
+    --b-slab: #0a2e28;
     --b-slab-ink: #e3f2ec;
-    --b-paper: #0f3a33;
-    --b-band: #134139;
-    --b-paper-ink: #eaf5f0;
+    --b-paper: #182120;
+    --b-band: #1e2927;
+    --b-paper-ink: #e3eee9;
+    --b-grid: rgba(143, 216, 191, 0.075);
+    --b-bar: #3f9a85;
+    --b-edge: rgba(0, 0, 0, 0.55);
 
-    --dk-bg: #0a2e28;
-    --dk-ink: #eaf5f0;
-    --dk-muted: #a9c4ba;
-    --dk-rule: #1f5249;
-    --dk-accent: var(--b-gold);
+    --dk-bg: #141a19;
+    --dk-ink: #e6ece9;
+    --dk-muted: #a6b6b0;
+    --dk-rule: #2e3b38;
+    --dk-accent: #8fd8bf;
     --dk-on-accent: #0a2e28;
-    --dk-code-bg: #0f3a33;
+    --dk-note: #8cc8e6;
+    --dk-tip: #8fd8bf;
+    --dk-warning: #ffd659;
+    --dk-danger: #ff9a8a;
+    --dk-code-bg: #1f2927;
     --dk-focus: var(--b-gold);
 
     color-scheme: dark;
@@ -742,32 +857,41 @@ body {
 }
 
 :root[data-theme="dark"] {
-  --b-masthead-bg: rgba(10, 46, 40, 0.92);
-  --b-mint: #0f3a33;
-  --b-mint-2: #164a41;
-  --b-green-ink: #eaf5f0;
-  --b-current-bg: #164a41;
+  --b-masthead-bg: rgba(20, 26, 25, 0.9);
+  --b-mint: #1b2321;
+  --b-mint-2: #26312f;
+  --b-mint-line: #2e3b38;
+  --b-green-ink: #eef3f0;
+  --b-current-bg: #222c2a;
   --b-current-bar: var(--b-gold);
-  --b-slab: #061f1b;
+  --b-slab: #0a2e28;
   --b-slab-ink: #e3f2ec;
-  --b-paper: #0f3a33;
-  --b-band: #134139;
-  --b-paper-ink: #eaf5f0;
+  --b-paper: #182120;
+  --b-band: #1e2927;
+  --b-paper-ink: #e3eee9;
+  --b-grid: rgba(143, 216, 191, 0.075);
+  --b-bar: #3f9a85;
+  --b-edge: rgba(0, 0, 0, 0.55);
 
-  --dk-bg: #0a2e28;
-  --dk-ink: #eaf5f0;
-  --dk-muted: #a9c4ba;
-  --dk-rule: #1f5249;
-  --dk-accent: var(--b-gold);
+  --dk-bg: #141a19;
+  --dk-ink: #e6ece9;
+  --dk-muted: #a6b6b0;
+  --dk-rule: #2e3b38;
+  --dk-accent: #8fd8bf;
   --dk-on-accent: #0a2e28;
-  --dk-code-bg: #0f3a33;
+  --dk-note: #8cc8e6;
+  --dk-tip: #8fd8bf;
+  --dk-warning: #ffd659;
+  --dk-danger: #ff9a8a;
+  --dk-code-bg: #1f2927;
   --dk-focus: var(--b-gold);
 
   color-scheme: dark;
 }
 
-/* The pills keep green ink on gold in both modes; green-ink flips to mint in
-   dark, so the pills name the ground color directly. */
+/* The pills keep green ink on gold in both modes; green-ink flips to cream
+   in dark, so the pills name the ground color directly. Inline code reads
+   in the pale mint, like a value filled in on the card. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .masthead__nav .masthead__install,
   :root:not([data-theme="light"]) .docs-copy__button {
@@ -778,13 +902,21 @@ body {
     color: var(--dk-muted);
   }
 
-  :root:not([data-theme="light"]) .docs-copy:has(code.language-output) .docs-copy__button {
-    color: #eaf5f0;
-    background: #1f5249;
+  :root:not([data-theme="light"]) .docs-article code {
+    color: #cfe9df;
   }
 
-  :root:not([data-theme="light"]) .docs-pager__link:hover {
-    background: #0f3a33;
+  :root:not([data-theme="light"]) .docs-article pre code {
+    color: inherit;
+  }
+
+  :root:not([data-theme="light"]) .docs-copy:has(code.language-output) .docs-copy__button {
+    color: #eef3f0;
+    background: #2e3b38;
+  }
+
+  :root:not([data-theme="light"]) .docs-copy:has(code.language-output) .docs-copy__button:hover {
+    background: #3a4946;
   }
 }
 
@@ -797,9 +929,21 @@ body {
   color: var(--dk-muted);
 }
 
+:root[data-theme="dark"] .docs-article code {
+  color: #cfe9df;
+}
+
+:root[data-theme="dark"] .docs-article pre code {
+  color: inherit;
+}
+
 :root[data-theme="dark"] .docs-copy:has(code.language-output) .docs-copy__button {
-  color: #eaf5f0;
-  background: #1f5249;
+  color: #eef3f0;
+  background: #2e3b38;
+}
+
+:root[data-theme="dark"] .docs-copy:has(code.language-output) .docs-copy__button:hover {
+  background: #3a4946;
 }
 
 /* --------------------------------------------------------- 10. responsive */
@@ -926,6 +1070,22 @@ body {
   .docs-copy__button {
     transition: background-color 0.15s, color 0.15s;
   }
+
+  /* The stamp lands once as the footer comes into view, the way each dose
+     on the front page's record card is stamped. Browsers without
+     scroll-driven animations play it once on load instead; it is down at the
+     foot of the page either way. */
+  .docs-footer > span:first-child {
+    animation: stamp-land 0.55s var(--b-ease-out) both;
+    animation-timeline: view();
+    animation-range: entry 10% entry 90%;
+  }
+}
+
+@keyframes stamp-land {
+  0% { opacity: 0; scale: 2.2; }
+  60% { opacity: 1; scale: 0.94; }
+  100% { opacity: 1; scale: 1; }
 }
 
 @keyframes dose-stroke {
@@ -962,7 +1122,18 @@ body {
   }
 
   .docs-footer {
+    color: #12241f;
+    background: none;
     box-shadow: none;
     clip-path: none;
+  }
+
+  .docs-footer > span:first-child,
+  .docs-footer a {
+    color: #12241f;
+  }
+
+  body::before {
+    display: none;
   }
 }
