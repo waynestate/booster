@@ -48,6 +48,7 @@ This page lists every hop Booster knows; the list is generated from the hop data
 | `vue-27-to-compat` | node | 2.7 | 3 | Move a Vue 2.7 front end to Vue 3 through the @vue/compat build. |
 | `vue-compat-codemod` | node | 3-compat | 3 | Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists. |
 | `vue-2-to-3` | vue | 2 | 3 | Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue). |
+| `inertia-2-to-3` | node | 2 | 3 | Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0. |
 
 > Every other hop lifts the engine; `wayneui-1-to-2` is the one that repaints the bodywork.
 
