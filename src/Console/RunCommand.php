@@ -13,6 +13,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Plan\Plan;
+use Waynestate\Booster\Replay\ReplayFile;
+use Waynestate\Booster\Replay\ReplayGate;
 use Waynestate\Booster\Report\JsonWriter;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\ComposerEditor;
@@ -48,7 +50,9 @@ final class RunCommand extends BaseCommand
             ->addOption('allow-dirty', null, InputOption::VALUE_NONE, 'Run even when the working copy has uncommitted changes.')
             ->addOption('test-command', null, InputOption::VALUE_REQUIRED, 'Command that runs the app tests inside the image (default: composer test, else vendor/bin/phpunit).')
             ->addOption('proctor-command', null, InputOption::VALUE_REQUIRED, 'Extra command run in the image after the tests, for example a PROCTOR check.')
-            ->addOption('proctor-advisory', null, InputOption::VALUE_NONE, 'Report the PROCTOR result but do not fail the run on it.');
+            ->addOption('proctor-advisory', null, InputOption::VALUE_NONE, 'Report the PROCTOR result but do not fail the run on it.')
+            ->addOption('replay', null, InputOption::VALUE_OPTIONAL, 'Also gate on request replay: record how the app answers before the first hop, replay after each hop, fail on a changed answer. Takes the request file (default: booster-replay.json).', false)
+            ->addOption('replay-out', null, InputOption::VALUE_REQUIRED, 'Folder for the replay transcripts (default: a new booster-replay-<app>-<time> folder in the system temp folder).');
     }
 
     protected function handle(InputInterface $input, OutputInterface $output): int
@@ -74,6 +78,20 @@ final class RunCommand extends BaseCommand
 
         $memoryLimit = $this->stringOption($input, 'memory-limit') ?? RectorRunner::DEFAULT_MEMORY_LIMIT;
         RectorRunner::assertMemoryLimit($memoryLimit);
+
+        // --replay with no value means the default request file; absent means off.
+        $replayOption = $input->getOption('replay');
+        $replay = null;
+        if ($replayOption !== false) {
+            if ((bool) $input->getOption('skip-gate')) {
+                throw new ToolError('--replay runs as part of the gate, so it cannot go with --skip-gate. Drop --skip-gate, or run booster replay check on its own.');
+            }
+            $appPath = realpath($this->stringOption($input, 'path') ?? '.');
+            $replay = ReplayFile::load(ReplayFile::locate($appPath === false ? '.' : $appPath, is_string($replayOption) && $replayOption !== '' ? $replayOption : null));
+            if ($replay->todos !== []) {
+                throw new ToolError(ReplayGate::todoMessage($replay));
+            }
+        }
 
         $plan = $this->buildPlan($input);
         $gateImage = GateImage::fromOption($this->stringOption($input, 'image'));
@@ -133,6 +151,8 @@ final class RunCommand extends BaseCommand
             proctorAdvisory: (bool) $input->getOption('proctor-advisory'),
             testEnv: $testEnv,
             progress: $progress,
+            replay: $replay,
+            replayOut: $this->stringOption($input, 'replay-out'),
         ));
 
         $output->writeln(

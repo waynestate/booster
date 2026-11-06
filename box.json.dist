@@ -10,6 +10,8 @@
         "data/versions.json",
         "docker/Dockerfile",
         "resources/policy.schema.json",
+        "resources/replay/client.php",
+        "resources/replay/router.php",
         "resources/sesame/config/sesame.php",
         "vendor/bin/phpcs",
         "vendor/bin/phpstan",

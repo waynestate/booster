@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Run;
 
 use Waynestate\Booster\Plan\Plan;
+use Waynestate\Booster\Replay\ReplayOutcome;
 
 final readonly class RunReport
 {
@@ -23,11 +24,13 @@ final readonly class RunReport
         public array $testEnvKeys = [],
         /** The deployments/ script this run wrote because composer.lock changed, or null when it wrote none. */
         public ?string $deployScript = null,
+        /** The replay baseline (--replay): recorded, failed or skipped; null when the run did not replay. */
+        public ?ReplayOutcome $replay = null,
     ) {}
 
     public function failed(): bool
     {
-        if ($this->baseline->failed()) {
+        if ($this->baseline->failed() || ($this->replay?->failed() ?? false)) {
             return true;
         }
         foreach ($this->results as $result) {
@@ -48,7 +51,7 @@ final readonly class RunReport
      */
     public function toArray(): array
     {
-        return [
+        $data = [
             'tool' => 'booster',
             'dry_run' => $this->dryRun,
             'test_env' => $this->testEnvKeys,
@@ -60,6 +63,12 @@ final readonly class RunReport
             'proctor_advisory' => $this->proctorAdvisory,
             'deploy_script' => $this->deployScript,
         ];
+        // Only runs with --replay carry the key, so every other report keeps its shape.
+        if ($this->replay !== null) {
+            $data['replay'] = $this->replay->toArray();
+        }
+
+        return $data;
     }
 
     /**

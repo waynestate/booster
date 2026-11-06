@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Run;
 
 use Closure;
+use Waynestate\Booster\Replay\ReplayFile;
 
 final readonly class RunOptions
 {
@@ -33,5 +34,9 @@ final readonly class RunOptions
         public array $testEnv = [],
         /** Called with one text line after each hop and once at the end; the executor never writes to a stream itself. */
         public ?Closure $progress = null,
+        /** When set (--replay), the gate also replays this request file after each hop and fails on a changed answer. */
+        public ?ReplayFile $replay = null,
+        /** The folder for the replay transcripts; null picks a new one in the system temp folder. */
+        public ?string $replayOut = null,
     ) {}
 }

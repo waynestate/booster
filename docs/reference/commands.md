@@ -14,6 +14,7 @@ This page lists every command and option Booster takes; the table is generated f
 | `booster hops` | List every hop BOOSTER knows. |
 | `booster init` | Write the coding-tab playbooks (.agents/skills). With --check, fail when they are stale. |
 | `booster plan` | Show the ordered hops from the app to a supported version. Changes nothing. |
+| `booster replay` | The replay gate on its own: init drafts booster-replay.json, record saves how the app answers now, check fails when an answer changed. |
 | `booster run` | Run the plan: Rector, composer.json edits and a test gate per hop. Edits the working copy only. |
 | `booster scan` | Advisory scans: show what will break on a PHP version, and what PHPStan says there. Changes nothing. |
 
@@ -81,11 +82,34 @@ Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today 
 | `--no-scan` | Skip the advisory scans (PHPCompatibility and PHPStan). |  |
 | `--silent` | Do not output any message |  |
 
+### `booster replay`
+
+The replay gate on its own: init drafts booster-replay.json, record saves how the app answers now, check fails when an answer changed.
+
+Usage: `booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recording RECORDING] [--php PHP] [--image IMAGE] [--out OUT] [--no-install] [--force] [--] <action>`
+
+| Argument | Required | Meaning |
+| --- | --- | --- |
+| `action` | yes | init, record or check. |
+
+| Option | Meaning | Default |
+| --- | --- | --- |
+| `--path=VALUE` | Path to the application. | `.` |
+| `--format=VALUE` | Output format (text, json). | `text` |
+| `--file=VALUE` | The request file, relative to the app or absolute. | `booster-replay.json` |
+| `--recording=VALUE` | Where record saves the answers and check reads them, relative to the app or absolute. | `booster-replay.recording.json` |
+| `--php=VALUE` | The PHP version to serve the app on (default: the version the app declares). |  |
+| `--image=VALUE` | Serve the app in this Docker image instead of booster-target, in the same three forms as run --image. |  |
+| `--out=VALUE` | Folder for the transcripts (default: a new booster-replay-<app>-<time> folder in the system temp folder). |  |
+| `--no-install` | Do not run composer install first; use the vendor/ the app already has. |  |
+| `--force` | init only: overwrite an existing request file. |  |
+| `--silent` | Do not output any message |  |
+
 ### `booster run`
 
 Run the plan: Rector, composer.json edits and a test gate per hop. Edits the working copy only.
 
-Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory]`
+Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory] [--replay [REPLAY]] [--replay-out REPLAY-OUT]`
 
 | Option | Meaning | Default |
 | --- | --- | --- |
@@ -117,6 +141,8 @@ Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today T
 | `--test-command=VALUE` | Command that runs the app tests inside the image (default: composer test, else vendor/bin/phpunit). |  |
 | `--proctor-command=VALUE` | Extra command run in the image after the tests, for example a PROCTOR check. |  |
 | `--proctor-advisory` | Report the PROCTOR result but do not fail the run on it. |  |
+| `--replay=VALUE` | Also gate on request replay: record how the app answers before the first hop, replay after each hop, fail on a changed answer. Takes the request file (default: booster-replay.json). |  |
+| `--replay-out=VALUE` | Folder for the replay transcripts (default: a new booster-replay-<app>-<time> folder in the system temp folder). |  |
 | `--silent` | Do not output any message |  |
 
 ### `booster scan`

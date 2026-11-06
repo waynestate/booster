@@ -35,6 +35,7 @@ final class BoosterApplication extends Application
         $this->add(new DetectCommand());
         $this->add(new InitCommand());
         $this->add(new ScanCommand($processes));
+        $this->add(new ReplayCommand($processes));
     }
 
     public function doRun(InputInterface $input, OutputInterface $output): int

@@ -327,6 +327,7 @@ Preview the edits: booster run --path=examples/laravel-blade --dry-run
 | `booster run` | Runs the plan. `--dry-run` previews every hop |
 | `booster hops` | Lists every hop Booster knows |
 | `booster init` | Writes the coding-tab playbooks to `.agents/skills`; `--check` exits 1 when they are stale |
+| `booster replay` | The replay gate's file and baseline: `init` drafts `booster-replay.json`, `record` saves how the app answers, `check` replays and compares (see below) |
 
 Options shared by `plan` and `run`:
 
@@ -379,6 +380,8 @@ Options for `run`:
 | `--test-command` | What runs the app's tests in the image (default `composer test`, else `vendor/bin/phpunit`, else the built-in `php -l` syntax check when the app has no tests) |
 | `--test-env` | Environment variable (`KEY=VALUE`) passed to the baseline and every gate container with `-e`; repeat it. The report names the keys only, never the values |
 | `--proctor-command` | An extra command run in the image after the tests, for example a PROCTOR check |
+| `--replay[=FILE]` | Record how the app answers the requests in `booster-replay.json` (or FILE) before the first hop, replay them after every hop's tests, and fail the hop on a changed answer. Off by default |
+| `--replay-out` | Where the replay transcripts go (default: a new `booster-replay-<app>-<time>` folder in the temp folder) |
 | `--proctor-advisory` | Report the PROCTOR result but do not fail the run on it. Applied automatically when the run stops before the final target (`--until`, `--only`, or a target past security support) |
 
 Exit codes: `0` pass, `1` the baseline failed, a hop was capped, errored or failed its gate, or the PROCTOR check
@@ -570,6 +573,16 @@ command line instead; Booster forwards each one to the baseline and every gate c
 names the keys only, never the values:
 
     booster run --path=<app> --test-env DB_CONNECTION=sqlite --test-env DB_DATABASE=:memory:
+
+### The replay gate
+
+Tests only prove what they ask. `booster run --replay` also records how the app answers a list of requests on its
+current PHP before the first hop (PHP's built-in server in the gate image, no network, fake data from a setup
+command), replays them after every hop, and fails the hop on a changed answer, showing the first difference. A PHP 8
+hop that turns `0 == "abc"` from true to false fails there even when no test visits that page. `booster replay init`
+drafts the request file from the app's routes, with `todo` items for what only a person knows; normalizers hide CSRF
+tokens, session ids, timestamps and asset hashes. The file format, the design and the honest limits (no real
+Oracle, SSO or JavaScript-driven pages) are in [the replay gate guide](docs/guides/replay-gate.md).
 
 ### What a hop does
 

@@ -23,6 +23,7 @@ Every page below is Markdown. The HTML pages send the same Markdown to a client 
 - [What a hop does | Booster docs](https://booster.apps.wayne.edu/docs/guides/hops.md): What happens inside one hop, from the Rector dry run to the gate.
 - [Laravel hops and vendor/ | Booster docs](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.md): Why Laravel hops need the app's vendor folder, and where the hop data comes from.
 - [Quick start | Booster docs](https://booster.apps.wayne.edu/docs/guides/quick-start.md): The first commands to run, and what a plan looks like.
+- [The replay gate | Booster docs](https://booster.apps.wayne.edu/docs/guides/replay-gate.md): Record how the app answers before an upgrade, replay the same requests after every hop, and fail the hop when an answer changes.
 - [The scans | Booster docs](https://booster.apps.wayne.edu/docs/guides/scans.md): The two advisory scans Booster runs, and how to run either one alone.
 - [A smoke test for WSU apps | Booster docs](https://booster.apps.wayne.edu/docs/guides/smoke-test.md): One small test that proves the app boots and its front door still sends guests to CAS.
 - [Booster | Booster docs](https://booster.apps.wayne.edu/docs/index.md): What Booster is, and the first command to run on your app today.

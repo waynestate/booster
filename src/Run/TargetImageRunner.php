@@ -193,20 +193,8 @@ final class TargetImageRunner
      */
     public function run(string $appPath, string $php, string $testCommand, ?string $extraCommand = null, ?GateImage $image = null, array $updatePackages = [], array $env = []): ProcessResult
     {
-        $version = $this->processes->run([$this->docker, 'version', '--format', '{{.Server.Version}}'], null, [], 30);
-        if (!$version->successful()) {
-            throw new ToolError('Docker is not available, so the target-image gate cannot run. Start Docker, or pass --skip-gate and run the tests yourself.');
-        }
-
-        $resolved = null;
-        if ($image === null) {
-            $this->ensureImage($php);
-        } else {
-            // The option may be a template or a map, so the image is resolved
-            // per call from the PHP version of this baseline or gate.
-            $resolved = $image->forPhp($php);
-            $this->ensureCustomImage($resolved);
-        }
+        $prepared = $this->prepareImage($php, $image);
+        $resolved = $image === null ? null : $prepared;
 
         $uid = function_exists('posix_getuid') ? posix_getuid() : null;
         $gid = function_exists('posix_getgid') ? posix_getgid() : null;
@@ -217,6 +205,31 @@ final class TargetImageRunner
             [],
             3600,
         );
+    }
+
+    /**
+     * Checks that Docker answers and that the image for this PHP version
+     * exists (building booster-target or pulling a --image image as needed),
+     * and returns the image to run. The replay gate shares it, so the app is
+     * served in exactly the image its tests ran in.
+     */
+    public function prepareImage(string $php, ?GateImage $image = null): string
+    {
+        $version = $this->processes->run([$this->docker, 'version', '--format', '{{.Server.Version}}'], null, [], 30);
+        if (!$version->successful()) {
+            throw new ToolError('Docker is not available, so the target-image gate cannot run. Start Docker, or pass --skip-gate and run the tests yourself.');
+        }
+        if ($image === null) {
+            $this->ensureImage($php);
+
+            return $this->imageTag($php);
+        }
+        // The option may be a template or a map, so the image is resolved
+        // per call from the PHP version of this baseline or gate.
+        $resolved = $image->forPhp($php);
+        $this->ensureCustomImage($resolved);
+
+        return $resolved;
     }
 
     /**

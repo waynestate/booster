@@ -1,0 +1,7 @@
+{
+    "name": "example/replay-notes",
+    "description": "Booster's replay gate fixture: a tiny raw-PHP notes app on fake data.",
+    "require": {
+        "php": "^7.4"
+    }
+}
