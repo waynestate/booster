@@ -19,6 +19,9 @@ use Waynestate\Booster\Prepass\NewByReferenceFixer;
 use Waynestate\Booster\Prepass\PrepassResult;
 use Waynestate\Booster\Project\AppType;
 use Waynestate\Booster\Refresh\HopDataRefresher;
+use Waynestate\Booster\Replay\ReplayGate;
+use Waynestate\Booster\Replay\ReplayOutcome;
+use Waynestate\Booster\Replay\ReplayRunner;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Scan\BehaviourScan;
 use Waynestate\Booster\Scan\RemovalsScan;
@@ -52,7 +55,11 @@ final class HopExecutor
         private readonly CasMigration $casMigration = new CasMigration(),
         private readonly WayneUiMigration $wayneUiMigration = new WayneUiMigration(),
         private readonly TrustProxiesRewriter $trustProxies = new TrustProxiesRewriter(),
+        private readonly ?ReplayRunner $replayRunner = null,
     ) {}
+
+    /** The replay gate for this run, once its baseline is recorded (--replay). */
+    private ?ReplayGate $replayGate = null;
 
     private ?RemovalsScan $removals = null;
 
@@ -147,6 +154,21 @@ final class HopExecutor
             return new RunReport($plan, $options->dryRun, $baseline, $results, testEnvKeys: $testEnvKeys);
         }
 
+        // With --replay, record how the app answers now, before the first hop
+        // changes anything. A baseline that cannot be recorded stops the run
+        // the way a red test baseline does: nothing could be proven later.
+        $replay = $this->recordReplay($plan, $path, $options);
+        if ($replay !== null && $replay->failed()) {
+            $results = [];
+            foreach ($plan->steps as $step) {
+                $results[] = new StepResult($step->number, $step->hop->id, StepResult::NOT_RUN, [], [
+                    'Not run because the replay baseline could not be recorded (see Replay above).',
+                ]);
+            }
+
+            return new RunReport($plan, $options->dryRun, $baseline, $results, testEnvKeys: $testEnvKeys, replay: $replay);
+        }
+
         $results = [];
         // Measure the app against the CREED policy on the PHP it is on now, so
         // the final gate can tell pre-existing findings from ones the upgrade
@@ -218,7 +240,7 @@ final class HopExecutor
             ? null
             : (new CitadelDeployScript())->writeIfLockChanged($path, $lockBefore, (new \DateTimeImmutable('now'))->format('YmdHi'));
 
-        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys, deployScript: $deployScript);
+        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys, deployScript: $deployScript, replay: $replay);
     }
 
     /**
@@ -394,8 +416,10 @@ final class HopExecutor
             if ($hop->kind === HopKind::Node) {
                 return match ($hop->id) {
                     HopRegistry::MIX_TO_VITE_ID => $this->runMixHop($step, $path, $plan, $options, $baseline),
+                    HopRegistry::VITE_MAJOR_ID => $this->runViteMajorHop($step, $path, $options, $baseline),
                     HopRegistry::TAILWIND_ID => $this->runTailwindHop($step, $path, $options, $baseline),
                     HopRegistry::INERTIA_3_ID => $this->runInertiaHop($step, $path, $options, $baseline),
+                    HopRegistry::TYPESCRIPT_MAJOR_ID => $this->runTypescriptMajorHop($step, $path, $options, $baseline),
                     HopRegistry::VUE_COMPAT_CODEMOD_ID => $this->runVueCompatCodemodHop($step, $path, $options),
                     default => $this->runNodeHop($step, $path, $options, $baseline),
                 };
@@ -807,7 +831,75 @@ final class HopExecutor
     }
 
     /**
-     * Runs the step's gate. When Composer 2.10's policy blocking refuses the
+     * The step's whole gate: the test gate first, then, when the run records
+     * a replay baseline (--replay), the replay on the hop's PHP. A changed
+     * answer fails the hop like a red test and leaves the changes in place.
+     *
+     * @param list<string>|null $update packages for composer update -W; the
+     *        hop's composer set by default, or the hop's own list when it
+     *        changes packages outside that set
+     */
+    private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, ?array $update = null): GateReport
+    {
+        $gate = $this->runTestGate($step, $path, $options, $baseline, $update);
+        if (!$gate->passed || $this->replayGate === null || $this->replayGate->recording() === null) {
+            return $gate;
+        }
+        $php = $step->phpAfter ?? '';
+        try {
+            $outcome = $this->replayGate->check($php, sprintf('step-%d-%s-php%s', $step->number, $step->hop->id, $php));
+        } catch (ToolError $e) {
+            return new GateReport(false, [...$gate->lines, 'Replay could not run: ' . $e->getMessage(), $this->undoHint($path)]);
+        }
+        if ($outcome->failed()) {
+            return new GateReport(false, [
+                ...$gate->lines,
+                ...$outcome->lines,
+                'The tests (or syntax check) passed, but an answer changed. The working copy keeps the changes so you can read them.',
+                $this->undoHint($path),
+            ]);
+        }
+
+        return new GateReport(true, [...$gate->lines, ...$outcome->lines]);
+    }
+
+    /**
+     * Records the replay baseline on the PHP the app starts from, right after
+     * the test baseline (which installed vendor/). Null without --replay; a
+     * dry run records nothing and says so.
+     */
+    private function recordReplay(Plan $plan, string $path, RunOptions $options): ?ReplayOutcome
+    {
+        $this->replayGate = null;
+        $file = $options->replay;
+        if ($file === null) {
+            return null;
+        }
+        $name = basename($file->path);
+        if ($options->dryRun || $options->skipGate) {
+            return new ReplayOutcome(ReplayOutcome::SKIPPED, null, [sprintf('Replay: SKIPPED (no requests sent in a dry run). A real run records how the app answers the requests in %s before the first hop, and replays them after each one.', $name)], $name);
+        }
+        $php = $this->startingPhp($plan);
+        if ($php === null) {
+            return new ReplayOutcome(ReplayOutcome::FAILED, null, ['Replay baseline could not be recorded: Booster could not tell which PHP the app runs on. Pass --from-php.'], $name);
+        }
+        $runner = $this->replayRunner ?? new ReplayRunner($this->gate, $this->processes);
+        $this->replayGate = new ReplayGate($runner, $file, $path, $options->replayOut ?? ReplayGate::defaultOutDir($path), $options->gateImage);
+
+        try {
+            $outcome = $this->replayGate->record($php);
+        } catch (ToolError $e) {
+            $outcome = new ReplayOutcome(ReplayOutcome::FAILED, $php, ['Replay baseline could not be recorded: ' . $e->getMessage()], $name);
+        }
+        if ($outcome->failed()) {
+            $this->replayGate = null;
+        }
+
+        return $outcome;
+    }
+
+    /**
+     * Runs the step's test gate. When Composer 2.10's policy blocking refuses the
      * tagged releases the lock update needs, it writes the temporary advisory
      * unblock into composer.json and runs the same gate once more: one retry,
      * never a loop. The same unblock answers the quiet variant of the same
@@ -820,7 +912,7 @@ final class HopExecutor
      *        hop's composer set by default, or the hop's own list when it
      *        changes packages outside that set
      */
-    private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, ?array $update = null): GateReport
+    private function runTestGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, ?array $update = null): GateReport
     {
         $php = $step->phpAfter ?? '';
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
@@ -1388,6 +1480,154 @@ final class HopExecutor
     }
 
     /**
+     * The Vite major hop. It pins vite wherever it sits and raises the
+     * Laravel and Vue plugin pins the app already carries to the majors in
+     * the data file, then runs npm install in the Node container so the lock
+     * and node_modules catch up.
+     */
+    private function runViteMajorHop(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): StepResult
+    {
+        $hop = $step->hop;
+        if ($this->node === null) {
+            throw new ToolError('The Vite major hop needs a Node runner, but this BOOSTER has none configured.');
+        }
+        [$changes, $files] = $this->applyViteMajorPackages($path, $options->dryRun);
+        if ($options->dryRun) {
+            if ($changes === []) {
+                $changes[] = 'Dry run: nothing to pin: package.json already matches the Vite pins.';
+            }
+            return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $files, [...$changes, ...$hop->notes]);
+        }
+
+        if ($changes === []) {
+            return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
+                'Nothing to do: package.json already matches the Vite pins, so the gate was skipped.',
+                ...$hop->notes,
+            ]);
+        }
+
+        $install = $this->node->run($path, ['npm', 'install']);
+        if (!$install->successful()) {
+            return new StepResult($step->number, $hop->id, StepResult::ERROR, $files, [
+                sprintf('npm install failed: it exited %d in the Node container. The working copy keeps the pins, so you can read them.', $install->exitCode),
+                trim($install->stdout . "\n" . $install->stderr),
+                $this->undoHint($path),
+            ]);
+        }
+        $changes[] = 'npm install ran in the Node container: package-lock.json and node_modules now match the pins.';
+
+        if (!$options->skipGate) {
+            $buildFailure = $this->runBuildGate($path);
+            if ($buildFailure !== null) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$buildFailure]);
+            }
+            $gate = $this->runGate($step, $path, $options, $baseline);
+            if (!$gate->passed) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
+            }
+            $changes = [...$changes, ...$gate->lines, 'Gate passed: npm ci, npm run build and the tests are green.'];
+        } else {
+            $changes[] = 'Gate skipped. Run npm ci, npm run build and the tests before the next step.';
+        }
+
+        return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$changes, ...$hop->notes]);
+    }
+
+    /**
+     * The TypeScript major hop. It pins typescript (and vue-tsc, when the app
+     * has it) to the majors in the hop data, then gates on the build and the
+     * tests like the Tailwind hop; the type check is a person's job.
+     */
+    private function runTypescriptMajorHop(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): StepResult
+    {
+        $hop = $step->hop;
+        if ($this->node === null) {
+            throw new ToolError('The TypeScript hop needs a Node runner, but this BOOSTER has none configured.');
+        }
+        $typescript = $this->registry()->typescriptVersion();
+        if ($options->dryRun) {
+            return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [], [
+                sprintf('Dry run: would pin typescript to %s in package.json (and vue-tsc to %s when the app has it), then gate on the build and the tests.', $typescript, $this->registry()->vueTscVersion()),
+                ...$hop->notes,
+            ]);
+        }
+
+        [$changes, $files] = $this->applyTypescriptPackages($path);
+        if ($changes === []) {
+            $changes[] = 'package.json already matched the TypeScript pins.';
+        }
+
+        if (!$options->skipGate) {
+            $buildFailure = $this->runBuildGate($path);
+            if ($buildFailure !== null) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$buildFailure]);
+            }
+            $gate = $this->runGate($step, $path, $options, $baseline);
+            if (!$gate->passed) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
+            }
+            $changes = [...$changes, ...$gate->lines, 'Gate passed: npm ci, npm run build and the tests are green.'];
+        } else {
+            $changes[] = 'Gate skipped. Run npm ci, npm run build and the tests before the next step.';
+        }
+
+        return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$changes, ...$hop->notes]);
+    }
+
+    /**
+     * Pins vite wherever it sits and raises the Laravel and Vue plugin pins
+     * the app already carries, reporting each change. A constraint that
+     * already floors at or above the target stays; in a dry run nothing is
+     * written and each pin is reported as what it would be.
+     *
+     * @return array{0: list<string>, 1: list<array{file: string, diff: string}>} what changed and which files
+     */
+    private function applyViteMajorPackages(string $path, bool $dryRun): array
+    {
+        $changes = [];
+        $files = [];
+        $packageFile = $path . '/package.json';
+        if (!is_file($packageFile)) {
+            return [$changes, $files];
+        }
+        $package = json_decode((string) file_get_contents($packageFile), true);
+        if (!is_array($package)) {
+            throw new ToolError(sprintf('package.json is not valid JSON: %s', $packageFile));
+        }
+        $registry = $this->registry();
+        $pins = [
+            'vite' => $registry->viteVersion(),
+            'laravel-vite-plugin' => $registry->laravelVitePluginVersion(),
+            '@vitejs/plugin-vue' => $registry->vuePluginVersion(),
+        ];
+        $edited = false;
+        foreach (['dependencies', 'devDependencies'] as $section) {
+            if (!is_array($package[$section] ?? null)) {
+                continue;
+            }
+            foreach ($pins as $name => $pin) {
+                $current = $package[$section][$name] ?? null;
+                if (!is_string($current) || self::atOrAboveFloor($current, $pin)) {
+                    continue;
+                }
+                if ($dryRun) {
+                    $changes[] = sprintf('Dry run: would set package.json %s %s to %s.', $section, $name, $pin);
+                } else {
+                    $package[$section][$name] = $pin;
+                    $changes[] = sprintf('package.json: %s %s to %s.', $section, $name, $pin);
+                    $edited = true;
+                }
+                $files[] = ['file' => 'package.json', 'diff' => $name . ' to ' . $pin];
+            }
+        }
+        if (!$dryRun && $edited) {
+            file_put_contents($packageFile, json_encode($package, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+        }
+
+        return [$changes, $files];
+    }
+
+    /**
      * Writes the Vite shape into the app.
      *
      * @return array{0: list<string>, 1: list<array{file: string, diff: string}>} what changed and which files
@@ -1846,6 +2086,54 @@ final class HopExecutor
         if ($edited) {
             file_put_contents($packageFile, json_encode($package, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
             $files[] = ['file' => 'package.json', 'diff' => 'pinned tailwindcss to ' . $pin . ' and added ' . $plugin];
+        }
+
+        return [$changes, $files];
+    }
+
+    /**
+     * Normalizes package.json for the TypeScript major: pin typescript
+     * wherever it sits, and vue-tsc to its pin when the app lists it. A fresh
+     * add is a human decision, so nothing is installed that was not there.
+     *
+     * @return array{0: list<string>, 1: list<array{file: string, diff: string}>} what changed and which files
+     */
+    private function applyTypescriptPackages(string $path): array
+    {
+        $changes = [];
+        $files = [];
+        $packageFile = $path . '/package.json';
+        $package = json_decode((string) file_get_contents($packageFile), true);
+        if (!is_array($package)) {
+            throw new ToolError(sprintf('package.json is not valid JSON: %s', $packageFile));
+        }
+        $typescript = $this->registry()->typescriptVersion();
+        $vueTsc = $this->registry()->vueTscVersion();
+        $edited = false;
+        $vueTscPinned = false;
+        foreach (['dependencies', 'devDependencies'] as $section) {
+            if (!is_array($package[$section] ?? null)) {
+                continue;
+            }
+            if (array_key_exists('typescript', $package[$section]) && $package[$section]['typescript'] !== $typescript) {
+                $package[$section]['typescript'] = $typescript;
+                $changes[] = 'package.json: ' . $section . ' typescript to ' . $typescript . '.';
+                $edited = true;
+            }
+            if (array_key_exists('vue-tsc', $package[$section]) && $package[$section]['vue-tsc'] !== $vueTsc) {
+                $package[$section]['vue-tsc'] = $vueTsc;
+                $changes[] = 'package.json: ' . $section . ' vue-tsc to ' . $vueTsc . '.';
+                $edited = true;
+                $vueTscPinned = true;
+            }
+        }
+        if ($edited) {
+            file_put_contents($packageFile, json_encode($package, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+            $diff = 'pinned typescript to ' . $typescript;
+            if ($vueTscPinned) {
+                $diff .= ' and vue-tsc to ' . $vueTsc;
+            }
+            $files[] = ['file' => 'package.json', 'diff' => $diff];
         }
 
         return [$changes, $files];

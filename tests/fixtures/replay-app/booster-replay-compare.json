@@ -1,0 +1,12 @@
+{
+    "$comment": "Two answers from the same route: the first is the same on every PHP, the second changes on the PHP 7.4 to 8.0 hop (0 == 'abc').",
+    "version": 1,
+    "serve": {
+        "docroot": "public",
+        "front_controller": "index.php"
+    },
+    "requests": [
+        {"name": "a number", "path": "/compare", "query": {"code": "0"}},
+        {"name": "a word", "path": "/compare", "query": {"code": "abc"}}
+    ]
+}

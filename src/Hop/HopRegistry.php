@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Hop;
 
 use Waynestate\Booster\Packaging\PharFiles;
+use Waynestate\Booster\Refresh\HopDataRefresher;
 use Waynestate\Booster\ToolError;
 
 /**
@@ -26,11 +27,17 @@ final class HopRegistry
     /** The Mix to Vite hop. The package versions it installs live in the data file. */
     public const MIX_TO_VITE_ID = 'mix-to-vite';
 
+    /** The Vite major hop. The package versions it pins live in the data file. */
+    public const VITE_MAJOR_ID = 'vite-major';
+
     /** The Tailwind 3 to 4 hop. The tool and pin versions live in the data file. */
     public const TAILWIND_ID = 'tailwind-3-to-4';
 
     /** The Inertia 2 to 3 hop. The package pins live in the data file. */
     public const INERTIA_3_ID = 'inertia-2-to-3';
+
+    /** The TypeScript major hop. The pins it writes live in the data file. */
+    public const TYPESCRIPT_MAJOR_ID = 'typescript-major';
 
     /** The staged hop that moves a Vue 2.6 front end onto Vue 2.7. */
     public const VUE_26_TO_27_ID = 'vue-26-to-27';
@@ -74,6 +81,10 @@ final class HopRegistry
 
     private readonly string $tailwindVersion;
 
+    private readonly string $typescriptVersion;
+
+    private readonly string $vueTscVersion;
+
     private readonly string $vue27Version;
 
     private readonly string $vueCompatVersion;
@@ -116,6 +127,8 @@ final class HopRegistry
         $this->vuePluginVersion = self::scalar($data, 'vue_plugin_version');
         $this->tailwindUpgradeVersion = self::scalar($data, 'tailwind_upgrade_version');
         $this->tailwindVersion = self::scalar($data, 'tailwind_version');
+        $this->typescriptVersion = self::scalar($data, 'typescript_version');
+        $this->vueTscVersion = self::scalar($data, 'vue_tsc_version');
         $this->vue27Version = self::scalar($data, 'vue_27');
         $this->vueCompatVersion = self::scalar($data, 'vue_compat');
         $this->vueLoaderCompatVersion = self::scalar($data, 'vue_loader_compat');
@@ -136,7 +149,9 @@ final class HopRegistry
         $this->add($this->wayneUi1To2Hop());
         $this->add($this->nodePinHop());
         $this->add($this->mixToViteHop());
+        $this->add($this->viteMajorHop());
         $this->add($this->tailwindHop());
+        $this->add($this->typescriptMajorHop());
         foreach ($this->vueHops() as $hop) {
             $this->add($hop);
         }
@@ -222,6 +237,16 @@ final class HopRegistry
     public function tailwindVersion(): string
     {
         return $this->tailwindVersion;
+    }
+
+    public function typescriptVersion(): string
+    {
+        return $this->typescriptVersion;
+    }
+
+    public function vueTscVersion(): string
+    {
+        return $this->vueTscVersion;
     }
 
     public function vue27Version(): string
@@ -769,6 +794,32 @@ final class HopRegistry
     }
 
     /**
+     * The Vite major hop. It pins vite wherever it sits and raises the Laravel
+     * and Vue plugin pins the app already carries to the majors in the data
+     * file, then runs npm install in the Node container so the lock and
+     * node_modules catch up. Offered only to apps that already build with
+     * Vite; mix-to-vite installs these same versions for Mix apps.
+     */
+    private function viteMajorHop(): Hop
+    {
+        $major = HopDataRefresher::lowestMajor($this->viteVersion) ?? 'unknown';
+
+        return new Hop(
+            id: self::VITE_MAJOR_ID,
+            kind: HopKind::Node,
+            from: 'any',
+            to: $major,
+            summary: sprintf('Move a Vite front end onto Vite %s: pin vite and the Laravel and Vue plugin packages to the data versions.', $major),
+            buildGate: true,
+            notes: [
+                'MANUAL: read the Vite migration guide and check your vite.config for removed options.',
+                'MANUAL: Sass, PostCSS and plugin versions must match the new Vite; run your build and tests.',
+            ],
+            links: ['https://vite.dev/guide/migration'],
+        );
+    }
+
+    /**
      * The Tailwind 3 to 4 hop. It runs the official @tailwindcss/upgrade tool
      * in the Node container, then normalizes package.json itself: the tool
      * rewrites the CSS and the config, BOOSTER owns the dependency pins.
@@ -820,6 +871,33 @@ final class HopRegistry
                 'MANUAL: the build targets ES2022; add @vitejs/plugin-legacy if you must serve older browsers.',
             ],
             links: ['https://inertiajs.com/docs/v3/getting-started/upgrade-guide'],
+        );
+    }
+
+    /**
+     * The TypeScript major hop. It pins typescript (and vue-tsc, when the app
+     * has it) to the majors in the data file; the type check and its fallout
+     * are a person's job, so the notes say what to look for.
+     */
+    private function typescriptMajorHop(): Hop
+    {
+        $to = HopDataRefresher::lowestMajor($this->typescriptVersion);
+        if ($to === null) {
+            throw new ToolError(sprintf('The typescript_version pin "%s" has no major to move to.', $this->typescriptVersion));
+        }
+
+        return new Hop(
+            id: self::TYPESCRIPT_MAJOR_ID,
+            kind: HopKind::Node,
+            from: 'any',
+            to: $to,
+            summary: sprintf('Move the app to TypeScript %s: pin typescript in package.json, and vue-tsc too when the app has it.', $to),
+            buildGate: true,
+            notes: [
+                'MANUAL: run your type check (tsc or vue-tsc) and fix new errors; stricter defaults and removed tsconfig options (for example baseUrl, moduleResolution node, target es5) can fail the build.',
+                'MANUAL: check that typescript-eslint and other tools using the compiler API support this TypeScript before moving to 7.',
+            ],
+            links: ['https://www.typescriptlang.org/docs/'],
         );
     }
 

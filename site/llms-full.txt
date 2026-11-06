@@ -207,7 +207,7 @@ Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel 
 
 Some hops come along by default, and some only when you ask:
 
-- The front-end Node hops (Mix to Vite, Tailwind, Vue) are in the plan by default. Pass any target (`--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php`, `--from-laravel`) and they drop out with a warning, unless you add `--with-node`.
+- The front-end Node hops (Mix to Vite, Vite major, Tailwind, TypeScript, Vue) are in the plan by default. Pass any target (`--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php`, `--from-laravel`) and they drop out with a warning, unless you add `--with-node`.
 - An app on PHPUnit 8 or older gets a manual PHPUnit 9 step before the first PHP 8 hop.
 - The SESAME move (`--sesame`) and the WayneUI move (`--wayneui`) are opt-in only.
 - `--skip ` drops a hop you do not want.
@@ -313,6 +313,7 @@ Preview the edits: booster run --path=examples/laravel-blade --dry-run
 | `booster run` | Runs the plan. `--dry-run` previews every hop |
 | `booster hops` | Lists every hop Booster knows |
 | `booster init` | Writes the coding-tab playbooks to `.agents/skills`; `--check` exits 1 when they are stale |
+| `booster replay` | The replay gate's file and baseline: `init` drafts `booster-replay.json`, `record` saves how the app answers, `check` replays and compares (see below) |
 
 Options shared by `plan` and `run`:
 
@@ -331,7 +332,7 @@ Options shared by `plan` and `run`:
 | `--no-package-check` | Skip the Packagist dependency check (for offline use) |
 | `--until` | Cut the plan after this hop id: that step and everything before it stay, and the plan's targets move to where it lands |
 | `--only` | Plan and run just this one hop id. The app must sit on the hop's starting versions, and `--until` and `--only` are never combined |
-| `--with-node` | include the Node front-end hops (Node pin, Mix to Vite, Tailwind, Vue) even when you passed a target version. Without it, any of `--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php` or `--from-laravel` leaves those hops out, and the plan prints: "Node front-end hops were left out because you passed a target version: . Add --with-node to include them." |
+| `--with-node` | include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version. Without it, any of `--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php` or `--from-laravel` leaves those hops out, and the plan prints: "Node front-end hops were left out because you passed a target version: . Add --with-node to include them." |
 
 Example: an app moving from Laravel 8 to 13 takes the climb in parts. `booster plan --path=../my-app --until=laravel-8-to-9` keeps every hop up to and including the move to Laravel 9, and `booster run` with the same flag applies exactly those hops.
 
@@ -365,6 +366,8 @@ Options for `run`:
 | `--test-command` | What runs the app's tests in the image (default `composer test`, else `vendor/bin/phpunit`, else the built-in `php -l` syntax check when the app has no tests) |
 | `--test-env` | Environment variable (`KEY=VALUE`) passed to the baseline and every gate container with `-e`; repeat it. The report names the keys only, never the values |
 | `--proctor-command` | An extra command run in the image after the tests, for example a PROCTOR check |
+| `--replay[=FILE]` | Record how the app answers the requests in `booster-replay.json` (or FILE) before the first hop, replay them after every hop's tests, and fail the hop on a changed answer. Off by default |
+| `--replay-out` | Where the replay transcripts go (default: a new `booster-replay--` folder in the temp folder) |
 | `--proctor-advisory` | Report the PROCTOR result but do not fail the run on it. Applied automatically when the run stops before the final target (`--until`, `--only`, or a target past security support) |
 
 Exit codes: `0` pass, `1` the baseline failed, a hop was capped, errored or failed its gate, or the PROCTOR check
@@ -557,6 +560,16 @@ names the keys only, never the values:
 
     booster run --path= --test-env DB_CONNECTION=sqlite --test-env DB_DATABASE=:memory:
 
+#### The replay gate
+
+Tests only prove what they ask. `booster run --replay` also records how the app answers a list of requests on its
+current PHP before the first hop (PHP's built-in server in the gate image, no network, fake data from a setup
+command), replays them after every hop, and fails the hop on a changed answer, showing the first difference. A PHP 8
+hop that turns `0 == "abc"` from true to false fails there even when no test visits that page. `booster replay init`
+drafts the request file from the app's routes, with `todo` items for what only a person knows; normalizers hide CSRF
+tokens, session ids, timestamps and asset hashes. The file format, the design and the honest limits (no real
+Oracle, SSO or JavaScript-driven pages) are in [the replay gate guide](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/docs/guides/replay-gate.md).
+
 #### What a hop does
 
 On PHP hops a pre-pass runs first: PHP 4 era `$a = &new Foo();` becomes a plain assignment, because PHP 7 and newer
@@ -633,13 +646,18 @@ A run prints one line per hop to standard error while it works: the hop's positi
 the number of files it changed and the seconds it took, and a final line totals the hops run, the stops and the whole
 run. They go to standard error so the report on standard output is untouched and `--format json` stays valid JSON.
 
-Three hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`,
+Four hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`,
 then the app's usual gate applies. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (below) and asks for a
 build gate, which runs `npm ci` and `npm run build` in the `node:26` container before the app's tests.
-`tailwind-3-to-4` runs the official `@tailwindcss/upgrade` tool in the Node container, then pins `tailwindcss` to
+`vite-major` moves a Vite front end onto the Vite major in the hop data: it pins `vite` wherever it sits in
+`package.json`, pins `laravel-vite-plugin` and `@vitejs/plugin-vue` to the hop data's versions when they are already
+listed, runs `npm install` in the Node container and asks for a build gate. `tailwind-3-to-4` runs the official
+`@tailwindcss/upgrade` tool in the Node container, then pins `tailwindcss` to
 `^4.1`, adds the matching Vite or PostCSS plugin, and removes `autoprefixer` and `postcss-import`, which Tailwind 4
 folds in; plugins listed in `tailwind.config.js` and `@apply` inside Vue SFC `` blocks stay manual work, and
-the hop says so.
+the hop says so. `typescript-major` pins `typescript` to `^6.0` wherever it sits in `package.json`, and `vue-tsc` to
+`^3.0` when the app lists it, then asks for the same build gate; running the type check and fixing what the new
+major flags stay manual work, and the hop says so.
 
 Vue 2 to Vue 3 is staged. `vue-26-to-27` moves the front end to the last Vue 2 release, which carries the Vue 3
 reactivity API; `vue-27-to-compat` switches to the `@vue/compat` build; `vue-compat-codemod` runs the
@@ -648,7 +666,7 @@ three: skipping it skips them, and a person finishes the job, because Rector doe
 
 #### Hops Booster knows
 
-Thirty-four hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
+Thirty-six hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
 major at a time from 9 to 13, each list read from `data/versions.json` and trimmed to the majors whose Rector ruleset
 is installed ([Hop data](#hop-data)). An app whose PHPUnit is below 9 gets `phpunit-to-9-manual`, a manual move to
 `^9.5` placed before the first hop that targets PHP 8.0 (PHPUnit 7 and 8 do not run on PHP 8), and the regular
@@ -680,9 +698,16 @@ newer, after `node-pin-24`: writes `vite.config.js`, swaps `laravel-mix` for `vi
 simple shape only: `mix.js`, `.vue()`, `.sass()`, `.postCss()`, `.version()` and `if (mix.inProduction()) {
 mix.version(); }` (dropped with a note, since Vite hashes production assets), anything else is refused by name, a
 Vue 2 front end must take `vue-2-to-3` first, and `withoutMix()` calls are listed for a manual rename to
-`withoutVite()`); `tailwind-3-to-4` (planned when `package.json` carries `tailwindcss` below 4, after `node-pin-24`
+`withoutVite()`); `vite-major` (planned when `package.json` lists `vite` whose lowest major is below the hop data's
+major, after `node-pin-24` and ahead of `tailwind-3-to-4`; never planned alongside `mix-to-vite`, which installs the
+new Vite itself: pins `vite` to the hop data's version wherever it sits, pins `laravel-vite-plugin` and
+`@vitejs/plugin-vue` to the hop data's versions when they are already listed, and runs `npm install` in the Node
+container); `tailwind-3-to-4` (planned when `package.json` carries `tailwindcss` below 4, after `node-pin-24`
 and `mix-to-vite`: runs the official `@tailwindcss/upgrade` tool, pins `tailwindcss` to `^4.1`, adds the matching
-Vite or PostCSS plugin and removes `autoprefixer` and `postcss-import`); and the Vue 2 to Vue 3 stage,
+Vite or PostCSS plugin and removes `autoprefixer` and `postcss-import`); `typescript-major` (planned when
+`package.json` lists `typescript` below major 6, after `tailwind-3-to-4`: pins `typescript` to `^6.0` wherever it
+sits, and `vue-tsc` to `^3.0` when the app lists it, then gates on the build and the tests; running the type check
+stays manual work, and the hop says so); and the Vue 2 to Vue 3 stage,
 `vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod`, with the `vue-2-to-3` playbook standing in for all three.
 `booster hops` prints them all.
 
@@ -723,7 +748,8 @@ nothing and says so, because the hop data carries no constraint there.
 
 `data/versions.json` holds the version facts Booster plans against: the PHP, Laravel and PHPUnit chains, the PHP range
 each Laravel major supports, the PHPUnit floor each Laravel major ships, the Node floor the `node-pin-24` hop writes,
-and the fixed Tailwind pin and Inertia constraint tables the front-end hops use. The file ships inside the PHAR. A new
+the Vite major and plugin pins the `vite-major` hop uses, and the fixed Tailwind, TypeScript and vue-tsc pins and
+the Inertia constraint tables the front-end hops use. The file ships inside the PHAR. A new
 major appears in the file as soon as its feed says so; Booster offers a hop for it only once Rector ships a ruleset
 for it, and a plan toward a major without one stops there with a warning instead of failing.
 
@@ -893,7 +919,7 @@ Inside one dose
    ### The gate
    Before the first hop your tests run once on the app's current PHP as the baseline; a red one stops the run unless you pass `--allow-failing-baseline`. An app with no tests of its own gets a built-in syntax check (php -l on every PHP file outside vendor/ and node_modules/) instead, and the report says so: it proves the code loads on the new PHP, not that it works. After each hop they run inside `booster-target:<php>`, built from `docker/Dockerfile` on the PHP the hop moves to. On Laravel and PHPUnit hops the gate refreshes `composer.lock` for the package the hop moved, so the lock lands on the new major version; if Packagist's security advisories block those releases, whether the install fails outright or Composer quietly locks a branch version where the hop asked for a tag, the gate writes a scoped temporary ignore, retries once, and tells you what it did. The plan's last step then fails until that entry is out of `composer.json`, so the upgrade never finishes with the unblock still in place. After the last hop PROCTOR checks the upgraded app against CREED's policy, blocking only on findings the upgrade introduced. If a red baseline names a missing Mix or Vite manifest, build the front-end assets first. A failure stops the run and leaves the changes for you to read. `git checkout .` undoes them.
 
-Not every hop is Rector. `node-pin-24` pins Node 26 in `package.json` and writes `.nvmrc`; `mix-to-vite` converts a simple `webpack.mix.js` and moves the build to Vite. The Vue 2 to 3 move is staged: `vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod`, with the `vue-2-to-3` playbook standing in for all three. Rector doesn't read Vue, so a person works those steps. The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.
+Not every hop is Rector. `node-pin-24` pins Node 26 in `package.json` and writes `.nvmrc`; `mix-to-vite` converts a simple `webpack.mix.js` and moves the build to Vite; `vite-major` pins `vite` and the plugin packages in `package.json` to the hop data's versions. The Vue 2 to 3 move is staged: `vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod`, with the `vue-2-to-3` playbook standing in for all three. Rector doesn't read Vue, so a person works those steps. The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.
 
 The commands
 
@@ -917,11 +943,11 @@ $ bin/booster run --path=examples/raw-php --to-php=8.2 --dry-run BOOSTER dry run
 
 **hopsEvery hop Booster knows**
 
-$ bin/booster hops php-55-to-56 Move PHP 5.5 code to PHP 5.6. php-56-to-70 Move PHP 5.6 code to PHP 7.0. php-70-to-71 Move PHP 7.0 code to PHP 7.1. php-71-to-72 Move PHP 7.1 code to PHP 7.2. php-72-to-73 Move PHP 7.2 code to PHP 7.3. php-73-to-74 Move PHP 7.3 code to PHP 7.4. php-74-to-80 Move PHP 7.4 code to PHP 8.0. php-80-to-81 Move PHP 8.0 code to PHP 8.1. php-81-to-82 Move PHP 8.1 code to PHP 8.2. php-82-to-83 Move PHP 8.2 code to PHP 8.3. php-83-to-84 Move PHP 8.3 code to PHP 8.4. php-84-to-85 Move PHP 8.4 code to PHP 8.5. laravel-5.8-to-6 Move a Laravel 5.8 app to Laravel 6. laravel-6-to-7 Move a Laravel 6 app to Laravel 7. laravel-7-to-8 Move a Laravel 7 app to Laravel 8. laravel-8-to-9 Move a Laravel 8 app to Laravel 9. laravel-9-to-10 Move a Laravel 9 app to Laravel 10. laravel-10-to-11 Move a Laravel 10 app to Laravel 11. laravel-11-to-12 Move a Laravel 11 app to Laravel 12. laravel-12-to-13 Move a Laravel 12 app to Laravel 13. phpunit-9-to-10 Move PHPUnit 9 tests to PHPUnit 10. phpunit-10-to-11 Move PHPUnit 10 tests to PHPUnit 11. phpunit-11-to-12 Move PHPUnit 11 tests to PHPUnit 12. phpunit-12-to-13 Move PHPUnit 12 tests to PHPUnit 13. phpunit-to-9-manual Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves. \[playbook\] cas-to-sesame Swap the wayne-cas package for SESAME using its compatibility classes. wayneui-1-to-2 Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. node-pin-24 Pin the app to Node 26: set engines.node in package.json and write .nvmrc. mix-to-vite Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). tailwind-3-to-4 Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool. vue-26-to-27 Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API. vue-27-to-compat Move a Vue 2.7 front end to Vue 3 through the @vue/compat build. vue-compat-codemod Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists. vue-2-to-3 Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue). \[playbook\]
+$ bin/booster hops php-55-to-56 Move PHP 5.5 code to PHP 5.6. php-56-to-70 Move PHP 5.6 code to PHP 7.0. php-70-to-71 Move PHP 7.0 code to PHP 7.1. php-71-to-72 Move PHP 7.1 code to PHP 7.2. php-72-to-73 Move PHP 7.2 code to PHP 7.3. php-73-to-74 Move PHP 7.3 code to PHP 7.4. php-74-to-80 Move PHP 7.4 code to PHP 8.0. php-80-to-81 Move PHP 8.0 code to PHP 8.1. php-81-to-82 Move PHP 8.1 code to PHP 8.2. php-82-to-83 Move PHP 8.2 code to PHP 8.3. php-83-to-84 Move PHP 8.3 code to PHP 8.4. php-84-to-85 Move PHP 8.4 code to PHP 8.5. laravel-5.8-to-6 Move a Laravel 5.8 app to Laravel 6. laravel-6-to-7 Move a Laravel 6 app to Laravel 7. laravel-7-to-8 Move a Laravel 7 app to Laravel 8. laravel-8-to-9 Move a Laravel 8 app to Laravel 9. laravel-9-to-10 Move a Laravel 9 app to Laravel 10. laravel-10-to-11 Move a Laravel 10 app to Laravel 11. laravel-11-to-12 Move a Laravel 11 app to Laravel 12. laravel-12-to-13 Move a Laravel 12 app to Laravel 13. phpunit-9-to-10 Move PHPUnit 9 tests to PHPUnit 10. phpunit-10-to-11 Move PHPUnit 10 tests to PHPUnit 11. phpunit-11-to-12 Move PHPUnit 11 tests to PHPUnit 12. phpunit-12-to-13 Move PHPUnit 12 tests to PHPUnit 13. phpunit-to-9-manual Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves. \[playbook\] cas-to-sesame Swap the wayne-cas package for SESAME using its compatibility classes. wayneui-1-to-2 Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. node-pin-24 Pin the app to Node 26: set engines.node in package.json and write .nvmrc. mix-to-vite Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). vite-major Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions. tailwind-3-to-4 Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool. typescript-major Move the app to TypeScript 6: pin typescript in package.json, and vue-tsc too when the app has it. vue-26-to-27 Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API. vue-27-to-compat Move a Vue 2.7 front end to Vue 3 through the @vue/compat build. vue-compat-codemod Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists. vue-2-to-3 Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue). \[playbook\]
 
 **initWrites the coding-tab playbooks to .agents/skills**
 
-$ bin/booster init --path=../my-app Wrote 35 playbooks (one for each step Booster knows, plus a general one), 35 changed. $ bin/booster init --path=../my-app --check Playbooks are current. # exits 1 when a playbook is stale, so CI notices
+$ bin/booster init --path=../my-app Wrote 36 playbooks (one for each step Booster knows, plus a general one), 36 changed. $ bin/booster init --path=../my-app --check Playbooks are current. # exits 1 when a playbook is stale, so CI notices
 
 Get the shot
 
@@ -1076,7 +1102,7 @@ Read first:
 
 Task:
 1. With Booster cloned beside the app, run bin/booster detect --path=../my-app and confirm the shape is raw-php-vue, with the Vue and Node versions.
-2. Run bin/booster plan --path=../my-app and sort the hops: PHP hops (Rector), node-pin-24 (pins Node 26 in package.json and writes .nvmrc), and the staged Vue hops if the app is on Vue 2: vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
+2. Run bin/booster plan --path=../my-app and sort the hops: PHP hops (Rector), node-pin-24 (pins Node 26 in package.json and writes .nvmrc), vite-major (pins vite and the plugin packages to the hop data's versions), and the staged Vue hops if the app is on Vue 2: vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
 3. Run bin/booster run --path=../my-app --dry-run and summarize the diffs.
 4. For the Vue hops, list the playbook steps for this app: the compat build, then the codemod, keeping every manual item the codemod lists. Rector does not read Vue, so Booster changes nothing there: a person does that work.
 
@@ -1125,13 +1151,13 @@ A prompt for your coding agent. Copy it as it stands:
 You are a coding agent upgrading a Laravel app with Blade views and Vue islands at Wayne State University with Booster, the upgrade tool of WELD, the Wayne State application stack.
 
 Read first:
-- https://booster.apps.wayne.edu/llms.txt, then the README in llms-full.txt beside it: Hops Booster knows (node-pin-24, mix-to-vite, vue-26-to-27, vue-27-to-compat, vue-compat-codemod) and Laravel hops and vendor.
+- https://booster.apps.wayne.edu/llms.txt, then the README in llms-full.txt beside it: Hops Booster knows (node-pin-24, mix-to-vite, vite-major, vue-26-to-27, vue-27-to-compat, vue-compat-codemod) and Laravel hops and vendor.
 - ADVISOR, the stack's MCP server, if it is connected: upgrade_path for this app, policy_lookup for Laravel and Node, and list_stack_rules with permutation laravel-blade-vue. If it is not connected, say so and work from the pages.
 - package.json, its lock file, and webpack.mix.js if there is one.
 
 Task:
 1. Run `composer install` in the app, then, with Booster cloned beside it, bin/booster plan --path=../my-app.
-2. If the plan has mix-to-vite, say whether this webpack.mix.js is the simple shape Booster converts (mix.js, .vue(), .sass(), .postCss(), .version(), and if (mix.inProduction()) { mix.version(); }) or which call it will refuse by name. A Vue 2 front end takes the staged Vue hops first: vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
+2. If the plan has mix-to-vite, say whether this webpack.mix.js is the simple shape Booster converts (mix.js, .vue(), .sass(), .postCss(), .version(), and if (mix.inProduction()) { mix.version(); }) or which call it will refuse by name. If the plan has vite-major, list the packages it will pin in package.json. A Vue 2 front end takes the staged Vue hops first: vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
 3. Run bin/booster run --path=../my-app --dry-run and summarize the diffs, Blade layouts included.
 4. List any withoutMix() calls for me to rename to withoutVite() by hand.
 
@@ -1159,7 +1185,7 @@ Read first:
 
 Task:
 1. Run `composer install` in the app, then, with Booster cloned beside it, bin/booster detect --path=../my-app and bin/booster plan --path=../my-app.
-2. Sort the hops: Laravel and PHP (Rector), node-pin-24, and the staged Vue hops if the app is on Vue 2 (playbooks, not code changes): vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
+2. Sort the hops: Laravel and PHP (Rector), node-pin-24, vite-major, and the staged Vue hops if the app is on Vue 2 (playbooks, not code changes): vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
 3. For each Laravel hop, list what to check by hand on the Inertia side: Booster has no Inertia checks per Laravel hop yet.
 4. Run bin/booster run --path=../my-app --dry-run and summarize the diffs per hop.
 
@@ -1381,7 +1407,7 @@ On PHP hops a pre-pass runs first: PHP 4 era `$a = &new Foo();` becomes a plain 
 1. Rector runs as a dry run. If it reports errors, the run stops before anything is written. So does a hop that would change more than 200 files, unless an interactive run confirms it after showing the per-rule summary; an explicit `--max-changes` is a hard limit that never asks. An empty Rector report usually means the process ran out of memory, and the message points at `--memory-limit`.
 2. Rector runs for real, with only that hop's rules. A rule that would change what the code does is never applied: the PHP 8.0 set's switch-to-match rewrite is skipped, because `match` compares strictly and would stop a `case 1:` from matching the string `"1"` a query string carries. Every run keeps Rector's and PHPStan's caches in its own temp directory, removed at exit, so one run never reads another's.
 3. `composer.json` is edited: the `php` or `laravel/framework` constraint is raised, and `config.platform.php` moves with it when the app already pins it. Booster never creates that key.
-4. The gate runs the app's tests inside `booster-target:<php>-<stamp>`, a container built from `docker/Dockerfile` on the PHP the hop moves to. The stamp is a short hash of the recipe, so an edited `docker/Dockerfile` rebuilds the image instead of reusing a stale one. The image carries the extension set Citadel's apps run with: intl, ldap, soap, zip, gd, pdo_mysql, mysqli, bcmath, pcntl, exif, redis, imagick and oci8. The first build downloads Oracle Instant Client for oci8, so it takes a few minutes; later hops reuse the image. Pass `--image` to run the gate in your own image instead (below). A red gate stops the run and leaves the changes in place so you can read them (`git checkout .` undoes them). To check the image itself, `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and verifies its extension list; it needs Docker and a few minutes per version, so it is not part of `composer ci`.
+4. The gate runs the app's tests inside `booster-target:<php>-<stamp>`, a container built from `docker/Dockerfile` on the PHP the hop moves to. The stamp is a short hash of the recipe, so an edited `docker/Dockerfile` rebuilds the image instead of reusing a stale one. The image carries the extension set Citadel's apps run with: intl, ldap, soap, zip, gd, pdo_mysql, mysqli, bcmath, pcntl, exif, redis, imagick and oci8. The first build downloads Oracle Instant Client for oci8, so it takes a few minutes; later hops reuse the image. Pass `--image` to run the gate in your own image instead (below). A red gate stops the run and leaves the changes in place so you can read them (`git checkout .` undoes them). With `--replay`, the gate also replays the requests recorded before the first hop and fails on a changed answer: see [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html). To check the image itself, `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and verifies its extension list; it needs Docker and a few minutes per version, so it is not part of `composer ci`.
 5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. Every other hop, and the baseline, run a plain `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's own output, because the tests never ran.
 
 Composer 2.10 refuses to load tagged releases Packagist has flagged with a security advisory, and hops that move onto Laravel 9 or 10 most often meet that block. The refusal has two faces. The loud one fails the install phase and names the advisories. The quiet one happens when the app allows dev stability: Composer does not fail at all, it locks the branch instead, `9.x-dev` where the hop asks for `^9.0`. Booster reads the refreshed lock back and treats a branch version behind a tagged range like the block. Either way it writes a temporary entry to `config.policy.advisories.ignore` in `composer.json`: scoped to the package and the constraint Composer refused, kept visible to `composer audit`, and carrying a reason PROCTOR can find and report until the app removes it. The gate then retries once. If the retry still fails, the run stops with the unblock and the failure both in the report, and the entry stays in `composer.json`.
@@ -1402,7 +1428,7 @@ A dry run previews every hop against the original tree, so the same file can app
 
 A run prints one line per hop to standard error while it works: the hop's position in the plan, its id, its status, the number of files it changed and the seconds it took, and a final line totals the hops run, the stops and the whole run. They go to standard error so the report on standard output is untouched and `--format json` stays valid JSON.
 
-Three hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`, then the app's usual gate applies. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (see [the hop list](https://booster.apps.wayne.edu/docs/reference/hops.html)) and asks for a build gate, which runs `npm ci` and `npm run build` in the `node:26` container before the app's tests. `tailwind-3-to-4` runs the official `@tailwindcss/upgrade` tool in the Node container, then pins `tailwindcss` to `^4.1`, adds the matching Vite or PostCSS plugin, and removes `autoprefixer` and `postcss-import`, which Tailwind 4 folds in; plugins listed in `tailwind.config.js` and `@apply` inside Vue SFC `<style>` blocks stay manual work, and the hop says so.
+Four hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`, then the app's usual gate applies. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (see [the hop list](https://booster.apps.wayne.edu/docs/reference/hops.html)) and asks for a build gate, which runs `npm ci` and `npm run build` in the `node:26` container before the app's tests. `vite-major` moves a Vite front end onto the Vite major in the hop data: it pins `vite` wherever it sits in `package.json`, pins `laravel-vite-plugin` and `@vitejs/plugin-vue` to the hop data's versions when they are already listed, runs `npm install` in the Node container and asks for a build gate. `tailwind-3-to-4` runs the official `@tailwindcss/upgrade` tool in the Node container, then pins `tailwindcss` to `^4.1`, adds the matching Vite or PostCSS plugin, and removes `autoprefixer` and `postcss-import`, which Tailwind 4 folds in; plugins listed in `tailwind.config.js` and `@apply` inside Vue SFC `<style>` blocks stay manual work, and the hop says so. `typescript-major` pins `typescript` to `^6.0` wherever it sits in `package.json`, and `vue-tsc` to `^3.0` when the app lists it, then asks for the same build gate; running the type check and fixing what the new major flags stay manual work, and the hop says so.
 
 Vue 2 to Vue 3 is staged. `vue-26-to-27` moves the front end to the last Vue 2 release, which carries the Vue 3 reactivity API; `vue-27-to-compat` switches to the `@vue/compat` build; `vue-compat-codemod` runs the `vue-upgrade-tool` codemod and keeps every manual item it lists. `vue-2-to-3` is the playbook that stands in for all three: skipping it skips them, and a person finishes the job, because Rector does not read Vue.
 
@@ -1420,7 +1446,7 @@ For an Inertia/Vue app, each Laravel hop also raises the Inertia constraints the
 
 ### Hop data[#](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html#hop-data)
 
-`data/versions.json` holds the version facts Booster plans against: the PHP, Laravel and PHPUnit chains, the PHP range each Laravel major supports, the PHPUnit floor each Laravel major ships, the Node floor the `node-pin-24` hop writes, and the fixed Tailwind pin and Inertia constraint tables the front-end hops use. The file ships inside the PHAR. A new major appears in the file as soon as its feed says so; Booster offers a hop for it only once Rector ships a ruleset for it, and a plan toward a major without one stops there with a warning instead of failing.
+`data/versions.json` holds the version facts Booster plans against: the PHP, Laravel and PHPUnit chains, the PHP range each Laravel major supports, the PHPUnit floor each Laravel major ships, the Node floor the `node-pin-24` hop writes, the Vite major and plugin pins the `vite-major` hop uses, and the fixed Tailwind, TypeScript and vue-tsc pins and the Inertia constraint tables the front-end hops use. The file ships inside the PHAR. A new major appears in the file as soon as its feed says so; Booster offers a hop for it only once Rector ships a ruleset for it, and a plan toward a major without one stops there with a warning instead of failing.
 
 `bin/refresh-hop-data.php` rewrites the file from the public feeds (Packagist for PHPUnit and Laravel, endoflife.date for Laravel's supported PHP ranges, npm for the Vite packages) plus CREED's policy for what counts as supported:
 
@@ -1476,7 +1502,7 @@ Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel 
 
 Some hops come along by default, and some only when you ask:
 
-- The front-end Node hops (Mix to Vite, Tailwind, Vue) are in the plan by default. Pass any target (`--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php`, `--from-laravel`) and they drop out with a warning, unless you add `--with-node`.
+- The front-end Node hops (Mix to Vite, Vite major, Tailwind, TypeScript, Vue) are in the plan by default. Pass any target (`--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php`, `--from-laravel`) and they drop out with a warning, unless you add `--with-node`.
 - An app on PHPUnit 8 or older gets a manual PHPUnit 9 step before the first PHP 8 hop.
 - The SESAME move (`--sesame`) and the WayneUI move (`--wayneui`) are opt-in only.
 - `--skip <hop id>` drops a hop you do not want.
@@ -1576,6 +1602,131 @@ The plan's Laravel and PHP hops, written up the way your doctor would: one stamp
 ![The front page's Form B-01 record card for examples/laravel-blade, six hops from laravel-10-to-11 to php-84-to-85, each with its pair, gate image and a Gate passed stamp, ending in RESULT: PASS.](https://booster.apps.wayne.edu/docs/readme/card.jpg)
 
 ![The overlap grid of Laravel 10 to 13 against PHP 8.1 to 8.5. Unsupported pairs are hatched, and a numbered path 0 to 6 climbs from Laravel 10 on PHP 8.2 to Laravel 13 on PHP 8.5.](https://booster.apps.wayne.edu/docs/readme/pairs.jpg)
+
+---
+
+Source: https://booster.apps.wayne.edu/docs/guides/replay-gate.html
+
+## The replay gate[#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#the-replay-gate)
+
+This page shows how to make the gate prove more than the tests do: Booster records how the app answers a list of requests before the upgrade, replays the same requests after every hop, and fails the hop when an answer changes. Before this: [What a hop does](https://booster.apps.wayne.edu/docs/guides/hops.html). Next: [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html).
+
+The test gate only knows what the tests ask. Plenty of WSU apps have one smoke test, or none, and the code a PHP hop changes most (string to number comparisons, `null` passed to `strlen`, a dynamic property) sits in pages no test visits. The replay gate takes the patient's vitals before the shot and again after every dose: it writes down what the app said on the old PHP, and after every hop it asks again and compares. It is off unless you ask for it.
+
+### In three commands[#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#in-three-commands)
+
+```sh
+booster replay init --path=<app>           # draft booster-replay.json from the app's routes
+# edit booster-replay.json: fill in every "todo", then delete it
+booster replay record --path=<app>         # optional: record once and save the answers
+booster run --path=<app> --replay          # record, then replay after every hop
+```
+
+`booster run --replay` needs nothing else: it records the baseline on the app's current PHP before the first hop (right after the test baseline), so `replay record` is only for when you want to look at the answers first, keep them, or check a hand-made change with `booster replay check --php=8.4`. `--replay=FILE` names another request file; `--replay-out=DIR` picks where the transcripts go.
+
+### What a run does with it[#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#what-a-run-does-with-it)
+
+1. Before the first hop, Booster serves the untouched app with PHP's built-in server inside `booster-target:<old php>-<stamp>`, the same image the baseline uses, sends every request in the file, and writes the answers to `baseline-php<old>.txt`. The run says so next to the baseline:
+   ```
+   Replay: recorded 11 answers on PHP 7.4 from booster-replay.json.
+   ```
+   If the baseline cannot be recorded (the setup command failed, the server never answered, an answer missed its `expect`), the upgrade does not start, and nothing is changed.
+2. After each hop's tests pass, Booster serves the changed app on the new PHP, sends the same requests, and compares. A match adds `Replay passed: all 11 answers match the baseline from PHP 7.4.` to the hop. A difference fails the hop like a red test, leaves the changes in place, and shows the first difference:
+   ```
+   Replay failed on PHP 8.0: 1 of 2 answers differ from the baseline from PHP 7.4.
+   First difference: 02 requests / a word: GET /compare?code=abc (- baseline, + now)
+           "code": "abc",
+     -     "matches_zero": true
+     +     "matches_zero": false
+       }
+   Every difference: diff /tmp/booster-replay-notes-20261105-201500/baseline-php7.4.txt /tmp/booster-replay-notes-20261105-201500/step-1-php-74-to-80-php8.0.txt
+   ```
+   That one is real: `0 == "abc"` is true on PHP 7.4 and false on PHP 8, and no test in the app asked.
+3. `--dry-run` sends no requests and says the replay was skipped.
+
+The transcripts are plain text, one block per request, written outside the app (in the temp folder unless `--replay-out` says otherwise), so `diff` and any editor read them. PHP errors and deprecations logged while serving are counted and written next to the transcript (`baseline-php7.4.php-errors.txt`); they are reported, never compared, because a hop is supposed to change them.
+
+### The request file[#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#the-request-file)
+
+`booster-replay.json` sits in the app's root. Keys that start with `$` are comments. A small one:
+
+```json
+{
+    "version": 1,
+    "serve": {
+        "docroot": "public",
+        "front_controller": "index.php",
+        "setup": "php replay/seed.php",
+        "env": { "DB_DATABASE": "/tmp/app.sqlite" },
+        "ini": { "date.timezone": "UTC" }
+    },
+    "normalize": ["csrf", "timestamps"],
+    "sequences": [
+        {
+            "name": "save then read back",
+            "requests": [
+                { "name": "form", "path": "/", "capture": { "token": "name=\"_token\" value=\"([^\"]+)\"" } },
+                { "name": "save", "method": "POST", "path": "/notes",
+                  "form": { "_token": "{{token}}", "title": "Replay note" },
+                  "capture": { "id": "Location: /notes/(\\d+)" }, "expect": 302 },
+                { "name": "read back", "path": "/notes/{{id}}", "expect": 200 }
+            ]
+        }
+    ]
+}
+```
+
+- **`serve`**: `docroot` (relative, inside the app; default `.`), `front_controller` (a PHP file in the docroot that every path without a file of its own goes to, like Apache's rewrite to `index.php`; leave it out and the server serves the docroot as files), `setup` (a shell command run once, in the app folder, before the server starts: seed a SQLite file, write a `.env`), `env` and `ini` (passed to the setup and the server), and `services`.
+- **`requests`** or **`sequences`**: a request has `path`, and may have `name`, `method` (default GET), `query`, `headers`, `cookies`, one body (`form`, `json` or a raw `body`), `capture` and `expect`. A sequence shares a cookie jar, so a session started by one request carries to the next. Redirects are recorded, never followed.
+- **`capture`**: a regular expression whose first group is saved under a name, matched against the body and the headers (as `Name: value` lines). Later requests in the same sequence use it as `{{name}}` in the path, query, headers, cookies or body. A placeholder nobody captured is an error when the file loads, not a surprise later.
+- **`expect`**: the status the baseline must answer. It is checked while recording only, so a baseline that is already broken (a 500 where a 200 belongs) is refused instead of faithfully recorded.
+- **`defaults`**: headers every request gets.
+- **`todo`**: a note for a person, on the file, `serve` or a request. `record`, `check` and `run --replay` refuse a file that still has one.
+
+#### What is compared[#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#what-is-compared)
+
+For each answer: the status, `Content-Type`, `Location` (with the server's own address written as `<app>`), `Allow`, the names of the cookies set (never their values), and the body. Everything else (`Date`, `X-Powered-By`, the values of cookies) changes on every request or every PHP, and is left out. By default runs of spaces and blank lines do not matter, and a JSON body is compared by value, so a reordered key or `1.0` against `1` is not a difference. `"compare": {"whitespace": "exact", "json": "exact"}` compares byte for byte.
+
+#### Normalizers[#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#normalizers)
+
+A normalizer rewrites the volatile parts of an answer before it is compared and written. The presets:
+
+| Name | Hides |
+| --- | --- |
+| `csrf` | CSRF tokens in hidden form fields and meta tags (`_token`, `csrf_token`, `authenticity_token` and friends) |
+| `session-id` | session ids in links, forms and scripts (`PHPSESSID=...`, `laravel_session=...`) |
+| `timestamps` | dates with a time of day, and Unix times from 2020 to 2033 |
+| `asset-hash` | content hashes in built asset names (`app.3f9a1c2b.js`, `app.js?id=3f9a1c`) |
+
+Anything else is an object: `{"name": "request id", "pattern": "req-[0-9a-f]{12}", "replace": "req-<ID>", "in": "body"}`, where `in` is `body` (the default), `headers` or `all`. The patterns are PCRE without delimiters. Normalizers are not part of the recording's fingerprint, so adding one after a failed check does not mean recording again; changing a request does, and `check` says so.
+
+### Design[#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#design)
+
+- **Served the way the gate already runs.** The app is served by `php -S` inside the same `booster-target` image as the test gate, on the same PHP, with the app folder mounted. No Apache, no nginx, no second image to build. A small router script (shipped with Booster) gives the built-in server the front controller rewrite and leaves real files alone.
+- **No network.** The replay container runs with `--network none`; the client talks to the server over the container's own loopback. A request that tries to reach a real database, CAS or an API fails the same way on both sides of the hop, instead of touching anything real. When the app needs a database server, `serve.services` starts fixture containers (`{"name": "db", "image": "mysql:8.4", "env": {...}}`) on a private Docker network created with `--internal`, reachable by name, removed afterwards. Fake data only.
+- **Composer runs where the network is.** A standalone `replay record` or `check` runs `composer install` in a normal gate container first (`--no-install` skips it); inside `booster run` the test gate has already installed `vendor/`.
+- **Old PHP included.** The client and router are written for PHP 5.5 and up, because the baseline of an app on PHP 5.6 runs inside a PHP 5.6 image. A test holds them to it.
+- **Fail closed.** No baseline, no upgrade. A recording made from a different request file is refused. A request that got no answer is a difference, not a pass.
+- **Nothing written into the app.** The setup command may write where the app's own settings point (`/tmp` is good); Booster's scratch files live in a temp folder it mounts and removes. `booster replay record` saves `booster-replay.recording.json` in the app because you asked it to keep the answers; commit it or ignore it.
+
+### Drafting the file[#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#drafting-the-file)
+
+`booster replay init` writes a first draft and never overwrites one. It looks, in order, for:
+
+1. `php artisan route:list --json`, when the app is Laravel and `vendor/` is installed (otherwise the `Route::` calls in `routes/`);
+2. Slim-style route calls (`$app->get('/batches/:id', ...)`), the kind a legacy Slim 1 app has in its `index.php`;
+3. PHP entry points under the docroot, skipping include folders, with a POST draft for each page that reads `$_POST`.
+
+Every GET without parameters becomes a request, plus one unknown path (an honest 404 is an answer too). Every path parameter, form and setup command gets a `todo`, because Booster cannot know which note id exists or what a valid form looks like. Fill those in, delete the `todo` lines, and record.
+
+### Limits, honestly[#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#limits-honestly)
+
+- **No real Oracle, SSO or CAS.** The replay never reaches a real system, by design. An app that cannot render a page without Oracle needs a fake for that page (an environment switch to SQLite, a stub repository), or that page stays out of the file. Pages behind CAS or Entra need the app's own test login (a fake user in the session, the way its tests sign in); without one, the honest request is the guest's: the redirect to sign-in.
+- **No JavaScript.** The client speaks HTTP, like curl. A page that builds itself in the browser is compared as the HTML and JSON the server sends, which still catches a changed API answer, but not a broken click.
+- **One server, one process.** `php -S` is not Apache: `.htaccess` rules other than the front controller rewrite, `mod_php` settings and server-side includes do not apply. Put the PHP settings that matter in `serve.ini`.
+- **The same data on both sides.** The setup command runs again before every replay, so each side starts from the same fixture. An app that keeps state elsewhere (a file cache under `storage/`, a queue) can answer differently for reasons that are not the hop; clear it in `setup`.
+- **Time, randomness and order.** Normalizers cover the common volatile parts. Anything else the app makes up per request (a request id, a shuffled list) needs a custom normalizer or a fixed seed in `setup`.
+- **Answers, not side effects.** The gate compares what the app says, not what it wrote to a database or a mail queue. A follow-up request that reads the saved record back (like `read back` above) covers the common case.
 
 ---
 
@@ -1972,7 +2123,7 @@ Not for: proving the app still works. A preview never runs your tests.
 
 ### 7. Backend only, or front end too[#](https://booster.apps.wayne.edu/docs/recipes.html#7-backend-only-or-front-end-too)
 
-Node front-end hops (the Node pin, Mix to Vite, Tailwind, the Vue steps) are in the plan only when you pass no target at all. Two ways to leave them out:
+Node front-end hops (the Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, the Vue steps) are in the plan only when you pass no target at all. Two ways to leave them out:
 
 ```
 booster run --path=../my-app --to-php=8.5          # any target drops them, with a warning
@@ -1985,7 +2136,7 @@ booster run --path=../my-app --skip=mix-to-vite    # or drop them by id
 booster run --path=../my-app --to-php=8.5 --with-node
 ```
 
-The ids are `node-pin-24`, `mix-to-vite`, `tailwind-3-to-4` and the Vue steps; `booster hops` lists every id. Skipping `vue-2-to-3` skips all the Vue steps.
+The ids are `node-pin-24`, `mix-to-vite`, `vite-major`, `tailwind-3-to-4`, `typescript-major` and the Vue steps; `booster hops` lists every id. Skipping `vue-2-to-3` skips all the Vue steps.
 
 Not for: skipping the Node hops and then keeping a Mix build around forever. That is a choice, not a plan.
 
@@ -2030,6 +2181,7 @@ booster run --path=../my-app --skip-gate
 - **Custom test command:** `--test-command` replaces the default (`composer test`, else `vendor/bin/phpunit`, else the syntax check).
 - **Environment for the tests:** `--test-env KEY=VALUE`, repeatable. The report names the keys only, never the values.
 - **Your own image:** `--image` takes one image name, a `{php}` template, or a map such as `8.1=foo:1,8.2=bar:2`; the image needs `php` and `composer` on `PATH`, and must cover every PHP in the plan.
+- **Few tests, but pages that must not change:** `--replay` records how the app answers a list of requests before the first hop and fails any hop that changes an answer. `booster replay init --path=../my-app` drafts the request file. See [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html).
 - **Skip the gate:** `--skip-gate` skips the baseline, the per-hop tests and the PROCTOR check.
 
 Not for: `--skip-gate` on a real upgrade. The gate is how you learn which hop broke the app. Use it only when Docker truly cannot run, and then run the tests yourself after each hop.
@@ -2097,6 +2249,7 @@ This page lists every command and option Booster takes; the table is generated f
 | `booster hops` | List every hop BOOSTER knows. |
 | `booster init` | Write the coding-tab playbooks (.agents/skills). With --check, fail when they are stale. |
 | `booster plan` | Show the ordered hops from the app to a supported version. Changes nothing. |
+| `booster replay` | The replay gate on its own: init drafts booster-replay.json, record saves how the app answers now, check fails when an answer changed. |
 | `booster run` | Run the plan: Rector, composer.json edits and a test gate per hop. Edits the working copy only. |
 | `booster scan` | Advisory scans: show what will break on a PHP version, and what PHPStan says there. Changes nothing. |
 
@@ -2154,7 +2307,7 @@ Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today 
 | `--from-laravel=VALUE` | The Laravel major the app runs on. |  |
 | `--to-laravel=VALUE` | Target Laravel major (default: the newest the policy supports). |  |
 | `--to-phpunit=VALUE` | Target PHPUnit major (default: the newest that runs on the target PHP). |  |
-| `--with-node` | Include the Node front-end hops (Node pin, Mix to Vite, Tailwind, Vue) even when you passed a target version |  |
+| `--with-node` | Include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version |  |
 | `--sesame` | Include the wayne-cas to SESAME swap. |  |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move. |  |
 | `--skip=VALUE` | Hop id to leave out (repeatable). |  |
@@ -2164,11 +2317,34 @@ Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today 
 | `--no-scan` | Skip the advisory scans (PHPCompatibility and PHPStan). |  |
 | `--silent` | Do not output any message |  |
 
+#### `booster replay` [#](https://booster.apps.wayne.edu/docs/reference/commands.html#booster-replay)
+
+The replay gate on its own: init drafts booster-replay.json, record saves how the app answers now, check fails when an answer changed.
+
+Usage: `booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recording RECORDING] [--php PHP] [--image IMAGE] [--out OUT] [--no-install] [--force] [--] <action>`
+
+| Argument | Required | Meaning |
+| --- | --- | --- |
+| `action` | yes | init, record or check. |
+
+| Option | Meaning | Default |
+| --- | --- | --- |
+| `--path=VALUE` | Path to the application. | `.` |
+| `--format=VALUE` | Output format (text, json). | `text` |
+| `--file=VALUE` | The request file, relative to the app or absolute. | `booster-replay.json` |
+| `--recording=VALUE` | Where record saves the answers and check reads them, relative to the app or absolute. | `booster-replay.recording.json` |
+| `--php=VALUE` | The PHP version to serve the app on (default: the version the app declares). |  |
+| `--image=VALUE` | Serve the app in this Docker image instead of booster-target, in the same three forms as run --image. |  |
+| `--out=VALUE` | Folder for the transcripts (default: a new booster-replay-- folder in the system temp folder). |  |
+| `--no-install` | Do not run composer install first; use the vendor/ the app already has. |  |
+| `--force` | init only: overwrite an existing request file. |  |
+| `--silent` | Do not output any message |  |
+
 #### `booster run` [#](https://booster.apps.wayne.edu/docs/reference/commands.html#booster-run)
 
 Run the plan: Rector, composer.json edits and a test gate per hop. Edits the working copy only.
 
-Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory]`
+Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory] [--replay [REPLAY]] [--replay-out REPLAY-OUT]`
 
 | Option | Meaning | Default |
 | --- | --- | --- |
@@ -2182,7 +2358,7 @@ Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today T
 | `--from-laravel=VALUE` | The Laravel major the app runs on. |  |
 | `--to-laravel=VALUE` | Target Laravel major (default: the newest the policy supports). |  |
 | `--to-phpunit=VALUE` | Target PHPUnit major (default: the newest that runs on the target PHP). |  |
-| `--with-node` | Include the Node front-end hops (Node pin, Mix to Vite, Tailwind, Vue) even when you passed a target version |  |
+| `--with-node` | Include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version |  |
 | `--sesame` | Include the wayne-cas to SESAME swap. |  |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move. |  |
 | `--skip=VALUE` | Hop id to leave out (repeatable). |  |
@@ -2200,6 +2376,8 @@ Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today T
 | `--test-command=VALUE` | Command that runs the app tests inside the image (default: composer test, else vendor/bin/phpunit). |  |
 | `--proctor-command=VALUE` | Extra command run in the image after the tests, for example a PROCTOR check. |  |
 | `--proctor-advisory` | Report the PROCTOR result but do not fail the run on it. |  |
+| `--replay=VALUE` | Also gate on request replay: record how the app answers before the first hop, replay after each hop, fail on a changed answer. Takes the request file (default: booster-replay.json). |  |
+| `--replay-out=VALUE` | Folder for the replay transcripts (default: a new booster-replay-- folder in the system temp folder). |  |
 | `--silent` | Do not output any message |  |
 
 #### `booster scan` [#](https://booster.apps.wayne.edu/docs/reference/commands.html#booster-scan)
@@ -2293,7 +2471,9 @@ This page lists every hop Booster knows; the list is generated from the hop data
 | `wayneui-1-to-2` | wayneui | 1 | 2 | Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. |
 | `node-pin-24` | node | any | 26 | Pin the app to Node 26: set engines.node in package.json and write .nvmrc. |
 | `mix-to-vite` | node | laravel-mix | vite | Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). |
+| `vite-major` | node | any | 8 | Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions. |
 | `tailwind-3-to-4` | node | 3 | 4 | Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool. |
+| `typescript-major` | node | any | 6 | Move the app to TypeScript 6: pin typescript in package.json, and vue-tsc too when the app has it. |
 | `vue-26-to-27` | node | 2.6 | 2.7 | Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API. |
 | `vue-27-to-compat` | node | 2.7 | 3 | Move a Vue 2.7 front end to Vue 3 through the @vue/compat build. |
 | `vue-compat-codemod` | node | 3-compat | 3 | Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists. |

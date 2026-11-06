@@ -107,7 +107,7 @@ Not for: proving the app still works. A preview never runs your tests.
 
 ## 7. Backend only, or front end too
 
-Node front-end hops (the Node pin, Mix to Vite, Tailwind, the Vue steps and Inertia 3) are in the plan only when you pass no target at all. Two ways to leave them out:
+Node front-end hops (the Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, the Vue steps and Inertia 3) are in the plan only when you pass no target at all. Two ways to leave them out:
 
 <!-- docs-test: skip run on your own app -->
 ```
@@ -122,7 +122,7 @@ booster run --path=../my-app --skip=mix-to-vite    # or drop them by id
 booster run --path=../my-app --to-php=8.5 --with-node
 ```
 
-The ids are `node-pin-24`, `mix-to-vite`, `tailwind-3-to-4`, the Vue steps and `inertia-2-to-3`; `booster hops` lists every id. Skipping `vue-2-to-3` skips all the Vue steps.
+The ids are `node-pin-24`, `mix-to-vite`, `vite-major`, `tailwind-3-to-4`, `typescript-major`, the Vue steps and `inertia-2-to-3`; `booster hops` lists every id. Skipping `vue-2-to-3` skips all the Vue steps.
 
 Not for: skipping the Node hops and then keeping a Mix build around forever. That is a choice, not a plan.
 
@@ -170,6 +170,7 @@ booster run --path=../my-app --skip-gate
 - **Custom test command:** `--test-command` replaces the default (`composer test`, else `vendor/bin/phpunit`, else the syntax check).
 - **Environment for the tests:** `--test-env KEY=VALUE`, repeatable. The report names the keys only, never the values.
 - **Your own image:** `--image` takes one image name, a `{php}` template, or a map such as `8.1=foo:1,8.2=bar:2`; the image needs `php` and `composer` on `PATH`, and must cover every PHP in the plan.
+- **Few tests, but pages that must not change:** `--replay` records how the app answers a list of requests before the first hop and fails any hop that changes an answer. `booster replay init --path=../my-app` drafts the request file. See [The replay gate](guides/replay-gate.md).
 - **Skip the gate:** `--skip-gate` skips the baseline, the per-hop tests and the PROCTOR check.
 
 Not for: `--skip-gate` on a real upgrade. The gate is how you learn which hop broke the app. Use it only when Docker truly cannot run, and then run the tests yourself after each hop.

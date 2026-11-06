@@ -27,7 +27,8 @@ under `Pre-pass fixes:`.
    ldap, soap, zip, gd, pdo_mysql, mysqli, bcmath, pcntl, exif, redis, imagick and oci8. The first build downloads
    Oracle Instant Client for oci8, so it takes a few minutes; later hops reuse the image. Pass `--image` to run the
    gate in your own image instead (below). A red gate stops the run and leaves the changes in place so you can read
-   them (`git checkout .` undoes them). To check the image itself,
+   them (`git checkout .` undoes them). With `--replay`, the gate also replays the requests recorded before the
+   first hop and fails on a changed answer: see [The replay gate](replay-gate.md). To check the image itself,
    `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and
    verifies its extension list; it needs Docker and a few minutes per version, so it is not part of `composer ci`.
 5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package
@@ -84,12 +85,17 @@ run. They go to standard error so the report on standard output is untouched and
 Four hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`,
 then the app's usual gate applies. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (see [the hop list](../reference/hops.md)) and asks for a
 build gate, which runs `npm ci` and `npm run build` in the `node:26` container before the app's tests.
-`tailwind-3-to-4` runs the official `@tailwindcss/upgrade` tool in the Node container, then pins `tailwindcss` to
+`vite-major` moves a Vite front end onto the Vite major in the hop data: it pins `vite` wherever it sits in
+`package.json`, pins `laravel-vite-plugin` and `@vitejs/plugin-vue` to the hop data's versions when they are already
+listed, runs `npm install` in the Node container and asks for a build gate. `tailwind-3-to-4` runs the official
+`@tailwindcss/upgrade` tool in the Node container, then pins `tailwindcss` to
 `^4.1`, adds the matching Vite or PostCSS plugin, and removes `autoprefixer` and `postcss-import`, which Tailwind 4
 folds in; plugins listed in `tailwind.config.js` and `@apply` inside Vue SFC `<style>` blocks stay manual work, and
 the hop says so. `inertia-2-to-3` raises `inertiajs/inertia-laravel` and `@inertiajs/vue3` to `^3.0` when the plan
 lands on Laravel 11 or newer on PHP 8.2 or newer, runs the composer and npm installs, and lists the v3 breaking
-changes as manual lines, because a person works them.
+changes as manual lines, because a person works them. `typescript-major` pins `typescript` to `^6.0` wherever it sits
+in `package.json`, and `vue-tsc` to `^3.0` when the app lists it, then asks for the same build gate; running the type
+check and fixing what the new major flags stay manual work, and the hop says so.
 
 Vue 2 to Vue 3 is staged. `vue-26-to-27` moves the front end to the last Vue 2 release, which carries the Vue 3
 reactivity API; `vue-27-to-compat` switches to the `@vue/compat` build; `vue-compat-codemod` runs the
