@@ -621,6 +621,9 @@ final class Planner
             return false;
         }
         $target = HopDataRefresher::lowestMajor($this->registry->typescriptVersion());
+        if ($target === null) {
+            return false;
+        }
         foreach (['dependencies', 'devDependencies'] as $section) {
             $constraint = $package[$section]['typescript'] ?? null;
             if (is_string($constraint)) {

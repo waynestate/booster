@@ -1889,9 +1889,9 @@ final class HopExecutor
     }
 
     /**
-     * Normalizes package.json for the TypeScript major: pin typescript where-
-     * ever it sits, and vue-tsc to its pin when the app lists it. A fresh add
-     * is a human decision, so nothing is installed that was not there.
+     * Normalizes package.json for the TypeScript major: pin typescript
+     * wherever it sits, and vue-tsc to its pin when the app lists it. A fresh
+     * add is a human decision, so nothing is installed that was not there.
      *
      * @return array{0: list<string>, 1: list<array{file: string, diff: string}>} what changed and which files
      */

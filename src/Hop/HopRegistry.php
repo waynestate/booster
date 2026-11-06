@@ -783,6 +783,9 @@ final class HopRegistry
     private function typescriptMajorHop(): Hop
     {
         $to = HopDataRefresher::lowestMajor($this->typescriptVersion);
+        if ($to === null) {
+            throw new ToolError(sprintf('The typescript_version pin "%s" has no major to move to.', $this->typescriptVersion));
+        }
 
         return new Hop(
             id: self::TYPESCRIPT_MAJOR_ID,
