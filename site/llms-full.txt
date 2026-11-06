@@ -207,7 +207,7 @@ Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel 
 
 Some hops come along by default, and some only when you ask:
 
-- The front-end Node hops (Mix to Vite, Tailwind, Vue) are in the plan by default. Pass any target (`--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php`, `--from-laravel`) and they drop out with a warning, unless you add `--with-node`.
+- The front-end Node hops (Mix to Vite, Vite major, Tailwind, Vue) are in the plan by default. Pass any target (`--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php`, `--from-laravel`) and they drop out with a warning, unless you add `--with-node`.
 - An app on PHPUnit 8 or older gets a manual PHPUnit 9 step before the first PHP 8 hop.
 - The SESAME move (`--sesame`) and the WayneUI move (`--wayneui`) are opt-in only.
 - `--skip ` drops a hop you do not want.
@@ -331,7 +331,7 @@ Options shared by `plan` and `run`:
 | `--no-package-check` | Skip the Packagist dependency check (for offline use) |
 | `--until` | Cut the plan after this hop id: that step and everything before it stay, and the plan's targets move to where it lands |
 | `--only` | Plan and run just this one hop id. The app must sit on the hop's starting versions, and `--until` and `--only` are never combined |
-| `--with-node` | include the Node front-end hops (Node pin, Mix to Vite, Tailwind, Vue) even when you passed a target version. Without it, any of `--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php` or `--from-laravel` leaves those hops out, and the plan prints: "Node front-end hops were left out because you passed a target version: . Add --with-node to include them." |
+| `--with-node` | include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, Vue) even when you passed a target version. Without it, any of `--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php` or `--from-laravel` leaves those hops out, and the plan prints: "Node front-end hops were left out because you passed a target version: . Add --with-node to include them." |
 
 Example: an app moving from Laravel 8 to 13 takes the climb in parts. `booster plan --path=../my-app --until=laravel-8-to-9` keeps every hop up to and including the move to Laravel 9, and `booster run` with the same flag applies exactly those hops.
 
@@ -633,10 +633,13 @@ A run prints one line per hop to standard error while it works: the hop's positi
 the number of files it changed and the seconds it took, and a final line totals the hops run, the stops and the whole
 run. They go to standard error so the report on standard output is untouched and `--format json` stays valid JSON.
 
-Three hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`,
+Four hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`,
 then the app's usual gate applies. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (below) and asks for a
 build gate, which runs `npm ci` and `npm run build` in the `node:26` container before the app's tests.
-`tailwind-3-to-4` runs the official `@tailwindcss/upgrade` tool in the Node container, then pins `tailwindcss` to
+`vite-major` moves a Vite front end onto the Vite major in the hop data: it pins `vite` wherever it sits in
+`package.json`, pins `laravel-vite-plugin` and `@vitejs/plugin-vue` to the hop data's versions when they are already
+listed, runs `npm install` in the Node container and asks for a build gate. `tailwind-3-to-4` runs the official
+`@tailwindcss/upgrade` tool in the Node container, then pins `tailwindcss` to
 `^4.1`, adds the matching Vite or PostCSS plugin, and removes `autoprefixer` and `postcss-import`, which Tailwind 4
 folds in; plugins listed in `tailwind.config.js` and `@apply` inside Vue SFC `` blocks stay manual work, and
 the hop says so.
@@ -648,7 +651,7 @@ three: skipping it skips them, and a person finishes the job, because Rector doe
 
 #### Hops Booster knows
 
-Thirty-four hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
+Thirty-five hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
 major at a time from 9 to 13, each list read from `data/versions.json` and trimmed to the majors whose Rector ruleset
 is installed ([Hop data](#hop-data)). An app whose PHPUnit is below 9 gets `phpunit-to-9-manual`, a manual move to
 `^9.5` placed before the first hop that targets PHP 8.0 (PHPUnit 7 and 8 do not run on PHP 8), and the regular
@@ -680,7 +683,11 @@ newer, after `node-pin-24`: writes `vite.config.js`, swaps `laravel-mix` for `vi
 simple shape only: `mix.js`, `.vue()`, `.sass()`, `.postCss()`, `.version()` and `if (mix.inProduction()) {
 mix.version(); }` (dropped with a note, since Vite hashes production assets), anything else is refused by name, a
 Vue 2 front end must take `vue-2-to-3` first, and `withoutMix()` calls are listed for a manual rename to
-`withoutVite()`); `tailwind-3-to-4` (planned when `package.json` carries `tailwindcss` below 4, after `node-pin-24`
+`withoutVite()`); `vite-major` (planned when `package.json` lists `vite` whose lowest major is below the hop data's
+major, after `node-pin-24` and ahead of `tailwind-3-to-4`; never planned alongside `mix-to-vite`, which installs the
+new Vite itself: pins `vite` to the hop data's version wherever it sits, pins `laravel-vite-plugin` and
+`@vitejs/plugin-vue` to the hop data's versions when they are already listed, and runs `npm install` in the Node
+container); `tailwind-3-to-4` (planned when `package.json` carries `tailwindcss` below 4, after `node-pin-24`
 and `mix-to-vite`: runs the official `@tailwindcss/upgrade` tool, pins `tailwindcss` to `^4.1`, adds the matching
 Vite or PostCSS plugin and removes `autoprefixer` and `postcss-import`); and the Vue 2 to Vue 3 stage,
 `vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod`, with the `vue-2-to-3` playbook standing in for all three.
@@ -723,7 +730,8 @@ nothing and says so, because the hop data carries no constraint there.
 
 `data/versions.json` holds the version facts Booster plans against: the PHP, Laravel and PHPUnit chains, the PHP range
 each Laravel major supports, the PHPUnit floor each Laravel major ships, the Node floor the `node-pin-24` hop writes,
-and the fixed Tailwind pin and Inertia constraint tables the front-end hops use. The file ships inside the PHAR. A new
+the Vite major and plugin pins the `vite-major` hop uses, and the fixed Tailwind pin and Inertia constraint tables the
+front-end hops use. The file ships inside the PHAR. A new
 major appears in the file as soon as its feed says so; Booster offers a hop for it only once Rector ships a ruleset
 for it, and a plan toward a major without one stops there with a warning instead of failing.
 
@@ -893,7 +901,7 @@ Inside one dose
    ### The gate
    Before the first hop your tests run once on the app's current PHP as the baseline; a red one stops the run unless you pass `--allow-failing-baseline`. An app with no tests of its own gets a built-in syntax check (php -l on every PHP file outside vendor/ and node_modules/) instead, and the report says so: it proves the code loads on the new PHP, not that it works. After each hop they run inside `booster-target:<php>`, built from `docker/Dockerfile` on the PHP the hop moves to. On Laravel and PHPUnit hops the gate refreshes `composer.lock` for the package the hop moved, so the lock lands on the new major version; if Packagist's security advisories block those releases, whether the install fails outright or Composer quietly locks a branch version where the hop asked for a tag, the gate writes a scoped temporary ignore, retries once, and tells you what it did. The plan's last step then fails until that entry is out of `composer.json`, so the upgrade never finishes with the unblock still in place. After the last hop PROCTOR checks the upgraded app against CREED's policy, blocking only on findings the upgrade introduced. If a red baseline names a missing Mix or Vite manifest, build the front-end assets first. A failure stops the run and leaves the changes for you to read. `git checkout .` undoes them.
 
-Not every hop is Rector. `node-pin-24` pins Node 26 in `package.json` and writes `.nvmrc`; `mix-to-vite` converts a simple `webpack.mix.js` and moves the build to Vite. The Vue 2 to 3 move is staged: `vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod`, with the `vue-2-to-3` playbook standing in for all three. Rector doesn't read Vue, so a person works those steps. The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.
+Not every hop is Rector. `node-pin-24` pins Node 26 in `package.json` and writes `.nvmrc`; `mix-to-vite` converts a simple `webpack.mix.js` and moves the build to Vite; `vite-major` pins `vite` and the plugin packages in `package.json` to the hop data's versions. The Vue 2 to 3 move is staged: `vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod`, with the `vue-2-to-3` playbook standing in for all three. Rector doesn't read Vue, so a person works those steps. The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.
 
 The commands
 
@@ -917,11 +925,11 @@ $ bin/booster run --path=examples/raw-php --to-php=8.2 --dry-run BOOSTER dry run
 
 **hopsEvery hop Booster knows**
 
-$ bin/booster hops php-55-to-56 Move PHP 5.5 code to PHP 5.6. php-56-to-70 Move PHP 5.6 code to PHP 7.0. php-70-to-71 Move PHP 7.0 code to PHP 7.1. php-71-to-72 Move PHP 7.1 code to PHP 7.2. php-72-to-73 Move PHP 7.2 code to PHP 7.3. php-73-to-74 Move PHP 7.3 code to PHP 7.4. php-74-to-80 Move PHP 7.4 code to PHP 8.0. php-80-to-81 Move PHP 8.0 code to PHP 8.1. php-81-to-82 Move PHP 8.1 code to PHP 8.2. php-82-to-83 Move PHP 8.2 code to PHP 8.3. php-83-to-84 Move PHP 8.3 code to PHP 8.4. php-84-to-85 Move PHP 8.4 code to PHP 8.5. laravel-5.8-to-6 Move a Laravel 5.8 app to Laravel 6. laravel-6-to-7 Move a Laravel 6 app to Laravel 7. laravel-7-to-8 Move a Laravel 7 app to Laravel 8. laravel-8-to-9 Move a Laravel 8 app to Laravel 9. laravel-9-to-10 Move a Laravel 9 app to Laravel 10. laravel-10-to-11 Move a Laravel 10 app to Laravel 11. laravel-11-to-12 Move a Laravel 11 app to Laravel 12. laravel-12-to-13 Move a Laravel 12 app to Laravel 13. phpunit-9-to-10 Move PHPUnit 9 tests to PHPUnit 10. phpunit-10-to-11 Move PHPUnit 10 tests to PHPUnit 11. phpunit-11-to-12 Move PHPUnit 11 tests to PHPUnit 12. phpunit-12-to-13 Move PHPUnit 12 tests to PHPUnit 13. phpunit-to-9-manual Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves. \[playbook\] cas-to-sesame Swap the wayne-cas package for SESAME using its compatibility classes. wayneui-1-to-2 Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. node-pin-24 Pin the app to Node 26: set engines.node in package.json and write .nvmrc. mix-to-vite Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). tailwind-3-to-4 Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool. vue-26-to-27 Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API. vue-27-to-compat Move a Vue 2.7 front end to Vue 3 through the @vue/compat build. vue-compat-codemod Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists. vue-2-to-3 Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue). \[playbook\]
+$ bin/booster hops php-55-to-56 Move PHP 5.5 code to PHP 5.6. php-56-to-70 Move PHP 5.6 code to PHP 7.0. php-70-to-71 Move PHP 7.0 code to PHP 7.1. php-71-to-72 Move PHP 7.1 code to PHP 7.2. php-72-to-73 Move PHP 7.2 code to PHP 7.3. php-73-to-74 Move PHP 7.3 code to PHP 7.4. php-74-to-80 Move PHP 7.4 code to PHP 8.0. php-80-to-81 Move PHP 8.0 code to PHP 8.1. php-81-to-82 Move PHP 8.1 code to PHP 8.2. php-82-to-83 Move PHP 8.2 code to PHP 8.3. php-83-to-84 Move PHP 8.3 code to PHP 8.4. php-84-to-85 Move PHP 8.4 code to PHP 8.5. laravel-5.8-to-6 Move a Laravel 5.8 app to Laravel 6. laravel-6-to-7 Move a Laravel 6 app to Laravel 7. laravel-7-to-8 Move a Laravel 7 app to Laravel 8. laravel-8-to-9 Move a Laravel 8 app to Laravel 9. laravel-9-to-10 Move a Laravel 9 app to Laravel 10. laravel-10-to-11 Move a Laravel 10 app to Laravel 11. laravel-11-to-12 Move a Laravel 11 app to Laravel 12. laravel-12-to-13 Move a Laravel 12 app to Laravel 13. phpunit-9-to-10 Move PHPUnit 9 tests to PHPUnit 10. phpunit-10-to-11 Move PHPUnit 10 tests to PHPUnit 11. phpunit-11-to-12 Move PHPUnit 11 tests to PHPUnit 12. phpunit-12-to-13 Move PHPUnit 12 tests to PHPUnit 13. phpunit-to-9-manual Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves. \[playbook\] cas-to-sesame Swap the wayne-cas package for SESAME using its compatibility classes. wayneui-1-to-2 Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. node-pin-24 Pin the app to Node 26: set engines.node in package.json and write .nvmrc. mix-to-vite Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). vite-major Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions. tailwind-3-to-4 Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool. vue-26-to-27 Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API. vue-27-to-compat Move a Vue 2.7 front end to Vue 3 through the @vue/compat build. vue-compat-codemod Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists. vue-2-to-3 Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue). \[playbook\]
 
 **initWrites the coding-tab playbooks to .agents/skills**
 
-$ bin/booster init --path=../my-app Wrote 35 playbooks (one for each step Booster knows, plus a general one), 35 changed. $ bin/booster init --path=../my-app --check Playbooks are current. # exits 1 when a playbook is stale, so CI notices
+$ bin/booster init --path=../my-app Wrote 36 playbooks (one for each step Booster knows, plus a general one), 36 changed. $ bin/booster init --path=../my-app --check Playbooks are current. # exits 1 when a playbook is stale, so CI notices
 
 Get the shot
 
@@ -1076,7 +1084,7 @@ Read first:
 
 Task:
 1. With Booster cloned beside the app, run bin/booster detect --path=../my-app and confirm the shape is raw-php-vue, with the Vue and Node versions.
-2. Run bin/booster plan --path=../my-app and sort the hops: PHP hops (Rector), node-pin-24 (pins Node 26 in package.json and writes .nvmrc), and the staged Vue hops if the app is on Vue 2: vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
+2. Run bin/booster plan --path=../my-app and sort the hops: PHP hops (Rector), node-pin-24 (pins Node 26 in package.json and writes .nvmrc), vite-major (pins vite and the plugin packages to the hop data's versions), and the staged Vue hops if the app is on Vue 2: vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
 3. Run bin/booster run --path=../my-app --dry-run and summarize the diffs.
 4. For the Vue hops, list the playbook steps for this app: the compat build, then the codemod, keeping every manual item the codemod lists. Rector does not read Vue, so Booster changes nothing there: a person does that work.
 
@@ -1125,13 +1133,13 @@ A prompt for your coding agent. Copy it as it stands:
 You are a coding agent upgrading a Laravel app with Blade views and Vue islands at Wayne State University with Booster, the upgrade tool of WELD, the Wayne State application stack.
 
 Read first:
-- https://booster.apps.wayne.edu/llms.txt, then the README in llms-full.txt beside it: Hops Booster knows (node-pin-24, mix-to-vite, vue-26-to-27, vue-27-to-compat, vue-compat-codemod) and Laravel hops and vendor.
+- https://booster.apps.wayne.edu/llms.txt, then the README in llms-full.txt beside it: Hops Booster knows (node-pin-24, mix-to-vite, vite-major, vue-26-to-27, vue-27-to-compat, vue-compat-codemod) and Laravel hops and vendor.
 - ADVISOR, the stack's MCP server, if it is connected: upgrade_path for this app, policy_lookup for Laravel and Node, and list_stack_rules with permutation laravel-blade-vue. If it is not connected, say so and work from the pages.
 - package.json, its lock file, and webpack.mix.js if there is one.
 
 Task:
 1. Run `composer install` in the app, then, with Booster cloned beside it, bin/booster plan --path=../my-app.
-2. If the plan has mix-to-vite, say whether this webpack.mix.js is the simple shape Booster converts (mix.js, .vue(), .sass(), .postCss(), .version(), and if (mix.inProduction()) { mix.version(); }) or which call it will refuse by name. A Vue 2 front end takes the staged Vue hops first: vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
+2. If the plan has mix-to-vite, say whether this webpack.mix.js is the simple shape Booster converts (mix.js, .vue(), .sass(), .postCss(), .version(), and if (mix.inProduction()) { mix.version(); }) or which call it will refuse by name. If the plan has vite-major, list the packages it will pin in package.json. A Vue 2 front end takes the staged Vue hops first: vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
 3. Run bin/booster run --path=../my-app --dry-run and summarize the diffs, Blade layouts included.
 4. List any withoutMix() calls for me to rename to withoutVite() by hand.
 
@@ -1159,7 +1167,7 @@ Read first:
 
 Task:
 1. Run `composer install` in the app, then, with Booster cloned beside it, bin/booster detect --path=../my-app and bin/booster plan --path=../my-app.
-2. Sort the hops: Laravel and PHP (Rector), node-pin-24, and the staged Vue hops if the app is on Vue 2 (playbooks, not code changes): vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
+2. Sort the hops: Laravel and PHP (Rector), node-pin-24, vite-major, and the staged Vue hops if the app is on Vue 2 (playbooks, not code changes): vue-26-to-27 when it is below 2.7, then vue-27-to-compat and vue-compat-codemod.
 3. For each Laravel hop, list what to check by hand on the Inertia side: Booster has no Inertia checks per Laravel hop yet.
 4. Run bin/booster run --path=../my-app --dry-run and summarize the diffs per hop.
 
@@ -1402,7 +1410,7 @@ A dry run previews every hop against the original tree, so the same file can app
 
 A run prints one line per hop to standard error while it works: the hop's position in the plan, its id, its status, the number of files it changed and the seconds it took, and a final line totals the hops run, the stops and the whole run. They go to standard error so the report on standard output is untouched and `--format json` stays valid JSON.
 
-Three hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`, then the app's usual gate applies. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (see [the hop list](https://booster.apps.wayne.edu/docs/reference/hops.html)) and asks for a build gate, which runs `npm ci` and `npm run build` in the `node:26` container before the app's tests. `tailwind-3-to-4` runs the official `@tailwindcss/upgrade` tool in the Node container, then pins `tailwindcss` to `^4.1`, adds the matching Vite or PostCSS plugin, and removes `autoprefixer` and `postcss-import`, which Tailwind 4 folds in; plugins listed in `tailwind.config.js` and `@apply` inside Vue SFC `<style>` blocks stay manual work, and the hop says so.
+Four hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`, then the app's usual gate applies. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (see [the hop list](https://booster.apps.wayne.edu/docs/reference/hops.html)) and asks for a build gate, which runs `npm ci` and `npm run build` in the `node:26` container before the app's tests. `vite-major` moves a Vite front end onto the Vite major in the hop data: it pins `vite` wherever it sits in `package.json`, pins `laravel-vite-plugin` and `@vitejs/plugin-vue` to the hop data's versions when they are already listed, runs `npm install` in the Node container and asks for a build gate. `tailwind-3-to-4` runs the official `@tailwindcss/upgrade` tool in the Node container, then pins `tailwindcss` to `^4.1`, adds the matching Vite or PostCSS plugin, and removes `autoprefixer` and `postcss-import`, which Tailwind 4 folds in; plugins listed in `tailwind.config.js` and `@apply` inside Vue SFC `<style>` blocks stay manual work, and the hop says so.
 
 Vue 2 to Vue 3 is staged. `vue-26-to-27` moves the front end to the last Vue 2 release, which carries the Vue 3 reactivity API; `vue-27-to-compat` switches to the `@vue/compat` build; `vue-compat-codemod` runs the `vue-upgrade-tool` codemod and keeps every manual item it lists. `vue-2-to-3` is the playbook that stands in for all three: skipping it skips them, and a person finishes the job, because Rector does not read Vue.
 
@@ -1420,7 +1428,7 @@ For an Inertia/Vue app, each Laravel hop also raises the Inertia constraints the
 
 ### Hop data[#](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html#hop-data)
 
-`data/versions.json` holds the version facts Booster plans against: the PHP, Laravel and PHPUnit chains, the PHP range each Laravel major supports, the PHPUnit floor each Laravel major ships, the Node floor the `node-pin-24` hop writes, and the fixed Tailwind pin and Inertia constraint tables the front-end hops use. The file ships inside the PHAR. A new major appears in the file as soon as its feed says so; Booster offers a hop for it only once Rector ships a ruleset for it, and a plan toward a major without one stops there with a warning instead of failing.
+`data/versions.json` holds the version facts Booster plans against: the PHP, Laravel and PHPUnit chains, the PHP range each Laravel major supports, the PHPUnit floor each Laravel major ships, the Node floor the `node-pin-24` hop writes, the Vite major and plugin pins the `vite-major` hop uses, and the fixed Tailwind pin and Inertia constraint tables the front-end hops use. The file ships inside the PHAR. A new major appears in the file as soon as its feed says so; Booster offers a hop for it only once Rector ships a ruleset for it, and a plan toward a major without one stops there with a warning instead of failing.
 
 `bin/refresh-hop-data.php` rewrites the file from the public feeds (Packagist for PHPUnit and Laravel, endoflife.date for Laravel's supported PHP ranges, npm for the Vite packages) plus CREED's policy for what counts as supported:
 
@@ -1476,7 +1484,7 @@ Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel 
 
 Some hops come along by default, and some only when you ask:
 
-- The front-end Node hops (Mix to Vite, Tailwind, Vue) are in the plan by default. Pass any target (`--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php`, `--from-laravel`) and they drop out with a warning, unless you add `--with-node`.
+- The front-end Node hops (Mix to Vite, Vite major, Tailwind, Vue) are in the plan by default. Pass any target (`--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php`, `--from-laravel`) and they drop out with a warning, unless you add `--with-node`.
 - An app on PHPUnit 8 or older gets a manual PHPUnit 9 step before the first PHP 8 hop.
 - The SESAME move (`--sesame`) and the WayneUI move (`--wayneui`) are opt-in only.
 - `--skip <hop id>` drops a hop you do not want.
@@ -1972,7 +1980,7 @@ Not for: proving the app still works. A preview never runs your tests.
 
 ### 7. Backend only, or front end too[#](https://booster.apps.wayne.edu/docs/recipes.html#7-backend-only-or-front-end-too)
 
-Node front-end hops (the Node pin, Mix to Vite, Tailwind, the Vue steps) are in the plan only when you pass no target at all. Two ways to leave them out:
+Node front-end hops (the Node pin, Mix to Vite, Vite major, Tailwind, the Vue steps) are in the plan only when you pass no target at all. Two ways to leave them out:
 
 ```
 booster run --path=../my-app --to-php=8.5          # any target drops them, with a warning
@@ -1985,7 +1993,7 @@ booster run --path=../my-app --skip=mix-to-vite    # or drop them by id
 booster run --path=../my-app --to-php=8.5 --with-node
 ```
 
-The ids are `node-pin-24`, `mix-to-vite`, `tailwind-3-to-4` and the Vue steps; `booster hops` lists every id. Skipping `vue-2-to-3` skips all the Vue steps.
+The ids are `node-pin-24`, `mix-to-vite`, `vite-major`, `tailwind-3-to-4` and the Vue steps; `booster hops` lists every id. Skipping `vue-2-to-3` skips all the Vue steps.
 
 Not for: skipping the Node hops and then keeping a Mix build around forever. That is a choice, not a plan.
 
@@ -2154,7 +2162,7 @@ Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today 
 | `--from-laravel=VALUE` | The Laravel major the app runs on. |  |
 | `--to-laravel=VALUE` | Target Laravel major (default: the newest the policy supports). |  |
 | `--to-phpunit=VALUE` | Target PHPUnit major (default: the newest that runs on the target PHP). |  |
-| `--with-node` | Include the Node front-end hops (Node pin, Mix to Vite, Tailwind, Vue) even when you passed a target version |  |
+| `--with-node` | Include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, Vue) even when you passed a target version |  |
 | `--sesame` | Include the wayne-cas to SESAME swap. |  |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move. |  |
 | `--skip=VALUE` | Hop id to leave out (repeatable). |  |
@@ -2182,7 +2190,7 @@ Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today T
 | `--from-laravel=VALUE` | The Laravel major the app runs on. |  |
 | `--to-laravel=VALUE` | Target Laravel major (default: the newest the policy supports). |  |
 | `--to-phpunit=VALUE` | Target PHPUnit major (default: the newest that runs on the target PHP). |  |
-| `--with-node` | Include the Node front-end hops (Node pin, Mix to Vite, Tailwind, Vue) even when you passed a target version |  |
+| `--with-node` | Include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, Vue) even when you passed a target version |  |
 | `--sesame` | Include the wayne-cas to SESAME swap. |  |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move. |  |
 | `--skip=VALUE` | Hop id to leave out (repeatable). |  |
@@ -2293,6 +2301,7 @@ This page lists every hop Booster knows; the list is generated from the hop data
 | `wayneui-1-to-2` | wayneui | 1 | 2 | Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. |
 | `node-pin-24` | node | any | 26 | Pin the app to Node 26: set engines.node in package.json and write .nvmrc. |
 | `mix-to-vite` | node | laravel-mix | vite | Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). |
+| `vite-major` | node | any | 8 | Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions. |
 | `tailwind-3-to-4` | node | 3 | 4 | Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool. |
 | `vue-26-to-27` | node | 2.6 | 2.7 | Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API. |
 | `vue-27-to-compat` | node | 2.7 | 3 | Move a Vue 2.7 front end to Vue 3 through the @vue/compat build. |

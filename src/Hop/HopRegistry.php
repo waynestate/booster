@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Hop;
 
 use Waynestate\Booster\Packaging\PharFiles;
+use Waynestate\Booster\Refresh\HopDataRefresher;
 use Waynestate\Booster\ToolError;
 
 /**
@@ -28,6 +29,9 @@ final class HopRegistry
 
     /** The Tailwind 3 to 4 hop. The tool and pin versions live in the data file. */
     public const TAILWIND_ID = 'tailwind-3-to-4';
+
+    /** The Vite major hop. The package versions it pins live in the data file. */
+    public const VITE_MAJOR_ID = 'vite-major';
 
     /** The staged hop that moves a Vue 2.6 front end onto Vue 2.7. */
     public const VUE_26_TO_27_ID = 'vue-26-to-27';
@@ -127,6 +131,7 @@ final class HopRegistry
         $this->add($this->wayneUi1To2Hop());
         $this->add($this->nodePinHop());
         $this->add($this->mixToViteHop());
+        $this->add($this->viteMajorHop());
         $this->add($this->tailwindHop());
         foreach ($this->vueHops() as $hop) {
             $this->add($hop);
@@ -727,6 +732,32 @@ final class HopRegistry
                 'Replace withoutMix() with withoutVite() by hand; Booster lists the files that call it.',
             ],
             links: ['https://laravel.com/docs/9.x/upgrade#vite'],
+        );
+    }
+
+    /**
+     * The Vite major hop. It pins vite wherever it sits and raises the Laravel
+     * and Vue plugin pins the app already carries to the majors in the data
+     * file, then runs npm install in the Node container so the lock and
+     * node_modules catch up. Offered only to apps that already build with
+     * Vite; mix-to-vite installs these same versions for Mix apps.
+     */
+    private function viteMajorHop(): Hop
+    {
+        $major = HopDataRefresher::lowestMajor($this->viteVersion) ?? 'unknown';
+
+        return new Hop(
+            id: self::VITE_MAJOR_ID,
+            kind: HopKind::Node,
+            from: 'any',
+            to: $major,
+            summary: sprintf('Move a Vite front end onto Vite %s: pin vite and the Laravel and Vue plugin packages to the data versions.', $major),
+            buildGate: true,
+            notes: [
+                'MANUAL: read the Vite migration guide and check your vite.config for removed options.',
+                'MANUAL: Sass, PostCSS and plugin versions must match the new Vite; run your build and tests.',
+            ],
+            links: ['https://vite.dev/guide/migration'],
         );
     }
 
