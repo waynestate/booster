@@ -9,6 +9,9 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
+# The read-only repo mount cannot create the named volume's mount point.
+mkdir -p tools/a11y/node_modules
+
 # Git Bash on Windows rewrites absolute-looking arguments for native programs
 # (docker would turn -w /work into a Windows path). Turn that off and pass the
 # Windows form of the repo path instead.
