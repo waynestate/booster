@@ -119,11 +119,15 @@ build gate, which runs <code>npm ci</code> and <code>npm run build</code> in the
 listed, runs <code>npm install</code> in the Node container and asks for a build gate. <code>tailwind-3-to-4</code> runs the official
 <code>@tailwindcss/upgrade</code> tool (one exact release, with <code>--force</code>) in the Node container, then pins <code>tailwindcss</code> to
 <code>^4.1</code>, adds the matching Vite or PostCSS plugin, removes <code>autoprefixer</code> and <code>postcss-import</code>, which Tailwind 4
-folds in, and runs <code>npm install</code> so the lock matches; plugins listed in <code>tailwind.config.js</code> and <code>@apply</code> inside Vue SFC <code>&lt;style&gt;</code> blocks stay manual work, and
+folds in, moves an inline <code>css.postcss</code> Tailwind block in <code>vite.config</code> to the <code>@tailwindcss/vite</code> plugin (the
+early 2025 Laravel starter kit shape; any other config that still imports them gets a MANUAL line), and runs
+<code>npm install</code> so the lock matches; plugins listed in <code>tailwind.config.js</code> and <code>@apply</code> inside Vue SFC <code>&lt;style&gt;</code> blocks stay manual work, and
 the hop says so. <code>inertia-2-to-3</code> raises <code>inertiajs/inertia-laravel</code> and <code>@inertiajs/vue3</code> to <code>^3.0</code> when the plan
 lands on Laravel 11 or newer on PHP 8.2 or newer, runs <code>composer update</code> and <code>npm install</code>, and lists the v3 breaking
 changes as manual lines, because a person works them. <code>typescript-major</code> pins <code>typescript</code> to <code>^6.0</code> wherever it sits
-in <code>package.json</code>, and <code>vue-tsc</code> to <code>^3.0</code> when the app lists it, runs <code>npm install</code> so the lock matches, then asks for the same build gate; running the type
+in <code>package.json</code>, and <code>vue-tsc</code> to <code>^3.0</code> when the app lists it, runs <code>npm install</code> so the lock matches, then asks for the same build gate; when
+that install has to override a peer dependency, the hop names the package to raise, because the next plain
+<code>npm install</code> would refuse the tree; running the type
 check and fixing what the new major flags stay manual work, and the hop says so.</p>
 <p>Vue 2 to Vue 3 is staged. <code>vue-26-to-27</code> moves the front end to the last Vue 2 release, which carries the Vue 3
 reactivity API; <code>vue-27-to-compat</code> switches to the <code>@vue/compat</code> build; <code>vue-compat-codemod</code> runs the

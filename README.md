@@ -668,11 +668,15 @@ build gate, which runs `npm ci` and `npm run build` in the `node:26` container b
 listed, runs `npm install` in the Node container and asks for a build gate. `tailwind-3-to-4` runs the official
 `@tailwindcss/upgrade` tool (one exact release, with `--force`) in the Node container, then pins `tailwindcss` to
 `^4.1`, adds the matching Vite or PostCSS plugin, removes `autoprefixer` and `postcss-import`, which Tailwind 4
-folds in, and runs `npm install` so the lock matches; plugins listed in `tailwind.config.js` and `@apply` inside Vue SFC `<style>` blocks stay manual work, and
+folds in, moves an inline `css.postcss` Tailwind block in `vite.config` to the `@tailwindcss/vite` plugin (the
+early 2025 Laravel starter kit shape; any other config that still imports them gets a MANUAL line), and runs
+`npm install` so the lock matches; plugins listed in `tailwind.config.js` and `@apply` inside Vue SFC `<style>` blocks stay manual work, and
 the hop says so. `inertia-2-to-3` raises `inertiajs/inertia-laravel` and `@inertiajs/vue3` to `^3.0` when the plan
 lands on Laravel 11 or newer on PHP 8.2 or newer, runs `composer update` and `npm install`, and lists the v3 breaking
 changes as manual lines, because a person works them. `typescript-major` pins `typescript` to `^6.0` wherever it sits
-in `package.json`, and `vue-tsc` to `^3.0` when the app lists it, runs `npm install` so the lock matches, then asks for the same build gate; running the type
+in `package.json`, and `vue-tsc` to `^3.0` when the app lists it, runs `npm install` so the lock matches, then asks for the same build gate; when
+that install has to override a peer dependency, the hop names the package to raise, because the next plain
+`npm install` would refuse the tree; running the type
 check and fixing what the new major flags stay manual work, and the hop says so.
 
 Vue 2 to Vue 3 is staged. `vue-26-to-27` moves the front end to the last Vue 2 release, which carries the Vue 3

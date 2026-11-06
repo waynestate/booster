@@ -148,6 +148,44 @@ final class TypescriptMajorTest extends TestCase
         self::assertSame((new HopRegistry())->typescriptVersion(), $package['devDependencies']['typescript']);
     }
 
+    public function test_a_peer_dependency_npm_overrode_becomes_one_manual_line(): void
+    {
+        // npm's words from a real app (2026-11-06): it only warns on this install,
+        // then refuses the next plain npm install of the same tree.
+        $warning = <<<'TXT'
+            npm warn ERESOLVE overriding peer dependency
+            npm warn While resolving: undefined@undefined
+            npm warn Found: vue-tsc@2.2.12
+            npm warn node_modules/vue-tsc
+            npm warn   vue-tsc@"^3.0" from the root project
+            npm warn
+            npm warn Could not resolve dependency:
+            npm warn peerOptional vue-tsc@"^2.1.0" from prettier-plugin-organize-imports@4.1.0
+            npm warn node_modules/prettier-plugin-organize-imports
+            TXT;
+        $dir = $this->app();
+        $fake = new FakeProcessRunner(static function (array $command) use ($warning): ProcessResult {
+            if ($command[0] === 'docker' && in_array('npm', $command, true) && in_array('install', $command, true)) {
+                return new ProcessResult(0, "added 6 packages\n", $warning . "\n" . $warning . "\n");
+            }
+
+            return new ProcessResult(0, '', '');
+        });
+        $report = $this->runTypescript($fake, new RunOptions(), $dir);
+
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        $manual = array_values(array_filter($report->results[0]->messages, static fn(string $m): bool => str_contains($m, 'override a peer dependency')));
+        self::assertSame(['MANUAL: npm install had to override a peer dependency: prettier-plugin-organize-imports@4.1.0 asks for vue-tsc@"^2.1.0". The build passed, but the next plain npm install refuses this tree (ERESOLVE); raise prettier-plugin-organize-imports to a release that accepts the new version.'], $manual);
+    }
+
+    public function test_a_clean_install_adds_no_peer_line(): void
+    {
+        $dir = $this->app();
+        $report = $this->runTypescript($this->fake($dir), new RunOptions(), $dir);
+
+        self::assertStringNotContainsString('peer dependency', implode("\n", $report->results[0]->messages));
+    }
+
     public function test_skip_gate_skips_npm_and_php_gates_but_still_pins(): void
     {
         $dir = $this->app();

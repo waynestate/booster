@@ -1474,16 +1474,21 @@ final class HopExecutor
         }
 
         [$changes, $files] = $this->applyTailwindPackages($path);
+        if ($this->usesVite($path)) {
+            [$viteChanges, $viteFiles] = $this->wireTailwindVitePlugin($path);
+            $changes = [...$changes, ...$viteChanges];
+            $files = [...$files, ...$viteFiles];
+        }
         if ($changes === []) {
             $changes[] = 'The upgrade tool ran, but package.json already matched the Tailwind 4 pins.';
         } else {
             // The tool installed its own pins; BOOSTER's edits came after, so the
             // lock must catch up before the build gate's npm ci can pass.
-            $syncFailure = $this->syncNpmLock($this->node, $path);
+            $syncFailure = $this->syncNpmLock($this->node, $path, $peerNotes);
             if ($syncFailure !== null) {
                 return new StepResult($step->number, $hop->id, StepResult::ERROR, $files, [...$changes, ...$syncFailure]);
             }
-            $changes[] = self::NPM_LOCK_SYNCED;
+            $changes = [...$changes, self::NPM_LOCK_SYNCED, ...$peerNotes];
         }
 
         if (!$options->skipGate) {
@@ -1530,11 +1535,11 @@ final class HopExecutor
             ]);
         }
 
-        $syncFailure = $this->syncNpmLock($this->node, $path);
+        $syncFailure = $this->syncNpmLock($this->node, $path, $peerNotes);
         if ($syncFailure !== null) {
             return new StepResult($step->number, $hop->id, StepResult::ERROR, $files, $syncFailure);
         }
-        $changes[] = self::NPM_LOCK_SYNCED;
+        $changes = [...$changes, self::NPM_LOCK_SYNCED, ...$peerNotes];
 
         if (!$options->skipGate) {
             $buildFailure = $this->runBuildGate($path);
@@ -1576,11 +1581,11 @@ final class HopExecutor
         if ($changes === []) {
             $changes[] = 'package.json already matched the TypeScript pins.';
         } else {
-            $syncFailure = $this->syncNpmLock($this->node, $path);
+            $syncFailure = $this->syncNpmLock($this->node, $path, $peerNotes);
             if ($syncFailure !== null) {
                 return new StepResult($step->number, $hop->id, StepResult::ERROR, $files, [...$changes, ...$syncFailure]);
             }
-            $changes[] = self::NPM_LOCK_SYNCED;
+            $changes = [...$changes, self::NPM_LOCK_SYNCED, ...$peerNotes];
         }
 
         if (!$options->skipGate) {
@@ -2166,6 +2171,69 @@ final class HopExecutor
     }
 
     /**
+     * Wires the @tailwindcss/vite plugin into the Vite config when Tailwind 3
+     * was fed through an inline css.postcss block there, the way the Laravel
+     * starter kits of early 2025 did it; the upgrade tool only migrates
+     * postcss.config files, so the build would still import tailwindcss and
+     * autoprefixer as PostCSS plugins (found on a real app, 2026-11-06).
+     *
+     * Only that exact shape is rewritten: the imports of tailwindcss (and
+     * autoprefixer), and a css block holding nothing but those PostCSS
+     * plugins. Anything else that still imports them gets a MANUAL line.
+     *
+     * @return array{0: list<string>, 1: list<array{file: string, diff: string}>} what changed and which files
+     */
+    private function wireTailwindVitePlugin(string $path): array
+    {
+        $name = null;
+        foreach (['vite.config.ts', 'vite.config.js', 'vite.config.mts', 'vite.config.mjs'] as $candidate) {
+            if (is_file($path . '/' . $candidate)) {
+                $name = $candidate;
+                break;
+            }
+        }
+        if ($name === null) {
+            return [[], []];
+        }
+        $source = (string) file_get_contents($path . '/' . $name);
+        if (str_contains($source, '@tailwindcss/vite')) {
+            return [[], []];
+        }
+        $importsTailwind = preg_match('/^import\s+(\w+)\s+from\s+([\'"])tailwindcss\2;?[ \t]*\r?\n/m', $source, $tw) === 1;
+        $importsPrefixer = preg_match('/^import\s+(\w+)\s+from\s+([\'"])autoprefixer\2;?[ \t]*\r?\n/m', $source, $ap) === 1;
+        if (!$importsTailwind && !$importsPrefixer) {
+            return [[], []];
+        }
+        $manual = [sprintf('MANUAL: %s still imports tailwindcss or autoprefixer as PostCSS plugins; replace them with the tailwindcss() plugin from @tailwindcss/vite in its plugins list.', $name)];
+        if (!$importsTailwind) {
+            return [$manual, []];
+        }
+        $plugins = preg_quote($tw[1], '/') . ($importsPrefixer ? '(?:\s*,\s*' . preg_quote($ap[1], '/') . ')?' : '');
+        $cssBlock = '/\r?\n[ \t]*css:\s*\{\s*postcss:\s*\{\s*plugins:\s*\[\s*' . $plugins . '\s*,?\s*\]\s*,?\s*\}\s*,?\s*\}\s*,?(?=\s*\r?\n)/';
+        if (preg_match_all($cssBlock, $source) !== 1) {
+            return [$manual, []];
+        }
+        $rewritten = (string) preg_replace($cssBlock, '', $source, 1);
+        if (preg_match('/\bplugins:\s*\[([ \t]*\r?\n([ \t]*))?/', $rewritten, $open, PREG_OFFSET_CAPTURE) !== 1) {
+            return [$manual, []];
+        }
+        $indent = isset($open[2]) ? $open[2][0] : '';
+        $at = $open[0][1] + strlen($open[0][0]);
+        $insert = isset($open[2]) ? $tw[1] . "(),\n" . $indent : $tw[1] . '(), ';
+        $rewritten = substr($rewritten, 0, $at) . $insert . substr($rewritten, $at);
+        $rewritten = str_replace($tw[0], 'import ' . $tw[1] . ' from ' . $tw[2] . '@tailwindcss/vite' . $tw[2] . ";\n", $rewritten);
+        if ($importsPrefixer) {
+            $rewritten = str_replace($ap[0], '', $rewritten);
+        }
+        file_put_contents($path . '/' . $name, $rewritten);
+
+        return [
+            [sprintf('%s: the Tailwind PostCSS block became the %s() plugin from @tailwindcss/vite.', $name, $tw[1])],
+            [['file' => $name, 'diff' => 'moved Tailwind from css.postcss to the @tailwindcss/vite plugin']],
+        ];
+    }
+
+    /**
      * The app builds with Vite: a vite.config.js or vite.config.ts exists, or
      * package.json depends on vite. Decides which Tailwind 4 plugin to pin.
      */
@@ -2310,11 +2378,11 @@ final class HopExecutor
             } else {
                 // npm install, not npm ci: the lock still names Inertia 2, and
                 // npm ci refuses a lock that disagrees with package.json.
-                $syncFailure = $this->syncNpmLock($this->node, $path);
+                $syncFailure = $this->syncNpmLock($this->node, $path, $peerNotes);
                 if ($syncFailure !== null) {
                     return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$syncFailure]);
                 }
-                $changes[] = self::NPM_LOCK_SYNCED;
+                $changes = [...$changes, self::NPM_LOCK_SYNCED, ...$peerNotes];
             }
         }
 
@@ -2652,12 +2720,23 @@ final class HopExecutor
      * so package-lock.json catches up before any npm ci (found on a real app,
      * 2026-11-06: npm ci refuses a lock that disagrees with package.json).
      *
+     * When npm had to override a peer dependency to get there, $peerNotes gets
+     * a MANUAL line per conflict: npm only warns this once, and the next plain
+     * npm install refuses the same tree with ERESOLVE (also found 2026-11-06).
+     *
+     * @param list<string>|null $peerNotes set to the peer-override lines (empty when there were none)
+     *
+     * @param-out list<string> $peerNotes
+     *
      * @return list<string>|null failure lines, or null when the install passed
      */
-    private function syncNpmLock(NodeRunner $node, string $path): ?array
+    private function syncNpmLock(NodeRunner $node, string $path, ?array &$peerNotes = null): ?array
     {
+        $peerNotes = [];
         $install = $node->run($path, ['npm', 'install']);
         if ($install->successful()) {
+            $peerNotes = self::peerOverrideNotes($install->stdout . "\n" . $install->stderr);
+
             return null;
         }
 
@@ -2666,6 +2745,43 @@ final class HopExecutor
             trim($install->stdout . "\n" . $install->stderr),
             $this->undoHint($path),
         ];
+    }
+
+    /**
+     * One MANUAL line per distinct peer conflict npm overrode during an
+     * install ("npm warn ERESOLVE overriding peer dependency", then a
+     * "peer[Optional] <wanted> from <package>" line).
+     *
+     * @return list<string>
+     */
+    private static function peerOverrideNotes(string $output): array
+    {
+        if (!str_contains($output, 'ERESOLVE overriding peer dependency')) {
+            return [];
+        }
+        preg_match_all('/^npm warn\s+peer(?:Optional)?\s+(\S+)\s+from\s+(\S+)\s*$/m', $output, $matches, PREG_SET_ORDER);
+        $notes = [];
+        foreach ($matches as $match) {
+            $notes[$match[2] . ' ' . $match[1]] = sprintf(
+                'MANUAL: npm install had to override a peer dependency: %s asks for %s. The build passed, but the next plain npm install refuses this tree (ERESOLVE); raise %s to a release that accepts the new version.',
+                $match[2],
+                $match[1],
+                self::npmPackageName($match[2]),
+            );
+        }
+        if ($notes === []) {
+            $notes[] = 'MANUAL: npm install had to override a peer dependency (ERESOLVE). The build passed, but the next plain npm install may refuse this tree; run it and raise the package that asks for the old version.';
+        }
+
+        return array_values($notes);
+    }
+
+    /** "prettier-plugin-organize-imports@4.1.0" or "@scope/name@1.2.3" to the bare package name. */
+    private static function npmPackageName(string $spec): string
+    {
+        $at = strrpos($spec, '@');
+
+        return $at > 0 ? substr($spec, 0, $at) : $spec;
     }
 
     /**

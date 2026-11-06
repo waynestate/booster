@@ -215,6 +215,91 @@ final class TailwindUpgradeTest extends TestCase
         self::assertSame(['npm install', 'npm ci', 'npm run build'], $npm);
     }
 
+    public function test_an_inline_postcss_block_in_the_vite_config_becomes_the_vite_plugin(): void
+    {
+        // The Laravel Vue starter kit of early 2025 fed Tailwind 3 this way, and
+        // the upgrade tool leaves vite.config alone (found on a real app, 2026-11-06).
+        $dir = $this->app();
+        file_put_contents($dir . '/vite.config.ts', <<<'TS'
+            import vue from '@vitejs/plugin-vue';
+            import autoprefixer from 'autoprefixer';
+            import laravel from 'laravel-vite-plugin';
+            import tailwindcss from 'tailwindcss';
+            import { defineConfig } from 'vite';
+
+            export default defineConfig({
+                plugins: [
+                    laravel({
+                        input: ['resources/js/app.ts'],
+                    }),
+                    vue(),
+                ],
+                css: {
+                    postcss: {
+                        plugins: [tailwindcss, autoprefixer],
+                    },
+                },
+            });
+
+            TS);
+        $report = $this->runTailwind($this->fake($dir), new RunOptions(), $dir);
+
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        self::assertSame(['package.json', 'vite.config.ts'], array_column($report->results[0]->files, 'file'));
+        self::assertSame(<<<'TS'
+            import vue from '@vitejs/plugin-vue';
+            import laravel from 'laravel-vite-plugin';
+            import tailwindcss from '@tailwindcss/vite';
+            import { defineConfig } from 'vite';
+
+            export default defineConfig({
+                plugins: [
+                    tailwindcss(),
+                    laravel({
+                        input: ['resources/js/app.ts'],
+                    }),
+                    vue(),
+                ],
+            });
+
+            TS, file_get_contents($dir . '/vite.config.ts'));
+        self::assertStringContainsString('vite.config.ts: the Tailwind PostCSS block became the tailwindcss() plugin from @tailwindcss/vite.', implode("\n", $report->results[0]->messages));
+    }
+
+    public function test_a_vite_config_with_other_postcss_plugins_is_left_alone_with_a_manual_line(): void
+    {
+        $dir = $this->app();
+        $config = <<<'JS'
+            import autoprefixer from 'autoprefixer';
+            import nesting from 'postcss-nesting';
+            import tailwindcss from 'tailwindcss';
+            import { defineConfig } from 'vite';
+
+            export default defineConfig({
+                plugins: [],
+                css: { postcss: { plugins: [nesting, tailwindcss, autoprefixer] } },
+            });
+
+            JS;
+        file_put_contents($dir . '/vite.config.js', $config);
+        $report = $this->runTailwind($this->fake($dir), new RunOptions(), $dir);
+
+        self::assertSame($config, file_get_contents($dir . '/vite.config.js'));
+        self::assertSame(['package.json'], array_column($report->results[0]->files, 'file'));
+        self::assertStringContainsString('MANUAL: vite.config.js still imports tailwindcss or autoprefixer as PostCSS plugins', implode("\n", $report->results[0]->messages));
+    }
+
+    public function test_a_vite_config_that_already_has_the_plugin_is_untouched(): void
+    {
+        $dir = $this->app();
+        $config = "import tailwindcss from '@tailwindcss/vite';\nimport { defineConfig } from 'vite';\n\nexport default defineConfig({ plugins: [tailwindcss()] });\n";
+        file_put_contents($dir . '/vite.config.ts', $config);
+        $report = $this->runTailwind($this->fake($dir), new RunOptions(), $dir);
+
+        self::assertSame($config, file_get_contents($dir . '/vite.config.ts'));
+        self::assertStringNotContainsString('vite.config', implode("\n", $report->results[0]->messages));
+    }
+
     public function test_a_failing_lock_sync_stops_the_step_before_the_build_gate(): void
     {
         $dir = $this->app();
