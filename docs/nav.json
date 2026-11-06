@@ -46,6 +46,10 @@
           "path": "guides/hops"
         },
         {
+          "title": "The replay gate",
+          "path": "guides/replay-gate"
+        },
+        {
           "title": "Laravel hops and vendor/",
           "path": "guides/laravel-and-vendor"
         },

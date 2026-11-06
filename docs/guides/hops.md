@@ -27,7 +27,8 @@ under `Pre-pass fixes:`.
    ldap, soap, zip, gd, pdo_mysql, mysqli, bcmath, pcntl, exif, redis, imagick and oci8. The first build downloads
    Oracle Instant Client for oci8, so it takes a few minutes; later hops reuse the image. Pass `--image` to run the
    gate in your own image instead (below). A red gate stops the run and leaves the changes in place so you can read
-   them (`git checkout .` undoes them). To check the image itself,
+   them (`git checkout .` undoes them). With `--replay`, the gate also replays the requests recorded before the
+   first hop and fails on a changed answer: see [The replay gate](replay-gate.md). To check the image itself,
    `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and
    verifies its extension list; it needs Docker and a few minutes per version, so it is not part of `composer ci`.
 5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package
