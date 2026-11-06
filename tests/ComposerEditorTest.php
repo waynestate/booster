@@ -66,6 +66,74 @@ final class ComposerEditorTest extends TestCase
         self::assertSame('8.3.0', $after['config']['platform']['php']);
     }
 
+    public function test_the_laravel_13_hop_raises_a_listed_companion_package_with_the_framework(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        $data = $this->read($dir);
+        $data['require']['laravel/framework'] = '^12.0';
+        $data['require']['laravel/tinker'] = '^2.10';
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        $changes = (new ComposerEditor())->apply((new HopRegistry())->get('laravel-12-to-13'), $dir);
+
+        self::assertSame(
+            ['Set laravel/framework to ^13.0 in require.', 'Set laravel/tinker to ^3.0 in require.'],
+            $changes,
+        );
+        $after = $this->read($dir);
+        self::assertSame('^13.0', $after['require']['laravel/framework']);
+        self::assertSame('^3.0', $after['require']['laravel/tinker']);
+    }
+
+    public function test_the_laravel_13_hop_never_adds_a_companion_package_the_app_does_not_list(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        $data = $this->read($dir);
+        $data['require']['laravel/framework'] = '^12.0';
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        $changes = (new ComposerEditor())->apply((new HopRegistry())->get('laravel-12-to-13'), $dir);
+
+        self::assertContains('Set laravel/framework to ^13.0 in require.', $changes);
+        foreach ($changes as $line) {
+            self::assertStringNotContainsString('laravel/tinker', $line);
+        }
+        $after = $this->read($dir);
+        self::assertArrayNotHasKey('laravel/tinker', $after['require']);
+        self::assertArrayNotHasKey('laravel/tinker', $after['require-dev'] ?? []);
+    }
+
+    public function test_the_laravel_13_hop_raises_a_companion_package_listed_in_require_dev(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        $data = $this->read($dir);
+        $data['require']['laravel/framework'] = '^12.0';
+        $data['require-dev']['laravel/tinker'] = '^2.10';
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        (new ComposerEditor())->apply((new HopRegistry())->get('laravel-12-to-13'), $dir);
+
+        $after = $this->read($dir);
+        self::assertSame('^3.0', $after['require-dev']['laravel/tinker']);
+        self::assertArrayNotHasKey('laravel/tinker', $after['require']);
+    }
+
+    public function test_the_laravel_13_hop_does_not_narrow_a_companion_constraint_already_at_the_floor(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        $data = $this->read($dir);
+        $data['require']['laravel/framework'] = '^12.0';
+        $data['require']['laravel/tinker'] = '^3.5';
+        file_put_contents($dir . '/composer.json', json_encode($data));
+
+        $changes = (new ComposerEditor())->apply((new HopRegistry())->get('laravel-12-to-13'), $dir);
+
+        self::assertSame('^3.5', $this->read($dir)['require']['laravel/tinker']);
+        foreach ($changes as $line) {
+            self::assertStringNotContainsString('laravel/tinker', $line);
+        }
+    }
+
     public function test_the_sesame_swap_replaces_the_cas_package(): void
     {
         $dir = $this->copyExample('laravel-wayne-cas');
