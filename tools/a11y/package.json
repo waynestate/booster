@@ -1,0 +1,13 @@
+{
+  "name": "booster-a11y",
+  "description": "Site accessibility gate: axe-core (WCAG 2.2 AA) in a real Chromium browser.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node check.mjs"
+  },
+  "dependencies": {
+    "@axe-core/playwright": "4.10.1",
+    "playwright": "1.49.1"
+  }
+}
