@@ -8,6 +8,7 @@ use Composer\Semver\VersionParser;
 use Throwable;
 use Waynestate\Booster\Hop\Hop;
 use Waynestate\Booster\Hop\HopKind;
+use Waynestate\Booster\Refresh\HopDataRefresher;
 use Waynestate\Booster\ToolError;
 
 /**
@@ -48,6 +49,9 @@ final class ComposerEditor
         $changes = [];
         foreach ($hop->composerSet as $package => $constraint) {
             $changes = [...$changes, ...$this->set($data, $package, $constraint, $hop)];
+        }
+        foreach ($hop->composerSetIfPresent as $package => $constraint) {
+            $changes = [...$changes, ...$this->setIfPresent($data, $package, $constraint)];
         }
         foreach ($hop->composerRemove as $package) {
             foreach (['require', 'require-dev'] as $section) {
@@ -246,6 +250,50 @@ final class ComposerEditor
         $data[$section][$package] = $constraint;
 
         return [sprintf('Set %s to %s in %s.', $package, $constraint, $section)];
+    }
+
+    /**
+     * Raises a companion package's constraint in the section where the app
+     * already lists it: require first, then require-dev. A package the app
+     * does not list is never added, and a constraint that already floors at
+     * or above the pin's floor is left alone, so the hop never narrows a
+     * range the app chose. The floor is judged against the pin itself rather
+     * than the hop's target, because a companion's major differs from the
+     * framework's.
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return list<string>
+     */
+    private function setIfPresent(array &$data, string $package, string $constraint): array
+    {
+        $section = isset($data['require'][$package]) ? 'require' : (isset($data['require-dev'][$package]) ? 'require-dev' : null);
+        if ($section === null) {
+            return [];
+        }
+        if ($this->atOrAboveFloor((string) $data[$section][$package], $constraint)) {
+            return [];
+        }
+
+        $data[$section][$package] = $constraint;
+
+        return [sprintf('Set %s to %s in %s.', $package, $constraint, $section)];
+    }
+
+    /**
+     * True when $current already floors at or above the floor of $target, so
+     * raising it would only narrow the range. A constraint with no usable
+     * floor ("*" or unparseable) is raised, the way HopExecutor treats it.
+     */
+    private static function atOrAboveFloor(string $current, string $target): bool
+    {
+        $floor = HopDataRefresher::lowestMajor($current);
+        $targetFloor = HopDataRefresher::lowestMajor($target);
+        if ($floor === null || $targetFloor === null) {
+            return false;
+        }
+
+        return version_compare($floor, $targetFloor, '>=');
     }
 
     /**

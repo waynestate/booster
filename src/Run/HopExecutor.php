@@ -500,7 +500,7 @@ final class HopExecutor
                         $options->reviewThreshold,
                     ), ...self::summaryLines($prepass, $preview)] : [];
                     // A real run's gate refreshes the lock for these hops; say so now.
-                    $update = $this->lockUpdatePackages($step);
+                    $update = $this->lockUpdatePackages($step, $path);
                     $wouldRun = $update === [] ? [] : [sprintf('would run: composer update -W %s', implode(' ', $update))];
                     if ($incomplete) {
                         $messages = [...$threshold, ...$wouldRun, sprintf('Preview incomplete: %s needs the app\'s vendor/ to recognize Laravel classes, and it is missing. Run composer install in the app, then dry-run again.', $hop->id), ...$inertiaChanges, ...$hop->notes, ...$notes];
@@ -579,7 +579,7 @@ final class HopExecutor
                     }
                     $messages = [...$messages, ...$gate->lines];
                     $messages[] = $this->gatePassedLine($step->phpAfter, $baseline->gateKind);
-                    $update = $this->lockUpdatePackages($step);
+                    $update = $this->lockUpdatePackages($step, $path);
                     if ($update !== []) {
                         $messages[] = sprintf('The gate refreshed composer.lock (composer update -W %s).', implode(' ', $update));
                     }
@@ -818,19 +818,47 @@ final class HopExecutor
      * plain `composer install` would hold the old lock (or fail on its stale
      * content hash); the gate instead runs `composer update -W` for those
      * packages, and because the app is mounted at /app the refreshed lock
-     * lands in the app itself. PHP hops only move the platform requirement,
-     * which Composer resolves from the lock, so they keep the plain install.
+     * lands in the app itself. A Laravel hop also refreshes each companion
+     * package the app actually lists, so the lock moves with composer.json.
+     * PHP hops only move the platform requirement, which Composer resolves
+     * from the lock, so they keep the plain install.
      *
      * @return list<string>
      */
-    private function lockUpdatePackages(PlanStep $step): array
+    private function lockUpdatePackages(PlanStep $step, string $path): array
     {
         $hop = $step->hop;
         if ($hop->kind !== HopKind::Laravel && $hop->kind !== HopKind::Phpunit) {
             return [];
         }
+        $packages = array_keys($hop->composerSet);
+        foreach (array_keys($hop->composerSetIfPresent) as $package) {
+            if (self::appListsPackage($path, $package)) {
+                $packages[] = $package;
+            }
+        }
 
-        return array_keys($hop->composerSet);
+        return $packages;
+    }
+
+    /**
+     * True when the app's composer.json lists $package in require or
+     * require-dev. A missing or unreadable manifest means no, so the hop
+     * falls back to refreshing only its own set.
+     */
+    private static function appListsPackage(string $path, string $package): bool
+    {
+        $file = rtrim($path, '/\\') . '/composer.json';
+        if (!is_file($file)) {
+            return false;
+        }
+        $raw = file_get_contents($file);
+        $data = $raw === false ? null : json_decode($raw, true);
+        if (!is_array($data)) {
+            return false;
+        }
+
+        return isset($data['require'][$package]) || isset($data['require-dev'][$package]);
     }
 
     /**
@@ -919,7 +947,7 @@ final class HopExecutor
     {
         $php = $step->phpAfter ?? '';
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
-        $update = $update ?? $this->lockUpdatePackages($step);
+        $update = $update ?? $this->lockUpdatePackages($step, $path);
         $unblock = [];
         $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update, $options->testEnv);
         $outcome = TargetImageRunner::gateOutcome($result);
