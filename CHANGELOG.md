@@ -7,6 +7,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 ### Fixed
 
 - The dependency check: a package whose newest release cannot install at the plan's starting version (a floor above it, or a ceiling below it) now gets its own finding that names where the plan starts, instead of blocking the first hop in the plan (such as `node-pin-24`, which moves nothing in PHP). Only a hop whose own destination violates the constraint is blamed.
+- `laravel-12-to-13`: the hop now raises the companion packages its target major pairs with (for Laravel 13, laravel/tinker to ^3.0) alongside laravel/framework, so a stock Laravel 12 app no longer blocks on tinker ^2. A companion is raised only where the app already lists it in require or require-dev and its constraint floors below the pin's floor; absent packages are never added, and the gate's composer update refreshes the listed companions together with the framework. The pins live in a new `laravel_companion_pins` table in `data/versions.json`, which the refresh carries through per major like the other fixed tables.
 
 ## [1.9.0] - 2026-11-06
 

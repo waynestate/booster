@@ -324,6 +324,9 @@
 <p>Booster plans any target the policy knows. A target past security support is allowed as a stop on the way up, with a
 plan warning that names the date its security support ended. A version the policy does not list at all is still
 refused by name.</p>
+<p>A Laravel major hop also raises the companion packages its target major pairs with (for Laravel 13, laravel/tinker to
+^3.0), but only where the app already lists them in require or require-dev; absent packages are never added, and a
+constraint that already floors at or above the pin's floor is left alone.</p>
 </article>
     </main>
     <nav class="docs-pager" aria-label="Pages"><a class="docs-pager__link" href="../../docs/reference/configuration.html"><span class="docs-pager__dir">Previous</span><span class="docs-pager__title">Configuration</span></a><a class="docs-pager__link docs-pager__link--next" href="../../docs/checks.html"><span class="docs-pager__dir">Next</span><span class="docs-pager__title">Checks</span></a></nav>

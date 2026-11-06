@@ -56,3 +56,7 @@ The hop id `node-pin-24` is a stable id and now pins Node 26.
 Booster plans any target the policy knows. A target past security support is allowed as a stop on the way up, with a
 plan warning that names the date its security support ended. A version the policy does not list at all is still
 refused by name.
+
+A Laravel major hop also raises the companion packages its target major pairs with (for Laravel 13, laravel/tinker to
+^3.0), but only where the app already lists them in require or require-dev; absent packages are never added, and a
+constraint that already floors at or above the pin's floor is left alone.
