@@ -537,12 +537,13 @@ wayneui-1-to-2     Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrite
 node-pin-24        Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
 mix-to-vite        Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only).
 tailwind-3-to-4    Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool.
+typescript-major   Move the app to TypeScript 6: pin typescript in package.json, and vue-tsc too when the app has it.
 vue-26-to-27       Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API.
 vue-27-to-compat   Move a Vue 2.7 front end to Vue 3 through the @vue/compat build.
 vue-compat-codemod Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists.
 vue-2-to-3         Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue). [playbook]</pre>
 <pre class="out" role="tabpanel" id="out-init" aria-labelledby="tab-init" tabindex="0" hidden><span class="out__cmd">$ bin/booster init --path=../my-app</span>
-Wrote 35 playbooks (one for each step Booster knows, plus a general one), 35 changed.
+Wrote 36 playbooks (one for each step Booster knows, plus a general one), 36 changed.
 
 <span class="out__cmd">$ bin/booster init --path=../my-app --check</span>
 Playbooks are current.
