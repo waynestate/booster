@@ -362,6 +362,10 @@ final class TextWriter
         foreach ($this->baselineLines($report->baseline) as $line) {
             $lines[] = $line;
         }
+        // --replay only: how the replay baseline went, right under the test baseline.
+        foreach ($report->replay->lines ?? [] as $line) {
+            $lines[] = self::clean($line);
+        }
         $lines[] = '';
         $previewedFiles = [];
         foreach ($report->results as $r) {
@@ -472,6 +476,9 @@ final class TextWriter
         }
         if ($report->baseline->failed() && $this->nothingRan($report)) {
             return 'The upgrade did not start: the app failed its check before any change. Fix that first, then run again. Nothing was changed.';
+        }
+        if (($report->replay?->failed() ?? false) && $this->nothingRan($report)) {
+            return 'The upgrade did not start: the replay baseline could not be recorded. Fix that first (booster replay record shows the same thing faster), then run again. Nothing was changed.';
         }
         if (!$this->anythingChanged($report)) {
             return 'Nothing was changed.';

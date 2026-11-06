@@ -1,0 +1,52 @@
+{
+    "$comment": "The request file for Booster's replay fixture app. Fake data only.",
+    "version": 1,
+    "serve": {
+        "docroot": "public",
+        "front_controller": "index.php",
+        "setup": "php replay/seed.php",
+        "env": {
+            "NOTES_DB": "/tmp/notes.sqlite"
+        },
+        "ini": {
+            "date.timezone": "UTC"
+        }
+    },
+    "defaults": {
+        "headers": {
+            "Accept": "text/html,application/xhtml+xml"
+        }
+    },
+    "normalize": [
+        "csrf",
+        "timestamps"
+    ],
+    "sequences": [
+        {
+            "name": "browse",
+            "requests": [
+                {"name": "home", "path": "/", "expect": 200},
+                {"name": "a note", "path": "/notes/1", "headers": {"Accept": "application/json"}, "expect": 200},
+                {"name": "a missing note", "path": "/notes/99", "expect": 404},
+                {"name": "wrong method", "path": "/notes", "expect": 405},
+                {"name": "error page", "path": "/boom", "expect": 500},
+                {"name": "unknown path", "path": "/no/such/page", "expect": 404}
+            ]
+        },
+        {
+            "name": "save then read back",
+            "requests": [
+                {"name": "form", "path": "/", "capture": {"token": "name=\"_token\" value=\"([^\"]+)\""}},
+                {"name": "save", "method": "POST", "path": "/notes", "form": {"_token": "{{token}}", "title": "Replay note"}, "capture": {"id": "Location: /notes/(\\d+)"}, "expect": 302},
+                {"name": "read back", "path": "/notes/{{id}}", "expect": 200},
+                {"name": "the list shows it", "path": "/", "expect": 200}
+            ]
+        },
+        {
+            "name": "stale form",
+            "requests": [
+                {"name": "save without a session", "method": "POST", "path": "/notes", "form": {"_token": "not-a-token", "title": "Nope"}, "expect": 419}
+            ]
+        }
+    ]
+}

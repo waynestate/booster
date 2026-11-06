@@ -19,6 +19,9 @@ use Waynestate\Booster\Prepass\NewByReferenceFixer;
 use Waynestate\Booster\Prepass\PrepassResult;
 use Waynestate\Booster\Project\AppType;
 use Waynestate\Booster\Refresh\HopDataRefresher;
+use Waynestate\Booster\Replay\ReplayGate;
+use Waynestate\Booster\Replay\ReplayOutcome;
+use Waynestate\Booster\Replay\ReplayRunner;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Scan\BehaviourScan;
 use Waynestate\Booster\Scan\RemovalsScan;
@@ -52,7 +55,11 @@ final class HopExecutor
         private readonly CasMigration $casMigration = new CasMigration(),
         private readonly WayneUiMigration $wayneUiMigration = new WayneUiMigration(),
         private readonly TrustProxiesRewriter $trustProxies = new TrustProxiesRewriter(),
+        private readonly ?ReplayRunner $replayRunner = null,
     ) {}
+
+    /** The replay gate for this run, once its baseline is recorded (--replay). */
+    private ?ReplayGate $replayGate = null;
 
     private ?RemovalsScan $removals = null;
 
@@ -147,6 +154,21 @@ final class HopExecutor
             return new RunReport($plan, $options->dryRun, $baseline, $results, testEnvKeys: $testEnvKeys);
         }
 
+        // With --replay, record how the app answers now, before the first hop
+        // changes anything. A baseline that cannot be recorded stops the run
+        // the way a red test baseline does: nothing could be proven later.
+        $replay = $this->recordReplay($plan, $path, $options);
+        if ($replay !== null && $replay->failed()) {
+            $results = [];
+            foreach ($plan->steps as $step) {
+                $results[] = new StepResult($step->number, $step->hop->id, StepResult::NOT_RUN, [], [
+                    'Not run because the replay baseline could not be recorded (see Replay above).',
+                ]);
+            }
+
+            return new RunReport($plan, $options->dryRun, $baseline, $results, testEnvKeys: $testEnvKeys, replay: $replay);
+        }
+
         $results = [];
         // Measure the app against the CREED policy on the PHP it is on now, so
         // the final gate can tell pre-existing findings from ones the upgrade
@@ -218,7 +240,7 @@ final class HopExecutor
             ? null
             : (new CitadelDeployScript())->writeIfLockChanged($path, $lockBefore, (new \DateTimeImmutable('now'))->format('YmdHi'));
 
-        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys, deployScript: $deployScript);
+        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys, deployScript: $deployScript, replay: $replay);
     }
 
     /**
@@ -807,7 +829,71 @@ final class HopExecutor
     }
 
     /**
-     * Runs the step's gate. When Composer 2.10's policy blocking refuses the
+     * The step's whole gate: the test gate first, then, when the run records
+     * a replay baseline (--replay), the replay on the hop's PHP. A changed
+     * answer fails the hop like a red test and leaves the changes in place.
+     */
+    private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): GateReport
+    {
+        $gate = $this->runTestGate($step, $path, $options, $baseline);
+        if (!$gate->passed || $this->replayGate === null || $this->replayGate->recording() === null) {
+            return $gate;
+        }
+        $php = $step->phpAfter ?? '';
+        try {
+            $outcome = $this->replayGate->check($php, sprintf('step-%d-%s-php%s', $step->number, $step->hop->id, $php));
+        } catch (ToolError $e) {
+            return new GateReport(false, [...$gate->lines, 'Replay could not run: ' . $e->getMessage(), $this->undoHint($path)]);
+        }
+        if ($outcome->failed()) {
+            return new GateReport(false, [
+                ...$gate->lines,
+                ...$outcome->lines,
+                'The tests (or syntax check) passed, but an answer changed. The working copy keeps the changes so you can read them.',
+                $this->undoHint($path),
+            ]);
+        }
+
+        return new GateReport(true, [...$gate->lines, ...$outcome->lines]);
+    }
+
+    /**
+     * Records the replay baseline on the PHP the app starts from, right after
+     * the test baseline (which installed vendor/). Null without --replay; a
+     * dry run records nothing and says so.
+     */
+    private function recordReplay(Plan $plan, string $path, RunOptions $options): ?ReplayOutcome
+    {
+        $this->replayGate = null;
+        $file = $options->replay;
+        if ($file === null) {
+            return null;
+        }
+        $name = basename($file->path);
+        if ($options->dryRun || $options->skipGate) {
+            return new ReplayOutcome(ReplayOutcome::SKIPPED, null, [sprintf('Replay: SKIPPED (no requests sent in a dry run). A real run records how the app answers the requests in %s before the first hop, and replays them after each one.', $name)], $name);
+        }
+        $php = $this->startingPhp($plan);
+        if ($php === null) {
+            return new ReplayOutcome(ReplayOutcome::FAILED, null, ['Replay baseline could not be recorded: Booster could not tell which PHP the app runs on. Pass --from-php.'], $name);
+        }
+        $runner = $this->replayRunner ?? new ReplayRunner($this->gate, $this->processes);
+        $this->replayGate = new ReplayGate($runner, $file, $path, $options->replayOut ?? ReplayGate::defaultOutDir($path), $options->gateImage);
+
+        try {
+            $outcome = $this->replayGate->record($php);
+        } catch (ToolError $e) {
+            $outcome = new ReplayOutcome(ReplayOutcome::FAILED, $php, ['Replay baseline could not be recorded: ' . $e->getMessage()], $name);
+        }
+        if ($outcome->failed()) {
+            $this->replayGate = null;
+        }
+
+        return $outcome;
+    }
+
+    /**
+     * Runs the step's test gate. When Composer 2.10's policy blocking refuses the
      * tagged releases the lock update needs, it writes the temporary advisory
      * unblock into composer.json and runs the same gate once more: one retry,
      * never a loop. The same unblock answers the quiet variant of the same
@@ -816,7 +902,7 @@ final class HopExecutor
      * back and a branch version behind a tagged range is treated like the
      * block.
      */
-    private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): GateReport
+    private function runTestGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): GateReport
     {
         $php = $step->phpAfter ?? '';
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
