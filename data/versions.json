@@ -124,5 +124,11 @@
         "13": "^2.0"
     },
     "inertia_laravel_next": "^3.0",
-    "inertia_vue3_next": "^3.0"
+    "inertia_vue3_next": "^3.0",
+    "laravel_companion_pins": {
+        "12": null,
+        "13": {
+            "laravel/tinker": "^3.0"
+        }
+    }
 }

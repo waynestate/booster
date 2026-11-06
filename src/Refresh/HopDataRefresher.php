@@ -111,6 +111,19 @@ final class HopDataRefresher
     /** Fixed @inertiajs/vue3 pin for the Inertia 2 to 3 hop; no feed drives it. */
     public const FIXED_INERTIA_VUE3_NEXT = '^3.0';
 
+    /**
+     * Companion composer constraints a Laravel hop raises alongside
+     * laravel/framework, keyed by the major the hop moves to; null means
+     * BOOSTER pins nothing there. No feed drives it: which companions a major
+     * pairs with is a human decision.
+     */
+    public const FIXED_LARAVEL_COMPANION_PINS = [
+        '12' => null,
+        '13' => [
+            'laravel/tinker' => '^3.0',
+        ],
+    ];
+
     public function __construct(private readonly Policy $policy) {}
 
     /**
@@ -164,6 +177,7 @@ final class HopDataRefresher
             'inertia_vue3' => $this->fixedTable($existing, 'inertia_vue3', $laravelChain, self::FIXED_INERTIA_VUE3),
             'inertia_laravel_next' => $this->fixedScalar($existing, 'inertia_laravel_next', self::FIXED_INERTIA_LARAVEL_NEXT),
             'inertia_vue3_next' => $this->fixedScalar($existing, 'inertia_vue3_next', self::FIXED_INERTIA_VUE3_NEXT),
+            'laravel_companion_pins' => $this->fixedCompanionPins($existing, 'laravel_companion_pins', $laravelChain, self::FIXED_LARAVEL_COMPANION_PINS),
         ];
     }
 
@@ -222,6 +236,7 @@ final class HopDataRefresher
         $this->tableCoverage($problems, $data, 'phpunit_php', $phpunitChain);
         $this->tableCoverage($problems, $data, 'inertia_laravel', $laravelChain);
         $this->tableCoverage($problems, $data, 'inertia_vue3', $laravelChain);
+        $this->tableCoverage($problems, $data, 'laravel_companion_pins', $laravelChain);
 
         return $problems;
     }
@@ -690,6 +705,62 @@ final class HopDataRefresher
         }
 
         return $table;
+    }
+
+    /**
+     * A fixed companion-pin table a refresh carries through per major, like
+     * fixedTable but each value is a package map or null: the value on file
+     * wins for every major the table already holds (an explicit null counts
+     * as a decision), majors the chain gained fall back to the seed, and a
+     * major in neither lands on null.
+     *
+     * @param array<string, mixed> $existing
+     * @param list<string> $chain
+     * @param array<int|string, array<string, string>|null> $seed PHP casts numeric string keys to int, so a seed like "13" => [...] carries an int key; array_key_exists still finds it by its string form
+     *
+     * @return array<string, array<string, string>|null>
+     */
+    private function fixedCompanionPins(array $existing, string $key, array $chain, array $seed): array
+    {
+        $onFile = $existing[$key] ?? [];
+        if (!is_array($onFile)) {
+            throw new ToolError(sprintf('Hop data key "%s" must be a JSON object.', $key));
+        }
+        $table = [];
+        foreach ($this->tableMajors($existing, $key, $chain) as $major) {
+            if (array_key_exists($major, $onFile)) {
+                $value = $onFile[$major];
+                if ($value !== null && !self::isPackageMap($value)) {
+                    throw new ToolError(sprintf('Hop data key "%s" must hold package maps or null.', $key));
+                }
+                /** @var array<string, string>|null $value */
+                $table[$major] = $value;
+                continue;
+            }
+            $table[$major] = array_key_exists($major, $seed) ? $seed[$major] : null;
+        }
+
+        return $table;
+    }
+
+    /**
+     * True when $value is a JSON object of package name to non-empty composer
+     * constraint.
+     *
+     * @param mixed $value
+     */
+    private static function isPackageMap(mixed $value): bool
+    {
+        if (!is_array($value)) {
+            return false;
+        }
+        foreach ($value as $package => $constraint) {
+            if (!is_string($package) || $package === '' || !is_string($constraint) || $constraint === '') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
