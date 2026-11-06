@@ -191,10 +191,47 @@ final class TailwindUpgradeTest extends TestCase
 
         self::assertSame([StepResult::APPLIED], $this->statuses($report));
         self::assertStringContainsString('Gate skipped', implode("\n", $report->results[0]->messages));
-        // Only the upgrade tool itself still runs in the Node container.
+        // Only the upgrade tool and the lock sync still run in the Node container.
         $docker = array_values(array_filter($fake->calls, static fn(array $c): bool => $c['command'][0] === 'docker'));
-        self::assertCount(1, $docker);
+        self::assertCount(2, $docker);
         self::assertContains('npx', $docker[0]['command']);
+        self::assertSame(['npm', 'install'], array_slice($docker[1]['command'], -2));
+    }
+
+    public function test_npm_install_syncs_the_lock_after_the_pins_and_before_npm_ci(): void
+    {
+        // Found on a real app: the tool installs its own pins, BOOSTER's edits
+        // come after, and npm ci refused the stale lock.
+        $dir = $this->app();
+        $fake = $this->fake($dir);
+        $report = $this->runTailwind($fake, new RunOptions(), $dir);
+
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        self::assertStringContainsString('npm install ran in the Node container: package-lock.json and node_modules now match the pins.', implode("\n", $report->results[0]->messages));
+        $npm = array_values(array_map(
+            static fn(array $c): string => implode(' ', array_slice($c['command'], (int) array_search('npm', $c['command'], true))),
+            array_filter($fake->calls, static fn(array $c): bool => $c['command'][0] === 'docker' && in_array('npm', $c['command'], true)),
+        ));
+        self::assertSame(['npm install', 'npm ci', 'npm run build'], $npm);
+    }
+
+    public function test_a_failing_lock_sync_stops_the_step_before_the_build_gate(): void
+    {
+        $dir = $this->app();
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'docker' && in_array('npm', $command, true) && in_array('install', $command, true)) {
+                return new ProcessResult(1, '', 'ERESOLVE could not resolve');
+            }
+
+            return new ProcessResult(0, '', '');
+        });
+        $report = $this->runTailwind($fake, new RunOptions(), $dir);
+
+        self::assertSame([StepResult::ERROR], $this->statuses($report));
+        $messages = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('npm install failed: it exited 1 in the Node container.', $messages);
+        self::assertStringContainsString('ERESOLVE could not resolve', $messages);
+        self::assertSame([], array_filter($fake->calls, static fn(array $c): bool => in_array('ci', $c['command'], true)));
     }
 
     private function app(): string

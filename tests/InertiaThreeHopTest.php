@@ -23,7 +23,7 @@ use Waynestate\Booster\Run\TargetImageRunner;
 /**
  * The inertia-2-to-3 hop: the planner offers it last for Inertia 2 apps that
  * land on Laravel 11 or newer, and the executor pins both Inertia packages at
- * 3, installs the new front end with npm ci, and gates the composer side.
+ * 3, installs the new front end with npm install, and gates the composer side.
  */
 final class InertiaThreeHopTest extends TestCase
 {
@@ -95,14 +95,14 @@ final class InertiaThreeHopTest extends TestCase
 
         $messages = implode("\n", $report->results[0]->messages);
         self::assertStringContainsString('Set inertiajs/inertia-laravel to ' . $registry->inertiaLaravelNext() . ' in require.', $messages);
-        self::assertStringContainsString('npm ci is green in the Node container.', $messages);
+        self::assertStringContainsString('npm install ran in the Node container: package-lock.json and node_modules now match the pins.', $messages);
         self::assertStringContainsString('Gate passed: syntax check is clean on PHP 8.3.', $messages);
         self::assertStringContainsString('MANUAL:', $messages);
 
-        // npm ci runs in the Node container, and the gate refreshes only the
+        // npm install (the lock still names Inertia 2, so npm ci would refuse it) runs in the Node container, and the gate refreshes only the
         // Inertia pin in the lock instead of a plain install.
         $all = $this->commandsBlob($fake);
-        self::assertStringContainsString(NodeRunner::imageTag(24) . ' npm ci', $all);
+        self::assertStringContainsString(NodeRunner::imageTag(24) . ' npm install', $all);
         self::assertStringContainsString('composer update -W --no-interaction --no-progress inertiajs/inertia-laravel', $all);
     }
 
@@ -119,7 +119,7 @@ final class InertiaThreeHopTest extends TestCase
         $messages = implode("\n", $report->results[0]->messages);
         self::assertStringContainsString('Dry run: would set inertiajs/inertia-laravel to ' . $registry->inertiaLaravelNext() . ' in require.', $messages);
         self::assertStringContainsString('Dry run: would set package.json devDependencies @inertiajs/vue3 to ' . $registry->inertiaVue3Next() . '.', $messages);
-        self::assertStringContainsString('Dry run: would install the new Inertia versions (npm ci, composer update -W inertiajs/inertia-laravel).', $messages);
+        self::assertStringContainsString('Dry run: would install the new Inertia versions (npm install, composer update -W inertiajs/inertia-laravel).', $messages);
         self::assertSame($before, $this->snapshot($dir, $names));
         self::assertSame([], array_filter($fake->calls, static fn(array $c): bool => $c['command'][0] === 'docker'));
     }
@@ -137,7 +137,7 @@ final class InertiaThreeHopTest extends TestCase
         self::assertSame($before, $this->snapshot($dir, $names));
     }
 
-    public function test_a_failing_npm_ci_fails_the_step_but_keeps_the_changes(): void
+    public function test_a_failing_npm_install_fails_the_step_but_keeps_the_changes(): void
     {
         $dir = $this->app();
         $report = $this->runInertia($this->fake(npmExit: 1), new RunOptions(), $dir);
@@ -145,7 +145,7 @@ final class InertiaThreeHopTest extends TestCase
         self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
         self::assertTrue($report->failed());
         $messages = implode("\n", $report->results[0]->messages);
-        self::assertStringContainsString('npm ci failed (exit 1) in the Node container. The working copy keeps the changes so you can read them.', $messages);
+        self::assertStringContainsString('npm install failed: it exited 1 in the Node container. The working copy keeps the pins, so you can read them.', $messages);
 
         $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
         self::assertIsArray($composer);
@@ -168,7 +168,7 @@ final class InertiaThreeHopTest extends TestCase
         self::assertSame((new HopRegistry())->inertiaVue3Next(), $package['devDependencies']['@inertiajs/vue3']);
     }
 
-    public function test_skip_gate_skips_the_composer_gate_but_not_npm_ci(): void
+    public function test_skip_gate_skips_the_composer_gate_but_not_npm_install(): void
     {
         $dir = $this->app();
         $fake = $this->fake();
@@ -176,13 +176,13 @@ final class InertiaThreeHopTest extends TestCase
 
         self::assertSame([StepResult::APPLIED], $this->statuses($report));
         self::assertStringContainsString('Gate skipped. Run the tests on PHP 8.3 before the next step.', implode("\n", $report->results[0]->messages));
-        // npm ci still proves the front end installs; no gate container runs.
+        // npm install still proves the front end installs; no gate container runs.
         $all = $this->commandsBlob($fake);
-        self::assertStringContainsString(NodeRunner::imageTag(24) . ' npm ci', $all);
+        self::assertStringContainsString(NodeRunner::imageTag(24) . ' npm install', $all);
         self::assertSame([], array_filter($fake->calls, static fn(array $c): bool => $c['command'][0] === 'docker' && in_array('sh', $c['command'], true)));
     }
 
-    public function test_a_composer_only_app_skips_npm_ci(): void
+    public function test_a_composer_only_app_skips_npm_install(): void
     {
         $dir = $this->composerOnlyApp();
         $fake = $this->fake();
@@ -193,7 +193,7 @@ final class InertiaThreeHopTest extends TestCase
         $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
         self::assertIsArray($composer);
         self::assertSame((new HopRegistry())->inertiaLaravelNext(), $composer['require']['inertiajs/inertia-laravel']);
-        self::assertStringNotContainsString(' npm ci', $this->commandsBlob($fake));
+        self::assertStringNotContainsString(' npm install', $this->commandsBlob($fake));
     }
 
     public function test_without_a_node_runner_the_hop_warns_and_still_gates(): void
@@ -207,9 +207,9 @@ final class InertiaThreeHopTest extends TestCase
 
         self::assertSame([StepResult::APPLIED], $this->statuses($report));
         $messages = implode("\n", $report->results[0]->messages);
-        self::assertStringContainsString('No Node runner configured, so npm ci did not run; run it yourself before relying on the front end.', $messages);
+        self::assertStringContainsString('No Node runner configured, so npm install did not run; run it yourself before relying on the front end.', $messages);
         self::assertStringContainsString('Gate passed: syntax check is clean on PHP 8.3.', $messages);
-        self::assertStringNotContainsString(' npm ci', $this->commandsBlob($fake));
+        self::assertStringNotContainsString(' npm install', $this->commandsBlob($fake));
     }
 
     /** An Inertia 2 app: Laravel 12 on PHP 8.3 with both Inertia packages below 3. */
@@ -289,7 +289,7 @@ final class InertiaThreeHopTest extends TestCase
     }
 
     /**
-     * git answers clean; docker answers from $npmExit for the npm ci call, from
+     * git answers clean; docker answers from $npmExit for the npm install call, from
      * $gateExit for every gate container after the baseline, and with exit 0
      * for everything else (docker version, image inspect, the baseline itself).
      */
@@ -309,7 +309,7 @@ final class InertiaThreeHopTest extends TestCase
                 return new ProcessResult(0, '', '');
             }
             if (in_array('npm', $command, true)) {
-                return new ProcessResult($npmExit, $npmExit !== 0 ? 'npm ci exploded' : '', '');
+                return new ProcessResult($npmExit, $npmExit !== 0 ? 'npm install exploded' : '', '');
             }
             // A gate container: the first one is the baseline, later ones gates.
             $gateRuns++;

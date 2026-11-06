@@ -44,6 +44,9 @@ final class HopExecutor
      */
     public const SYNTAX_CHECK_COMMAND = "find . -name '*.php' -not -path './vendor/*' -not -path './node_modules/*' -print0 | xargs -0 -r -n1 php -l > /dev/null";
 
+    /** What a front-end hop reports once npm install has brought the lock up to its pins. */
+    private const NPM_LOCK_SYNCED = 'npm install ran in the Node container: package-lock.json and node_modules now match the pins.';
+
     public function __construct(
         private readonly RectorRunner $rector,
         private readonly ComposerEditor $composer,
@@ -1473,6 +1476,14 @@ final class HopExecutor
         [$changes, $files] = $this->applyTailwindPackages($path);
         if ($changes === []) {
             $changes[] = 'The upgrade tool ran, but package.json already matched the Tailwind 4 pins.';
+        } else {
+            // The tool installed its own pins; BOOSTER's edits came after, so the
+            // lock must catch up before the build gate's npm ci can pass.
+            $syncFailure = $this->syncNpmLock($this->node, $path);
+            if ($syncFailure !== null) {
+                return new StepResult($step->number, $hop->id, StepResult::ERROR, $files, [...$changes, ...$syncFailure]);
+            }
+            $changes[] = self::NPM_LOCK_SYNCED;
         }
 
         if (!$options->skipGate) {
@@ -1519,15 +1530,11 @@ final class HopExecutor
             ]);
         }
 
-        $install = $this->node->run($path, ['npm', 'install']);
-        if (!$install->successful()) {
-            return new StepResult($step->number, $hop->id, StepResult::ERROR, $files, [
-                sprintf('npm install failed: it exited %d in the Node container. The working copy keeps the pins, so you can read them.', $install->exitCode),
-                trim($install->stdout . "\n" . $install->stderr),
-                $this->undoHint($path),
-            ]);
+        $syncFailure = $this->syncNpmLock($this->node, $path);
+        if ($syncFailure !== null) {
+            return new StepResult($step->number, $hop->id, StepResult::ERROR, $files, $syncFailure);
         }
-        $changes[] = 'npm install ran in the Node container: package-lock.json and node_modules now match the pins.';
+        $changes[] = self::NPM_LOCK_SYNCED;
 
         if (!$options->skipGate) {
             $buildFailure = $this->runBuildGate($path);
@@ -1568,6 +1575,12 @@ final class HopExecutor
         [$changes, $files] = $this->applyTypescriptPackages($path);
         if ($changes === []) {
             $changes[] = 'package.json already matched the TypeScript pins.';
+        } else {
+            $syncFailure = $this->syncNpmLock($this->node, $path);
+            if ($syncFailure !== null) {
+                return new StepResult($step->number, $hop->id, StepResult::ERROR, $files, [...$changes, ...$syncFailure]);
+            }
+            $changes[] = self::NPM_LOCK_SYNCED;
         }
 
         if (!$options->skipGate) {
@@ -2273,7 +2286,7 @@ final class HopExecutor
             } else {
                 $installs = [];
                 if (self::fileTouched($files, 'package.json')) {
-                    $installs[] = 'npm ci';
+                    $installs[] = 'npm install';
                 }
                 if (self::fileTouched($files, 'composer.json')) {
                     $installs[] = 'composer update -W inertiajs/inertia-laravel';
@@ -2293,18 +2306,15 @@ final class HopExecutor
 
         if (self::fileTouched($files, 'package.json')) {
             if ($this->node === null) {
-                $changes[] = 'No Node runner configured, so npm ci did not run; run it yourself before relying on the front end.';
+                $changes[] = 'No Node runner configured, so npm install did not run; run it yourself before relying on the front end.';
             } else {
-                $install = $this->node->run($path, ['npm', 'ci']);
-                if (!$install->successful()) {
-                    return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [
-                        ...$changes,
-                        sprintf('npm ci failed (exit %d) in the Node container. The working copy keeps the changes so you can read them.', $install->exitCode),
-                        trim($install->stdout . "\n" . $install->stderr),
-                        $this->undoHint($path),
-                    ]);
+                // npm install, not npm ci: the lock still names Inertia 2, and
+                // npm ci refuses a lock that disagrees with package.json.
+                $syncFailure = $this->syncNpmLock($this->node, $path);
+                if ($syncFailure !== null) {
+                    return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$syncFailure]);
                 }
-                $changes[] = 'npm ci is green in the Node container.';
+                $changes[] = self::NPM_LOCK_SYNCED;
             }
         }
 
@@ -2635,6 +2645,27 @@ final class HopExecutor
         }
 
         return 'Undo with: git checkout . && git clean -fd -- ' . implode(' ', $created) . ' (inside the app).';
+    }
+
+    /**
+     * Runs npm install in the Node container after BOOSTER edited package.json,
+     * so package-lock.json catches up before any npm ci (found on a real app,
+     * 2026-11-06: npm ci refuses a lock that disagrees with package.json).
+     *
+     * @return list<string>|null failure lines, or null when the install passed
+     */
+    private function syncNpmLock(NodeRunner $node, string $path): ?array
+    {
+        $install = $node->run($path, ['npm', 'install']);
+        if ($install->successful()) {
+            return null;
+        }
+
+        return [
+            sprintf('npm install failed: it exited %d in the Node container. The working copy keeps the pins, so you can read them.', $install->exitCode),
+            trim($install->stdout . "\n" . $install->stderr),
+            $this->undoHint($path),
+        ];
     }
 
     /**

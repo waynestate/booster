@@ -23,6 +23,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 ### Fixed
 
 - `tailwind-3-to-4` on a real app: the upgrade tool is pinned to one exact release (`4.3.3`) instead of `^4.1`, because 4.3.4 needs a compiler and Python to install and npx failed silently in the slim Node image. The tool now runs with `--force`, since its clean-tree check needs git, which that image lacks, and earlier hops have already edited the tree. When the tool fails having printed only npm notices, the step says it likely never installed and gives the `docker run` line to try it by hand.
+- `tailwind-3-to-4`, `typescript-major` and `inertia-2-to-3` on a real app: after BOOSTER edits `package.json` it now runs `npm install` in the Node container, as `vite-major` does, so `package-lock.json` matches the new pins. Before, the build gate's `npm ci` (or, for Inertia, the hop's own `npm ci`) refused the stale lock and the hop failed on a sound change. The lock sync runs with `--skip-gate` too.
 
 ## [1.8.3] - 2026-11-04
 

@@ -91,6 +91,15 @@ final class TypescriptMajorTest extends TestCase
         self::assertSame([], array_filter($commands, static fn(array $command): bool => in_array('npx', $command, true)));
         self::assertNotSame([], array_filter($commands, static fn(array $command): bool => in_array('npm', $command, true) && in_array('ci', $command, true)));
         self::assertNotSame([], array_filter($commands, static fn(array $command): bool => in_array('npm', $command, true) && in_array('build', $command, true)));
+
+        // npm install brings the lock up to the new pins first; npm ci refuses a
+        // lock that disagrees with package.json (found on a real app, 2026-11-06).
+        $npm = array_values(array_map(
+            static fn(array $command): string => implode(' ', array_slice($command, (int) array_search('npm', $command, true))),
+            array_filter($commands, static fn(array $command): bool => $command[0] === 'docker' && in_array('npm', $command, true)),
+        ));
+        self::assertSame(['npm install', 'npm ci', 'npm run build'], $npm);
+        self::assertStringContainsString('npm install ran in the Node container: package-lock.json and node_modules now match the pins.', $messages);
     }
 
     public function test_vue_tsc_is_not_added_when_the_app_does_not_list_it(): void
@@ -147,8 +156,10 @@ final class TypescriptMajorTest extends TestCase
 
         self::assertSame([StepResult::APPLIED], $this->statuses($report));
         self::assertStringContainsString('Gate skipped', implode("\n", $report->results[0]->messages));
-        // Nothing runs in the Node container at all.
-        self::assertSame([], array_filter($fake->calls, static fn(array $c): bool => $c['command'][0] === 'docker'));
+        // Only the lock sync runs in the Node container, as in vite-major: no npm ci, no build.
+        $docker = array_values(array_filter($fake->calls, static fn(array $c): bool => $c['command'][0] === 'docker'));
+        self::assertCount(1, $docker);
+        self::assertSame(['npm', 'install'], array_slice($docker[0]['command'], -2));
     }
 
     private function app(): string
