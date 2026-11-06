@@ -54,6 +54,14 @@ final class TypescriptMajorTest extends TestCase
         self::assertSame([HopRegistry::laravelHopId('12', '13')], $this->ids($plan));
     }
 
+    public function test_the_registry_exposes_the_typescript_pins(): void
+    {
+        $registry = new HopRegistry();
+
+        self::assertSame('^6.0', $registry->typescriptVersion());
+        self::assertSame('^3.0', $registry->vueTscVersion());
+    }
+
     public function test_the_hop_pins_typescript_and_vue_tsc_and_gates(): void
     {
         $dir = $this->app();
@@ -71,6 +79,10 @@ final class TypescriptMajorTest extends TestCase
         self::assertSame($registry->vueTscVersion(), $package['devDependencies']['vue-tsc']);
 
         $messages = implode("\n", $report->results[0]->messages);
+        // Each pin is reported as its own change line, and the file diff names both.
+        self::assertStringContainsString('package.json: devDependencies typescript to ' . $registry->typescriptVersion() . '.', $messages);
+        self::assertStringContainsString('package.json: devDependencies vue-tsc to ' . $registry->vueTscVersion() . '.', $messages);
+        self::assertSame('pinned typescript to ' . $registry->typescriptVersion() . ' and vue-tsc to ' . $registry->vueTscVersion(), $report->results[0]->files[0]['diff']);
         self::assertStringContainsString('Gate passed: npm ci, npm run build and the tests are green.', $messages);
         self::assertStringContainsString('MANUAL:', $messages);
 
