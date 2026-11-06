@@ -395,6 +395,7 @@ final class HopExecutor
                 return match ($hop->id) {
                     HopRegistry::MIX_TO_VITE_ID => $this->runMixHop($step, $path, $plan, $options, $baseline),
                     HopRegistry::TAILWIND_ID => $this->runTailwindHop($step, $path, $options, $baseline),
+                    HopRegistry::TYPESCRIPT_MAJOR_ID => $this->runTypescriptMajorHop($step, $path, $options, $baseline),
                     HopRegistry::VUE_COMPAT_CODEMOD_ID => $this->runVueCompatCodemodHop($step, $path, $options),
                     default => $this->runNodeHop($step, $path, $options, $baseline),
                 };
@@ -1383,6 +1384,47 @@ final class HopExecutor
     }
 
     /**
+     * The TypeScript major hop. It pins typescript (and vue-tsc, when the app
+     * has it) to the majors in the hop data, then gates on the build and the
+     * tests like the Tailwind hop; the type check is a person's job.
+     */
+    private function runTypescriptMajorHop(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): StepResult
+    {
+        $hop = $step->hop;
+        if ($this->node === null) {
+            throw new ToolError('The TypeScript hop needs a Node runner, but this BOOSTER has none configured.');
+        }
+        $typescript = $this->registry()->typescriptVersion();
+        if ($options->dryRun) {
+            return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [], [
+                sprintf('Dry run: would pin typescript to %s in package.json (and vue-tsc to %s when the app has it), then gate on the build and the tests.', $typescript, $this->registry()->vueTscVersion()),
+                ...$hop->notes,
+            ]);
+        }
+
+        [$changes, $files] = $this->applyTypescriptPackages($path);
+        if ($changes === []) {
+            $changes[] = 'package.json already matched the TypeScript pins.';
+        }
+
+        if (!$options->skipGate) {
+            $buildFailure = $this->runBuildGate($path);
+            if ($buildFailure !== null) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$buildFailure]);
+            }
+            $gate = $this->runGate($step, $path, $options, $baseline);
+            if (!$gate->passed) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
+            }
+            $changes = [...$changes, ...$gate->lines, 'Gate passed: npm ci, npm run build and the tests are green.'];
+        } else {
+            $changes[] = 'Gate skipped. Run npm ci, npm run build and the tests before the next step.';
+        }
+
+        return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$changes, ...$hop->notes]);
+    }
+
+    /**
      * Writes the Vite shape into the app.
      *
      * @return array{0: list<string>, 1: list<array{file: string, diff: string}>} what changed and which files
@@ -1841,6 +1883,54 @@ final class HopExecutor
         if ($edited) {
             file_put_contents($packageFile, json_encode($package, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
             $files[] = ['file' => 'package.json', 'diff' => 'pinned tailwindcss to ' . $pin . ' and added ' . $plugin];
+        }
+
+        return [$changes, $files];
+    }
+
+    /**
+     * Normalizes package.json for the TypeScript major: pin typescript where-
+     * ever it sits, and vue-tsc to its pin when the app lists it. A fresh add
+     * is a human decision, so nothing is installed that was not there.
+     *
+     * @return array{0: list<string>, 1: list<array{file: string, diff: string}>} what changed and which files
+     */
+    private function applyTypescriptPackages(string $path): array
+    {
+        $changes = [];
+        $files = [];
+        $packageFile = $path . '/package.json';
+        $package = json_decode((string) file_get_contents($packageFile), true);
+        if (!is_array($package)) {
+            throw new ToolError(sprintf('package.json is not valid JSON: %s', $packageFile));
+        }
+        $typescript = $this->registry()->typescriptVersion();
+        $vueTsc = $this->registry()->vueTscVersion();
+        $edited = false;
+        $vueTscPinned = false;
+        foreach (['dependencies', 'devDependencies'] as $section) {
+            if (!is_array($package[$section] ?? null)) {
+                continue;
+            }
+            if (array_key_exists('typescript', $package[$section]) && $package[$section]['typescript'] !== $typescript) {
+                $package[$section]['typescript'] = $typescript;
+                $changes[] = 'package.json: ' . $section . ' typescript to ' . $typescript . '.';
+                $edited = true;
+            }
+            if (array_key_exists('vue-tsc', $package[$section]) && $package[$section]['vue-tsc'] !== $vueTsc) {
+                $package[$section]['vue-tsc'] = $vueTsc;
+                $changes[] = 'package.json: ' . $section . ' vue-tsc to ' . $vueTsc . '.';
+                $edited = true;
+                $vueTscPinned = true;
+            }
+        }
+        if ($edited) {
+            file_put_contents($packageFile, json_encode($package, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+            $diff = 'pinned typescript to ' . $typescript;
+            if ($vueTscPinned) {
+                $diff .= ' and vue-tsc to ' . $vueTsc;
+            }
+            $files[] = ['file' => 'package.json', 'diff' => $diff];
         }
 
         return [$changes, $files];

@@ -67,6 +67,12 @@ final class HopDataRefresher
     /** Fixed Tailwind pin BOOSTER writes into the app's package.json; no feed drives it. */
     public const FIXED_TAILWIND_VERSION = '^4.1';
 
+    /** Fixed TypeScript pin BOOSTER writes into the app's package.json; no feed drives it. */
+    public const FIXED_TYPESCRIPT_VERSION = '^6.0';
+
+    /** Fixed vue-tsc pin BOOSTER writes when the app lists it; no feed drives it. */
+    public const FIXED_VUE_TSC_VERSION = '^3.0';
+
     /** Inertia composer constraint per Laravel major; null means BOOSTER pins nothing there. */
     public const FIXED_INERTIA_LARAVEL = [
         '5.8' => null,
@@ -133,6 +139,8 @@ final class HopDataRefresher
             'vue_plugin_version' => $this->distTagCaret($feeds[self::FEED_VUE_PLUGIN], $existing, 'vue_plugin_version'),
             'tailwind_upgrade_version' => $this->fixedScalar($existing, 'tailwind_upgrade_version', self::FIXED_TAILWIND_UPGRADE_VERSION),
             'tailwind_version' => $this->fixedScalar($existing, 'tailwind_version', self::FIXED_TAILWIND_VERSION),
+            'typescript_version' => $this->fixedScalar($existing, 'typescript_version', self::FIXED_TYPESCRIPT_VERSION),
+            'vue_tsc_version' => $this->fixedScalar($existing, 'vue_tsc_version', self::FIXED_VUE_TSC_VERSION),
             'vue_27' => $this->keptValue($existing, 'vue_27'),
             'vue_compat' => $this->keptValue($existing, 'vue_compat'),
             'vue_loader_compat' => $this->keptValue($existing, 'vue_loader_compat'),

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Hop;
 
 use Waynestate\Booster\Packaging\PharFiles;
+use Waynestate\Booster\Refresh\HopDataRefresher;
 use Waynestate\Booster\ToolError;
 
 /**
@@ -28,6 +29,9 @@ final class HopRegistry
 
     /** The Tailwind 3 to 4 hop. The tool and pin versions live in the data file. */
     public const TAILWIND_ID = 'tailwind-3-to-4';
+
+    /** The TypeScript major hop. The pins it writes live in the data file. */
+    public const TYPESCRIPT_MAJOR_ID = 'typescript-major';
 
     /** The staged hop that moves a Vue 2.6 front end onto Vue 2.7. */
     public const VUE_26_TO_27_ID = 'vue-26-to-27';
@@ -71,6 +75,10 @@ final class HopRegistry
 
     private readonly string $tailwindVersion;
 
+    private readonly string $typescriptVersion;
+
+    private readonly string $vueTscVersion;
+
     private readonly string $vue27Version;
 
     private readonly string $vueCompatVersion;
@@ -109,6 +117,8 @@ final class HopRegistry
         $this->vuePluginVersion = self::scalar($data, 'vue_plugin_version');
         $this->tailwindUpgradeVersion = self::scalar($data, 'tailwind_upgrade_version');
         $this->tailwindVersion = self::scalar($data, 'tailwind_version');
+        $this->typescriptVersion = self::scalar($data, 'typescript_version');
+        $this->vueTscVersion = self::scalar($data, 'vue_tsc_version');
         $this->vue27Version = self::scalar($data, 'vue_27');
         $this->vueCompatVersion = self::scalar($data, 'vue_compat');
         $this->vueLoaderCompatVersion = self::scalar($data, 'vue_loader_compat');
@@ -128,6 +138,7 @@ final class HopRegistry
         $this->add($this->nodePinHop());
         $this->add($this->mixToViteHop());
         $this->add($this->tailwindHop());
+        $this->add($this->typescriptMajorHop());
         foreach ($this->vueHops() as $hop) {
             $this->add($hop);
         }
@@ -212,6 +223,16 @@ final class HopRegistry
     public function tailwindVersion(): string
     {
         return $this->tailwindVersion;
+    }
+
+    public function typescriptVersion(): string
+    {
+        return $this->typescriptVersion;
+    }
+
+    public function vueTscVersion(): string
+    {
+        return $this->vueTscVersion;
     }
 
     public function vue27Version(): string
@@ -751,6 +772,30 @@ final class HopRegistry
                 'Tailwind 4 raises the browser floor: Safari 16.4+, Chrome 111+, Firefox 128+. Check the app\'s supported browsers before you ship.',
             ],
             links: ['https://tailwindcss.com/docs/upgrade-guide'],
+        );
+    }
+
+    /**
+     * The TypeScript major hop. It pins typescript (and vue-tsc, when the app
+     * has it) to the majors in the data file; the type check and its fallout
+     * are a person's job, so the notes say what to look for.
+     */
+    private function typescriptMajorHop(): Hop
+    {
+        $to = HopDataRefresher::lowestMajor($this->typescriptVersion);
+
+        return new Hop(
+            id: self::TYPESCRIPT_MAJOR_ID,
+            kind: HopKind::Node,
+            from: 'any',
+            to: $to,
+            summary: sprintf('Move the app to TypeScript %s: pin typescript in package.json, and vue-tsc too when the app has it.', $to),
+            buildGate: true,
+            notes: [
+                'MANUAL: run your type check (tsc or vue-tsc) and fix new errors; stricter defaults and removed tsconfig options (for example baseUrl, moduleResolution node, target es5) can fail the build.',
+                'MANUAL: check that typescript-eslint and other tools using the compiler API support this TypeScript before moving to 7.',
+            ],
+            links: ['https://www.typescriptlang.org/docs/'],
         );
     }
 

@@ -602,8 +602,41 @@ final class Planner
     }
 
     /**
+     * The app has typescript in package.json and its constraint floors below
+     * the TypeScript major in the hop data. Offered after node-pin-24,
+     * mix-to-vite and tailwind-3-to-4, so the build gate runs on the pinned
+     * Node against the settled front end.
+     */
+    private function needsTypescript(Project $project): bool
+    {
+        if (!$project->hasPackageJson) {
+            return false;
+        }
+        $file = $project->path . '/package.json';
+        if (!is_file($file)) {
+            return false;
+        }
+        $package = json_decode((string) file_get_contents($file), true);
+        if (!is_array($package)) {
+            return false;
+        }
+        $target = HopDataRefresher::lowestMajor($this->registry->typescriptVersion());
+        foreach (['dependencies', 'devDependencies'] as $section) {
+            $constraint = $package[$section]['typescript'] ?? null;
+            if (is_string($constraint)) {
+                $floor = HopDataRefresher::lowestMajor($constraint);
+                if ($floor !== null && version_compare($floor, $target, '<')) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * The Node front-end hops that land before the SESAME swap, in run order:
-     * the Node pin, Mix to Vite, Tailwind.
+     * the Node pin, Mix to Vite, Tailwind, TypeScript.
      *
      * @return list<string>
      */
@@ -618,6 +651,9 @@ final class Planner
         }
         if ($this->needsTailwind($project)) {
             $ids[] = HopRegistry::TAILWIND_ID;
+        }
+        if ($this->needsTypescript($project)) {
+            $ids[] = HopRegistry::TYPESCRIPT_MAJOR_ID;
         }
 
         return $ids;

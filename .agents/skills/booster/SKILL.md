@@ -51,6 +51,7 @@ Playbooks:
 - `booster-node-pin-24`: Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
 - `booster-mix-to-vite`: Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only).
 - `booster-tailwind-3-to-4`: Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool.
+- `booster-typescript-major`: Move the app to TypeScript 6: pin typescript in package.json, and vue-tsc too when the app has it.
 - `booster-vue-26-to-27`: Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API.
 - `booster-vue-27-to-compat`: Move a Vue 2.7 front end to Vue 3 through the @vue/compat build.
 - `booster-vue-compat-codemod`: Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists.
