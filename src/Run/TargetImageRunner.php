@@ -151,7 +151,10 @@ final class TargetImageRunner
      */
     public function runCommand(string $appPath, string $php, string $script, ?int $uid = null, ?int $gid = null, ?string $image = null, array $env = []): array
     {
-        $command = [$this->docker, 'run', '--rm', '-v', $appPath . ':/app', '-w', '/app', '-e', 'COMPOSER_HOME=/tmp/composer', '-e', 'HOME=/tmp'];
+        // COMPOSER_PROCESS_TIMEOUT=0: Composer cuts a script such as `composer test`
+        // off at 300 seconds, which failed a real app's slow suite (2026-11-06);
+        // the gate's own one-hour limit is the one that should govern.
+        $command = [$this->docker, 'run', '--rm', '-v', $appPath . ':/app', '-w', '/app', '-e', 'COMPOSER_HOME=/tmp/composer', '-e', 'HOME=/tmp', '-e', 'COMPOSER_PROCESS_TIMEOUT=0'];
         foreach ($env as $pair) {
             array_push($command, '-e', $pair);
         }

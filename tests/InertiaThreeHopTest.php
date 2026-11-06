@@ -98,6 +98,8 @@ final class InertiaThreeHopTest extends TestCase
         self::assertStringContainsString('npm install ran in the Node container: package-lock.json and node_modules now match the pins.', $messages);
         self::assertStringContainsString('Gate passed: syntax check is clean on PHP 8.3.', $messages);
         self::assertStringContainsString('MANUAL:', $messages);
+        // A real app showed a blank page until the compiled Blade views were cleared (2026-11-06).
+        self::assertStringContainsString('MANUAL: run php artisan view:clear on every machine that serves the app', $messages);
 
         // npm install (the lock still names Inertia 2, so npm ci would refuse it) runs in the Node container, and the gate refreshes only the
         // Inertia pin in the lock instead of a plain install.

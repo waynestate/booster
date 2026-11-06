@@ -23,7 +23,7 @@ Boost is read-only help. Booster's gate stays the authority: never skip a gate b
 
 What Rector cannot do (check these by hand):
 
-- Booster pins inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0, runs npm ci when package.json moves, and runs the composer gate; the manual lines below are the code changes.
+- Booster pins inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0, runs npm install when package.json moves, and runs the composer gate; the manual lines below are the code changes.
 - MANUAL: Axios is no longer part of the core; the router ships a built-in XHR client, and Axios comes back only through an adapter.
 - MANUAL: qs and lodash-es are no longer bundled; install them yourself if your code imports them.
 - MANUAL: the invalid event is now httpException and the exception event is now networkError; rename the handlers you register.
@@ -32,7 +32,8 @@ What Rector cannot do (check these by hand):
 - MANUAL: the head attribute inertia is now data-inertia.
 - MANUAL: hideProgress() and revealProgress() are removed; use the progress object instead.
 - MANUAL: Inertia::lazy() and LazyProp are removed; use Inertia::optional() instead.
-- MANUAL: the config file is restructured; republish it, then run php artisan view:clear.
+- MANUAL: the config file is restructured; republish it if you published it before.
+- MANUAL: run php artisan view:clear on every machine that serves the app: compiled Blade views still print the Inertia 2 page data, and the Inertia 3 client shows a blank page.
 - MANUAL: the packages are ESM only; CommonJS require() calls stop working.
 - MANUAL: the build targets ES2022; add @vitejs/plugin-legacy if you must serve older browsers.
 

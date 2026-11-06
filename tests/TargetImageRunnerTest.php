@@ -204,6 +204,17 @@ final class TargetImageRunnerTest extends TestCase
         }
     }
 
+    public function test_composer_scripts_get_no_timeout_of_their_own_in_the_gate(): void
+    {
+        // A real app's suite ran past Composer's default 300 seconds and failed its baseline.
+        $command = (new TargetImageRunner(new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '', ''))))
+            ->runCommand('/app', '8.4', 'composer test');
+
+        $i = array_search('COMPOSER_PROCESS_TIMEOUT=0', $command, true);
+        self::assertNotFalse($i);
+        self::assertSame('-e', $command[$i - 1]);
+    }
+
     public function test_the_given_image_is_used_and_nothing_is_built(): void
     {
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '', ''));
