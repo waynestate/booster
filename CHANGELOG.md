@@ -4,6 +4,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Security
+
+- The front-page deploy layer moves to Symfony 7.4.23 (symfony/http-foundation and symfony/yaml advisories, including CVE-2026-118514).
+
 ### Added
 
 - The `vite-major` hop: for an app whose `package.json` lists `vite` below the hop data's Vite major, it pins `vite` to the hop data's version wherever it sits, pins `laravel-vite-plugin` and `@vitejs/plugin-vue` to the hop data's versions when they are already listed, runs `npm install` in the Node container and asks for a build gate. The planner offers it after `node-pin-24` and ahead of `tailwind-3-to-4`, and never alongside `mix-to-vite`, which installs the new Vite itself. It reuses the existing `vite_version`, `laravel_vite_plugin_version` and `vue_plugin_version` keys in `data/versions.json`.
