@@ -4,6 +4,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- The site accessibility gate: `scripts/a11y.sh` (Linux, macOS, Git Bash) and `scripts/a11y.ps1` (Windows PowerShell) run axe-core in Playwright (WCAG 2.2 AA, light and dark, 360 and 1280 px) in Docker over the front page and every page under `site/docs/`; `tools/a11y/check.mjs` takes repeated `--page` values.
+
 ### Fixed
 
 - The dependency check: a package whose newest release cannot install at the plan's starting version (a floor above it, or a ceiling below it) now gets its own finding that names where the plan starts, instead of blocking the first hop in the plan (such as `node-pin-24`, which moves nothing in PHP). Only a hop whose own destination violates the constraint is blamed.
