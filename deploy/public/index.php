@@ -16,7 +16,7 @@ declare(strict_types=1);
  * own name. Any other .md in the site folder (a README) stays private.
  *
  * The site folder comes from SQUIRE_STATIC_ROOT when that variable is set and non-empty: a path relative to
- * the app directory, the parent of public/. Otherwise it is ../../site, because the app lives in deploy/
+ * public/, the directory this file sits in. Otherwise it is ../../site, because the app lives in deploy/
  * beside site/.
  */
 
@@ -52,8 +52,9 @@ if ($siteRoot === false) {
     exit;
 }
 
-$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-$path = rawurldecode($path);
+$rawUri = $_SERVER['REQUEST_URI'] ?? '/';
+$rawPath = parse_url($rawUri, PHP_URL_PATH) ?: '/';
+$path = rawurldecode($rawPath);
 
 // Reject what must never leave the machine: a NUL byte, any dot segment
 // (.htaccess, .., ./), and the extensions that are not site assets.
@@ -73,6 +74,20 @@ if (in_array($extension, ['php', 'phar'], true)) {
 // Resolve inside the site folder. A directory maps to its index.html.
 $resolved = realpath($siteRoot . $path);
 if ($resolved !== false && is_dir($resolved)) {
+    // A directory asked for without its trailing slash redirects to the
+    // slashed form, so the page's relative images and links resolve against
+    // it. The raw path keeps the encoding the client sent.
+    if (!str_ends_with($rawPath, '/')) {
+        $location = '/' . ltrim($rawPath, '/') . '/';
+        $query = parse_url($rawUri, PHP_URL_QUERY);
+        if ($query !== null && $query !== '') {
+            $location .= '?' . $query;
+        }
+        http_response_code(301);
+        header('Location: ' . $location);
+        header('Cache-Control: no-cache');
+        exit;
+    }
     $resolved = realpath($resolved . '/index.html') ?: false;
 }
 if ($resolved === false
