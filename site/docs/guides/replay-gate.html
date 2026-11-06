@@ -47,8 +47,8 @@ requests before the upgrade, replays the same requests after every hop, and fail
 Before this: <a href="hops.html">What a hop does</a>. Next: <a href="laravel-and-vendor.html">Laravel hops and vendor/</a>.</p>
 <p>The test gate only knows what the tests ask. Plenty of WSU apps have one smoke test, or none, and the code a PHP hop
 changes most (string to number comparisons, <code>null</code> passed to <code>strlen</code>, a dynamic property) sits in pages no test
-visits. The replay gate is the flight recorder: it writes down what the app said on the old PHP, and after every hop
-it asks again and compares. It is off unless you ask for it.</p>
+visits. The replay gate takes the patient's vitals before the shot and again after every dose: it writes down what
+the app said on the old PHP, and after every hop it asks again and compares. It is off unless you ask for it.</p>
 <h2 id="in-three-commands">In three commands<a class="docs-heading-link" aria-label="Link to this section" href="#in-three-commands">#</a></h2>
 <!-- docs-test: skip needs Docker, run on your own app -->
 <pre><code class="language-sh">booster replay init --path=&lt;app&gt;           # draft booster-replay.json from the app's routes

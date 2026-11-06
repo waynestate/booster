@@ -11,8 +11,8 @@ Before this: [What a hop does](hops.md). Next: [Laravel hops and vendor/](larave
 
 The test gate only knows what the tests ask. Plenty of WSU apps have one smoke test, or none, and the code a PHP hop
 changes most (string to number comparisons, `null` passed to `strlen`, a dynamic property) sits in pages no test
-visits. The replay gate is the flight recorder: it writes down what the app said on the old PHP, and after every hop
-it asks again and compares. It is off unless you ask for it.
+visits. The replay gate takes the patient's vitals before the shot and again after every dose: it writes down what
+the app said on the old PHP, and after every hop it asks again and compares. It is off unless you ask for it.
 
 ## In three commands
 
