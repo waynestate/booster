@@ -112,6 +112,9 @@ final class HopRegistry
 
     private readonly string $inertiaVue3Next;
 
+    /** @var array<string, array<string, string>|null> */
+    private readonly array $laravelCompanionPins;
+
     /** @var array<string, Hop> */
     private array $hops = [];
 
@@ -140,6 +143,7 @@ final class HopRegistry
         $this->inertiaVue3 = self::nullableStringTable($data, 'inertia_vue3');
         $this->inertiaLaravelNext = self::scalar($data, 'inertia_laravel_next');
         $this->inertiaVue3Next = self::scalar($data, 'inertia_vue3_next');
+        $this->laravelCompanionPins = self::companionPinTable($data, 'laravel_companion_pins');
 
         $this->addPhpHops();
         $this->addLaravelHops();
@@ -380,6 +384,20 @@ final class HopRegistry
         ];
     }
 
+    /**
+     * The companion composer constraints a Laravel hop moving to $laravelTo
+     * raises alongside laravel/framework, empty when BOOSTER pins nothing for
+     * that major. One source of truth for the hop's data and the executor.
+     *
+     * @return array<string, string>
+     */
+    public function laravelCompanionPins(string $laravelTo): array
+    {
+        $pins = $this->laravelCompanionPins[$laravelTo] ?? null;
+
+        return is_array($pins) ? $pins : [];
+    }
+
     /** The PHP version Booster can move to from $from, or null at the end of the chain. */
     public function nextPhp(string $from): ?string
     {
@@ -501,6 +519,72 @@ final class HopRegistry
     }
 
     /**
+     * A table whose values are package maps or null: null means BOOSTER pins
+     * no companion packages for that major, which is a decision, not a missing
+     * entry.
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return array<string, array<string, string>|null>
+     */
+    private static function companionPinTable(array $data, string $key): array
+    {
+        $value = $data[$key] ?? null;
+        if (!is_array($value)) {
+            throw new ToolError(sprintf('Hop data key "%s" must be a JSON object.', $key));
+        }
+        $table = [];
+        foreach ($value as $major => $pins) {
+            if ($pins === null) {
+                $table[(string) $major] = null;
+                continue;
+            }
+            if (!self::isPackageMap($pins)) {
+                throw new ToolError(sprintf('Hop data key "%s" must map majors to package maps or null.', $key));
+            }
+            /** @var array<mixed> $pins */
+            $table[(string) $major] = self::packageMap($pins);
+        }
+
+        return $table;
+    }
+
+    /**
+     * True when $value is an object of package name to non-empty composer
+     * constraint.
+     *
+     * @param mixed $value
+     */
+    private static function isPackageMap(mixed $value): bool
+    {
+        if (!is_array($value)) {
+            return false;
+        }
+        foreach ($value as $package => $constraint) {
+            if (!is_string($package) || $package === '' || !is_string($constraint) || $constraint === '') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<mixed> $pins
+     *
+     * @return array<string, string>
+     */
+    private static function packageMap(array $pins): array
+    {
+        $map = [];
+        foreach ($pins as $package => $constraint) {
+            $map[(string) $package] = (string) $constraint;
+        }
+
+        return $map;
+    }
+
+    /**
      * @param array<string, mixed> $data
      *
      * @return array<string, array{0: string, 1: string}>
@@ -610,6 +694,7 @@ final class HopRegistry
                 summary: sprintf('Move a Laravel %s app to Laravel %s.', $from, $to),
                 rectorSets: ['RectorLaravel\Set\LaravelSetList::LARAVEL_' . self::laravelSetSuffix($to)],
                 composerSet: ['laravel/framework' => '^' . $to . '.0'],
+                composerSetIfPresent: $this->laravelCompanionPins($to),
                 composerRemove: $this->laravelComposerRemove($to),
                 notes: [
                     'If your database server is old, check its version against the minimum MySQL (or other database) version Laravel ' . $to . ' needs before you apply this hop.',

@@ -12,17 +12,18 @@ namespace Waynestate\Booster\Hop;
 final readonly class Hop
 {
     /**
-     * @param list<string>          $rectorSets    constant names such as "Rector\Set\ValueObject\SetList::PHP_80"
-     * @param array<string, string> $classRenames  old class name to new class name, applied with Rector's RenameClassRector
-     * @param array<string, string> $composerSet   package name to the constraint to require
-     * @param list<string>          $composerRemove packages to drop from require
-     * @param list<string>          $notes         what Rector cannot do; the person reviewing the diff reads these
-     * @param list<string>          $links         official migration notes
-     * @param array<string, string> $npmSet          package.json dot-path to value, for example "engines.node" to ">=24"
-     * @param array<string, string> $npmSetIfPresent same as npmSet, but only when the package is already listed
-     * @param list<string>          $npmRemove       packages to drop from dependencies and devDependencies
-     * @param bool                  $pinNode         also write .nvmrc with the hop's target version
-     * @param list<string>          $aliasOf         hop ids this manual hop stands in for
+     * @param list<string>          $rectorSets           constant names such as "Rector\Set\ValueObject\SetList::PHP_80"
+     * @param array<string, string> $classRenames         old class name to new class name, applied with Rector's RenameClassRector
+     * @param array<string, string> $composerSet          package name to the constraint to require
+     * @param array<string, string> $composerSetIfPresent same as composerSet, but only when the package is already listed in require or require-dev
+     * @param list<string>          $composerRemove       packages to drop from require
+     * @param list<string>          $notes                what Rector cannot do; the person reviewing the diff reads these
+     * @param list<string>          $links                official migration notes
+     * @param array<string, string> $npmSet               package.json dot-path to value, for example "engines.node" to ">=24"
+     * @param array<string, string> $npmSetIfPresent      same as npmSet, but only when the package is already listed
+     * @param list<string>          $npmRemove            packages to drop from dependencies and devDependencies
+     * @param bool                  $pinNode              also write .nvmrc with the hop's target version
+     * @param list<string>          $aliasOf              hop ids this manual hop stands in for
      */
     public function __construct(
         public string $id,
@@ -33,6 +34,7 @@ final readonly class Hop
         public array $rectorSets = [],
         public array $classRenames = [],
         public array $composerSet = [],
+        public array $composerSetIfPresent = [],
         public array $composerRemove = [],
         public array $notes = [],
         public array $links = [],
