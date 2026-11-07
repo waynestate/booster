@@ -44,6 +44,12 @@ abstract class TestCase extends PhpUnitTestCase
         return ($command[2] ?? '') === 'check' && str_ends_with((string) ($command[1] ?? ''), 'proctor');
     }
 
+    /** Whether $command is the advisory composer audit (composer audit ...). */
+    protected static function isComposerAudit(array $command): bool
+    {
+        return FakeProcessRunner::isComposerAudit($command);
+    }
+
     /** @var list<string> */
     private array $tempDirs = [];
 
