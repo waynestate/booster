@@ -15,6 +15,7 @@ Every page below is Markdown. The HTML pages send the same Markdown to a client 
 ## Pages
 
 - [Booster: Boosts your versions.](https://booster.apps.wayne.edu/index.md): Booster plans and runs PHP and Laravel upgrades one hop at a time on Rector, gates every hop with your tests on the target PHP, and never commits or pushes for you.
+- [Changelog | Booster docs](https://booster.apps.wayne.edu/docs/changelog.md): All notable changes to this project.
 - [Checks | Booster docs](https://booster.apps.wayne.edu/docs/checks.md): How Booster is built, tested and released, and where its proof lives.
 - [The baseline | Booster docs](https://booster.apps.wayne.edu/docs/guides/baseline.md): The test run that separates a bad hop from a suite that was already red.
 - [Behavior changes | Booster docs](https://booster.apps.wayne.edu/docs/guides/behaviour-changes.md): The silent changes between versions that Rector does not rewrite, one block per hop.
