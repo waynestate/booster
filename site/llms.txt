@@ -48,7 +48,7 @@ Every page below is Markdown. The HTML pages send the same Markdown to a client 
 
 ## Source
 
-- [README](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/README.md): the project's README, with install, commands and checks
+- [README](https://github.com/waynestate/booster/blob/HEAD/README.md): the project's README, with install, commands and checks
 - [Everything in one file](https://booster.apps.wayne.edu/llms-full.txt): the README and every page above, as one Markdown file
 
 ## Optional

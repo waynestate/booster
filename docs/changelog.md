@@ -19,6 +19,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 - An advisory `composer audit` after composer hops: when a hop changes the app's `composer.json` or `composer.lock`, `run` executes `composer audit --format=json --no-interaction` in the app and lists advisories (package, advisory id or CVE, affected versions, title) and abandoned packages in the text and JSON reports, with counts. Advisory only: it never changes the exit code, a clean audit stays silent, a hop that changed no composer file skips it and says so in one line, and an audit that cannot run is reported with the command to run by hand. Source: `src/Scan/ComposerAuditScan.php`; tests: `tests/ComposerAuditHopTest.php`, `tests/ComposerAuditScanTest.php`. Guide: `docs/guides/scans.md`.
 
+### Changed
+
+- The canonical repository is git.wayne.edu (ADR-0021); docs, links and package metadata no longer point at the archived nougat copy.
+
 ### Fixed
 
 - The gate and the baseline skip the Composer phase for an app with no `composer.json`: before, `composer install` failed on the missing file and the run stopped at the baseline ("composer install failed") before the syntax check ever ran, so an app that never met Composer could not be upgraded at all.
