@@ -83,6 +83,10 @@
     {
       "title": "Next",
       "path": "next"
+    },
+    {
+      "title": "Changelog",
+      "path": "changelog"
     }
   ],
   "source": "https://nougat.snu.gs/enterprise-apps/booster",
