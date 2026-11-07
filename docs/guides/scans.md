@@ -43,3 +43,7 @@ Booster's folder) or download the PHAR again.
 It ignores `vendor/`, `node_modules/` and `storage/`, reads the app only and changes nothing. `booster scan
 --path=../my-app --php=8.5 --phpstan` runs the same scan on its own, for any PHP version Booster knows, and exits 0
 even when it finds a wall of missing types.
+
+## The composer audit during the run
+
+`run` carries a third advisory check, per hop: after a hop changes `composer.json` or `composer.lock`, Booster runs `composer audit --format=json --no-interaction` in the app and lists advisories and abandoned packages in the step's report with counts. It never changes the exit code, a clean audit stays silent, and a hop that changed no composer file skips it and says so.

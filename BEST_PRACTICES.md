@@ -63,9 +63,13 @@ tag for how Booster holds each rule today.
 - **PHPStan against the destination version is advisory only.** `Enforced`: `plan` ends with a PHPStan scan of the
   app at its target PHP (Pinstripe's `base.neon` preset), and `booster scan --phpstan` runs it alone. It never
   changes the exit code, and a missing PHPStan or preset is reported with the command that enables it.
-- **`composer audit` after dependency changes.** `Documented`: hop notes name what Rector cannot do (for example
-  `mysql_*` removal, implicit nullable parameters). `Not yet`: Booster does not run `composer audit` inside the app
-  for you; pass it with `--proctor-command`.
+- **`composer audit` after dependency changes is advisory only.** `Enforced`: hop notes name what Rector cannot do
+  (for example `mysql_*` removal, implicit nullable parameters), and a hop that changed `composer.json` or
+  `composer.lock` then runs `composer audit --format=json --no-interaction` in the app
+  (`src/Scan/ComposerAuditScan.php`), listing advisories and abandoned packages in the text and JSON reports with
+  counts. It never changes the exit code, a clean audit stays silent, a hop that changed no composer file skips it
+  and says so, and an audit that cannot run is reported with the command to run by hand. Tests:
+  `tests/ComposerAuditHopTest.php`, `tests/ComposerAuditScanTest.php`.
 - **PHPCompatibility is advisory only.** `Enforced`: `plan` and `booster scan` run it as an advisory scan; it never changes the exit code and a scan that cannot run is reported, not failed.
 
 ## Safe edits

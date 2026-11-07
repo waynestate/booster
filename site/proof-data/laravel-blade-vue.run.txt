@@ -7,19 +7,23 @@ Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests a
    Preview incomplete: laravel-12-to-13 needs the app's vendor/ to recognize Laravel classes, and it is missing. Run composer install in the app, then dry-run again.
    If your database server is old, check its version against the minimum MySQL (or other database) version Laravel 13 needs before you apply this hop.
    Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.
+   Composer audit: skipped (this hop changed no composer file).
 2. php-83-to-84: PREVIEWED (0 files)
    No edits needed for this step (dry run).
    General notes for this step (nothing found in your app, just good to know):
    Implicitly nullable parameters (T $a = null) are deprecated; fputcsv(), fgetcsv() and str_getcsv() want an explicit escape argument.
+   Composer audit: skipped (this hop changed no composer file).
 3. php-84-to-85: PREVIEWED (0 files)
    No edits needed for this step (dry run).
    General notes for this step (nothing found in your app, just good to know):
    Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
    PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
+   Composer audit: skipped (this hop changed no composer file).
 4. node-pin-24: PREVIEWED (0 files)
    Dry run: would set engines.node to >=26 in package.json and write .nvmrc with 26.
    The pin is a floor, not a ceiling: engines.node ">=26" still allows newer Node majors.
    Later front-end hops run in the same node:26 container, so this hop comes before them.
+   Composer audit: skipped (this hop changed no composer file).
 
 RESULT: PASS (previewed, no tests ran)
 

@@ -11,6 +11,7 @@ Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests a
    Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output
      keep old: error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED in php.ini
      check: Watch error logs and rendered pages for new notices after the hop
+   Composer audit: skipped (this hop changed no composer file).
    --- src/Legacy.php
    --- Original
    +++ New
@@ -46,12 +47,16 @@ Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests a
    General notes for this step (nothing found in your app, just good to know):
    mysqli now throws on errors by default; PDO on MySQL returns native int and float types; htmlspecialchars() now escapes single quotes.
    Passing null to a non-nullable built-in parameter is deprecated: check the log after the run.
+   Composer audit: skipped (this hop changed no composer file).
 3. php-81-to-82: PREVIEWED (0 files)
    No edits needed for this step (dry run).
+   Composer audit: skipped (this hop changed no composer file).
 4. php-82-to-83: PREVIEWED (0 files)
    No edits needed for this step (dry run).
+   Composer audit: skipped (this hop changed no composer file).
 5. php-83-to-84: PREVIEWED (1 file)
    Implicitly nullable parameters (T $a = null) are deprecated; fputcsv(), fgetcsv() and str_getcsv() want an explicit escape argument.
+   Composer audit: skipped (this hop changed no composer file).
    --- src/Legacy.php
    --- Original
    +++ New
@@ -70,6 +75,7 @@ Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests a
    General notes for this step (nothing found in your app, just good to know):
    Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
    PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
+   Composer audit: skipped (this hop changed no composer file).
 
 Unique files across hops: 1. Later hops were previewed against the original tree, so the same file can appear in several hops.
 
