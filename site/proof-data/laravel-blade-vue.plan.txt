@@ -2,7 +2,7 @@ BOOSTER plan for examples/laravel-blade-vue
   app type: laravel-blade-vue
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.4 (today 2026-11-07)
+  policy: waynestate/creed 0.1.7 (today 2026-11-07)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.

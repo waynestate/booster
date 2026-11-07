@@ -82,7 +82,7 @@ BOOSTER plan for examples/laravel-blade
   PHP: 8.2 -> 8.5
   Laravel: 10 -> 13
   PHPUnit: 10 -> 13
-  policy: waynestate/creed 0.1.4 (today 2026-10-29)
+  policy: waynestate/creed 0.1.7 (today 2026-10-29)
 
 1. phpunit-10-to-11
    Move PHPUnit 10 tests to PHPUnit 11.

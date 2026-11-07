@@ -125,7 +125,7 @@
   <!-- ========================================================= record card -->
   <!-- The magic: pick an app, press Run the plan, and watch the countdown,
        each dose stamped as its gate passes, and the version climb. The data is
-          real Booster 1.8 output for the example apps in examples/. -->
+          real Booster 1.10 output for the example apps in examples/. -->
   <section class="section section--record" id="record" aria-labelledby="record-title">
     <div class="wsu-container">
       <div class="head head--split">
@@ -171,7 +171,7 @@
               <dl class="card__fields">
                 <div><dt>App type</dt><dd data-card-type>laravel-blade</dd></div>
                 <div><dt>Course</dt><dd data-card-course>PHP 8.2 → 8.5 · Laravel 10 → 13 · PHPUnit 10 → 13</dd></div>
-                <div><dt>Policy</dt><dd>waynestate/creed 0.1.6</dd></div>
+                <div><dt>Policy</dt><dd>waynestate/creed 0.1.7</dd></div>
                 <div><dt>Next booster due</dt><dd data-card-due>17 Mar 2028</dd></div>
               </dl>
             </header>
@@ -373,7 +373,7 @@ Warning: PHP 8.1 is past security support since 2025-12-31. Use it only as a sto
       </div>
 
       <!-- A greenbar printout, tractor-feed holes and all. Output is real
-            Booster 1.8 output against the bundled example apps. -->
+            Booster 1.10 output against the bundled example apps. -->
       <div class="printout">
         <span class="printout__feed printout__feed--l" aria-hidden="true"></span>
         <span class="printout__feed printout__feed--r" aria-hidden="true"></span>
@@ -401,14 +401,14 @@ Next: bin/booster plan --path=examples/vue-spa</pre>
 BOOSTER plan for examples/raw-php
   app type: raw-php
   PHP: 7.4 -> 8.5
-  policy: waynestate/creed 0.1.6 (today 2026-10-29)
+  policy: waynestate/creed 0.1.7 (today 2026-10-29)
 
 1. php-74-to-80
    Move PHP 7.4 code to PHP 8.0.
    After this step your tests run in Docker.
    Give this hop the most review time.
    Removed between PHP 7.4 and PHP 8.0: none found.
-    Behavior changes to check:
+   Behavior changes to check:
    Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; &lt; / &lt;= against negative numbers also flip for such strings
      check: Audit loose comparisons of request parameters and string DB columns
    Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output
@@ -885,7 +885,7 @@ Output: the plan sorted by kind, the Inertia checks per Laravel hop, the dry-run
         <li class="member"><span class="member__mark"><img src="assets/marks/sesame.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://sesame.apps.wayne.edu/">SESAME</a></span><span class="member__role">Sign-in; <code>--sesame</code> moves wayne-cas apps to it.</span></li>
         <li class="member"><span class="member__mark"><img src="assets/marks/helmet.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://helmet.apps.wayne.edu/">HELMET</a></span><span class="member__role">Security headers and session hardening.</span></li>
         <li class="member"><span class="member__mark"><img src="assets/marks/pinstripe.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://pinstripe.apps.wayne.edu/">Pinstripe</a></span><span class="member__role">The coding standard. Booster's PHPStan advisory scan runs against its raw preset.</span></li>
-        <li class="member"><span class="member__mark"><img src="assets/marks/sourdough.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://sourdough.apps.wayne.edu/">Sourdough</a></span><span class="member__role">Starts new raw PHP apps on current versions.</span></li>
+        <li class="member"><span class="member__mark"><img src="assets/marks/sourdough.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://sourdough.apps.wayne.edu/">Sourdough</a></span><span class="member__role">Starts new apps on current versions, in any of the five shapes.</span></li>
         <li class="member"><span class="member__mark"><img src="assets/marks/weld.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://weld.apps.wayne.edu/">WELD</a></span><span class="member__role">The Laravel and Vue starter, with the stack already installed.</span></li>
         <li class="member member--self"><span class="member__mark"><img src="brand/booster-avatar-256.png" width="56" height="56" alt=""></span><span class="member__name">Booster</span><span class="member__role">Moves apps forward, one dose at a time.</span><span class="member__here">You are here</span></li>
         <li class="member"><span class="member__mark"><img src="assets/marks/squire.png" width="56" height="56" alt=""></span><span class="member__name"><a class="part-link" href="https://squire.apps.wayne.edu/">Squire</a></span><span class="member__role">Carries the release out the door.</span></li>
@@ -900,7 +900,7 @@ Output: the plan sorted by kind, the Inertia checks per Laravel hop, the dry-run
   <section class="section section--next" aria-labelledby="next-title">
     <div class="wsu-container next">
       <div>
-        <p class="label"><span class="label__dot" aria-hidden="true"></span>Version 1.8</p>
+        <p class="label"><span class="label__dot" aria-hidden="true"></span>Version 1.10</p>
         <h2 id="next-title">Next</h2>
         <p>The six example apps prove the plumbing end to end, and the gate now ends with PROCTOR checking the result against CREED's policy. What stays open, from <a href="https://github.com/waynestate/booster/blob/main/OPEN_QUESTIONS.md">OPEN_QUESTIONS.md</a>:</p>
       </div>

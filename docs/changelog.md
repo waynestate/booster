@@ -11,6 +11,14 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- The lock moves to CREED 0.1.7 (was 0.1.4), the policy every plan reads. The Real output page is captured again (`build-proof.php --capture`), so its plans name `waynestate/creed 0.1.7`; the plan samples in the README, the quick start and the front page match a fresh run.
+
+### Fixed
+
+- The front page's "Next" label reads Version 1.10 (it said 1.8, beside a 1.10 masthead), and its cast says Sourdough starts new apps in all five shapes, not raw PHP only.
+
 ## [1.10.0] - 2026-11-07
 
 ### Added

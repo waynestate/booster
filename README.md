@@ -247,7 +247,7 @@ BOOSTER plan for examples/laravel-blade
   PHP: 8.2 -> 8.5
   Laravel: 10 -> 13
   PHPUnit: 10 -> 13
-  policy: waynestate/creed 0.1.4 (today 2026-10-29)
+  policy: waynestate/creed 0.1.7 (today 2026-10-29)
 
 1. phpunit-10-to-11
    Move PHPUnit 10 tests to PHPUnit 11.
@@ -258,8 +258,8 @@ BOOSTER plan for examples/laravel-blade
 3. laravel-11-to-12
    Move a Laravel 11 app to Laravel 12.
    After this step your tests run in Docker.
-    Behavior changes to check:
-    When the app does not define a local disk, its root now defaults to storage/app/private instead of storage/app (config/filesystems.php)
+   Behavior changes to check:
+   When the app does not define a local disk, its root now defaults to storage/app/private instead of storage/app (config/filesystems.php)
      keep old: define the local disk with 'root' => storage_path('app')
      check: Check where Storage::disk('local') writes after the hop
 4. php-82-to-83

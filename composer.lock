@@ -1916,20 +1916,19 @@
         },
         {
             "name": "waynestate/creed",
-            "version": "0.1.4",
+            "version": "0.1.7",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/creed.git",
-                "reference": "4748ab3c8eb98d8e7d9b5a98de079928131c5920"
+                "reference": "58d9891122cb9abc98bc3270f03df845f23e121e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/creed/zipball/4748ab3c8eb98d8e7d9b5a98de079928131c5920",
-                "reference": "4748ab3c8eb98d8e7d9b5a98de079928131c5920",
+                "url": "https://api.github.com/repos/waynestate/creed/zipball/58d9891122cb9abc98bc3270f03df845f23e121e",
+                "reference": "58d9891122cb9abc98bc3270f03df845f23e121e",
                 "shasum": ""
             },
             "require": {
-                "composer/semver": "^3.5",
                 "php": "^8.3"
             },
             "require-dev": {
@@ -1941,6 +1940,11 @@
                 "waynestate/pinstripe": "^0.1"
             },
             "type": "library",
+            "extra": {
+                "proctor": {
+                    "wayneui.copies": "fail"
+                }
+            },
             "autoload": {
                 "psr-4": {
                     "Waynestate\\Creed\\": "src/"
@@ -1958,10 +1962,10 @@
             "description": "The Wayne State app stack version policy as data, with a framework-free PHP reader.",
             "homepage": "https://creed.apps.wayne.edu/",
             "support": {
-                "issues": "https://github.com/waynestate/creed/issues",
+                "issues": "https://git.wayne.edu/enterprise-apps/creed/-/issues",
                 "source": "https://github.com/waynestate/creed"
             },
-            "time": "2026-10-31T02:52:16+00:00"
+            "time": "2026-11-07T23:07:33+00:00"
         },
         {
             "name": "waynestate/pinstripe",

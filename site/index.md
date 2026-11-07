@@ -40,7 +40,7 @@ Form B-01 · Version immunization record
 
 - **App type**: laravel-blade
 - **Course**: PHP 8.2 → 8.5 · Laravel 10 → 13 · PHPUnit 10 → 13
-- **Policy**: waynestate/creed 0.1.6
+- **Policy**: waynestate/creed 0.1.7
 - **Next booster due**: 17 Mar 2028
 
 1. 01 `phpunit-10-to-11` Move PHPUnit 10 tests to PHPUnit 11. PHP 8.2 · Laravel 10 booster-target:8.2 Gate passed PHP 8.2 28 Oct 2026
@@ -110,7 +110,7 @@ $ bin/booster detect --path=examples/vue-spa path examples/vue-spa app_type raw-
 
 **planThe ordered hops, the warnings and the scans. Changes nothing.**
 
-$ bin/booster plan --path=examples/raw-php --today=2026-10-29 BOOSTER plan for examples/raw-php app type: raw-php PHP: 7.4 -> 8.5 policy: waynestate/creed 0.1.6 (today 2026-10-29) 1. php-74-to-80 Move PHP 7.4 code to PHP 8.0. After this step your tests run in Docker. Give this hop the most review time. Removed between PHP 7.4 and PHP 8.0: none found. Behavior changes to check: Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; \< / \<= against negative numbers also flip for such strings check: Audit loose comparisons of request parameters and string DB columns Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output keep old: error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED in php.ini check: Watch error logs and rendered pages for new notices after the hop 2. php-80-to-81 Move PHP 8.0 code to PHP 8.1. After this step your tests run in Docker. Removed between PHP 8.0 and PHP 8.1: none found. 3. php-81-to-82 Move PHP 8.1 code to PHP 8.2. After this step your tests run in Docker. Removed between PHP 8.1 and PHP 8.2: none found. 4. php-82-to-83 Move PHP 8.2 code to PHP 8.3. After this step your tests run in Docker. Removed between PHP 8.2 and PHP 8.3: none found. 5. php-83-to-84 Move PHP 8.3 code to PHP 8.4. After this step your tests run in Docker. Removed between PHP 8.3 and PHP 8.4: none found. 6. php-84-to-85 Move PHP 8.4 code to PHP 8.5. After this step your tests run in Docker. Removed between PHP 8.4 and PHP 8.5: none found. PHPCompatibility check for PHP 8.0: no findings. PHPStan on PHP 8.5: 3 findings (code quality hints, not upgrade blockers). src/Legacy.php:20 \[missingType.parameter\] Method Example\\Legacy::className() has parameter $object with no type specified. src/Legacy.php:22 \[return.type\] Method Example\\Legacy::className() should return string but returns class-string|false. src/Legacy.php:25 \[parameter.implicitlyNullable\] Deprecated in PHP 8.4: Parameter #1 $label (string) is implicitly nullable via default value null. Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice for you to read, not errors. Booster does every numbered step above when you run it. Preview the edits: bin/booster run --path=examples/raw-php --dry-run (The real run needs Docker, and your app committed in git: bin/booster run --path=examples/raw-php)
+$ bin/booster plan --path=examples/raw-php --today=2026-10-29 BOOSTER plan for examples/raw-php app type: raw-php PHP: 7.4 -> 8.5 policy: waynestate/creed 0.1.7 (today 2026-10-29) 1. php-74-to-80 Move PHP 7.4 code to PHP 8.0. After this step your tests run in Docker. Give this hop the most review time. Removed between PHP 7.4 and PHP 8.0: none found. Behavior changes to check: Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; \< / \<= against negative numbers also flip for such strings check: Audit loose comparisons of request parameters and string DB columns Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output keep old: error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED in php.ini check: Watch error logs and rendered pages for new notices after the hop 2. php-80-to-81 Move PHP 8.0 code to PHP 8.1. After this step your tests run in Docker. Removed between PHP 8.0 and PHP 8.1: none found. 3. php-81-to-82 Move PHP 8.1 code to PHP 8.2. After this step your tests run in Docker. Removed between PHP 8.1 and PHP 8.2: none found. 4. php-82-to-83 Move PHP 8.2 code to PHP 8.3. After this step your tests run in Docker. Removed between PHP 8.2 and PHP 8.3: none found. 5. php-83-to-84 Move PHP 8.3 code to PHP 8.4. After this step your tests run in Docker. Removed between PHP 8.3 and PHP 8.4: none found. 6. php-84-to-85 Move PHP 8.4 code to PHP 8.5. After this step your tests run in Docker. Removed between PHP 8.4 and PHP 8.5: none found. PHPCompatibility check for PHP 8.0: no findings. PHPStan on PHP 8.5: 3 findings (code quality hints, not upgrade blockers). src/Legacy.php:20 \[missingType.parameter\] Method Example\\Legacy::className() has parameter $object with no type specified. src/Legacy.php:22 \[return.type\] Method Example\\Legacy::className() should return string but returns class-string|false. src/Legacy.php:25 \[parameter.implicitlyNullable\] Deprecated in PHP 8.4: Parameter #1 $label (string) is implicitly nullable via default value null. Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice for you to read, not errors. Booster does every numbered step above when you run it. Preview the edits: bin/booster run --path=examples/raw-php --dry-run (The real run needs Docker, and your app committed in git: bin/booster run --path=examples/raw-php)
 
 **runRuns the plan; --dry-run previews every hop**
 
@@ -406,7 +406,7 @@ WELD is the Wayne State application stack. Booster is its upgrade layer, and it 
 - [SESAME](https://sesame.apps.wayne.edu/)Sign-in; `--sesame` moves wayne-cas apps to it.
 - [HELMET](https://helmet.apps.wayne.edu/)Security headers and session hardening.
 - [Pinstripe](https://pinstripe.apps.wayne.edu/)The coding standard. Booster's PHPStan advisory scan runs against its raw preset.
-- [Sourdough](https://sourdough.apps.wayne.edu/)Starts new raw PHP apps on current versions.
+- [Sourdough](https://sourdough.apps.wayne.edu/)Starts new apps on current versions, in any of the five shapes.
 - [WELD](https://weld.apps.wayne.edu/)The Laravel and Vue starter, with the stack already installed.
 - BoosterMoves apps forward, one dose at a time.You are here
 - [Squire](https://squire.apps.wayne.edu/)Carries the release out the door.
@@ -414,7 +414,7 @@ WELD is the Wayne State application stack. Booster is its upgrade layer, and it 
 - [ADVISOR](https://advisor.apps.wayne.edu/)An MCP server your agent can ask about the stack.
 - [Drawbridge](https://drawbridge.apps.wayne.edu/)The sign-in gateway, lowered on request.
 
-Version 1.8
+Version 1.10
 
 ## Next
 

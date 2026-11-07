@@ -12,6 +12,14 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## \[Unreleased\][#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed)
+
+- The lock moves to CREED 0.1.7 (was 0.1.4), the policy every plan reads. The Real output page is captured again (`build-proof.php --capture`), so its plans name `waynestate/creed 0.1.7`; the plan samples in the README, the quick start and the front page match a fresh run.
+
+### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed)
+
+- The front page's "Next" label reads Version 1.10 (it said 1.8, beside a 1.10 masthead), and its cast says Sourdough starts new apps in all five shapes, not raw PHP only.
+
 ## \[1.10.0\] - 2026-11-07[#](https://booster.apps.wayne.edu/docs/changelog.html#1-10-0-2026-11-07)
 
 ### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added)
@@ -20,12 +28,12 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - The site accessibility gate: `scripts/a11y.sh` (Linux, macOS, Git Bash) and `scripts/a11y.ps1` (Windows PowerShell) run axe-core in Playwright (WCAG 2.2 AA, light and dark, 360 and 1280 px) in Docker over the front page and every page under `site/docs/`; `tools/a11y/check.mjs` takes repeated `--page` values.
 - An advisory `composer audit` after composer hops: when a hop changes the app's `composer.json` or `composer.lock`, `run` executes `composer audit --format=json --no-interaction` in the app and lists advisories (package, advisory id or CVE, affected versions, title) and abandoned packages in the text and JSON reports, with counts. Advisory only: it never changes the exit code, a clean audit stays silent, a hop that changed no composer file skips it and says so in one line, and an audit that cannot run is reported with the command to run by hand. Source: `src/Scan/ComposerAuditScan.php`; tests: `tests/ComposerAuditHopTest.php`, `tests/ComposerAuditScanTest.php`. Guide: `docs/guides/scans.md`.
 
-### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed)
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-1)
 
 - The front page's deploy layer (`deploy/`) runs Squire's kit 0.5.0 (was 0.3.4): `oracle-check.php` arrives, `scripts/release.sh`, `scripts/parity.ps1` and `.squire/base-fallback.Dockerfile` take the new templates, and `docker-compose.squire.yml`, which Renovate had edited, is Squire's template again, so `squire init --check` passes. `site/assets/stack-env.js` takes the stack's one copy, with bindingless catch blocks.
 - The canonical repository is git.wayne.edu (ADR-0021); docs, links and package metadata no longer point at the archived nougat copy.
 
-### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed)
+### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-1)
 
 - The gate and the baseline skip the Composer phase for an app with no `composer.json`: before, `composer install` failed on the missing file and the run stopped at the baseline ("composer install failed") before the syntax check ever ran, so an app that never met Composer could not be upgraded at all.
 - PHP hops on an app that pins `config.platform.php` (every Sourdough app, WELD included) no longer fail their own gate: `composer.lock` kept the old pin in its `platform-overrides`, so `composer install` refused the raised `php` constraint ("your php version (8.3.0; overridden via config.platform)"). The gate now runs `composer update --lock` for those hops, which moves no package and rewrites the lock's hash and overrides; apps without the pin keep the plain install. Found by running Booster on WELD, 2026-11-06.
@@ -53,11 +61,11 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - Vendored libraries: `plan` and `run` find the libraries copied into `vendor/` (a name and version from its `composer.json` or `VERSION` file, or `version unknown`) and list each with the Composer package that replaces it. The plan text and the run report get a block for them, and the JSON gains `vendored_libraries` and `from_php` (the PHP version the run starts from, when it differs from the app's own).
 - An `inertia-2-to-3` hop for apps that require `inertiajs/inertia-laravel` or carry `@inertiajs/vue3` below 3, planned last when the plan lands on Laravel 11 or newer on PHP 8.2 or newer: it pins `inertiajs/inertia-laravel` to `^3.0` and `@inertiajs/vue3` to `^3.0`, runs the composer and npm installs, and lists the Inertia 3 breaking changes (Axios out of the core, `qs` and `lodash-es` no longer bundled, renamed events, `router.cancelAll()`, the restructured config, ESM only, ES2022) as manual lines.
 
-### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-1)
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-2)
 
 - Docs theme: the docs read as the front page's own. Dark mode is no longer a deep green page: it is the record room after hours (graphite ground, cream type, pale mint links and titles, gold for focus and the current page), with every kit dark token set by the theme. The hero's graph paper lies under the top of each page and fades out before the reading; the footer is the front page's deep green band, with the version stamped on it like a dose that passed its gate (the stamp lands once, only without reduced motion); pager cards wear the record card's green and gold top edge; wide tables shade the edge that scrolls.
 
-### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-1)
+### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-2)
 
 - `tailwind-3-to-4` on a real app: the upgrade tool is pinned to one exact release (`4.3.3`) instead of `^4.1`, because 4.3.4 needs a compiler and Python to install and npx failed silently in the slim Node image. The tool now runs with `--force`, since its clean-tree check needs git, which that image lacks, and earlier hops have already edited the tree. When the tool fails having printed only npm notices, the step says it likely never installed and gives the `docker run` line to try it by hand.
 - `tailwind-3-to-4`, `typescript-major` and `inertia-2-to-3` on a real app: after BOOSTER edits `package.json` it now runs `npm install` in the Node container, as `vite-major` does, so `package-lock.json` matches the new pins. Before, the build gate's `npm ci` (or, for Inertia, the hop's own `npm ci`) refused the stale lock and the hop failed on a sound change. The lock sync runs with `--skip-gate` too.
@@ -68,12 +76,12 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## \[1.8.3\] - 2026-11-04[#](https://booster.apps.wayne.edu/docs/changelog.html#1-8-3-2026-11-04)
 
-### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-2)
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-3)
 
 - Docs: a new "How do I..." page (`docs/recipes.md`) with 14 recipes: look first, go all the way, PHP only, a specific Laravel, one hop at a time, dry run, backend only, skipping a hop, big apps, tests and the gate, offline and dirty trees, SESAME and WayneUI, other dates and policies, and what to do after a stop. Linked from the docs menu, the front page of the docs, the quick start and the README.
 - Docs: the quick start and README gain "What a run does by default": what `detect`, `plan` and `run` do with no flags, the hop-count rule (one hop per PHP minor, Laravel major and PHPUnit major), the extras that come by default or only on request, what a run does per hop, and the ways to stop early. The command reference points to it.
 
-### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-2)
+### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-3)
 
 - The second Booster run on a machine no longer dies on hop 1 with `"phar:///tmp/booster-phar-.../phpstan.phar/.../standard_10.stub" is not a file`. The phar unpacks into a new temp directory each run and removes it at exit, but Rector's PHPStan cached its container (and the PHPStan scan its result cache) in the shared temp directory, with absolute paths into the first run's deleted copy. Every Rector cache, PHPStan container, PHPStan scan `tmpDir` and the child processes' `TMPDIR` now live in a per-run scratch directory (`booster-run-<random>`) that is removed at exit, so no run reads another's cache. Tests prove each path is per-run and that the real Rector writes its container there.
 - The `php-74-to-80` hop no longer turns a loose `switch` into a strict `match`. Rector's `ChangeSwitchToMatchRector` rewrote `switch ($get['order'][0]['column'])` with `case 1:` into `match (...) { 1 => ... }`, which never matches the string `"1"` from a query string, so every request silently fell to `default`. The rule is skipped for every hop; a test runs the real Rector on a string subject and asserts no `match` appears.
@@ -86,20 +94,20 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 - The Real output page, `site/proof.html`: Booster's own plan and dry-run output on each example app, captured from the real tool, linked from the front page, with a Markdown twin and entries in `llms.txt` and `llms-full.txt`. `composer proof` rebuilds it, `composer proof:capture` re-captures it, and `composer ci` fails when it is stale.
 
-### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-3)
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-4)
 
 - The docs pages wear Booster's own look instead of the generic builder one: the front page's masthead and main menu (Docs marked as the current item, and a gold "Run it today" pill on every page that lands on the install one-liners), Barlow Condensed titles with the hero's gold underline, the install section's green slab for commands, the greenbar printout for output, Booster's palette in light mode and a derived deep-green dark mode. It comes from the docs builder's new `theme` key (`docs/_header.html` and `docs/theme/booster.css`); the builder and kit come from Squire's theme-hook branch, which also fixes two kit bugs: the copy button said "Copy failed" after every successful copy, and code blocks that scroll sideways could not be reached by keyboard.
 - OPEN_QUESTIONS: the "Not built yet" list now says what shipped (the `&new` pre-pass in 1.0.0, the real-app `cas-to-sesame` hop in 1.6.0, the proof runs of 2026-10-28 and 2026-11-01) and what is still open.
 - The front page main menu now links to the docs site (`docs/`), between the Agents and Proof links.
 
-### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-3)
+### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-4)
 
 - `booster run` (dry or real) no longer stops a hop with "Rector reported errors" and `PHPStan\PhpDocParser\Ast\Type\CallableTypeNode::__construct(): Argument #1 ($identifier) must be of type ... IdentifierTypeNode, ... FullyQualifiedNameNode given` on any app that has a closure (an `array_map(function ...)`, a route closure). 1.8.0 and 1.8.1 locked Rector 2.8.1 next to PHPStan 2.3.4, and the two load different copies of phpdoc-parser in one process. The lock now pairs Rector 2.8.4 with PHPStan 2.3.5, a new test runs the real Rector (not the fake runner) on a tiny app with a closure so `composer ci` fails if the pair splits again, and Renovate updates the two packages together.
 - The Real output page's Markdown twin link points at proof.md, so the agent-ready check passes.
 
 ## \[1.8.1\] - 2026-11-03[#](https://booster.apps.wayne.edu/docs/changelog.html#1-8-1-2026-11-03)
 
-### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-4)
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-5)
 
 - Synced Squire's docs builder and agent-ready kit (`bin/docs-site.php`, `bin/agent-ready.php`, `site/assets/agent-ready.js`): table cells strip Symfony console style tags, and the kit JS uses bindingless catch blocks. The command reference and docs site are rebuilt.
 - The PHPCompatibility check no longer calls `oci_*()` functions "removed since PHP 8.4" for an app that declares `ext-oci8` in `require`, `require-dev` or `config.platform`: PHP 8.4 moved oci8 out of the PHP download and into PECL, and such an app installs the PECL extension on purpose. Other findings are unchanged.
@@ -124,7 +132,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## \[1.8.0\] - 2026-11-03[#](https://booster.apps.wayne.edu/docs/changelog.html#1-8-0-2026-11-03)
 
-### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-5)
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-6)
 
 - Changed: docs and package metadata name nougat as the canonical repository, with git.wayne.edu and GitHub as read-only mirrors, until git.wayne.edu has CI runners.
 - The advisory scans bundle their tools: phpstan/phpstan, squizlabs/php_codesniffer, phpcompatibility/php-compatibility and waynestate/pinstripe moved from require-dev to require, so plan and scan run them from the PHAR or a clone without installing anything into the app. When Booster runs its own vendor/bin/phpcs it points PHP_CodeSniffer at the bundled standard with --runtime-set installed_paths; the skip messages now say to reinstall Booster's dependencies instead of editing the app's composer.json.
@@ -137,7 +145,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - `--path` accepts a leading `~` for your home folder: `~` and `~/...` (or `~\...` on Windows) are rewritten from `HOME`, or `USERPROFILE` on Windows, because the shell does not expand a tilde after `=` or inside quotes. `~user/...` stays as typed.
 - A test keeps the reported version, the newest CHANGELOG heading, the README and the front page in step, and the tag build refuses a phar that reports a different version than its tag.
 
-### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-6)
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-7)
 
 - The README and the front page install docs put the single-file PHAR first, downloaded straight from the GitHub release (`releases/latest/download/booster.phar`), and make the clone route second. The Linux, macOS and WSL route opens with `sudo apt install php-cli php-xml php-mbstring php-zip php-curl unzip git composer`, because a stock Ubuntu `php-cli` lacks the XML extension Composer's dev dependencies need. The Windows tab no longer claims "no bash or WSL needed"; it says PHP and Composer must be present instead. The Docker-only route states plainly that it can run `detect`, `plan`, `scan` and `run --dry-run`, and that a real `run` needs the single-file or clone route.
 - Changed: CI pulls its Docker Hub images through the GitLab Dependency Proxy (the group's CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX), so pipelines no longer hit Docker Hub's anonymous pull limit.
@@ -147,7 +155,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - A dry-run step that has no edits to make now says "No edits needed for this step (dry run)." instead of "Dry run: nothing was changed.", which read like a failure.
 - Every text report now ends with a short plain-English note: what happened, whether anything was changed, and the exact next command with your `--path` filled in (`detect`, `plan`, `scan`, `hops`, `init` and `run`, dry or real; a failed real run names the step it stopped at). `--format json` output is unchanged.
 
-### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-4)
+### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-5)
 
 - The single-file PHAR now carries the launchers for its bundled PHPStan and PHP_CodeSniffer, so `scan` and the plan no longer print "could not run" when started from the PHAR.
 - The package-block warning now says "needs PHP X or newer" when the package's PHP floor is above the hop's target, instead of naming a cap that is not the real reason the step fails.
@@ -178,7 +186,7 @@ WayneUI joins the stack: a hop for the 1.x to 2.x move, and ten more behavior-ch
 
 The cas-to-sesame hop now finishes what a person had to do by hand on a real app.
 
-### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-7)
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-8)
 
 - `cas-to-sesame` drops the `wayne-cas` path and vcs repositories from `composer.json`, so the moved package no longer lingers as a repository entry.
 - `cas-to-sesame` writes `config/sesame.php` from the SESAME defaults when the app has no `wayne-cas` config to carry over.
@@ -205,7 +213,7 @@ Fixes from the second real-use report (two apps taken to PHP 7.4/Laravel 8 and P
 - Citadel apps (a `deployments/` folder) get a once-only `deployments/0000_composer_install_<stamp>` script when a run changes `composer.lock`, because Citadel copies the old `vendor/` into each new deployment and never re-runs a deployment script that already ran. It adds `php artisan migrate --force` only when the app has `artisan`.
 - The skill has an optional ADVISOR section with the real install lines.
 
-### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-8)
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-9)
 
 - `cas-to-sesame` leaves an app that signs people in. Before, the hop reported success on an app that would not boot. The hop now requires `waynestate/sesame:^0.3` and:
   - writes SESAME's own published config with two changes: the CAS root falls back to the app's old wayne-cas root (the environment and the playbook still win), and the wayne-cas compat user resolver is the default. The env lookups, `SESAME_DRIVER` and the `fake` block for local work are kept;
@@ -217,7 +225,7 @@ Fixes from the second real-use report (two apps taken to PHP 7.4/Laravel 8 and P
 - Packages Booster adds to `composer.json` are appended, keeping the app's order. They are sorted, in Composer's order, only when the app sets `config.sort-packages`.
 - The weekly hop-data refresh treats a change of date alone as no change, so it opens a merge request only when the data changed.
 
-### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-5)
+### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-6)
 
 - The hop-data robot crashed on its first GitLab API call. Booster now locks CREED 0.1.4, whose bot client is fixed.
 - PROCTOR runs as the final target even when the plan has nothing left to do.
@@ -228,7 +236,7 @@ Fixes from the second real-use report (two apps taken to PHP 7.4/Laravel 8 and P
 
 Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, Laravel 5.8 and 8, CAS, oci8).
 
-### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-9)
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-10)
 
 - Laravel and PHPUnit hops now update `composer.lock`: the gate runs `composer update -W` for the packages the hop changed, inside the target image, and the new lock is part of the hop's diff. Before, the gate failed at `composer install` (Composer 2.10) or quietly tested the old framework. Dry runs never update anything.
 - A failed `composer install` or `composer update` is reported as a Composer failure with its output, never as "phpunit exited 4", and a baseline whose install failed is no longer reported as failing tests.
@@ -252,7 +260,7 @@ Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, L
 
 ## \[1.2.0\] - 2026-10-30[#](https://booster.apps.wayne.edu/docs/changelog.html#1-2-0-2026-10-30)
 
-### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-10)
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-11)
 
 - The gate's target image carries the extension set Citadel's apps run with: intl, ldap, soap, zip, gd, pdo_mysql, mysqli, bcmath, pcntl, exif, redis, imagick and oci8 (before: zip, pdo_mysql, mysqli and bcmath). The extensions come from mlocati/php-extension-installer, pinned to 2.13.1 by digest; it also downloads Oracle Instant Client for oci8, so the first build takes a few minutes.
 - Target image tags are stamped with a short hash of `docker/Dockerfile` (`booster-target:<php>-<stamp>`), so an edited recipe rebuilds the image instead of reusing a stale tag.
@@ -264,11 +272,11 @@ Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, L
 
 ## \[1.1.0\] - 2026-10-30[#](https://booster.apps.wayne.edu/docs/changelog.html#1-1-0-2026-10-30)
 
-### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-11)
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-12)
 
 - The 50-file cap per hop becomes a 200-file review threshold: an interactive run shows the per-rule summary and asks before applying a bigger hop, while non-interactive and JSON runs stop at the threshold. `--max-changes` is now an explicit hard limit that never prompts, and `0` lifts the limit entirely.
 
-### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-6)
+### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-7)
 
 - The GitLab release job runs on any runner architecture: it calls the Releases API with curl from a multi-arch image instead of the deprecated release-cli.
 
@@ -293,7 +301,7 @@ Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, L
 - mix-to-vite accepts if (mix.inProduction()) { mix.version(); } and drops it with a note; its refusal text lists the accepted calls.
 - A failed baseline whose output mentions a Mix or Vite manifest now names the missing build artifact.
 
-### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-12)
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-13)
 
 - The version policy is read straight from the `waynestate/creed` package (`^0.1`) in Booster's own `vendor/`, and the plan names it as `waynestate/creed <version>`. There is no bundled copy to refresh.
 - `--skip-gate` also skips the PROCTOR check at the end.
@@ -307,7 +315,7 @@ Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, L
 
 - The generated copy of CREED under `src/Creed/` (reader, `policy.json`, manifest) and the `composer creed-copy:check` script: the policy comes from the `waynestate/creed` package.
 
-### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-7)
+### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-8)
 
 - Invalid UTF-8 in a Rector report is repaired instead of stopping the run; the report notes the repair.
 - Rector parse errors keep their line numbers.
@@ -319,11 +327,11 @@ Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, L
 
 - Added: agent-ready site (prompt blocks, Markdown twins, llms.txt), from Squire's kit.
 
-### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-8)
+### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed-9)
 
 - Fixed: stale capability claims in the site and README.
 
-### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-13)
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-14)
 
 - Changed: the proof page moves to a private site that needs a Wayne State sign-in.
 - Changed: project names written as words except acronyms.
@@ -340,7 +348,7 @@ Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, L
 - A scheduled GitLab pipeline job that runs the refresh against the live feeds and fails when `data/versions.json` would change, so a feed that moved while the file slept is visible until someone commits the refreshed file.
 - A plan warning when the target major has no Rector ruleset yet: BOOSTER stops short of the target instead of failing.
 
-### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-14)
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-15)
 
 - The PHP, Laravel and PHPUnit hop lists now come from `data/versions.json`; a major whose Rector ruleset is not installed gets no hop.
 - The `node-pin-24` hop now floors Node at the hop data's target (26 today, following the policy's newest supported major) and runs its npm work in the matching `node:` container.
@@ -371,6 +379,6 @@ Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, L
 - `booster detect` now reports the Node floor from `engines.node`.
 - An advisory PHPCompatibility scan (`phpcompatibility/php-compatibility` 10.0.0-alpha2 on `squizlabs/php_codesniffer` 3.13): `plan` shows "Will break on PHP X.Y" for the first PHP hop's target, and a new `booster scan --path=... --php=X.Y [--format=json]` command runs it on demand. Findings never change exit codes; a scan that cannot run is reported as "could not run" without failing the plan. The scan ignores `vendor/`, `node_modules/` and `storage/`; `plan --no-scan` skips it.
 
-### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-15)
+### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed-16)
 
 - The PHPCompatibility packages (`phpcompatibility/php-compatibility`, `squizlabs/php_codesniffer`) moved from `require` to `require-dev` and `suggest`: the advisory scan is now optional, and BOOSTER reports a skip when no installed PHP_CodeSniffer carries the PHPCompatibility standard.
