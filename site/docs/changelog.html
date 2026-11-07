@@ -53,6 +53,9 @@
 <li>
 <p>The site accessibility gate: <code>scripts/a11y.sh</code> (Linux, macOS, Git Bash) and <code>scripts/a11y.ps1</code> (Windows PowerShell) run axe-core in Playwright (WCAG 2.2 AA, light and dark, 360 and 1280 px) in Docker over the front page and every page under <code>site/docs/</code>; <code>tools/a11y/check.mjs</code> takes repeated <code>--page</code> values.</p>
 </li>
+<li>
+<p>An advisory <code>composer audit</code> after composer hops: when a hop changes the app's <code>composer.json</code> or <code>composer.lock</code>, <code>run</code> executes <code>composer audit --format=json --no-interaction</code> in the app and lists advisories (package, advisory id or CVE, affected versions, title) and abandoned packages in the text and JSON reports, with counts. Advisory only: it never changes the exit code, a clean audit stays silent, a hop that changed no composer file skips it and says so in one line, and an audit that cannot run is reported with the command to run by hand. Source: <code>src/Scan/ComposerAuditScan.php</code>; tests: <code>tests/ComposerAuditHopTest.php</code>, <code>tests/ComposerAuditScanTest.php</code>. Guide: <code>docs/guides/scans.md</code>.</p>
+</li>
 </ul>
 <h3 id="fixed">Fixed<a class="docs-heading-link" aria-label="Link to this section" href="#fixed">#</a></h3>
 <ul>

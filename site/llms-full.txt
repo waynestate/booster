@@ -1304,6 +1304,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 - The first framework hop, `vendored-to-composer`, planned with the new `--vendored` option: it moves an app's hand-copied Doctrine 2, Smarty 3 and Slim 1 out of `vendor/` and onto the maintained Composer releases that keep the same API (`doctrine/orm ^2.20` with `doctrine/annotations ^1.14` and `symfony/cache`, `smarty/smarty ^4.5`, `slim/slim ^4.15` with `slim/psr7`). It deletes the copies, writes or extends `composer.json`, points each file's `require` of a copy at `vendor/autoload.php` and drops the 2012 bootstrap lines (`Setup::registerAutoloadDirectory()`, `define('SMARTY_DIR')`). A Slim 1 app keeps its routes through `slim1-bridge.php`, written at the app root and loaded by Composer's classmap: Slim 1.6's API (`:param` routes and conditions, first match wins, `render()` through the app's `Slim_View`, `halt()`, `redirect()`, the 404, 405 and 500 pages byte for byte) on Slim 4's router. The planner places the hop at the first PHP every release runs on (7.4 with Slim, 7.1 without); anything the hop cannot rewrite exactly (Doctrine's `ClassLoader`, Slim hooks, cookies, middleware or regex routes, a Smarty 2 copy) is a stop sign that leaves the hop out with the file and line. With `--replay`, steps before the hop defer their replay, since the old copies may not run on the new PHP. Libraries without a recipe and nested copies stay where they are and are listed as MANUAL lines. Guide: `docs/guides/framework-hops.md`.
 - The site accessibility gate: `scripts/a11y.sh` (Linux, macOS, Git Bash) and `scripts/a11y.ps1` (Windows PowerShell) run axe-core in Playwright (WCAG 2.2 AA, light and dark, 360 and 1280 px) in Docker over the front page and every page under `site/docs/`; `tools/a11y/check.mjs` takes repeated `--page` values.
+- An advisory `composer audit` after composer hops: when a hop changes the app's `composer.json` or `composer.lock`, `run` executes `composer audit --format=json --no-interaction` in the app and lists advisories (package, advisory id or CVE, affected versions, title) and abandoned packages in the text and JSON reports, with counts. Advisory only: it never changes the exit code, a clean audit stays silent, a hop that changed no composer file skips it and says so in one line, and an audit that cannot run is reported with the command to run by hand. Source: `src/Scan/ComposerAuditScan.php`; tests: `tests/ComposerAuditHopTest.php`, `tests/ComposerAuditScanTest.php`. Guide: `docs/guides/scans.md`.
 
 #### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed)
 
@@ -2252,6 +2253,10 @@ The scan needs no change to the app: Booster ships PHPStan and Pinstripe's prese
 
 It ignores `vendor/`, `node_modules/` and `storage/`, reads the app only and changes nothing. `booster scan --path=../my-app --php=8.5 --phpstan` runs the same scan on its own, for any PHP version Booster knows, and exits 0 even when it finds a wall of missing types.
 
+### The composer audit during the run[#](https://booster.apps.wayne.edu/docs/guides/scans.html#the-composer-audit-during-the-run)
+
+`run` carries a third advisory check, per hop: after a hop changes `composer.json` or `composer.lock`, Booster runs `composer audit --format=json --no-interaction` in the app and lists advisories and abandoned packages in the step's report with counts. It never changes the exit code, a clean audit stays silent, and a hop that changed no composer file skips it and says so. A dry run previews the hops and runs no audit.
+
 ---
 
 Source: https://booster.apps.wayne.edu/docs/guides/smoke-test.html
@@ -3007,7 +3012,7 @@ Source: https://booster.apps.wayne.edu/proof.html
 
 ## Real output, from Booster's own example apps
 
-Captured on 2026-11-06 with Booster 1.9.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
+Captured on 2026-11-07 with Booster 1.9.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
 
 ### laravel-blade
 
@@ -3021,7 +3026,7 @@ BOOSTER plan for examples/laravel-blade
   PHP: 8.2 -> 8.5
   Laravel: 10 -> 13
   PHPUnit: 10 -> 13
-  policy: waynestate/creed 0.1.4 (today 2026-11-06)
+  policy: waynestate/creed 0.1.4 (today 2026-11-07)
 
 1. phpunit-10-to-11
    Move PHPUnit 10 tests to PHPUnit 11.
@@ -3227,7 +3232,7 @@ BOOSTER plan for examples/laravel-blade-vue
   app type: laravel-blade-vue
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.4 (today 2026-11-06)
+  policy: waynestate/creed 0.1.4 (today 2026-11-07)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
@@ -3301,7 +3306,7 @@ BOOSTER plan for examples/laravel-inertia-vue
   app type: laravel-inertia-vue
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.4 (today 2026-11-06)
+  policy: waynestate/creed 0.1.4 (today 2026-11-07)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
@@ -3365,7 +3370,7 @@ Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests a
    Dry run: would set inertiajs/inertia-laravel to ^3.0 in require.
    Dry run: would set package.json dependencies @inertiajs/vue3 to ^3.0.
    Dry run: would install the new Inertia versions (npm install, composer update -W inertiajs/inertia-laravel).
-   Booster pins inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0, runs npm install when package.json moves, and runs the composer gate; the manual lines below are the code changes.
+   Booster pins inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0, runs npm install and the build gate (npm ci, npm run build) when package.json moves, and runs the composer gate; the manual lines below are the code changes.
    MANUAL: Axios is no longer part of the core; the router ships a built-in XHR client, and Axios comes back only through an adapter.
    MANUAL: qs and lodash-es are no longer bundled; install them yourself if your code imports them.
    MANUAL: the invalid event is now httpException and the exception event is now networkError; rename the handlers you register.
@@ -3404,7 +3409,7 @@ BOOSTER plan for examples/laravel-wayne-cas
   app type: laravel-blade
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.4 (today 2026-11-06)
+  policy: waynestate/creed 0.1.4 (today 2026-11-07)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
@@ -3479,7 +3484,7 @@ Nothing was changed.
 BOOSTER plan for examples/raw-php
   app type: raw-php
   PHP: 7.4 -> 8.5
-  policy: waynestate/creed 0.1.4 (today 2026-11-06)
+  policy: waynestate/creed 0.1.4 (today 2026-11-07)
 
 1. php-74-to-80
    Move PHP 7.4 code to PHP 8.0.
@@ -3625,7 +3630,7 @@ Next, if the edits look right: php bin/booster run --path=examples/raw-php
 BOOSTER plan for examples/vue-spa
   app type: raw-php-vue
   PHP: 8.0 -> 8.5
-  policy: waynestate/creed 0.1.4 (today 2026-11-06)
+  policy: waynestate/creed 0.1.4 (today 2026-11-07)
 
 1. php-80-to-81
    Move PHP 8.0 code to PHP 8.1.

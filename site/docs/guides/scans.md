@@ -25,3 +25,7 @@ The scan ignores `vendor/`, `node_modules/` and `storage/`, because those hold t
 The scan needs no change to the app: Booster ships PHPStan and Pinstripe's preset with its own dependencies, from the PHAR and from a clone alike. Booster looks for a PHPStan binary, trying the app's own `vendor/bin/phpstan`, then Booster's `vendor/bin/phpstan`, then `phpstan` on the PATH, and for the preset it tries the app's vendor tree and Booster's. When either is missing, the report says to reinstall Booster's dependencies (`composer install` in Booster's folder) or download the PHAR again.
 
 It ignores `vendor/`, `node_modules/` and `storage/`, reads the app only and changes nothing. `booster scan --path=../my-app --php=8.5 --phpstan` runs the same scan on its own, for any PHP version Booster knows, and exits 0 even when it finds a wall of missing types.
+
+## The composer audit during the run[#](https://booster.apps.wayne.edu/docs/guides/scans.html#the-composer-audit-during-the-run)
+
+`run` carries a third advisory check, per hop: after a hop changes `composer.json` or `composer.lock`, Booster runs `composer audit --format=json --no-interaction` in the app and lists advisories and abandoned packages in the step's report with counts. It never changes the exit code, a clean audit stays silent, and a hop that changed no composer file skips it and says so. A dry run previews the hops and runs no audit.

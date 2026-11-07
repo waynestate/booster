@@ -64,7 +64,7 @@
 <main id="main">
 <section class="wsu-container proof" aria-labelledby="proof-title">
 <h1 id="proof-title">Real output, from Booster's own example apps</h1>
-<p>Captured on 2026-11-06 with Booster 1.9.0. Each app below is one of the example apps in the <code>examples/</code> folder. A dry run changes nothing. This page is regenerated each release.</p>
+<p>Captured on 2026-11-07 with Booster 1.9.0. Each app below is one of the example apps in the <code>examples/</code> folder. A dry run changes nothing. This page is regenerated each release.</p>
 <nav aria-label="Example apps">
 <ul>
 <li><a href="#app-laravel-blade">laravel-blade</a></li>
@@ -84,7 +84,7 @@
   PHP: 8.2 -&gt; 8.5
   Laravel: 10 -&gt; 13
   PHPUnit: 10 -&gt; 13
-  policy: waynestate/creed 0.1.4 (today 2026-11-06)
+  policy: waynestate/creed 0.1.4 (today 2026-11-07)
 
 1. phpunit-10-to-11
    Move PHPUnit 10 tests to PHPUnit 11.
@@ -283,7 +283,7 @@ Next, if the edits look right: php bin/booster run --path=examples/laravel-blade
   app type: laravel-blade-vue
   PHP: 8.3 -&gt; 8.5
   Laravel: 12 -&gt; 13
-  policy: waynestate/creed 0.1.4 (today 2026-11-06)
+  policy: waynestate/creed 0.1.4 (today 2026-11-07)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
@@ -350,7 +350,7 @@ Nothing was changed.
   app type: laravel-inertia-vue
   PHP: 8.3 -&gt; 8.5
   Laravel: 12 -&gt; 13
-  policy: waynestate/creed 0.1.4 (today 2026-11-06)
+  policy: waynestate/creed 0.1.4 (today 2026-11-07)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
@@ -410,7 +410,7 @@ Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests a
    Dry run: would set inertiajs/inertia-laravel to ^3.0 in require.
    Dry run: would set package.json dependencies @inertiajs/vue3 to ^3.0.
    Dry run: would install the new Inertia versions (npm install, composer update -W inertiajs/inertia-laravel).
-   Booster pins inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0, runs npm install when package.json moves, and runs the composer gate; the manual lines below are the code changes.
+   Booster pins inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0, runs npm install and the build gate (npm ci, npm run build) when package.json moves, and runs the composer gate; the manual lines below are the code changes.
    MANUAL: Axios is no longer part of the core; the router ships a built-in XHR client, and Axios comes back only through an adapter.
    MANUAL: qs and lodash-es are no longer bundled; install them yourself if your code imports them.
    MANUAL: the invalid event is now httpException and the exception event is now networkError; rename the handlers you register.
@@ -446,7 +446,7 @@ Next, if the edits look right: php bin/booster run --path=examples/laravel-inert
   app type: laravel-blade
   PHP: 8.3 -&gt; 8.5
   Laravel: 12 -&gt; 13
-  policy: waynestate/creed 0.1.4 (today 2026-11-06)
+  policy: waynestate/creed 0.1.4 (today 2026-11-07)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
@@ -514,7 +514,7 @@ Nothing was changed.
 <pre class="out" tabindex="0">BOOSTER plan for examples/raw-php
   app type: raw-php
   PHP: 7.4 -&gt; 8.5
-  policy: waynestate/creed 0.1.4 (today 2026-11-06)
+  policy: waynestate/creed 0.1.4 (today 2026-11-07)
 
 1. php-74-to-80
    Move PHP 7.4 code to PHP 8.0.
@@ -653,7 +653,7 @@ Next, if the edits look right: php bin/booster run --path=examples/raw-php
 <pre class="out" tabindex="0">BOOSTER plan for examples/vue-spa
   app type: raw-php-vue
   PHP: 8.0 -&gt; 8.5
-  policy: waynestate/creed 0.1.4 (today 2026-11-06)
+  policy: waynestate/creed 0.1.4 (today 2026-11-07)
 
 1. php-80-to-81
    Move PHP 8.0 code to PHP 8.1.
