@@ -209,7 +209,7 @@ Some hops come along by default, and some only when you ask:
 
 - The front-end Node hops (Mix to Vite, Vite major, Tailwind, TypeScript, Vue) are in the plan by default. Pass any target (`--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php`, `--from-laravel`) and they drop out with a warning, unless you add `--with-node`.
 - An app on PHPUnit 8 or older gets a manual PHPUnit 9 step before the first PHP 8 hop.
-- The SESAME move (`--sesame`) and the WayneUI move (`--wayneui`) are opt-in only.
+- The SESAME move (`--sesame`), the WayneUI move (`--wayneui`) and the move of hand-copied libraries to Composer (`--vendored`) are opt-in only.
 - `--skip ` drops a hop you do not want.
 - If a target is past security support, the plan stops at the policy limit and warns. If Rector has no ruleset for a step yet, the plan stops short and warns.
 
@@ -328,6 +328,7 @@ Options shared by `plan` and `run`:
 | `--to-php`, `--to-laravel`, `--to-phpunit` | The target. Default: the newest version the policy supports today (PHPUnit: the newest that runs on the target PHP) |
 | `--sesame` | Include the `wayne-cas` to SESAME swap |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move |
+| `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of `vendor/` and onto Composer ([the guide](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/docs/guides/framework-hops.md)) |
 | `--skip` | A hop id to leave out (repeat it) |
 | `--no-package-check` | Skip the Packagist dependency check (for offline use) |
 | `--until` | Cut the plan after this hop id: that step and everything before it stay, and the plan's targets move to where it lands |
@@ -570,6 +571,17 @@ drafts the request file from the app's routes, with `todo` items for what only a
 tokens, session ids, timestamps and asset hashes. The file format, the design and the honest limits (no real
 Oracle, SSO or JavaScript-driven pages) are in [the replay gate guide](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/docs/guides/replay-gate.md).
 
+#### Hand-copied libraries to Composer
+
+An app that copied Doctrine 2, Smarty 3 or Slim 1 into `vendor/` by hand (a real one did all three in 2012) cannot
+climb past PHP 7 on the PHP hops alone, and Booster never edits a library's files. `--vendored` plans
+`vendored-to-composer`, which moves the app instead: the copies leave, `composer.json` asks for the maintained release
+that keeps the same API (`doctrine/orm ^2.20`, `smarty/smarty ^4.5`, `slim/slim ^4.15` through a Slim 1 bridge the
+hop writes), and the `require` lines load Composer's autoloader. Hooks, cookies through Slim, Doctrine's
+`ClassLoader` and other shapes it cannot rewrite exactly are stop signs: it refuses and changes nothing. Run it with
+`--replay`; the replay waits for this hop, then compares every step. The recipes, the stop signs and the bridge are in
+[the guide](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/docs/guides/framework-hops.md).
+
 #### What a hop does
 
 On PHP hops a pre-pass runs first: PHP 4 era `$a = &new Foo();` becomes a plain assignment, because PHP 7 and newer
@@ -676,7 +688,7 @@ three: skipping it skips them, and a person finishes the job, because Rector doe
 
 #### Hops Booster knows
 
-Thirty-seven hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
+Thirty-eight hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
 major at a time from 9 to 13, each list read from `data/versions.json` and trimmed to the majors whose Rector ruleset
 is installed ([Hop data](#hop-data)). An app whose PHPUnit is below 9 gets `phpunit-to-9-manual`, a manual move to
 `^9.5` placed before the first hop that targets PHP 8.0 (PHPUnit 7 and 8 do not run on PHP 8), and the regular
@@ -722,7 +734,12 @@ stays manual work, and the hop says so); and the Vue 2 to Vue 3 stage,
 `inertia-2-to-3` (planned when composer.json requires `inertiajs/inertia-laravel` or `package.json` carries
 `@inertiajs/vue3` below 3, and the plan lands on Laravel 11 or newer on PHP 8.2 or newer, last after the Vue stage:
 raises both constraints to `^3.0`, runs `composer update` and `npm install`, and lists the v3 breaking changes as manual
-lines). `booster hops` prints them all.
+lines). `vendored-to-composer`, the first framework hop (planned with `--vendored` for an app that hand-copied
+Doctrine 2, Smarty 3 or Slim 1 into its root `vendor/`, at the first PHP every Composer release runs on: 7.4 with
+Slim, 7.1 without): deletes the hand copies, writes `composer.json` for `doctrine/orm ^2.20`, `smarty/smarty ^4.5` and
+`slim/slim ^4.15`, points the app's `require` lines at `vendor/autoload.php`, and keeps a Slim 1 app's routes running on
+Slim 4 through `slim1-bridge.php`; anything it cannot rewrite exactly is a stop sign that leaves it out, and the
+replay waits for it ([the guide](https://nougat.snu.gs/enterprise-apps/booster/blob/HEAD/docs/guides/framework-hops.md)). `booster hops` prints them all.
 
 > Every other hop lifts the engine; `wayneui-1-to-2` is the one that repaints the bodywork.
 
@@ -965,7 +982,7 @@ $ bin/booster run --path=examples/raw-php --to-php=8.2 --dry-run BOOSTER dry run
 
 **hopsEvery hop Booster knows**
 
-$ bin/booster hops php-55-to-56 Move PHP 5.5 code to PHP 5.6. php-56-to-70 Move PHP 5.6 code to PHP 7.0. php-70-to-71 Move PHP 7.0 code to PHP 7.1. php-71-to-72 Move PHP 7.1 code to PHP 7.2. php-72-to-73 Move PHP 7.2 code to PHP 7.3. php-73-to-74 Move PHP 7.3 code to PHP 7.4. php-74-to-80 Move PHP 7.4 code to PHP 8.0. php-80-to-81 Move PHP 8.0 code to PHP 8.1. php-81-to-82 Move PHP 8.1 code to PHP 8.2. php-82-to-83 Move PHP 8.2 code to PHP 8.3. php-83-to-84 Move PHP 8.3 code to PHP 8.4. php-84-to-85 Move PHP 8.4 code to PHP 8.5. laravel-5.8-to-6 Move a Laravel 5.8 app to Laravel 6. laravel-6-to-7 Move a Laravel 6 app to Laravel 7. laravel-7-to-8 Move a Laravel 7 app to Laravel 8. laravel-8-to-9 Move a Laravel 8 app to Laravel 9. laravel-9-to-10 Move a Laravel 9 app to Laravel 10. laravel-10-to-11 Move a Laravel 10 app to Laravel 11. laravel-11-to-12 Move a Laravel 11 app to Laravel 12. laravel-12-to-13 Move a Laravel 12 app to Laravel 13. phpunit-9-to-10 Move PHPUnit 9 tests to PHPUnit 10. phpunit-10-to-11 Move PHPUnit 10 tests to PHPUnit 11. phpunit-11-to-12 Move PHPUnit 11 tests to PHPUnit 12. phpunit-12-to-13 Move PHPUnit 12 tests to PHPUnit 13. phpunit-to-9-manual Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves. \[playbook\] cas-to-sesame Swap the wayne-cas package for SESAME using its compatibility classes. wayneui-1-to-2 Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. node-pin-24 Pin the app to Node 26: set engines.node in package.json and write .nvmrc. mix-to-vite Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). vite-major Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions. tailwind-3-to-4 Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool. typescript-major Move the app to TypeScript 6: pin typescript in package.json, and vue-tsc too when the app has it. vue-26-to-27 Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API. vue-27-to-compat Move a Vue 2.7 front end to Vue 3 through the @vue/compat build. vue-compat-codemod Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists. vue-2-to-3 Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue). \[playbook\] inertia-2-to-3 Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0.
+$ bin/booster hops php-55-to-56 Move PHP 5.5 code to PHP 5.6. php-56-to-70 Move PHP 5.6 code to PHP 7.0. php-70-to-71 Move PHP 7.0 code to PHP 7.1. php-71-to-72 Move PHP 7.1 code to PHP 7.2. php-72-to-73 Move PHP 7.2 code to PHP 7.3. php-73-to-74 Move PHP 7.3 code to PHP 7.4. php-74-to-80 Move PHP 7.4 code to PHP 8.0. php-80-to-81 Move PHP 8.0 code to PHP 8.1. php-81-to-82 Move PHP 8.1 code to PHP 8.2. php-82-to-83 Move PHP 8.2 code to PHP 8.3. php-83-to-84 Move PHP 8.3 code to PHP 8.4. php-84-to-85 Move PHP 8.4 code to PHP 8.5. laravel-5.8-to-6 Move a Laravel 5.8 app to Laravel 6. laravel-6-to-7 Move a Laravel 6 app to Laravel 7. laravel-7-to-8 Move a Laravel 7 app to Laravel 8. laravel-8-to-9 Move a Laravel 8 app to Laravel 9. laravel-9-to-10 Move a Laravel 9 app to Laravel 10. laravel-10-to-11 Move a Laravel 10 app to Laravel 11. laravel-11-to-12 Move a Laravel 11 app to Laravel 12. laravel-12-to-13 Move a Laravel 12 app to Laravel 13. phpunit-9-to-10 Move PHPUnit 9 tests to PHPUnit 10. phpunit-10-to-11 Move PHPUnit 10 tests to PHPUnit 11. phpunit-11-to-12 Move PHPUnit 11 tests to PHPUnit 12. phpunit-12-to-13 Move PHPUnit 12 tests to PHPUnit 13. phpunit-to-9-manual Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves. \[playbook\] cas-to-sesame Swap the wayne-cas package for SESAME using its compatibility classes. wayneui-1-to-2 Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. vendored-to-composer Move hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto their maintained Composer releases (doctrine/orm 2.20, smarty/smarty 4.5, slim/slim 4 through a Slim 1 bridge). node-pin-24 Pin the app to Node 26: set engines.node in package.json and write .nvmrc. mix-to-vite Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). vite-major Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions. tailwind-3-to-4 Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool. typescript-major Move the app to TypeScript 6: pin typescript in package.json, and vue-tsc too when the app has it. vue-26-to-27 Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API. vue-27-to-compat Move a Vue 2.7 front end to Vue 3 through the @vue/compat build. vue-compat-codemod Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists. vue-2-to-3 Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue). \[playbook\] inertia-2-to-3 Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0.
 
 **initWrites the coding-tab playbooks to .agents/skills**
 
@@ -1285,10 +1302,12 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 #### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added)
 
+- The first framework hop, `vendored-to-composer`, planned with the new `--vendored` option: it moves an app's hand-copied Doctrine 2, Smarty 3 and Slim 1 out of `vendor/` and onto the maintained Composer releases that keep the same API (`doctrine/orm ^2.20` with `doctrine/annotations ^1.14` and `symfony/cache`, `smarty/smarty ^4.5`, `slim/slim ^4.15` with `slim/psr7`). It deletes the copies, writes or extends `composer.json`, points each file's `require` of a copy at `vendor/autoload.php` and drops the 2012 bootstrap lines (`Setup::registerAutoloadDirectory()`, `define('SMARTY_DIR')`). A Slim 1 app keeps its routes through `slim1-bridge.php`, written at the app root and loaded by Composer's classmap: Slim 1.6's API (`:param` routes and conditions, first match wins, `render()` through the app's `Slim_View`, `halt()`, `redirect()`, the 404, 405 and 500 pages byte for byte) on Slim 4's router. The planner places the hop at the first PHP every release runs on (7.4 with Slim, 7.1 without); anything the hop cannot rewrite exactly (Doctrine's `ClassLoader`, Slim hooks, cookies, middleware or regex routes, a Smarty 2 copy) is a stop sign that leaves the hop out with the file and line. With `--replay`, steps before the hop defer their replay, since the old copies may not run on the new PHP. Libraries without a recipe and nested copies stay where they are and are listed as MANUAL lines. Guide: `docs/guides/framework-hops.md`.
 - The site accessibility gate: `scripts/a11y.sh` (Linux, macOS, Git Bash) and `scripts/a11y.ps1` (Windows PowerShell) run axe-core in Playwright (WCAG 2.2 AA, light and dark, 360 and 1280 px) in Docker over the front page and every page under `site/docs/`; `tools/a11y/check.mjs` takes repeated `--page` values.
 
 #### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed)
 
+- The gate and the baseline skip the Composer phase for an app with no `composer.json`: before, `composer install` failed on the missing file and the run stopped at the baseline ("composer install failed") before the syntax check ever ran, so an app that never met Composer could not be upgraded at all.
 - PHP hops on an app that pins `config.platform.php` (every Sourdough app, WELD included) no longer fail their own gate: `composer.lock` kept the old pin in its `platform-overrides`, so `composer install` refused the raised `php` constraint ("your php version (8.3.0; overridden via config.platform)"). The gate now runs `composer update --lock` for those hops, which moves no package and rewrites the lock's hash and overrides; apps without the pin keep the plain install. Found by running Booster on WELD, 2026-11-06.
 - `php-83-to-84` now moves a `config.platform.php` pin to 8.4.1, not 8.4.0: PHP 8.4.0 was tagged but never released, so packages floor at 8.4.1 (PHPUnit 13, Symfony 8) and a pin of 8.4.0 stopped `phpunit-12-to-13` from resolving on WELD. Every other PHP hop still pins x.y.0.
 - PHPUnit hops now raise Pest with PHPUnit on a Pest app: Pest's majors pair one to one with PHPUnit's (Pest 4 holds PHPUnit at 12, Pest 5 runs on 13), so `phpunit-12-to-13` could never resolve on a Pest 4 app such as WELD. A new `phpunit_companion_pins` table in `data/versions.json` (carried through the refresh like `laravel_companion_pins`) pins `pestphp/pest` and `pestphp/pest-plugin-laravel` to ^2.0, ^3.0, ^4.0 and ^5.0 for PHPUnit 10 to 13, only where the app already lists them; the gate's `composer update -W` refreshes them with PHPUnit.
@@ -1785,6 +1804,94 @@ The check fetches from `repo.packagist.org` and from any composer-type repositor
 
 ---
 
+Source: https://booster.apps.wayne.edu/docs/guides/framework-hops.html
+
+## Hand-copied libraries to Composer[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#hand-copied-libraries-to-composer)
+
+This page covers the first framework hop, `vendored-to-composer`: what it moves, what it writes, what makes it refuse, and how the replay gate proves the app still answers the same. Before this: [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html). Next: [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html).
+
+Some apps never met Composer. In 2012 a real WSU app copied Doctrine 2.2, Smarty 3.1 and Slim 1.6 straight into `vendor/`, loaded them with `require` lines, and ran happily until PHP moved on. The PHP hops cannot help it: Booster never edits a library's files, and a 2012 copy of Doctrine crashes on PHP 7.4 before the app's own code runs. So this hop moves the app instead. The hand copies leave, `composer.json` asks for the maintained release of the same library, and the lines that loaded the copies load Composer's autoloader. Every other hop lifts the engine; this one finally gets the parts from a dealer instead of the junkyard.
+
+### In two commands[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#in-two-commands)
+
+```sh
+booster plan --path=<app> --from-php=5.6 --vendored          # where the move fits, or the stop signs that block it
+booster run --path=<app> --from-php=5.6 --vendored --replay  # move it, with the replay as proof
+```
+
+Without `--vendored` the plan still finds the copies and says so:
+
+```
+The app hand-copied Doctrine, Slim and Smarty into vendor/. Add --vendored to plan the move to Composer.
+```
+
+Draft the replay file first (`booster replay init`, see [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html)). The drafter reads Slim 1 routes (`$app->get('/batches/:id', ...)`), so an old Slim app gets a useful first draft.
+
+### The recipes[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#the-recipes)
+
+Each recipe goes to the nearest maintained release that keeps the API the app already calls, so the app's own code does not change. Booster checked these against Packagist on 2026-11-06.
+
+| Copy under `vendor/` | Moves to | Needs PHP | The app's code |
+| --- | --- | --- | --- |
+| Doctrine 2.x (`vendor/Doctrine`) | `doctrine/orm ^2.20`, `doctrine/annotations ^1.14`, `symfony/cache` | 7.1 | unchanged: ORM 2.20 still has `Setup`, `EntityManager::create()` and docblock annotations |
+| Smarty 3.x (`vendor/Smarty`) | `smarty/smarty ^4.5` | 7.1 | unchanged: Smarty 4 keeps the `Smarty` class and its API |
+| Slim 1.x (`vendor/Slim`) | `slim/slim ^4.15`, `slim/psr7 ^1.6`, plus `slim1-bridge.php` | 7.4 | unchanged: the bridge keeps `new Slim()`, `$app->get()`, `render()`, `redirect()` and friends |
+
+The planner puts the hop at the first PHP every recipe's release runs on: right after the PHP hop that lands on 7.4 when the app has Slim 1, on 7.1 when it has only Doctrine and Smarty, and first when the app is already there. A plan that ends below that leaves the hop out with a warning.
+
+### What the hop changes[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#what-the-hop-changes)
+
+- Deletes each moved copy (`vendor/Doctrine/`, `vendor/Smarty/`, `vendor/Slim/`), and `vendor/` itself when nothing else is left in it. That is the only thing it does to `vendor/`: it never edits a library file.
+- Writes `composer.json` (or adds to the app's own): the packages above, `php` at the hop's PHP when the app named none, and `autoload.classmap` for the bridge. A package the app already requires keeps its constraint.
+- In each app file, the first `require` or `include` of a moved copy becomes `require_once` of `vendor/autoload.php` with the same path prefix, so `dirname(__FILE__) . '/../vendor/Smarty/Smarty.class.php'` becomes `dirname(__FILE__) . '/../vendor/autoload.php'`. Later requires of the copies go, and so do the 2012 bootstrap lines that pointed at them: `Setup::registerAutoloadDirectory(...)`, `define('SMARTY_DIR', ...)` and `require SMARTY_DIR . 'Smarty.class.php'`. Line endings stay as they were.
+- For Slim 1, writes `slim1-bridge.php` at the app root (next section).
+
+The gate then runs `composer install` on the hop's PHP inside the target image, which resolves the packages and writes the app's first `composer.lock`; an app that already had a lock gets `composer update -W` for the new packages only. Then it runs the app's tests, or the syntax check for an app with none, and the replay.
+
+### The Slim 1 bridge[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#the-slim-1-bridge)
+
+Slim 4 is not Slim 1: different classes, PSR-7 requests, a different router. Rewriting every route by hand is how a framework move eats a semester. Instead the hop writes `slim1-bridge.php`, about 1,200 lines ported from Slim 1.6.7 (MIT), that keeps Slim 1's classes and behavior and hands the routing and the sending to Slim 4:
+
+- `:param` patterns and conditions, the first registered route wins, parameters url-decoded once and passed in pattern order, echoed output as the body, `Content-Type: text/html` by default;
+- the 404, 405 (with `Allow`) and 500 pages byte for byte, the 301 to a trailing slash, `_METHOD` and `X-HTTP-Method-Override`;
+- `render()` through the app's own `Slim_View` subclass, `halt()`, `stop()`, `redirect()`, `notFound()`, `error()`, `urlFor()`, `getMode()`, `configureMode()`, route middleware, and the app's own properties on `$app`.
+
+It does not turn a PHP notice into an error page the way Slim 1 did in development mode: on a new PHP every deprecation would become a 500, which is a strange way to celebrate an upgrade. The bridge is the app's code from then on. Move one route at a time to plain Slim 4 (or to Laravel) with the replay green after each, and delete the file when nothing calls `new Slim()` any more.
+
+### Stop signs[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#stop-signs)
+
+The hop rewrites a few exact line shapes and nothing else. Anything that touches a moved library in another way is a stop sign: the plan leaves the hop out and names the file and line, and a run that finds one refuses the step and changes nothing.
+
+- Doctrine's own `ClassLoader` (ORM 2.20 no longer ships it; move the app's own classes to Composer's autoload first), or a `registerAutoloadDirectory` call spread over several lines.
+- `SMARTY_DIR` used for anything but loading Smarty, or a path into a copy that is not a one-line `require`.
+- The Slim 1 API the bridge does not carry: hooks, application middleware (`Slim_Middleware`), `flash()`, cookies through the app or the response, `etag()`, `lastModified()`, `expires()`, `pass()`, `Slim::getInstance()`, and a route pattern with regular-expression characters, which Slim 4's router reads differently.
+- A copy whose major the recipe does not cover (Smarty 2, Doctrine 1, Slim 2), an existing `slim1-bridge.php`, or a `composer.json` that is not valid JSON.
+
+A commented-out call is not a stop sign. Booster reads the line, not the vibe.
+
+### What stays[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#what-stays)
+
+- Libraries without a recipe (PHPMailer, Swift Mailer, Twig, Monolog, anything Booster does not recognize) stay where they are, still loaded the way they always were, and the hop lists each one as a MANUAL line.
+- Copies in a nested `vendor/` (say `admin/vendor/Smarty`) stay too: `composer.json` goes at the app root, so only the root's `vendor/` can be pointed at Composer.
+
+### Why the replay waits[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#why-the-replay-waits)
+
+With `--replay`, the baseline is recorded on the app's current PHP as always. The PHP hops before `vendored-to-composer` still run their test gate, but their replay is deferred, because the app still loads its 2012 copies and those may not run on the new PHP; that is the problem the hop exists to fix. From the hop on, every step is compared against the baseline:
+
+```
+Replay deferred to step 6 (vendored-to-composer): the app still loads its hand-copied libraries, which may not run on PHP 7.4. The answers are compared once Composer's releases are in.
+```
+
+A real app's replay found two Doctrine changes no test asked about: `DISTINCT(alias.field)` in DQL reads as an expression in ORM 2.20, and an entity whose id holds a date needs a custom column type. The hop lists both as MANUAL lines, so you know where to look when the replay says an answer changed.
+
+### After the hop[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#after-the-hop)
+
+- Commit `composer.json`, `composer.lock` and, for Slim, `slim1-bridge.php`. Citadel never runs `composer install`, so commit `vendor/` on the deploy branch or let Booster's `deployments/` script install it (see [Deploying on Citadel](https://booster.apps.wayne.edu/docs/guides/citadel.html)).
+- ORM 2.20 is the last line that reads docblock annotations, and `doctrine/annotations` 1.x is abandoned. ORM 3 (PHP 8.1 or newer, attributes instead of annotations) is the next move, by hand for now. Smarty 5 likewise, once the templates stop using PHP functions as modifiers.
+- The lock was resolved on the hop's PHP. Later PHP hops keep it, so run `composer update` once the app lands on its target to pick up the newest releases that PHP allows.
+
+---
+
 Source: https://booster.apps.wayne.edu/docs/guides/hops.html
 
 ## What a hop does[#](https://booster.apps.wayne.edu/docs/guides/hops.html#what-a-hop-does)
@@ -1998,7 +2105,7 @@ Source: https://booster.apps.wayne.edu/docs/guides/replay-gate.html
 
 ## The replay gate[#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#the-replay-gate)
 
-This page shows how to make the gate prove more than the tests do: Booster records how the app answers a list of requests before the upgrade, replays the same requests after every hop, and fails the hop when an answer changes. Before this: [What a hop does](https://booster.apps.wayne.edu/docs/guides/hops.html). Next: [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html).
+This page shows how to make the gate prove more than the tests do: Booster records how the app answers a list of requests before the upgrade, replays the same requests after every hop, and fails the hop when an answer changes. Before this: [What a hop does](https://booster.apps.wayne.edu/docs/guides/hops.html). Next: [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html).
 
 The test gate only knows what the tests ask. Plenty of WSU apps have one smoke test, or none, and the code a PHP hop changes most (string to number comparisons, `null` passed to `strlen`, a dynamic property) sits in pages no test visits. The replay gate takes the patient's vitals before the shot and again after every dose: it writes down what the app said on the old PHP, and after every hop it asks again and compares. It is off unless you ask for it.
 
@@ -2602,6 +2709,8 @@ booster run  --path=../my-app --sesame --wayneui
 
 Without the flag, `plan` only warns that your app uses `wayne-cas` or WayneUI 1.x and tells you the flag to add. `--sesame` needs the app to require `cit-web-infra/wayne-cas` and a plan that reaches PHP 8.3; it lands just before the Laravel 10 to 11 hop. `--wayneui` needs the app to require `cit-web-infra/wayne-ui` and a plan that reaches Laravel 11. If the plan ends below those, the move is left out with a warning, and Booster says why.
 
+An app that hand-copied Doctrine 2, Smarty 3 or Slim 1 into `vendor/` has a third opt-in move, `--vendored`, which puts those libraries on Composer; see [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html).
+
 ### 13. Plan for a future date, or a different policy[#](https://booster.apps.wayne.edu/docs/recipes.html#13-plan-for-a-future-date-or-a-different-policy)
 
 ```
@@ -2686,7 +2795,7 @@ Usage: `booster init [--path PATH] [--dir DIR] [--check]`
 
 Show the ordered hops from the app to a supported version. Changes nothing.
 
-Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--no-scan]`
+Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--vendored] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--no-scan]`
 
 | Option | Meaning | Default |
 | --- | --- | --- |
@@ -2703,6 +2812,7 @@ Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today 
 | `--with-node` | Include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version |  |
 | `--sesame` | Include the wayne-cas to SESAME swap. |  |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move. |  |
+| `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto Composer. |  |
 | `--skip=VALUE` | Hop id to leave out (repeatable). |  |
 | `--no-package-check` | Skip the Packagist dependency check (for offline use). |  |
 | `--until=VALUE` | Cut the plan after this hop id: that step and everything before it stay. |  |
@@ -2737,7 +2847,7 @@ Usage: `booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recordin
 
 Run the plan: Rector, composer.json edits and a test gate per hop. Edits the working copy only.
 
-Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory] [--replay [REPLAY]] [--replay-out REPLAY-OUT]`
+Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--vendored] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory] [--replay [REPLAY]] [--replay-out REPLAY-OUT]`
 
 | Option | Meaning | Default |
 | --- | --- | --- |
@@ -2754,6 +2864,7 @@ Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today T
 | `--with-node` | Include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version |  |
 | `--sesame` | Include the wayne-cas to SESAME swap. |  |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move. |  |
+| `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto Composer. |  |
 | `--skip=VALUE` | Hop id to leave out (repeatable). |  |
 | `--no-package-check` | Skip the Packagist dependency check (for offline use). |  |
 | `--until=VALUE` | Cut the plan after this hop id: that step and everything before it stay. |  |
@@ -2862,6 +2973,7 @@ This page lists every hop Booster knows; the list is generated from the hop data
 | `phpunit-to-9-manual` | phpunit | below-9 | 9 | Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves. |
 | `cas-to-sesame` | sesame | wayne-cas | sesame | Swap the wayne-cas package for SESAME using its compatibility classes. |
 | `wayneui-1-to-2` | wayneui | 1 | 2 | Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. |
+| `vendored-to-composer` | framework | hand-copied | composer | Move hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto their maintained Composer releases (doctrine/orm 2.20, smarty/smarty 4.5, slim/slim 4 through a Slim 1 bridge). |
 | `node-pin-24` | node | any | 26 | Pin the app to Node 26: set engines.node in package.json and write .nvmrc. |
 | `mix-to-vite` | node | laravel-mix | vite | Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). |
 | `vite-major` | node | any | 8 | Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions. |
@@ -2876,6 +2988,8 @@ This page lists every hop Booster knows; the list is generated from the hop data
 The hop id `node-pin-24` is a stable id and now pins Node 26.
 
 > Every other hop lifts the engine; `wayneui-1-to-2` is the one that repaints the bodywork.
+
+`vendored-to-composer` is the first framework hop, planned only with `--vendored`. It moves hand-copied Doctrine 2, Smarty 3 and Slim 1 under the app root's `vendor/` onto `doctrine/orm ^2.20`, `smarty/smarty ^4.5` and `slim/slim ^4.15` (through the Slim 1 bridge it writes), at the first PHP every one of those runs on: 7.4 with Slim, 7.1 without. Its recipes and stop signs live in code (`VendoredMigration`), not in the hop data, and a stop sign leaves it out of the plan with the file and line. [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html) has the details.
 
 Booster plans any target the policy knows. A target past security support is allowed as a stop on the way up, with a plan warning that names the date its security support ended. A version the policy does not list at all is still refused by name.
 

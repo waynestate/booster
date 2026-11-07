@@ -7,7 +7,7 @@ description: Record how the app answers before an upgrade, replay the same reque
 
 This page shows how to make the gate prove more than the tests do: Booster records how the app answers a list of
 requests before the upgrade, replays the same requests after every hop, and fails the hop when an answer changes.
-Before this: [What a hop does](hops.md). Next: [Laravel hops and vendor/](laravel-and-vendor.md).
+Before this: [What a hop does](hops.md). Next: [Hand-copied libraries to Composer](framework-hops.md).
 
 The test gate only knows what the tests ask. Plenty of WSU apps have one smoke test, or none, and the code a PHP hop
 changes most (string to number comparisons, `null` passed to `strlen`, a dynamic property) sits in pages no test

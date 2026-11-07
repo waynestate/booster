@@ -8,7 +8,7 @@ generator: Squire agent-ready
 
 # The replay gate[#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#the-replay-gate)
 
-This page shows how to make the gate prove more than the tests do: Booster records how the app answers a list of requests before the upgrade, replays the same requests after every hop, and fails the hop when an answer changes. Before this: [What a hop does](https://booster.apps.wayne.edu/docs/guides/hops.html). Next: [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html).
+This page shows how to make the gate prove more than the tests do: Booster records how the app answers a list of requests before the upgrade, replays the same requests after every hop, and fails the hop when an answer changes. Before this: [What a hop does](https://booster.apps.wayne.edu/docs/guides/hops.html). Next: [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html).
 
 The test gate only knows what the tests ask. Plenty of WSU apps have one smoke test, or none, and the code a PHP hop changes most (string to number comparisons, `null` passed to `strlen`, a dynamic property) sits in pages no test visits. The replay gate takes the patient's vitals before the shot and again after every dose: it writes down what the app said on the old PHP, and after every hop it asks again and compares. It is off unless you ask for it.
 

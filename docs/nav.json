@@ -50,6 +50,10 @@
           "path": "guides/replay-gate"
         },
         {
+          "title": "Hand-copied libraries to Composer",
+          "path": "guides/framework-hops"
+        },
+        {
           "title": "Laravel hops and vendor/",
           "path": "guides/laravel-and-vendor"
         },

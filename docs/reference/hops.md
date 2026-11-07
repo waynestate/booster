@@ -37,6 +37,7 @@ This page lists every hop Booster knows; the list is generated from the hop data
 | `phpunit-to-9-manual` | phpunit | below-9 | 9 | Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves. |
 | `cas-to-sesame` | sesame | wayne-cas | sesame | Swap the wayne-cas package for SESAME using its compatibility classes. |
 | `wayneui-1-to-2` | wayneui | 1 | 2 | Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. |
+| `vendored-to-composer` | framework | hand-copied | composer | Move hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto their maintained Composer releases (doctrine/orm 2.20, smarty/smarty 4.5, slim/slim 4 through a Slim 1 bridge). |
 | `node-pin-24` | node | any | 26 | Pin the app to Node 26: set engines.node in package.json and write .nvmrc. |
 | `mix-to-vite` | node | laravel-mix | vite | Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). |
 | `vite-major` | node | any | 8 | Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions. |
@@ -52,6 +53,12 @@ This page lists every hop Booster knows; the list is generated from the hop data
 The hop id `node-pin-24` is a stable id and now pins Node 26.
 
 > Every other hop lifts the engine; `wayneui-1-to-2` is the one that repaints the bodywork.
+
+`vendored-to-composer` is the first framework hop, planned only with `--vendored`. It moves hand-copied Doctrine 2,
+Smarty 3 and Slim 1 under the app root's `vendor/` onto `doctrine/orm ^2.20`, `smarty/smarty ^4.5` and `slim/slim
+^4.15` (through the Slim 1 bridge it writes), at the first PHP every one of those runs on: 7.4 with Slim, 7.1 without.
+Its recipes and stop signs live in code (`VendoredMigration`), not in the hop data, and a stop sign leaves it out of
+the plan with the file and line. [Hand-copied libraries to Composer](../guides/framework-hops.md) has the details.
 
 Booster plans any target the policy knows. A target past security support is allowed as a stop on the way up, with a
 plan warning that names the date its security support ended. A version the policy does not list at all is still

@@ -58,7 +58,7 @@ Usage: `booster init [--path PATH] [--dir DIR] [--check]`
 
 Show the ordered hops from the app to a supported version. Changes nothing.
 
-Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--no-scan]`
+Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--vendored] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--no-scan]`
 
 | Option | Meaning | Default |
 | --- | --- | --- |
@@ -75,6 +75,7 @@ Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today 
 | `--with-node` | Include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version |  |
 | `--sesame` | Include the wayne-cas to SESAME swap. |  |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move. |  |
+| `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto Composer. |  |
 | `--skip=VALUE` | Hop id to leave out (repeatable). |  |
 | `--no-package-check` | Skip the Packagist dependency check (for offline use). |  |
 | `--until=VALUE` | Cut the plan after this hop id: that step and everything before it stay. |  |
@@ -109,7 +110,7 @@ Usage: `booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recordin
 
 Run the plan: Rector, composer.json edits and a test gate per hop. Edits the working copy only.
 
-Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory] [--replay [REPLAY]] [--replay-out REPLAY-OUT]`
+Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--vendored] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory] [--replay [REPLAY]] [--replay-out REPLAY-OUT]`
 
 | Option | Meaning | Default |
 | --- | --- | --- |
@@ -126,6 +127,7 @@ Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today T
 | `--with-node` | Include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version |  |
 | `--sesame` | Include the wayne-cas to SESAME swap. |  |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move. |  |
+| `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto Composer. |  |
 | `--skip=VALUE` | Hop id to leave out (repeatable). |  |
 | `--no-package-check` | Skip the Packagist dependency check (for offline use). |  |
 | `--until=VALUE` | Cut the plan after this hop id: that step and everything before it stay. |  |

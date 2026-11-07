@@ -21,6 +21,7 @@ Every page below is Markdown. The HTML pages send the same Markdown to a client 
 - [Behavior changes | Booster docs](https://booster.apps.wayne.edu/docs/guides/behaviour-changes.md): The silent changes between versions that Rector does not rewrite, one block per hop.
 - [Deploying on Citadel | Booster docs](https://booster.apps.wayne.edu/docs/guides/citadel.md): The deployment script Booster writes when a real run changes composer.lock.
 - [The dependency check | Booster docs](https://booster.apps.wayne.edu/docs/guides/dependency-check.md): How Booster asks Packagist whether your direct dependencies can follow the plan.
+- [Hand-copied libraries to Composer | Booster docs](https://booster.apps.wayne.edu/docs/guides/framework-hops.md): The vendored-to-composer hop moves an app's hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto their maintained Composer releases, with the replay gate as proof.
 - [What a hop does | Booster docs](https://booster.apps.wayne.edu/docs/guides/hops.md): What happens inside one hop, from the Rector dry run to the gate.
 - [Laravel hops and vendor/ | Booster docs](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.md): Why Laravel hops need the app's vendor folder, and where the hop data comes from.
 - [Quick start | Booster docs](https://booster.apps.wayne.edu/docs/guides/quick-start.md): The first commands to run, and what a plan looks like.

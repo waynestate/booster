@@ -200,6 +200,8 @@ booster run  --path=../my-app --sesame --wayneui
 
 Without the flag, `plan` only warns that your app uses `wayne-cas` or WayneUI 1.x and tells you the flag to add. `--sesame` needs the app to require `cit-web-infra/wayne-cas` and a plan that reaches PHP 8.3; it lands just before the Laravel 10 to 11 hop. `--wayneui` needs the app to require `cit-web-infra/wayne-ui` and a plan that reaches Laravel 11. If the plan ends below those, the move is left out with a warning, and Booster says why.
 
+An app that hand-copied Doctrine 2, Smarty 3 or Slim 1 into `vendor/` has a third opt-in move, `--vendored`, which puts those libraries on Composer; see [Hand-copied libraries to Composer](guides/framework-hops.md).
+
 ## 13. Plan for a future date, or a different policy
 
 <!-- docs-test: skip run on your own app -->
