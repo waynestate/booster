@@ -65,8 +65,8 @@ final class TargetImageRunner
     }
 
     /**
-     * The shell command run inside the container: Composer, then test. The two
-     * phases report separately: each writes its output to a log file, and on
+     * The shell command run inside the container: Composer (skipped when the
+     * app has no composer.json), then test. The two phases report separately: each writes its output to a log file, and on
      * failure the script prints the last 30 lines of that phase's log plus
      * marker lines (BOOSTER_GATE_PHASE, BOOSTER_GATE_EXIT) that
      * gateOutcome() reads back. A stale lock (Composer exit 4) is therefore
@@ -94,8 +94,14 @@ final class TargetImageRunner
         };
         $lines = [
             'install_log=/tmp/booster-gate-install.log',
-            $composerPhase . ' >"$install_log" 2>&1',
-            'install_exit=$?',
+            // An app with no composer.json (a 2012 app that hand-copied its
+            // libraries) has nothing to install, and Composer would fail on
+            // the missing file before the syntax check ever ran.
+            'install_exit=0',
+            'if [ -f composer.json ]; then',
+            '  ' . $composerPhase . ' >"$install_log" 2>&1',
+            '  install_exit=$?',
+            'fi',
             'if [ "$install_exit" -ne 0 ]; then',
             '  tail -n 30 "$install_log"',
             '  echo "BOOSTER_GATE_PHASE=install"',

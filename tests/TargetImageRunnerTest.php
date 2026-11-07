@@ -55,6 +55,51 @@ final class TargetImageRunnerTest extends TestCase
         self::assertStringNotContainsString('proctor', $script);
     }
 
+    public function test_an_app_without_composer_json_skips_composer_and_still_runs_the_gate(): void
+    {
+        $script = TargetImageRunner::containerScript('vendor/bin/phpunit', null);
+
+        self::assertStringContainsString('if [ -f composer.json ]; then', $script);
+        self::assertStringContainsString('install_exit=0', $script);
+        self::assertLessThan(strpos($script, 'composer install'), strpos($script, 'if [ -f composer.json ]; then'));
+    }
+
+    public function test_the_container_script_runs_in_a_real_shell_with_and_without_composer_json(): void
+    {
+        if (DIRECTORY_SEPARATOR === '\\' || !is_executable('/bin/sh')) {
+            self::markTestSkipped('Needs a POSIX shell.');
+        }
+        $dir = sys_get_temp_dir() . '/booster-script-' . bin2hex(random_bytes(4));
+        mkdir($dir);
+        try {
+            // No composer.json: Composer is never called (it is not even on
+            // PATH here), and the test command decides the outcome.
+            $script = TargetImageRunner::containerScript('echo tests-ran', null);
+            $run = static function (string $script) use ($dir): array {
+                $process = proc_open(['/bin/sh', '-c', $script], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $dir, ['PATH' => '/nonexistent-bin:/usr/bin:/bin']);
+                self::assertIsResource($process);
+                $out = (string) stream_get_contents($pipes[1]);
+                fclose($pipes[1]);
+                fclose($pipes[2]);
+
+                return [proc_close($process), $out];
+            };
+            [$exit, $out] = $run($script);
+            self::assertSame(0, $exit, $out);
+            self::assertStringContainsString('BOOSTER_GATE_PHASE=tests', $out);
+
+            // With composer.json the Composer phase runs, and a missing
+            // composer binary is reported as an install failure.
+            file_put_contents($dir . '/composer.json', '{}');
+            [$exit, $out] = $run(str_replace('composer install', 'missing-composer-binary install', $script));
+            self::assertNotSame(0, $exit);
+            self::assertStringContainsString('BOOSTER_GATE_PHASE=install', $out);
+            self::assertStringNotContainsString('tests-ran', $out);
+        } finally {
+            @unlink($dir . '/composer.json');
+            @rmdir($dir);
+        }
+    }
     public function test_gate_outcome_reads_an_install_failure_from_the_markers(): void
     {
         $stdout = "Problem 1 of 1\n- The lock file is not up to date with the latest changes in composer.json.\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4\n";
