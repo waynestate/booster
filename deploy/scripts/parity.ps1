@@ -60,6 +60,21 @@ function Invoke-Compose {
     }
 }
 
+function Get-SourceUidGid {
+    # The container's `citadel` user must match the host owner of the bind-mounted source, whatever number that is.
+    # A mismatch means the release cannot write vendor/ into the source and the app container exits 1 on start.
+    # On Windows ownership is emulated and Docker Desktop maps bind mounts to 1000:1000 by default, so the safe
+    # default is right there; on Linux and macOS the current user's ids are the ones that matter.
+    if ($env:OS -eq 'Windows_NT') {
+        return @('1000', '1000')
+    }
+    $uid = (& id -u 2>$null) -join ''
+    $gid = (& id -g 2>$null) -join ''
+    if ($uid -notmatch '^\d+$' -or [long]$uid -lt 1 -or [long]$uid -gt 65534) { $uid = '1000' }
+    if ($gid -notmatch '^\d+$' -or [long]$gid -lt 1 -or [long]$gid -gt 65534) { $gid = '1000' }
+    return @($uid, $gid)
+}
+
 if ($null -eq (Get-Command docker -ErrorAction SilentlyContinue)) {
     Exit-Parity 'docker is not installed or not on PATH'
 }
@@ -82,8 +97,9 @@ if (-not (Test-Path -LiteralPath $EnvFile)) {
 switch ($Command) {
     'up' {
         if ($Fallback) {
-            Write-Output "parity: building the fallback base image $FallbackTag (an approximation of Citadel's image)"
-            & docker build --build-arg 'CITADEL_SOURCE_UID=1000' --build-arg 'CITADEL_SOURCE_GID=1000' `
+            $sourceIds = Get-SourceUidGid
+            Write-Output "parity: building the fallback base image $FallbackTag (an approximation of Citadel's image, citadel user $($sourceIds[0]):$($sourceIds[1]))"
+            & docker build --build-arg "CITADEL_SOURCE_UID=$($sourceIds[0])" --build-arg "CITADEL_SOURCE_GID=$($sourceIds[1])" `
                 -f .squire/base-fallback.Dockerfile -t $FallbackTag .squire
             if ($LASTEXITCODE -ne 0) {
                 Exit-Parity 'the fallback base image failed to build'

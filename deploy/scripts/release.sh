@@ -7,7 +7,8 @@
 #   Quick Update post-script in the Citadel dashboard:  user `citadel`, script `./scripts/release.sh`
 #
 # Steps: preconditions, composer install from the lock file without dev packages, composer audit (report),
-# frontend install and build, Laravel migrate and optimize, PROCTOR, and a smoke test of /up.
+# frontend install and build, Laravel migrate and optimize, PROCTOR, an Oracle connection check (report only),
+# and a smoke test of /up.
 # By default PROCTOR is a report here, never a gate: a failing post-script cannot undo a Quick Update, because the
 # new commit is already live (S20). With SQUIRE_PROCTOR=enforce a failed check stops the release: the first release
 # never comes up healthy, and a Quick Update keeps the new commit checked out, so fix the findings and re-run.
@@ -323,6 +324,14 @@ else
                 ;;
         esac
     fi
+fi
+
+step "check Oracle (never fails the release)"
+if [ -f oracle-check.php ]; then
+    # Like the PROCTOR report above, a finding is logged and the release goes on: the check is never a gate.
+    php oracle-check.php || true
+else
+    note "skipped (no oracle-check.php in the app root; the app does not use Oracle)"
 fi
 
 step "smoke test the health endpoint"
