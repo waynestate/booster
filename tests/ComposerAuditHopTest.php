@@ -55,9 +55,15 @@ final class ComposerAuditHopTest extends TestCase
         );
     }
 
-    private function execute(FakeProcessRunner $fake, RunOptions $options, string $example = 'raw-php', ?PlanOptions $plan = null): RunReport
+    /**
+     * @param callable(string): void|null $modify tweaks the copied example before the plan runs
+     */
+    private function execute(FakeProcessRunner $fake, RunOptions $options, string $example = 'raw-php', ?PlanOptions $plan = null, ?callable $modify = null): RunReport
     {
         $dir = $this->copyExample($example);
+        if ($modify !== null) {
+            $modify($dir);
+        }
         $project = (new ProjectDetector())->detect($dir);
         $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, $plan ?? new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
         $executor = new HopExecutor(
@@ -114,13 +120,35 @@ final class ComposerAuditHopTest extends TestCase
         self::assertStringContainsString('exited 127 without a JSON report', (string) $json['results'][0]['composer_audit']['error']);
     }
 
-    public function test_a_hop_with_no_composer_changes_does_not_run_the_audit(): void
+    public function testDryRunPrintsNoComposerAuditLine(): void
     {
-        // A dry run never writes composer files, so no hop may audit.
         $fake = $this->fake();
         $fake->auditResponse = new ProcessResult(1, self::ADVISORY_JSON, '');
         $report = $this->execute($fake, new RunOptions(dryRun: true));
 
+        // No hop audits in a dry run, even one whose preview would raise a
+        // composer constraint.
+        self::assertSame([], $this->auditRuns($fake));
+        foreach ($report->results as $result) {
+            self::assertNull($result->composerAudit);
+            self::assertStringNotContainsString('Composer audit', implode(' ', $result->messages));
+        }
+        $json = $report->toArray();
+        self::assertArrayNotHasKey('composer_audit', $json['results'][0]);
+    }
+
+    public function test_a_hop_with_no_composer_changes_does_not_run_the_audit(): void
+    {
+        // A real run whose hops raise nothing: the app already floors at the
+        // target PHP, so no hop changes a composer file and each one says the
+        // audit was skipped.
+        $fake = $this->fake();
+        $fake->auditResponse = new ProcessResult(1, self::ADVISORY_JSON, '');
+        $report = $this->execute($fake, new RunOptions(), 'raw-php', null, static function (string $dir): void {
+            file_put_contents($dir . '/composer.json', json_encode(['name' => 'example/raw-php', 'require' => ['php' => '^8.3']], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+        });
+
+        self::assertSame(['applied', 'applied'], array_map(static fn($r): string => $r->status, $report->results));
         self::assertSame([], $this->auditRuns($fake));
         foreach ($report->results as $result) {
             self::assertStringContainsString('Composer audit: skipped (this hop changed no composer file).', implode(' ', $result->messages));

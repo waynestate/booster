@@ -385,20 +385,25 @@ final class HopExecutor
         // Scan first: the advisory must describe the app as it was before the hop rewrites it.
         $removals = $this->removalsLines($step, $path);
         $behaviour = $this->behaviourLines($step, $path, $plan);
-        $composerBefore = $this->composerFingerprint($path);
+        // A dry run changes no file, so there is nothing to fingerprint and
+        // nothing to audit afterwards.
+        $composerBefore = $options->dryRun ? null : $this->composerFingerprint($path);
         $result = $this->runStepCore($step, $path, $plan, $options, $baseline);
 
         // After the hop: did it change what the app declares? Then audit the
-        // packages, again advisory only. A clean audit stays silent.
+        // packages, again advisory only. A clean audit stays silent. A dry
+        // run neither audits nor says it skipped.
         $audit = null;
         $skipAudit = false;
-        if ($this->composerFingerprint($path) !== $composerBefore) {
-            $audit = $this->composerAuditScanner()->scan($path);
-            if ($audit->ok && !$audit->hasFindings()) {
-                $audit = null;
+        if (!$options->dryRun) {
+            if ($this->composerFingerprint($path) !== $composerBefore) {
+                $audit = $this->composerAuditScanner()->scan($path);
+                if ($audit->ok && !$audit->hasFindings()) {
+                    $audit = null;
+                }
+            } else {
+                $skipAudit = true;
             }
-        } else {
-            $skipAudit = true;
         }
 
         $messages = [...$result->messages];
