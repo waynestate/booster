@@ -18,9 +18,9 @@ where an app must land. Rockets need fuel, and this one runs on fresh version da
 
 ## Where it lives
 
-Development happens on nougat (the canonical repository, [enterprise-apps/booster](https://nougat.snu.gs/enterprise-apps/booster)).
-This GitHub repository and git.wayne.edu are read-only mirrors: `main` and tags are copied automatically. Changes,
-issues and merge requests go to nougat. Nobody pushes to the mirrors.
+Development happens on git.wayne.edu (the canonical repository, [enterprise-apps/booster](https://git.wayne.edu/enterprise-apps/booster)).
+This GitHub repository is a read-only push mirror of it: `main` and tags are copied automatically. Changes,
+issues and merge requests go to git.wayne.edu. Nobody pushes to the mirror.
 
 ## Build and test
 
@@ -114,7 +114,7 @@ without touching any remote: `php bin/hop-data-bot.php --dry-run`.
 2. `composer ci` green locally, then both pipelines green for that commit.
 3. Run a secrets scan of the history and check that nothing internal (server names, people, app names, IDs) is in the
    tree.
-4. Tag `X.Y.Z` (no `v`) on nougat. The mirror carries the tag to GitHub, and Packagist picks it up from there.
+4. Tag `X.Y.Z` (no `v`) on git.wayne.edu, with an approver. The mirror carries the tag to GitHub, and Packagist picks it up from there.
 5. A release needs a maintainer's approval. Never move or delete a published tag.
 
 ## The Real output page

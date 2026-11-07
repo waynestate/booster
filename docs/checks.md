@@ -12,7 +12,7 @@ Maintainers: how to build, test and release this project, and where its data com
 
 Checks: `composer ci` (the same command runs on GitLab and GitHub).
 
-Development happens on Wayne State's GitLab; this repository is a release mirror. Changes land there first.
+Development happens on git.wayne.edu (the canonical repository); this GitHub repository is a read-only push mirror of it. Changes land on git.wayne.edu first.
 
 <!-- docs-test: skip needs network -->
 ```

@@ -21,9 +21,9 @@ Documentation: the docs live at [booster.apps.wayne.edu/docs/](https://booster.a
 
 ## Where the code lives
 
-The canonical repository is on nougat: [enterprise-apps/booster](https://nougat.snu.gs/enterprise-apps/booster). git.wayne.edu and GitHub ([waynestate/booster](https://github.com/waynestate/booster)) are read-only mirrors of it.
-Open issues and merge requests on nougat, not on the mirrors.
-This moves to git.wayne.edu once it has CI runners. Nougat is the shot; the mirrors are the bandage.
+The canonical repository is [enterprise-apps/booster](https://git.wayne.edu/enterprise-apps/booster) on git.wayne.edu: clone it as `git@git.wayne.edu:enterprise-apps/booster.git`, open issues and merge requests there, and make its tags there, by the maintainer, with an approver.
+GitHub ([waynestate/booster](https://github.com/waynestate/booster)) is a read-only push mirror of it, for the published package: nobody pushes to it, and Packagist reads from it.
+git.wayne.edu is the shot; the mirror is the bandage.
 
 > A booster shot keeps your immunity current. This one keeps your PHP current, and it stings less.
 
@@ -900,7 +900,7 @@ MIT, Wayne State University, Enterprise Applications.
   <a href="https://github.com/waynestate/pinstripe" title="Pinstripe"><img src="docs/readme/cast/pinstripe.png" width="40" alt="Pinstripe"></a>
   <a href="https://github.com/waynestate/booster" title="Booster"><img src="docs/readme/cast/booster.png" width="40" alt="Booster"></a>
   <a href="https://github.com/waynestate/rollcall" title="Rollcall"><img src="docs/readme/cast/rollcall.png" width="40" alt="Rollcall"></a>
-  <a href="https://nougat.snu.gs/enterprise-apps/drawbridge" title="Drawbridge"><img src="docs/readme/cast/drawbridge.png" width="40" alt="Drawbridge"></a>
+  <a href="https://git.wayne.edu/enterprise-apps/drawbridge" title="Drawbridge"><img src="docs/readme/cast/drawbridge.png" width="40" alt="Drawbridge"></a>
   <a href="https://github.com/waynestate/advisor" title="ADVISOR"><img src="docs/readme/cast/advisor.png" width="40" alt="ADVISOR"></a>
   <a href="https://github.com/waynestate/weld" title="WELD"><img src="docs/readme/cast/weld.png" width="40" alt="WELD"></a>
 </div>

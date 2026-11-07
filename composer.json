@@ -3,8 +3,8 @@
     "description": "WELD's upgrade tool: plans and runs PHP and Laravel upgrade hops on top of Rector, using CREED's version policy.",
     "homepage": "https://booster.apps.wayne.edu/",
     "support": {
-        "source": "https://nougat.snu.gs/enterprise-apps/booster",
-        "issues": "https://nougat.snu.gs/enterprise-apps/booster/-/issues"
+        "source": "https://github.com/waynestate/booster",
+        "issues": "https://git.wayne.edu/enterprise-apps/booster/-/issues"
     },
     "type": "library",
     "license": "MIT",
