@@ -47,10 +47,10 @@
   function store(key, value) {
     try {
       if (value === null) { localStorage.removeItem(key); } else { localStorage.setItem(key, value); }
-    } catch (e) { /* storage blocked: the choice lasts for this page only */ }
+    } catch { /* storage blocked: the choice lasts for this page only */ }
   }
   function recall(key) {
-    try { return localStorage.getItem(key); } catch (e) { return null; }
+    try { return localStorage.getItem(key); } catch { return null; }
   }
 
   var params = new URLSearchParams(location.search);
@@ -76,7 +76,7 @@
     var links = document.querySelectorAll('a[href^="https://"]');
     for (var i = 0; i < links.length; i++) {
       var url;
-      try { url = new URL(links[i].href); } catch (e) { continue; }
+      try { url = new URL(links[i].href); } catch { continue; }
       var m = host.exec(url.hostname);
       if (!m || PROJECTS.indexOf(m[1]) === -1) { continue; }
       if (m[1] === "wayneui") {
@@ -90,7 +90,7 @@
     var links = document.querySelectorAll('a[href^="https://"]');
     for (var i = 0; i < links.length; i++) {
       var url;
-      try { url = new URL(links[i].href); } catch (e) { continue; }
+      try { url = new URL(links[i].href); } catch { continue; }
       var m = host.exec(url.hostname);
       // wayneui has no pre-production app, so its link keeps the production href.
       if (!m || PROJECTS.indexOf(m[1]) === -1 || m[1] === "wayneui") { continue; }

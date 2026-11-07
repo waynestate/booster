@@ -73,7 +73,7 @@ services:
         max-file: "2"
 
   proxy:
-    image: ${SQUIRE_PROXY_IMAGE:-haproxy:3.0-alpine@sha256:1c15903c50d5510dcc01de755049e7015a6dd3f35bb2dc4582e888116cb71d8f}
+    image: ${SQUIRE_PROXY_IMAGE:-haproxy:3.0-alpine@sha256:f06f6cc1c25c7071e62d955d8e67a33d6935066ced8fac496cdd0ad9ffdd17f3}
     depends_on:
       - app
     ports:
