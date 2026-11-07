@@ -4,6 +4,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- CI caches Composer downloads per lock file (`.composer-cache`, keyed on `composer.lock` and `deploy/composer.lock`), so a pipeline stops fetching every package from Packagist on every run. Images already come through the Dependency Proxy.
+
 ## [1.10.0] - 2026-11-07
 
 ### Added
