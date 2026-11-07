@@ -57,6 +57,9 @@ final class HopRegistry
     /** The hop that moves an app from WayneUI 1.x to WayneUI 2.x. */
     public const WAYNEUI_1_TO_2_ID = 'wayneui-1-to-2';
 
+    /** The framework hop that moves hand-copied Doctrine, Smarty and Slim 1 out of vendor/ and onto Composer. */
+    public const VENDORED_TO_COMPOSER_ID = 'vendored-to-composer';
+
     /** The lowest Laravel major whose upgrade guide ships Vite as the front-end tool. */
     public const VITE_LARAVEL_FLOOR = '9';
 
@@ -164,6 +167,7 @@ final class HopRegistry
         $this->add($this->phpunitTo9ManualHop());
         $this->add($this->sesameHop());
         $this->add($this->wayneUi1To2Hop());
+        $this->add($this->vendoredToComposerHop());
         $this->add($this->nodePinHop());
         $this->add($this->mixToViteHop());
         $this->add($this->viteMajorHop());
@@ -873,6 +877,37 @@ final class HopRegistry
                 "WayneUI's MIGRATING.md is the full spec.",
             ],
             links: [],
+        );
+    }
+
+    /**
+     * The first framework hop. A 2012 app that hand-copied Doctrine 2,
+     * Smarty 3 or Slim 1 into vendor/ cannot climb past PHP 7: the copies
+     * break, and Booster never edits a library's files. This hop moves the
+     * app instead, onto the maintained Composer release that keeps the API
+     * the app already calls. The recipes and stop signs live in
+     * VendoredMigration; this is the hop's face in plans and listings.
+     */
+    private function vendoredToComposerHop(): Hop
+    {
+        return new Hop(
+            id: self::VENDORED_TO_COMPOSER_ID,
+            kind: HopKind::Framework,
+            from: 'hand-copied',
+            to: 'composer',
+            summary: 'Move hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto their maintained Composer releases (doctrine/orm 2.20, smarty/smarty 4.5, slim/slim 4 through a Slim 1 bridge).',
+            notes: [
+                'Opt in with --vendored. The planner puts the hop at the first PHP every Composer release runs on (7.1 for Doctrine and Smarty, 7.4 for Slim).',
+                'Booster never edits a file under vendor/: it deletes the hand copies, writes composer.json and points the app\'s require lines at vendor/autoload.php.',
+                'Anything it cannot rewrite exactly (Doctrine\'s ClassLoader, a Slim hook or cookie call, a regex route) is a stop sign: the hop refuses and changes nothing.',
+                'Run it with --replay. The syntax check proves the code parses; only the replay proves the pages answer the same.',
+                'Citadel never runs composer install: commit vendor/ on the deploy branch or add a deployments/ script.',
+            ],
+            links: [
+                'https://www.smarty.net/docs/en/',
+                'https://www.doctrine-project.org/projects/doctrine-orm/en/2.20/index.html',
+                'https://www.slimframework.com/docs/v4/',
+            ],
         );
     }
 

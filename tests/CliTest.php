@@ -667,11 +667,12 @@ final class CliTest extends TestCase
         self::assertStringContainsString('typescript-major', $out);
         self::assertStringContainsString('phpunit-to-9-manual', $out);
         self::assertStringContainsString('wayneui-1-to-2', $out);
+        self::assertStringContainsString('vendored-to-composer', $out);
         self::assertStringContainsString('[playbook]', $out);
 
         [, $json] = $this->booster(['command' => 'hops', '--format' => 'json']);
         $hops = json_decode($json, true)['hops'];
-        self::assertCount(37, $hops);
+        self::assertCount(38, $hops);
         $byId = [];
         foreach ($hops as $hop) {
             $byId[$hop['id']] = $hop;

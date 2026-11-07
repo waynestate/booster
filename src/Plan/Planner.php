@@ -11,6 +11,7 @@ use Waynestate\Booster\Policy\Policy;
 use Waynestate\Booster\Policy\PolicyException;
 use Waynestate\Booster\Project\Project;
 use Waynestate\Booster\Refresh\HopDataRefresher;
+use Waynestate\Booster\Run\VendoredMigration;
 use Waynestate\Booster\Scan\VendoredLibraries;
 use Waynestate\Booster\ToolError;
 use Waynestate\Creed\State;
@@ -33,6 +34,7 @@ final class Planner
         private readonly HopRegistry $registry,
         private readonly ?PackageFetcher $packages = null,
         private readonly ?WayneCasReachability $casReachability = null,
+        private readonly VendoredMigration $vendoredMigration = new VendoredMigration(),
     ) {}
 
     public function plan(Project $project, PlanOptions $options, DateTimeImmutable $today): Plan
@@ -138,6 +140,48 @@ final class Planner
             }
         }
 
+        // Hand-copied Doctrine 2, Smarty 3 and Slim 1 break on a new PHP, and
+        // their Composer releases do not run on an old one. So with --vendored
+        // the move goes in at the first PHP every recipe's release runs on:
+        // the first step when the app is already there, else right after the
+        // PHP hop that lands on it. A stop sign leaves the hop out entirely,
+        // with the reasons, rather than plan a step that would refuse.
+        $vendoredLibraries = VendoredLibraries::find($project->path);
+        $vendoredFloor = null;
+        if ($options->vendored && !in_array(HopRegistry::VENDORED_TO_COMPOSER_ID, $options->skip, true)) {
+            $inspection = $this->vendoredMigration->inspect($project->path);
+            if ($inspection->moves === [] && $inspection->refusals === []) {
+                $warnings[] = 'Asked for the vendored move, but found no hand-copied Doctrine 2, Smarty 3 or Slim 1 under vendor/; skipped.';
+            } elseif ($inspection->refusals !== []) {
+                $warnings[] = sprintf(
+                    'The %s hop was left out: Booster will not guess past %s. Fix %s and plan again:',
+                    HopRegistry::VENDORED_TO_COMPOSER_ID,
+                    count($inspection->refusals) === 1 ? 'this stop sign' : 'these ' . count($inspection->refusals) . ' stop signs',
+                    count($inspection->refusals) === 1 ? 'it' : 'them',
+                );
+                foreach ($inspection->refusals as $refusal) {
+                    $warnings[] = 'Stop sign: ' . $refusal;
+                }
+            } elseif (version_compare($toPhp, (string) $inspection->floor, '<')) {
+                $warnings[] = sprintf('Moving %s to Composer needs PHP %s or newer; the vendored move was left out because the plan ends below that.', $inspection->summary(), (string) $inspection->floor);
+            } else {
+                $vendoredFloor = $inspection->floor;
+            }
+        } elseif (!$options->vendored) {
+            $movable = [];
+            foreach ($vendoredLibraries as $library) {
+                if (VendoredMigration::floorFor($library) !== null && dirname($library->path) === 'vendor') {
+                    $movable[] = $library->name;
+                }
+            }
+            $movable = array_values(array_unique($movable));
+            if ($movable !== []) {
+                $last = array_pop($movable);
+                $names = $movable === [] ? $last : implode(', ', $movable) . ' and ' . $last;
+                $warnings[] = sprintf('The app hand-copied %s into vendor/. Add --vendored to plan the move to Composer.', $names);
+            }
+        }
+
         $steps = [];
         $php = $fromPhp;
         $laravel = $fromLaravel;
@@ -158,6 +202,12 @@ final class Planner
             $nextLaravel = $laravel !== null && $toLaravel !== null && $laravel !== $toLaravel ? $this->registry->nextLaravel($laravel) : null;
             $nextPhpunit = $phpunit !== null && $toPhpunit !== null && $phpunit !== $toPhpunit ? $this->registry->nextPhpunit($phpunit) : null;
             $nextPhp = $php !== $toPhp ? $this->registry->nextPhp($php) : null;
+
+            if ($vendoredFloor !== null && version_compare($php, $vendoredFloor, '>=')) {
+                $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::VENDORED_TO_COMPOSER_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+                $vendoredFloor = null;
+                continue;
+            }
 
             // PHPUnit below 9 cannot run the gates on PHP 8, so the manual move
             // to 9 lands before the first step that targets PHP 8.0 or newer.
@@ -231,6 +281,10 @@ final class Planner
                 ));
             }
             break;
+        }
+
+        if ($vendoredFloor !== null) {
+            $warnings[] = sprintf('The vendored move needs PHP %s, and the plan stops below it; it was left out.', $vendoredFloor);
         }
 
         // The lock may allow a narrower PHP span than composer.json claims.
@@ -338,7 +392,7 @@ final class Planner
         // The hand-copied libraries are reported by the writer as their own
         // block, so they travel on the plan without a warning entry of their
         // own.
-        return new Plan($project, $today->format('Y-m-d'), $this->policy->origin(), $toPhp, $toLaravel, $toPhpunit, $steps, $warnings, $packageChecks, $stopsEarly, VendoredLibraries::find($project->path), $fromPhp);
+        return new Plan($project, $today->format('Y-m-d'), $this->policy->origin(), $toPhp, $toLaravel, $toPhpunit, $steps, $warnings, $packageChecks, $stopsEarly, $vendoredLibraries, $fromPhp);
     }
 
     /**

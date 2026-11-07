@@ -968,4 +968,79 @@ final class PlannerTest extends TestCase
             $plan->warnings,
         );
     }
+
+    /** Plans the 2012 fixture app (hand-copied Doctrine 2, Smarty 3 and Slim 1, no composer.json). */
+    private function planVendored(PlanOptions $options, ?callable $edit = null): Plan
+    {
+        $dir = $this->tempDir();
+        $from = __DIR__ . '/fixtures/vendored-2012';
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($from, \FilesystemIterator::SKIP_DOTS));
+        foreach ($files as $file) {
+            self::assertInstanceOf(\SplFileInfo::class, $file);
+            $target = $dir . substr($file->getPathname(), strlen($from));
+            if (!is_dir(dirname($target))) {
+                mkdir(dirname($target), 0775, true);
+            }
+            copy($file->getPathname(), $target);
+        }
+        if ($edit !== null) {
+            $edit($dir);
+        }
+
+        return (new Planner($this->policy(), new HopRegistry()))->plan((new ProjectDetector())->detect($dir), $options, $this->today());
+    }
+
+    public function test_the_vendored_move_lands_right_after_the_php_hop_that_reaches_its_floor(): void
+    {
+        $plan = $this->planVendored(new PlanOptions(fromPhp: '5.6', toPhp: '8.1', vendored: true));
+
+        self::assertSame(['php-56-to-70', 'php-70-to-71', 'php-71-to-72', 'php-72-to-73', 'php-73-to-74', 'vendored-to-composer', 'php-74-to-80', 'php-80-to-81'], $this->ids($plan));
+        $step = $plan->steps[5];
+        self::assertSame(['7.4', '7.4'], [$step->phpBefore, $step->phpAfter]);
+        self::assertSame(['target-image-tests'], $step->gates);
+        self::assertFalse($step->hop->isManual());
+    }
+
+    public function test_the_vendored_move_goes_first_when_the_app_already_runs_on_its_floor(): void
+    {
+        $plan = $this->planVendored(new PlanOptions(fromPhp: '7.4', toPhp: '8.0', vendored: true));
+
+        self::assertSame(['vendored-to-composer', 'php-74-to-80'], $this->ids($plan));
+    }
+
+    public function test_without_vendored_the_plan_suggests_the_flag(): void
+    {
+        $plan = $this->planVendored(new PlanOptions(fromPhp: '7.4', toPhp: '8.0'));
+
+        self::assertSame(['php-74-to-80'], $this->ids($plan));
+        self::assertContains('The app hand-copied Doctrine, Slim and Smarty into vendor/. Add --vendored to plan the move to Composer.', $plan->warnings);
+    }
+
+    public function test_the_vendored_move_is_left_out_when_the_plan_ends_below_its_floor(): void
+    {
+        $plan = $this->planVendored(new PlanOptions(fromPhp: '5.6', toPhp: '7.3', vendored: true));
+
+        self::assertNotContains('vendored-to-composer', $this->ids($plan));
+        self::assertContains('Moving Doctrine 2.2.2, Slim 1.6.7 and Smarty 3.1.8 to Composer needs PHP 7.4 or newer; the vendored move was left out because the plan ends below that.', $plan->warnings);
+    }
+
+    public function test_a_stop_sign_leaves_the_vendored_move_out_and_names_it(): void
+    {
+        $plan = $this->planVendored(new PlanOptions(fromPhp: '7.4', toPhp: '8.0', vendored: true), static function (string $dir): void {
+            file_put_contents($dir . '/hooks.php', "<?php\n\$app->hook('slim.before', function () {});\n");
+        });
+
+        self::assertSame(['php-74-to-80'], $this->ids($plan));
+        self::assertContains('The vendored-to-composer hop was left out: Booster will not guess past this stop sign. Fix it and plan again:', $plan->warnings);
+        self::assertContains("Stop sign: hooks.php:2 calls \$app->hook(), which the Slim 1 bridge does not carry: \$app->hook('slim.before', function () {});", $plan->warnings);
+    }
+
+    public function test_the_vendored_move_can_be_skipped_and_says_so_when_nothing_is_there(): void
+    {
+        $skipped = $this->planVendored(new PlanOptions(fromPhp: '7.4', toPhp: '8.0', vendored: true, skip: ['vendored-to-composer']));
+        self::assertSame(['php-74-to-80'], $this->ids($skipped));
+
+        $plan = $this->plan('raw-php', new PlanOptions(toPhp: '8.0', vendored: true));
+        self::assertContains('Asked for the vendored move, but found no hand-copied Doctrine 2, Smarty 3 or Slim 1 under vendor/; skipped.', $plan->warnings);
+    }
 }

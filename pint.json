@@ -4,7 +4,8 @@
         "vendor",
         "tests/fixtures",
         "examples",
-        "resources/replay"
+        "resources/replay",
+        "resources/slim1"
     ],
     "notPath": [
         "bin/agent-ready.php",

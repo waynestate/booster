@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Report;
 
 use Waynestate\Booster\Console\Invocation;
+use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanStep;
 use Waynestate\Booster\Plan\Planner;
@@ -117,6 +118,12 @@ final class TextWriter
             $lines[] = sprintf('  - %s (%s)%s', $label, self::clean($library->path), $replace);
         }
         $lines[] = "Libraries copied in by hand are often written for an older PHP and can crash even when BOOSTER's changes to your own code are clean. Replace them with Composer packages, then run your tests on the new PHP.";
+        foreach ($plan->steps as $step) {
+            if ($step->hop->id === HopRegistry::VENDORED_TO_COMPOSER_ID) {
+                $lines[] = sprintf('Step %d (%s) does that for the Doctrine 2, Smarty 3 and Slim 1 copies; any other copy stays and is listed in its result.', $step->number, $step->hop->id);
+                break;
+            }
+        }
 
         return $lines;
     }

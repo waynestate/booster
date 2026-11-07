@@ -59,10 +59,19 @@ final class HopExecutor
         private readonly WayneUiMigration $wayneUiMigration = new WayneUiMigration(),
         private readonly TrustProxiesRewriter $trustProxies = new TrustProxiesRewriter(),
         private readonly ?ReplayRunner $replayRunner = null,
+        private readonly VendoredMigration $vendoredMigration = new VendoredMigration(),
     ) {}
 
     /** The replay gate for this run, once its baseline is recorded (--replay). */
     private ?ReplayGate $replayGate = null;
+
+    /**
+     * The step number of the plan's vendored-to-composer hop. The replay
+     * waits for it: until the hand copies leave, the app may load a 2012
+     * library that crashes on the new PHP (Doctrine 2.2's class loader did,
+     * on a real app), and that is the very thing the hop fixes.
+     */
+    private ?int $replayFrom = null;
 
     private ?RemovalsScan $removals = null;
 
@@ -161,6 +170,13 @@ final class HopExecutor
         // changes anything. A baseline that cannot be recorded stops the run
         // the way a red test baseline does: nothing could be proven later.
         $replay = $this->recordReplay($plan, $path, $options);
+        $this->replayFrom = null;
+        foreach ($plan->steps as $step) {
+            if ($step->hop->id === HopRegistry::VENDORED_TO_COMPOSER_ID) {
+                $this->replayFrom = $step->number;
+                break;
+            }
+        }
         if ($replay !== null && $replay->failed()) {
             $results = [];
             foreach ($plan->steps as $step) {
@@ -430,6 +446,10 @@ final class HopExecutor
 
             if ($hop->kind === HopKind::WayneUi) {
                 return $this->runWayneUiHop($step, $path, $options, $baseline);
+            }
+
+            if ($hop->kind === HopKind::Framework) {
+                return $this->runFrameworkHop($step, $path, $options, $baseline);
             }
 
             // PHP hops get the new-by-reference pre-pass first: modern PHP refuses to compile
@@ -922,6 +942,14 @@ final class HopExecutor
             return $gate;
         }
         $php = $step->phpAfter ?? '';
+        if ($this->replayFrom !== null && $step->number < $this->replayFrom) {
+            return new GateReport(true, [...$gate->lines, sprintf(
+                'Replay deferred to step %d (%s): the app still loads its hand-copied libraries, which may not run on PHP %s. The answers are compared once Composer\'s releases are in.',
+                $this->replayFrom,
+                HopRegistry::VENDORED_TO_COMPOSER_ID,
+                $php,
+            )]);
+        }
         try {
             $outcome = $this->replayGate->check($php, sprintf('step-%d-%s-php%s', $step->number, $step->hop->id, $php));
         } catch (ToolError $e) {
@@ -1268,6 +1296,48 @@ final class HopExecutor
         }
 
         return new StepResult($step->number, $hop->id, StepResult::APPLIED, $migration->files, [...$messages, ...$migration->changes, $migration->summary(), ...$migration->manual, ...$hop->notes]);
+    }
+
+    /**
+     * The vendored-to-composer hop. VendoredMigration does the work: the
+     * hand copies leave vendor/, composer.json asks for the maintained
+     * releases, and the require lines load Composer's autoloader. The gate
+     * then installs them on the hop's PHP (an app with no lock gets its first
+     * composer.lock from that install) and runs the app's tests or the syntax
+     * check; with --replay the replay proves the pages answer the same.
+     */
+    private function runFrameworkHop(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): StepResult
+    {
+        $hop = $step->hop;
+        $php = $step->phpAfter ?? $step->phpBefore ?? '';
+        $hadLock = is_file($path . '/composer.lock');
+        $migration = $this->vendoredMigration->migrate($path, $options->dryRun, $php);
+        if ($migration->refused()) {
+            return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [
+                'Refused: Booster will not guess past a stop sign, so nothing changed.',
+                ...array_map(static fn(string $reason): string => 'Stop sign: ' . $reason, $migration->refusals),
+            ]);
+        }
+        if ($options->dryRun) {
+            return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $migration->files, [...$migration->changes, ...$migration->manual]);
+        }
+
+        $messages = $migration->changes;
+        if (!$options->skipGate) {
+            // An app that already had a lock moves it for the new packages
+            // only; a brand-new composer.json has no lock, so the plain
+            // install resolves the packages on this PHP and writes one.
+            $update = $hadLock && $migration->packages !== [] ? $migration->packages : [];
+            $gate = $this->runGate($step, $path, $options, $baseline, $update);
+            if (!$gate->passed) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $migration->files, [...$messages, ...$migration->manual, ...$gate->lines]);
+            }
+            $messages = [...$messages, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $baseline->gateKind)];
+        } else {
+            $messages[] = sprintf('Gate skipped. Run composer install and the tests on PHP %s before the next step.', $php);
+        }
+
+        return new StepResult($step->number, $hop->id, StepResult::APPLIED, $migration->files, [...$messages, ...$migration->manual]);
     }
 
     /**

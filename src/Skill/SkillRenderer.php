@@ -142,6 +142,11 @@ final class SkillRenderer
                 'Use `browser-logs` after a page load to catch the Vue warnings the console prints.',
                 'Run `last-error` and `read-log-entries` after the tests.',
             ],
+            HopKind::Framework => [
+                'Use `search-docs` for the Doctrine ORM 2.20, Smarty 4 or Slim 4 docs, whichever the hop moved, and check them against every file Booster changed.',
+                'Use `list-routes` (or the app\'s own route list) to pick the pages the replay file should hit.',
+                'Run `last-error` and `read-log-entries` after the replay.',
+            ],
             HopKind::Node => [
                 "Use `search-docs` for the Vite front-end docs and check the app's build config against them.",
                 'Use `browser-logs` after a page load to catch front-end errors the change might surface.',

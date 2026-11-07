@@ -75,6 +75,7 @@ abstract class BaseCommand extends Command
             ->addOption('with-node', null, InputOption::VALUE_NONE, 'Include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version')
             ->addOption('sesame', null, InputOption::VALUE_NONE, 'Include the wayne-cas to SESAME swap.')
             ->addOption('wayneui', null, InputOption::VALUE_NONE, 'Include the WayneUI 1.x to 2.x move.')
+            ->addOption('vendored', null, InputOption::VALUE_NONE, 'Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto Composer.')
             ->addOption('skip', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hop id to leave out (repeatable).')
             ->addOption('no-package-check', null, InputOption::VALUE_NONE, 'Skip the Packagist dependency check (for offline use).')
             ->addOption('until', null, InputOption::VALUE_REQUIRED, 'Cut the plan after this hop id: that step and everything before it stay.')
@@ -136,6 +137,7 @@ abstract class BaseCommand extends Command
             noPackageCheck: (bool) $input->getOption('no-package-check'),
             until: $this->stringOption($input, 'until'),
             only: $this->stringOption($input, 'only'),
+            vendored: (bool) $input->getOption('vendored'),
         );
 
         $casReachability = new WayneCasReachability($this->processes);

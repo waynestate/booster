@@ -15,6 +15,7 @@ final readonly class PlanOptions
      * @param bool        $noPackageCheck   skip the Packagist dependency check (for offline use)
      * @param ?string     $until            hop id to cut the plan after (that step and everything before it stay)
      * @param ?string     $only             hop id to plan and run alone; never set together with $until
+     * @param bool        $vendored         plan the move of hand-copied libraries under vendor/ onto Composer
      */
     public function __construct(
         public ?string $fromPhp = null,
@@ -29,5 +30,6 @@ final readonly class PlanOptions
         public bool $noPackageCheck = false,
         public ?string $until = null,
         public ?string $only = null,
+        public bool $vendored = false,
     ) {}
 }
