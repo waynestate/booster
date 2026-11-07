@@ -24,6 +24,7 @@ use Waynestate\Booster\Replay\ReplayOutcome;
 use Waynestate\Booster\Replay\ReplayRunner;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Scan\BehaviourScan;
+use Waynestate\Booster\Scan\ComposerAuditScan;
 use Waynestate\Booster\Scan\RemovalsScan;
 use Waynestate\Booster\ToolError;
 
@@ -77,6 +78,8 @@ final class HopExecutor
 
     private ?BehaviourScan $behaviour = null;
 
+    private ?ComposerAuditScan $composerAudit = null;
+
     /**
      * The locked package versions read before the first step, so the package
      * rows on the last step compare against the lock the app started with,
@@ -120,6 +123,15 @@ final class HopExecutor
     private function behaviourScanner(): BehaviourScan
     {
         return $this->behaviour ??= new BehaviourScan();
+    }
+
+    /**
+     * The advisory audit of the app's packages, built on this run's process
+     * seam so tests can feed it a canned report.
+     */
+    private function composerAuditScanner(): ComposerAuditScan
+    {
+        return $this->composerAudit ??= new ComposerAuditScan($this->processes);
     }
 
     public function execute(Plan $plan, RunOptions $options): RunReport
@@ -363,17 +375,32 @@ final class HopExecutor
      * Runs one step. For PHP hops it first lists what the language removes
      * between the hop's two versions, and for PHP and Laravel hops (plus the
      * plan's last step) the curated behaviour changes: advisories in the
-     * step's messages, never a failure and never a reason to stop.
+     * step's messages, never a failure and never a reason to stop. When the
+     * hop changed the app's composer files it then audits the packages the
+     * app now declares, again advisory only: the audit never fails the step
+     * and a clean audit stays silent.
      */
     private function runStep(PlanStep $step, string $path, Plan $plan, RunOptions $options, BaselineResult $baseline): StepResult
     {
         // Scan first: the advisory must describe the app as it was before the hop rewrites it.
         $removals = $this->removalsLines($step, $path);
         $behaviour = $this->behaviourLines($step, $path, $plan);
+        $composerBefore = $this->composerFingerprint($path);
         $result = $this->runStepCore($step, $path, $plan, $options, $baseline);
-        if ($removals === '' && $behaviour === '') {
-            return $result;
+
+        // After the hop: did it change what the app declares? Then audit the
+        // packages, again advisory only. A clean audit stays silent.
+        $audit = null;
+        $skipAudit = false;
+        if ($this->composerFingerprint($path) !== $composerBefore) {
+            $audit = $this->composerAuditScanner()->scan($path);
+            if ($audit->ok && !$audit->hasFindings()) {
+                $audit = null;
+            }
+        } else {
+            $skipAudit = true;
         }
+
         $messages = [...$result->messages];
         if ($removals !== '') {
             array_unshift($messages, $removals);
@@ -381,8 +408,11 @@ final class HopExecutor
         if ($behaviour !== '') {
             $messages[] = $behaviour;
         }
+        if ($skipAudit) {
+            $messages[] = 'Composer audit: skipped (this hop changed no composer file).';
+        }
 
-        return new StepResult($step->number, $step->hop->id, $result->status, $result->files, $messages, $result->incomplete, $result->prepass);
+        return new StepResult($step->number, $step->hop->id, $result->status, $result->files, $messages, $result->incomplete, $result->prepass, $result->rules, $audit);
     }
 
     /**
@@ -2994,13 +3024,33 @@ final class HopExecutor
      */
     private function lockFingerprint(string $path): ?string
     {
-        $lock = $path . '/composer.lock';
-        if (!is_file($lock)) {
+        // A lock we cannot read counts as absent, so no change is reported.
+        return self::fileFingerprint($path . '/composer.lock');
+    }
+
+    /**
+     * The fingerprint of the app's composer files, so a step can tell whether
+     * it changed what the app declares. Each entry is the file's md5, or null
+     * when the file is absent or unreadable, mirroring lockFingerprint.
+     *
+     * @return array{json: ?string, lock: ?string}
+     */
+    private function composerFingerprint(string $path): array
+    {
+        return [
+            'json' => self::fileFingerprint($path . '/composer.json'),
+            'lock' => self::fileFingerprint($path . '/composer.lock'),
+        ];
+    }
+
+    /** The md5 of one file, or null when it is absent or unreadable. */
+    private static function fileFingerprint(string $file): ?string
+    {
+        if (!is_file($file)) {
             return null;
         }
-        $hash = md5_file($lock);
+        $hash = md5_file($file);
 
-        // A lock we cannot read counts as absent, so no change is reported.
         return $hash === false ? null : $hash;
     }
 

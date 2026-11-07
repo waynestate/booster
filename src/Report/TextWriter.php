@@ -15,6 +15,7 @@ use Waynestate\Booster\Run\RunReport;
 use Waynestate\Booster\Run\StepResult;
 use Waynestate\Booster\Scan\BehaviourEntry;
 use Waynestate\Booster\Scan\BehaviourResult;
+use Waynestate\Booster\Scan\ComposerAuditResult;
 use Waynestate\Booster\Scan\RemovalsResult;
 use Waynestate\Booster\Scan\ScanResult;
 
@@ -356,6 +357,64 @@ final class TextWriter
         return sprintf('%s (%d in %d file%s: %s)', $entry->label, $entry->total, count($files), count($files) === 1 ? '' : 's', $shown);
     }
 
+    /**
+     * The advisory composer audit block for one hop: what the audit found in
+     * the app's packages after the hop changed its composer files, or why the
+     * audit could not run. Null and a clean audit print nothing: the hop's
+     * own lines already say what changed, and an empty section would only add
+     * noise. Sub-lines carry three leading spaces; the caller adds its own
+     * indent.
+     *
+     * @return list<string>
+     */
+    public function composerAudit(?ComposerAuditResult $audit): array
+    {
+        if ($audit === null || ($audit->ok && !$audit->hasFindings())) {
+            return [];
+        }
+        if (!$audit->ok) {
+            $lines = ['Composer audit: could not run'];
+            foreach (explode("\n", self::clean((string) $audit->error)) as $line) {
+                $lines[] = '   ' . $line;
+            }
+
+            return $lines;
+        }
+
+        $advisories = count($audit->advisories);
+        $abandoned = count($audit->abandoned);
+        $lines = [sprintf(
+            'Composer audit after this hop: %d %s, %d %s (hints, not upgrade blockers).',
+            $advisories,
+            $advisories === 1 ? 'advisory' : 'advisories',
+            $abandoned,
+            $abandoned === 1 ? 'abandoned package' : 'abandoned packages',
+        )];
+        foreach ($audit->advisories as $finding) {
+            $id = $finding['id'] !== '' ? $finding['id'] : $finding['cve'];
+            if ($finding['id'] !== '' && $finding['cve'] !== '') {
+                $id .= ' (' . $finding['cve'] . ')';
+            }
+            $line = self::clean($finding['package']);
+            if ($id !== '') {
+                $line .= ': ' . self::clean($id);
+            }
+            if ($finding['affected_versions'] !== '') {
+                $line .= ' affects ' . self::clean($finding['affected_versions']);
+            }
+            if ($finding['title'] !== '') {
+                $line .= ': ' . self::clean($finding['title']);
+            }
+            $lines[] = '   ' . $line;
+        }
+        foreach ($audit->abandoned as $package => $replacement) {
+            $line = self::clean($package) . ' is abandoned';
+            $lines[] = '   ' . $line . ($replacement !== '' ? ' (use ' . self::clean($replacement) . ' instead).' : '.');
+        }
+
+        return $lines;
+    }
+
     public function run(RunReport $report, ?string $path = null, ?string $program = null): string
     {
         $path ??= $report->plan->project->path;
@@ -401,6 +460,11 @@ final class TextWriter
                 foreach ($r->prepass as $fix) {
                     $lines[] = sprintf('      %s: %d %s', self::clean($fix['file']), $fix['rewrites'], $fix['rewrites'] === 1 ? 'rewrite' : 'rewrites');
                 }
+            }
+            // The advisory composer audit, when this hop changed the app's
+            // composer files and the audit found something or could not run.
+            foreach ($this->composerAudit($r->composerAudit) as $line) {
+                $lines[] = '   ' . $line;
             }
         }
         $lines[] = '';

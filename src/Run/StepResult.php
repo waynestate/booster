@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Run;
 
+use Waynestate\Booster\Scan\ComposerAuditResult;
+
 /**
  * The outcome of one plan step.
  */
@@ -31,6 +33,7 @@ final readonly class StepResult
      * @param bool                                     $incomplete true when a dry-run preview could not see the whole app (a Laravel hop without vendor/)
      * @param list<array{file: string, rewrites: int}> $prepass files the new-by-reference pre-pass rewrote before Rector ran
      * @param array<string, int>                       $rules short rule name to number of files the rule changed; set on capped and previewed PHP and PHPUnit steps
+     * @param ComposerAuditResult|null                 $composerAudit the advisory audit of the app's packages, when the hop changed its composer files and the audit found something or could not run
      */
     public function __construct(
         public int $step,
@@ -41,6 +44,7 @@ final readonly class StepResult
         public bool $incomplete = false,
         public array $prepass = [],
         public array $rules = [],
+        public ?ComposerAuditResult $composerAudit = null,
     ) {}
 
     public function failed(): bool
@@ -67,6 +71,9 @@ final readonly class StepResult
         }
         if ($this->rules !== []) {
             $data['rules'] = $this->rules;
+        }
+        if ($this->composerAudit !== null) {
+            $data['composer_audit'] = $this->composerAudit->toArray();
         }
 
         return $data;
