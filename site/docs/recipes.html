@@ -51,7 +51,7 @@
 <h2 id="1-just-look-first">1. Just look first<a class="docs-heading-link" aria-label="Link to this section" href="#1-just-look-first">#</a></h2>
 <p>You want to know what the app is on and what moving it would take, before anything changes.</p>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster detect --path=../my-app
+<pre tabindex="0"><code>booster detect --path=../my-app
 booster plan   --path=../my-app
 booster plan   --path=../my-app --format=json
 </code></pre>
@@ -60,14 +60,14 @@ booster plan   --path=../my-app --format=json
 <h2 id="2-go-all-the-way-to-current">2. Go all the way to current<a class="docs-heading-link" aria-label="Link to this section" href="#2-go-all-the-way-to-current">#</a></h2>
 <p>You want the newest PHP and Laravel CREED's policy supports, and you are happy to take it a hop at a time.</p>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster run --path=../my-app
+<pre tabindex="0"><code>booster run --path=../my-app
 </code></pre>
 <p>With no flags Booster plans one hop per PHP minor, Laravel major and PHPUnit major up to the policy's newest, plus the front-end Node hops. It runs them in order, tests the app after each one, and stops at the first red gate. It never commits. A Laravel 10 app on PHP 8.1 plans 11 hops; a PHP 5.5 app with no framework plans 12 hops to PHP 8.5. The long version is in <a href="guides/quick-start.html#what-a-run-does-by-default">What a run does by default</a>.</p>
 <p>Not for: an app with no tests and no one to click through it afterward. The gate then only proves every file still parses, which is a start and not a finish (see recipe 10).</p>
 <h2 id="3-only-get-off-an-old-php-or-reach-a-specific-php">3. Only get off an old PHP, or reach a specific PHP<a class="docs-heading-link" aria-label="Link to this section" href="#3-only-get-off-an-old-php-or-reach-a-specific-php">#</a></h2>
 <p>You want PHP 8.4, say, and you would rather not change anything else.</p>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster run --path=../my-app --to-php=8.4
+<pre tabindex="0"><code>booster run --path=../my-app --to-php=8.4
 booster run --path=../my-app --goal=php-74-to-84
 </code></pre>
 <p><code>--goal=php-74-to-84</code> is shorthand for <code>--from-php=7.4 --to-php=8.4</code>; use it (or <code>--from-php</code>) when <code>composer.json</code> has no usable <code>php</code> constraint.</p>
@@ -77,13 +77,13 @@ booster run --path=../my-app --goal=php-74-to-84
 <li><strong>Laravel app:</strong> passing only <code>--to-php</code> does not freeze Laravel. The Laravel target still defaults to the newest the policy supports, so Booster plans the Laravel hops too, or stops with an error such as &quot;Laravel 13 does not run on PHP 8.2&quot; when that newest Laravel cannot run on the PHP you asked for. To move PHP and leave Laravel alone, name the Laravel you are on:</li>
 </ul>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster run --path=../my-app --to-php=8.3 --to-laravel=10
+<pre tabindex="0"><code>booster run --path=../my-app --to-php=8.3 --to-laravel=10
 </code></pre>
 <p>Booster checks the pair against what Laravel supports and refuses one it does not (for example, a PHP the Laravel you are on cannot run on). Passing any target also leaves the Node front-end hops out, with a warning (recipe 7).</p>
 <p>Not for: getting a Laravel app current. Laravel and PHP limit each other, so the interleaved default plan is the safe path.</p>
 <h2 id="4-reach-a-specific-laravel-major">4. Reach a specific Laravel major<a class="docs-heading-link" aria-label="Link to this section" href="#4-reach-a-specific-laravel-major">#</a></h2>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster plan --path=../my-app --to-laravel=12
+<pre tabindex="0"><code>booster plan --path=../my-app --to-laravel=12
 booster run  --path=../my-app --to-laravel=12
 </code></pre>
 <p>Booster plans the Laravel hops up to that major and adds the PHP hops that Laravel needs along the way; the PHP target is still the policy's newest unless you also pass <code>--to-php</code>, and a pair Laravel does not support is an error. PHPUnit follows the newest major that runs on the target PHP, raised to at least the floor your target Laravel ships with. A target older than the app is an error.</p>
@@ -91,7 +91,7 @@ booster run  --path=../my-app --to-laravel=12
 <h2 id="5-one-hop-at-a-time-for-small-reviewable-merge-requests">5. One hop at a time, for small reviewable merge requests<a class="docs-heading-link" aria-label="Link to this section" href="#5-one-hop-at-a-time-for-small-reviewable-merge-requests">#</a></h2>
 <p>You want each hop as its own commit, so a reviewer reads one diff at a time.</p>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster plan --path=../my-app                  # note the id of hop 1
+<pre tabindex="0"><code>booster plan --path=../my-app                  # note the id of hop 1
 booster run  --path=../my-app --only=&lt;hop id&gt;  # run that one hop
 git -C ../my-app diff                          # review it
 git -C ../my-app add -A &amp;&amp; git -C ../my-app commit -m &quot;&lt;hop id&gt;&quot;   # commit; the tree is clean again
@@ -100,32 +100,32 @@ git -C ../my-app add -A &amp;&amp; git -C ../my-app commit -m &quot;&lt;hop id&g
 <p>Not for: hops that depend on each other more than you expect. Hops are ordered for a reason; a bigger batch with <code>--until</code> is fine when the hops in it are boring.</p>
 <h2 id="6-preview-without-changing-anything">6. Preview without changing anything<a class="docs-heading-link" aria-label="Link to this section" href="#6-preview-without-changing-anything">#</a></h2>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster run --path=../my-app --dry-run
+<pre tabindex="0"><code>booster run --path=../my-app --dry-run
 </code></pre>
 <p>Rector shows the diffs it would make, hop by hop, and nothing is written. No git or Docker is needed, and the baseline and gate are skipped. The limit: a Laravel hop needs the app's own <code>vendor/</code> to see Laravel's classes. With no <code>vendor/</code>, that hop's preview is marked incomplete (run <code>composer install</code> first). With a <code>vendor/</code> from an older Laravel, a later Laravel hop reports &quot;Can't preview&quot; because it needs the earlier hops applied. Preview one hop at a time with <code>--only</code>, or apply the earlier hops for real and dry-run again.</p>
 <p>Not for: proving the app still works. A preview never runs your tests.</p>
 <h2 id="7-backend-only-or-front-end-too">7. Backend only, or front end too<a class="docs-heading-link" aria-label="Link to this section" href="#7-backend-only-or-front-end-too">#</a></h2>
 <p>Node front-end hops (the Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, the Vue steps and Inertia 3) are in the plan only when you pass no target at all. Two ways to leave them out:</p>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster run --path=../my-app --to-php=8.5          # any target drops them, with a warning
+<pre tabindex="0"><code>booster run --path=../my-app --to-php=8.5          # any target drops them, with a warning
 booster run --path=../my-app --skip=mix-to-vite    # or drop them by id
 </code></pre>
 <p><code>plan</code> lists the left-out ids in its warning. To keep them while passing a target, add <code>--with-node</code>:</p>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster run --path=../my-app --to-php=8.5 --with-node
+<pre tabindex="0"><code>booster run --path=../my-app --to-php=8.5 --with-node
 </code></pre>
 <p>The ids are <code>node-pin-24</code>, <code>mix-to-vite</code>, <code>vite-major</code>, <code>tailwind-3-to-4</code>, <code>typescript-major</code>, the Vue steps and <code>inertia-2-to-3</code>; <code>booster hops</code> lists every id. Skipping <code>vue-2-to-3</code> skips all the Vue steps.</p>
 <p>Not for: skipping the Node hops and then keeping a Mix build around forever. That is a choice, not a plan.</p>
 <h2 id="8-skip-a-hop-you-will-do-by-hand">8. Skip a hop you will do by hand<a class="docs-heading-link" aria-label="Link to this section" href="#8-skip-a-hop-you-will-do-by-hand">#</a></h2>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster run --path=../my-app --skip=&lt;hop id&gt;
+<pre tabindex="0"><code>booster run --path=../my-app --skip=&lt;hop id&gt;
 </code></pre>
 <p><code>--skip</code> can be repeated. The hop leaves the plan and Booster plans the rest around it; an unknown id is an error that tells you so. Some hops are marked <code>[manual: you do this one by hand]</code>: those are playbooks, and Booster does not do them for you. Do any hop you skip before the hops that depend on it, or the later gates will tell you.</p>
 <p>Not for: skipping to dodge a red gate. Fix the cause, or use recipe 14.</p>
 <h2 id="9-a-big-app">9. A big app<a class="docs-heading-link" aria-label="Link to this section" href="#9-a-big-app">#</a></h2>
 <p>A hop that would change more than 200 files stops to ask you first. In a terminal you see the per-rule summary and a prompt; with <code>--no-interaction</code>, in CI, or with <code>--format=json</code>, the run stops at that hop instead of asking nobody.</p>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster run --path=../my-app --max-changes=500   # apply a hop up to 500 files, no prompt
+<pre tabindex="0"><code>booster run --path=../my-app --max-changes=500   # apply a hop up to 500 files, no prompt
 booster run --path=../my-app --max-changes=0     # no limit
 booster run --path=../my-app --memory-limit=4G   # more memory for Rector (default 2G, -1 for none)
 </code></pre>
@@ -134,7 +134,7 @@ booster run --path=../my-app --memory-limit=4G   # more memory for Rector (defau
 <h2 id="10-tests-and-the-gate">10. Tests and the gate<a class="docs-heading-link" aria-label="Link to this section" href="#10-tests-and-the-gate">#</a></h2>
 <p>The gate is your app's tests, run in the target PHP's Docker image after every hop. Options for every kind of app:</p>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster run --path=../my-app --allow-failing-baseline
+<pre tabindex="0"><code>booster run --path=../my-app --allow-failing-baseline
 booster run --path=../my-app --test-command=&quot;vendor/bin/phpunit tests/Unit&quot;
 booster run --path=../my-app --test-env=DB_CONNECTION=sqlite --test-env=APP_ENV=testing
 booster run --path=../my-app --image=my-registry/php-apache:{php}
@@ -152,7 +152,7 @@ booster run --path=../my-app --skip-gate
 <p>Not for: <code>--skip-gate</code> on a real upgrade. The gate is how you learn which hop broke the app. Use it only when Docker truly cannot run, and then run the tests yourself after each hop.</p>
 <h2 id="11-offline-or-a-dirty-working-copy">11. Offline, or a dirty working copy<a class="docs-heading-link" aria-label="Link to this section" href="#11-offline-or-a-dirty-working-copy">#</a></h2>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster plan --path=../my-app --no-package-check
+<pre tabindex="0"><code>booster plan --path=../my-app --no-package-check
 booster run  --path=../my-app --allow-dirty
 </code></pre>
 <p><code>--no-package-check</code> skips the Packagist dependency check, so <code>plan</code> works with no network (you lose the report of which direct dependencies block which hops). <code>--allow-dirty</code> lets a real run start with uncommitted changes. The default refuses so that the upgrade diff stands alone and <code>git checkout .</code> can undo it; with <code>--allow-dirty</code> that undo would also throw away your own edits, so commit or stash if you can.</p>
@@ -160,14 +160,14 @@ booster run  --path=../my-app --allow-dirty
 <h2 id="12-move-off-wayne-cas-to-sesame-or-wayneui-1-to-2">12. Move off wayne-cas to SESAME, or WayneUI 1 to 2<a class="docs-heading-link" aria-label="Link to this section" href="#12-move-off-wayne-cas-to-sesame-or-wayneui-1-to-2">#</a></h2>
 <p>Both moves are opt-in:</p>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster plan --path=../my-app --sesame
+<pre tabindex="0"><code>booster plan --path=../my-app --sesame
 booster plan --path=../my-app --wayneui
 booster run  --path=../my-app --sesame --wayneui
 </code></pre>
 <p>Without the flag, <code>plan</code> only warns that your app uses <code>wayne-cas</code> or WayneUI 1.x and tells you the flag to add. <code>--sesame</code> needs the app to require <code>cit-web-infra/wayne-cas</code> and a plan that reaches PHP 8.3; it lands just before the Laravel 10 to 11 hop. <code>--wayneui</code> needs the app to require <code>cit-web-infra/wayne-ui</code> and a plan that reaches Laravel 11. If the plan ends below those, the move is left out with a warning, and Booster says why.</p>
 <h2 id="13-plan-for-a-future-date-or-a-different-policy">13. Plan for a future date, or a different policy<a class="docs-heading-link" aria-label="Link to this section" href="#13-plan-for-a-future-date-or-a-different-policy">#</a></h2>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster plan --path=../my-app --today=2027-06-01
+<pre tabindex="0"><code>booster plan --path=../my-app --today=2027-06-01
 booster plan --path=../my-app --policy=/path/to/policy.json
 </code></pre>
 <p>The default target is &quot;the newest the policy supports on the plan's date&quot;. <code>--today</code> pins the date (format <code>YYYY-MM-DD</code>), so a plan is repeatable and you can see what a later date would ask of you. <code>--policy</code>, or the <code>BOOSTER_POLICY</code> environment variable, points at a different CREED <code>policy.json</code>; the default is the copy in the <code>waynestate/creed</code> package.</p>

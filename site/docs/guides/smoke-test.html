@@ -48,11 +48,11 @@ real app the front page sits behind CAS, so an unauthenticated request is a redi
 200. The stock suite also assumes an <code>APP_URL</code> that points somewhere real and an <code>APP_KEY</code> that exists; a fresh
 checkout has neither, so the suite is red before any change, and even a green run of it proves nothing about the
 upgrade. When Booster sees only the two stock example tests, it says so next to the baseline:</p>
-<pre><code>The app's tests are only Laravel's stock examples, so the gate cannot prove anything. See &quot;A smoke test for WSU apps&quot; in the README.
+<pre tabindex="0"><code>The app's tests are only Laravel's stock examples, so the gate cannot prove anything. See &quot;A smoke test for WSU apps&quot; in the README.
 </code></pre>
 <p>Write one small test that proves the app boots and its front door still works. It needs a few environment values in
 <code>phpunit.xml</code>, because the test environment starts empty:</p>
-<pre><code class="language-xml">&lt;php&gt;
+<pre tabindex="0"><code class="language-xml">&lt;php&gt;
     &lt;env name=&quot;APP_ENV&quot; value=&quot;testing&quot;/&gt;
     &lt;env name=&quot;APP_KEY&quot; value=&quot;base64:c21va2UtdGVzdC1rZXkwMDAwMDAwMDAwMDAwMDAwMDA=&quot;/&gt;
     &lt;env name=&quot;APP_URL&quot; value=&quot;http://localhost&quot;/&gt;
@@ -60,11 +60,11 @@ upgrade. When Booster sees only the two stock example tests, it says so next to 
 </code></pre>
 <p><code>APP_KEY</code> can be any throwaway 32-byte key (<code>php artisan key:generate --show</code>); it never leaves the test
 environment. If the app touches the database while booting, point the tests at an in-memory SQLite database:</p>
-<pre><code class="language-xml">    &lt;env name=&quot;DB_CONNECTION&quot; value=&quot;sqlite&quot;/&gt;
+<pre tabindex="0"><code class="language-xml">    &lt;env name=&quot;DB_CONNECTION&quot; value=&quot;sqlite&quot;/&gt;
     &lt;env name=&quot;DB_DATABASE&quot; value=&quot;:memory:&quot;/&gt;
 </code></pre>
 <p>And the test itself, in <code>tests/Feature/SmokeTest.php</code>:</p>
-<pre><code class="language-php">&lt;?php
+<pre tabindex="0"><code class="language-php">&lt;?php
 
 namespace Tests\Feature;
 
@@ -86,7 +86,7 @@ It passes on the old PHP and must still pass on the new one, which is what the g
 <p>Those values live in <code>phpunit.xml</code>, committed with the app. When you would rather not commit them, pass them on the
 command line instead; Booster forwards each one to the baseline and every gate container with <code>-e</code>, and the report
 names the keys only, never the values:</p>
-<pre><code>booster run --path=&lt;app&gt; --test-env DB_CONNECTION=sqlite --test-env DB_DATABASE=:memory:
+<pre tabindex="0"><code>booster run --path=&lt;app&gt; --test-env DB_CONNECTION=sqlite --test-env DB_DATABASE=:memory:
 </code></pre>
 </article>
     </main>

@@ -51,7 +51,7 @@ visits. The replay gate takes the patient's vitals before the shot and again aft
 the app said on the old PHP, and after every hop it asks again and compares. It is off unless you ask for it.</p>
 <h2 id="in-three-commands">In three commands<a class="docs-heading-link" aria-label="Link to this section" href="#in-three-commands">#</a></h2>
 <!-- docs-test: skip needs Docker, run on your own app -->
-<pre><code class="language-sh">booster replay init --path=&lt;app&gt;           # draft booster-replay.json from the app's routes
+<pre tabindex="0"><code class="language-sh">booster replay init --path=&lt;app&gt;           # draft booster-replay.json from the app's routes
 # edit booster-replay.json: fill in every &quot;todo&quot;, then delete it
 booster replay record --path=&lt;app&gt;         # optional: record once and save the answers
 booster run --path=&lt;app&gt; --replay          # record, then replay after every hop
@@ -66,7 +66,7 @@ them, or check a hand-made change with <code>booster replay check --php=8.4</cod
 <p>Before the first hop, Booster serves the untouched app with PHP's built-in server inside
 <code>booster-target:&lt;old php&gt;-&lt;stamp&gt;</code>, the same image the baseline uses, sends every request in the file, and writes
 the answers to <code>baseline-php&lt;old&gt;.txt</code>. The run says so next to the baseline:</p>
-<pre><code>Replay: recorded 11 answers on PHP 7.4 from booster-replay.json.
+<pre tabindex="0"><code>Replay: recorded 11 answers on PHP 7.4 from booster-replay.json.
 </code></pre>
 <p>When a later hop runs the build gate (<code>vite-major</code>, <code>tailwind-3-to-4</code>, <code>typescript-major</code> and the other front-end
 hops), Booster first runs <code>npm ci</code> and <code>npm run build</code> in the Node container, so the baseline serves the built
@@ -78,7 +78,7 @@ recorded (the front end does not build, the setup command failed, the server nev
 <p>After each hop's tests pass, Booster serves the changed app on the new PHP, sends the same requests, and compares.
 A match adds <code>Replay passed: all 11 answers match the baseline from PHP 7.4.</code> to the hop. A difference fails the
 hop like a red test, leaves the changes in place, and shows the first difference:</p>
-<pre><code>Replay failed on PHP 8.0: 1 of 2 answers differ from the baseline from PHP 7.4.
+<pre tabindex="0"><code>Replay failed on PHP 8.0: 1 of 2 answers differ from the baseline from PHP 7.4.
 First difference: 02 requests / a word: GET /compare?code=abc (- baseline, + now)
         &quot;code&quot;: &quot;abc&quot;,
   -     &quot;matches_zero&quot;: true
@@ -98,7 +98,7 @@ counted and written next to the transcript (<code>baseline-php7.4.php-errors.txt
 because a hop is supposed to change them.</p>
 <h2 id="the-request-file">The request file<a class="docs-heading-link" aria-label="Link to this section" href="#the-request-file">#</a></h2>
 <p><code>booster-replay.json</code> sits in the app's root. Keys that start with <code>$</code> are comments. A small one:</p>
-<pre><code class="language-json">{
+<pre tabindex="0"><code class="language-json">{
     &quot;version&quot;: 1,
     &quot;serve&quot;: {
         &quot;docroot&quot;: &quot;public&quot;,

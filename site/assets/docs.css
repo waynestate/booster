@@ -259,6 +259,90 @@
   white-space: nowrap;
 }
 
+/* Images. WayneUI's reset makes every image a block, which stacks a README's badge row or icon row into
+ * a column. In the article an image sits in the line again, centered on the text, the way a README
+ * renders. An image alone in its paragraph (a hero, a diagram), or followed only by a <sub> credit,
+ * stays a block. */
+.docs-article img {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.docs-article p > img:only-child,
+.docs-article p > a:only-child > img:only-child,
+.docs-article p > img:first-child:has(+ sub:last-child),
+.docs-article p > a:first-child:has(+ sub:last-child) > img:only-child {
+  display: block;
+}
+
+/* An image row: a paragraph or block holding two or more images or linked images and nothing else
+ * (badges, the README cast row). It stays inline, so align="center" still centers it; balanced lines
+ * keep a lone icon off the last line, and each image gets the same room on every side. CSS cannot see
+ * text nodes, so a row like this with loose words in it lays out the same way, which is harmless. */
+.docs-article :is(p, div):has(> :is(img, a) + :is(img, a)):has(> img, > a > img):not(:has(> :not(img, a), > a > :not(img), > a > img ~ *)) {
+  text-wrap: balance;
+}
+
+.docs-article :is(p, div):has(> :is(img, a) + :is(img, a)):has(> img, > a > img):not(:has(> :not(img, a), > a > :not(img), > a > img ~ *)) > :is(img, a) {
+  display: inline-block;
+  margin: 0.25rem 0.125rem;
+  vertical-align: middle;
+}
+
+.docs-article :is(p, div):has(> :is(img, a) + :is(img, a)):has(> img, > a > img):not(:has(> :not(img, a), > a > :not(img), > a > img ~ *)) > a {
+  border-radius: 0.5rem;
+}
+
+.docs-article :is(p, div):has(> :is(img, a) + :is(img, a)):has(> img, > a > img):not(:has(> :not(img, a), > a > :not(img), > a > img ~ *)) > a > img {
+  display: block;
+}
+
+/* A tile row: a list whose every item is one image or one linked image (a cast list) lays out as
+ * wrapping 4rem tiles, no bullets, even gaps. */
+.docs-article ul:has(> li > img, > li > a > img):not(:has(> li > :not(img, a), > li > :is(img, a) ~ *, > li > a > :not(img), > li > a > img ~ *)) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1rem 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.docs-article ul:has(> li > img, > li > a > img):not(:has(> li > :not(img, a), > li > :is(img, a) ~ *, > li > a > :not(img), > li > a > img ~ *)) > li {
+  margin: 0;
+}
+
+.docs-article ul:has(> li > img, > li > a > img):not(:has(> li > :not(img, a), > li > :is(img, a) ~ *, > li > a > :not(img), > li > a > img ~ *)) > li > a {
+  display: block;
+  border-radius: 0.875rem;
+}
+
+.docs-article ul:has(> li > img, > li > a > img):not(:has(> li > :not(img, a), > li > :is(img, a) ~ *, > li > a > :not(img), > li > a > img ~ *)) > li img {
+  display: block;
+  width: 4rem;
+  height: auto;
+}
+
+/* A linked image in either row answers the pointer with one accent hairline around the tile, and lifts
+ * a little for readers who allow motion. Keyboard focus keeps the kit's full ring, on the same corners. */
+.docs-article :is(p, div):has(> :is(img, a) + :is(img, a)):has(> img, > a > img):not(:has(> :not(img, a), > a > :not(img), > a > img ~ *)) > a:hover:not(:focus-visible),
+.docs-article ul:has(> li > img, > li > a > img):not(:has(> li > :not(img, a), > li > :is(img, a) ~ *, > li > a > :not(img), > li > a > img ~ *)) > li > a:hover:not(:focus-visible) {
+  outline: 1px solid var(--dk-accent);
+  outline-offset: var(--dk-focus-o);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .docs-article :is(p, div):has(> :is(img, a) + :is(img, a)):has(> img, > a > img):not(:has(> :not(img, a), > a > :not(img), > a > img ~ *)) > a,
+  .docs-article ul:has(> li > img, > li > a > img):not(:has(> li > :not(img, a), > li > :is(img, a) ~ *, > li > a > :not(img), > li > a > img ~ *)) > li > a {
+    transition: transform 160ms ease;
+  }
+
+  .docs-article :is(p, div):has(> :is(img, a) + :is(img, a)):has(> img, > a > img):not(:has(> :not(img, a), > a > :not(img), > a > img ~ *)) > a:is(:hover, :focus-visible),
+  .docs-article ul:has(> li > img, > li > a > img):not(:has(> li > :not(img, a), > li > :is(img, a) ~ *, > li > a > :not(img), > li > a > img ~ *)) > li > a:is(:hover, :focus-visible) {
+    transform: translateY(-2px);
+  }
+}
+
 .docs-article pre {
   background: var(--dk-code-bg);
   border: 1px solid var(--dk-rule);
@@ -398,6 +482,13 @@
   text-align: left;
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--dk-rule);
+}
+
+/* Inline code in a header cell borrows the cell's own colors, so it keeps the
+ * header text's contrast in light and dark themes. */
+.docs-article th code {
+  color: inherit;
+  background: none;
 }
 
 .docs-toc {

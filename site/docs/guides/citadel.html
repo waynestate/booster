@@ -46,7 +46,7 @@
 <p>When a real (not dry) run changes <code>composer.lock</code> and the app has a <code>deployments/</code> directory, Booster writes one
 deployment script, <code>deployments/0000_composer_install_&lt;YYYYMMDDHHMM&gt;</code>:</p>
 <!-- docs-test: skip installs software -->
-<pre><code class="language-sh">#!/bin/sh
+<pre tabindex="0"><code class="language-sh">#!/bin/sh
 # Added by Booster: this upgrade changed composer.lock. Citadel runs each deployment script once, in name order,
 # so a new name makes existing deployments install the new vendor/ before anything else runs.
 set -e

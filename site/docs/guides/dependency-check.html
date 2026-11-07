@@ -50,7 +50,7 @@ itself (<code>laravel/framework</code>, its <code>illuminate/*</code> components
 skipped.</p>
 <p>The answer is advisory, like the scans: a package that cannot follow the plan does not drop the hop. It adds a
 warning that names the package, the hop it blocks, and what to do about it:</p>
-<pre><code>acme/legacy-auth 2.3.0 supports Laravel up to 10 and PHP up to 8.3, so it blocks laravel-10-to-11. Replace or upgrade it first.
+<pre tabindex="0"><code>acme/legacy-auth 2.3.0 supports Laravel up to 10 and PHP up to 8.3, so it blocks laravel-10-to-11. Replace or upgrade it first.
 </code></pre>
 <p>The warning names only the dimensions the blocked hop fails on: a Laravel ceiling alone, a PHP ceiling alone, or both
 together. A ceiling is printed as the newest version Booster plans that the constraint allows (a PHP constraint capping

@@ -47,7 +47,7 @@
 key that was optional is required, a default that flipped. Rector rewrites what it knows; the silent changes need a
 human eye. So <code>plan</code> and <code>run</code> carry a curated list of them, one block per PHP and Laravel hop, plus the package rows
 on the last step, where the lock lands. A booster should know its own payload.</p>
-<pre><code>Behavior changes to check:
+<pre tabindex="0"><code>Behavior changes to check:
   Config key needed (config/app.php)
     check: Add the key.
   Minimum PHP raised
@@ -62,7 +62,7 @@ prints when nothing matches. In JSON output the entries land under <code>behavio
 must equal after, and how to measure it. When a matched entry has one, the block gains a <code>Parity checks</code> section
 under the same step, one <code>[ ]</code> row per entry, so you can write down the before value now and compare it after the
 hop. The field is optional; entries without it print exactly as before.</p>
-<pre><code class="language-json">{
+<pre tabindex="0"><code class="language-json">{
   &quot;parity&quot;: {
     &quot;what&quot;: &quot;How long a flashed toast stays open&quot;,
     &quot;before&quot;: &quot;The timer value the app sets today (SWEET_ALERT_TIMER in .env or 'timer' in config/sweetalert.php)&quot;,
@@ -75,7 +75,7 @@ hop. The field is optional; entries without it print exactly as before.</p>
 (<code>php-80-to-81</code>, <code>laravel-10-to-11</code>, or <code>package:vendor/name@2</code> for a floor a package raises), how to find it
 (<code>detect</code>: a <code>function</code>, <code>method</code>, <code>class</code>, <code>property</code>, string <code>token</code>, blade snippet, config <code>file</code> and <code>key</code>,
 composer <code>package</code>, or <code>always</code>), and a <code>source</code> link that confirms the change:</p>
-<pre><code class="language-json">{
+<pre tabindex="0"><code class="language-json">{
   &quot;id&quot;: &quot;laravel-11-config-key&quot;,
   &quot;hop&quot;: &quot;laravel-10-to-11&quot;,
   &quot;detect&quot;: { &quot;kind&quot;: &quot;config&quot;, &quot;file&quot;: &quot;config/app.php&quot;, &quot;key&quot;: &quot;cipher&quot; },

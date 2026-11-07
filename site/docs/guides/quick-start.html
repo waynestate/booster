@@ -44,7 +44,7 @@
       <article class="docs-article"><h1 id="quick-start">Quick start<a class="docs-heading-link" aria-label="Link to this section" href="#quick-start">#</a></h1>
 <p>This page runs Booster on an app for the first time. Next: <a href="hops.html">What a hop does</a> for what each step does.</p>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster detect --path=../my-app        # which of the five permutations, and which versions
+<pre tabindex="0"><code>booster detect --path=../my-app        # which of the five permutations, and which versions
 booster plan   --path=../my-app        # the ordered hops to a supported version
 booster scan   --path=../my-app --php=&lt;target&gt;   # what will break on that newer PHP; advisory, changes nothing
 booster run    --path=../my-app --dry-run   # the diffs Rector would make; changes nothing
@@ -104,7 +104,7 @@ booster init   --path=../my-app        # optional: writes playbooks for AI codin
 </ul>
 <p>The one-command form for a forced image upgrade:</p>
 <!-- docs-test: skip run on your own app -->
-<pre><code>booster run --path=../my-app --goal=php-74-to-84
+<pre tabindex="0"><code>booster run --path=../my-app --goal=php-74-to-84
 </code></pre>
 <p>When the app carries a <code>composer.lock</code>, <code>detect</code> also reads the PHP range the locked packages allow: the highest
 <code>require.php</code> floor and the lowest ceiling across <code>packages</code> and <code>packages-dev</code>, raised by a <code>platform-overrides.php</code>
@@ -114,9 +114,9 @@ the lock's ceiling, a second warning notes that hop will need a <code>composer u
 Without a lock, <code>composer.json</code> stays the sole source.</p>
 <p>A plan for the bundled Laravel 10 example app on PHP 8.2 looks like this (the order keeps the app on a PHP and
 Laravel pair Laravel supports at every step):</p>
-<pre><code class="language-bash">booster plan --path=examples/laravel-blade --today=2026-10-29
+<pre tabindex="0"><code class="language-bash">booster plan --path=examples/laravel-blade --today=2026-10-29
 </code></pre>
-<pre><code class="language-output">BOOSTER plan for examples/laravel-blade
+<pre tabindex="0"><code class="language-output">BOOSTER plan for examples/laravel-blade
   app type: laravel-blade
   PHP: 8.2 -&gt; 8.5
   Laravel: 10 -&gt; 13
