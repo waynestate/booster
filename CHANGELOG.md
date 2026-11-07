@@ -4,6 +4,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-07
+
 ### Added
 
 - The first framework hop, `vendored-to-composer`, planned with the new `--vendored` option: it moves an app's hand-copied Doctrine 2, Smarty 3 and Slim 1 out of `vendor/` and onto the maintained Composer releases that keep the same API (`doctrine/orm ^2.20` with `doctrine/annotations ^1.14` and `symfony/cache`, `smarty/smarty ^4.5`, `slim/slim ^4.15` with `slim/psr7`). It deletes the copies, writes or extends `composer.json`, points each file's `require` of a copy at `vendor/autoload.php` and drops the 2012 bootstrap lines (`Setup::registerAutoloadDirectory()`, `define('SMARTY_DIR')`). A Slim 1 app keeps its routes through `slim1-bridge.php`, written at the app root and loaded by Composer's classmap: Slim 1.6's API (`:param` routes and conditions, first match wins, `render()` through the app's `Slim_View`, `halt()`, `redirect()`, the 404, 405 and 500 pages byte for byte) on Slim 4's router. The planner places the hop at the first PHP every release runs on (7.4 with Slim, 7.1 without); anything the hop cannot rewrite exactly (Doctrine's `ClassLoader`, Slim hooks, cookies, middleware or regex routes, a Smarty 2 copy) is a stop sign that leaves the hop out with the file and line. With `--replay`, steps before the hop defer their replay, since the old copies may not run on the new PHP. Libraries without a recipe and nested copies stay where they are and are listed as MANUAL lines. Guide: `docs/guides/framework-hops.md`.

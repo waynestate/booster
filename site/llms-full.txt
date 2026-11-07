@@ -859,7 +859,7 @@ browser. The private proof site has the hop-by-hop table.
 
 ### Status
 
-Version 1.9. See [CHANGELOG.md](https://github.com/waynestate/booster/blob/HEAD/CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](https://github.com/waynestate/booster/blob/HEAD/OPEN_QUESTIONS.md) for what stays
+Version 1.10. See [CHANGELOG.md](https://github.com/waynestate/booster/blob/HEAD/CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](https://github.com/waynestate/booster/blob/HEAD/OPEN_QUESTIONS.md) for what stays
 open, and [BEST_PRACTICES.md](https://github.com/waynestate/booster/blob/HEAD/BEST_PRACTICES.md) for the rules Booster follows.
 
 ### License
@@ -1299,6 +1299,8 @@ Source: https://booster.apps.wayne.edu/docs/changelog.html
 All notable changes to Booster are recorded here. The format follows Keep a Changelog.
 
 ### \[Unreleased\][#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
+
+### \[1.10.0\] - 2026-11-07[#](https://booster.apps.wayne.edu/docs/changelog.html#1-10-0-2026-11-07)
 
 #### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added)
 
@@ -3017,7 +3019,7 @@ Source: https://booster.apps.wayne.edu/proof.html
 
 ## Real output, from Booster's own example apps
 
-Captured on 2026-11-07 with Booster 1.9.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
+Captured on 2026-11-07 with Booster 1.10.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
 
 ### laravel-blade
 
