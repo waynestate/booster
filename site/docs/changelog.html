@@ -56,6 +56,7 @@
 </ul>
 <h3 id="changed">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed">#</a></h3>
 <ul>
+<li>Docs: the README's Commands section gains the stack's &quot;Which command when&quot; table, copied word for word from WELD's docs: <code>booster plan</code>, <code>booster replay check</code>, <code>booster init --check</code>, <code>proctor check</code> and the other look-alikes, with what each checks, when to run it and where it runs (D-064).</li>
 <li>Docs: <code>ADR/</code> and <code>DECISIONS.md</code> record Booster's shape decisions (one CLI, no tools image, PROCTOR from the host, the PNG mark).</li>
 <li>Changed: the GitLab pipeline pins the Preflight components to 0.2.0 (was 0.1.4).</li>
 <li>The front page's deploy layer (<code>deploy/</code>) runs Squire's kit 0.6.0 (was 0.5.0): <code>scripts/release.sh</code> asks PROCTOR's deploy gate for a go or no-go on each release (a report, not a stop, unless <code>SQUIRE_PROCTOR=enforce</code>), and <code>.env.squire.example</code> lists the new setting. The layer's pins move to HELMET <code>^0.4</code> (locked 0.4.0) and PROCTOR <code>^0.7</code> (locked 0.7.0).</li>
