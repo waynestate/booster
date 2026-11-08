@@ -45,6 +45,10 @@
 <h1 id="changelog">Changelog<a class="docs-heading-link" aria-label="Link to this section" href="#changelog">#</a></h1>
 <p>All notable changes to Booster are recorded here. The format follows Keep a Changelog.</p>
 <h2 id="unreleased">[Unreleased]<a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></h2>
+<h3 id="added">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added">#</a></h3>
+<ul>
+<li>Added: Booster checks the Rector config with rector validate-config before a Rector hop changes anything, and the run report records the Rector version.</li>
+</ul>
 <h3 id="changed">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed">#</a></h3>
 <ul>
 <li>Changed: the GitLab pipeline pins the Preflight components to 0.2.0 (was 0.1.4).</li>
@@ -62,7 +66,7 @@
 <li>The front page's &quot;Next&quot; label reads Version 1.10 (it said 1.8, beside a 1.10 masthead), and its cast says Sourdough starts new apps in all five shapes, not raw PHP only.</li>
 </ul>
 <h2 id="1-10-0-2026-11-07">[1.10.0] - 2026-11-07<a class="docs-heading-link" aria-label="Link to this section" href="#1-10-0-2026-11-07">#</a></h2>
-<h3 id="added">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added">#</a></h3>
+<h3 id="added-1">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-1">#</a></h3>
 <ul>
 <li>
 <p>The first framework hop, <code>vendored-to-composer</code>, planned with the new <code>--vendored</code> option: it moves an app's hand-copied Doctrine 2, Smarty 3 and Slim 1 out of <code>vendor/</code> and onto the maintained Composer releases that keep the same API (<code>doctrine/orm ^2.20</code> with <code>doctrine/annotations ^1.14</code> and <code>symfony/cache</code>, <code>smarty/smarty ^4.5</code>, <code>slim/slim ^4.15</code> with <code>slim/psr7</code>). It deletes the copies, writes or extends <code>composer.json</code>, points each file's <code>require</code> of a copy at <code>vendor/autoload.php</code> and drops the 2012 bootstrap lines (<code>Setup::registerAutoloadDirectory()</code>, <code>define('SMARTY_DIR')</code>). A Slim 1 app keeps its routes through <code>slim1-bridge.php</code>, written at the app root and loaded by Composer's classmap: Slim 1.6's API (<code>:param</code> routes and conditions, first match wins, <code>render()</code> through the app's <code>Slim_View</code>, <code>halt()</code>, <code>redirect()</code>, the 404, 405 and 500 pages byte for byte) on Slim 4's router. The planner places the hop at the first PHP every release runs on (7.4 with Slim, 7.1 without); anything the hop cannot rewrite exactly (Doctrine's <code>ClassLoader</code>, Slim hooks, cookies, middleware or regex routes, a Smarty 2 copy) is a stop sign that leaves the hop out with the file and line. With <code>--replay</code>, steps before the hop defer their replay, since the old copies may not run on the new PHP. Libraries without a recipe and nested copies stay where they are and are listed as MANUAL lines. Guide: <code>docs/guides/framework-hops.md</code>.</p>
@@ -98,7 +102,7 @@
 <ul>
 <li>The front-page deploy layer moves to Symfony 7.4.23 (symfony/http-foundation and symfony/yaml advisories, including CVE-2026-118514).</li>
 </ul>
-<h3 id="added-1">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-1">#</a></h3>
+<h3 id="added-2">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-2">#</a></h3>
 <ul>
 <li>The <code>vite-major</code> hop: for an app whose <code>package.json</code> lists <code>vite</code> below the hop data's Vite major, it pins <code>vite</code> to the hop data's version wherever it sits, pins <code>laravel-vite-plugin</code> and <code>@vitejs/plugin-vue</code> to the hop data's versions when they are already listed, runs <code>npm install</code> in the Node container and asks for a build gate. The planner offers it after <code>node-pin-24</code> and ahead of <code>tailwind-3-to-4</code>, and never alongside <code>mix-to-vite</code>, which installs the new Vite itself. It reuses the existing <code>vite_version</code>, <code>laravel_vite_plugin_version</code> and <code>vue_plugin_version</code> keys in <code>data/versions.json</code>.</li>
 <li>A new hop, <code>typescript-major</code>: for an app whose <code>typescript</code> constraint in <code>package.json</code> floors below major 6, it pins <code>typescript</code> to <code>^6.0</code> wherever it sits, and <code>vue-tsc</code> to <code>^3.0</code> when the app lists it, then runs the build gate (<code>npm ci</code>, <code>npm run build</code>) and the tests. Offered after <code>node-pin-24</code>, <code>mix-to-vite</code> and <code>tailwind-3-to-4</code>; running the type check and fixing what the new major flags stay manual work, and the hop says so.</li>
@@ -133,7 +137,7 @@
 <li>When the gate image cannot be built, <code>booster run</code> exits non-zero and says so: &quot;Could not build booster-target:<php>-<stamp> (docker build exit N), so the gate cannot run&quot;, with the ways out (<code>--image</code>, <code>--skip-gate</code>) and the last 40 lines of the build output instead of BuildKit's whole log.</li>
 </ul>
 <h2 id="1-8-2-2026-11-04">[1.8.2] - 2026-11-04<a class="docs-heading-link" aria-label="Link to this section" href="#1-8-2-2026-11-04">#</a></h2>
-<h3 id="added-2">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-2">#</a></h3>
+<h3 id="added-3">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-3">#</a></h3>
 <ul>
 <li>The Real output page, <code>site/proof.html</code>: Booster's own plan and dry-run output on each example app, captured from the real tool, linked from the front page, with a Markdown twin and entries in <code>llms.txt</code> and <code>llms-full.txt</code>. <code>composer proof</code> rebuilds it, <code>composer proof:capture</code> re-captures it, and <code>composer ci</code> fails when it is stale.</li>
 </ul>
@@ -167,7 +171,7 @@
 <li>Docs: the front-page samples show waynestate/creed 0.1.6.</li>
 <li>Tests: phpunit skips tests/docs-fixture, which only feeds the docs examples.</li>
 </ul>
-<h3 id="added-3">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-3">#</a></h3>
+<h3 id="added-4">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-4">#</a></h3>
 <ul>
 <li>The documentation site: <code>site/docs/</code> is built from <code>docs/</code> by <code>bin/docs-site.php</code> (<code>composer docs</code>), the built pages are committed, and <code>composer docs:check</code> (part of <code>composer ci</code>) fails when they drift from the sources.</li>
 <li>Every shell block in <code>docs/</code> is tagged for the examples runner: <code>booster detect</code> and the quick start's <code>booster plan</code> run against <code>tests/docs-fixture/</code> with their output committed beside them, and the rest carry a <code>docs-test: skip</code> reason (needs network, needs Docker, installs software, run on your own app).</li>
@@ -180,7 +184,7 @@
 <li>The plan and scan text reports speak plainly: an automatic step no longer carries the internal <code>[target-image-tests]</code> label and instead says &quot;After this step your tests run in Docker.&quot; after its summary; a step you do by hand is marked <code>[manual: you do this one by hand]</code>; the advisory scan line reads &quot;PHPCompatibility check for PHP X: N errors, M warnings.&quot; with singular counts (&quot;1 error&quot;, &quot;1 warning&quot;) instead of &quot;Will break on PHP X&quot;; and packages the dependency check cannot reach are reported as &quot;not on Packagist or unreachable&quot; instead of &quot;offline&quot;. JSON output is unchanged.</li>
 <li>User-facing text uses US spelling (behavior, color, license and so on); command and JSON key names are unchanged.</li>
 </ul>
-<h3 id="added-4">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-4">#</a></h3>
+<h3 id="added-5">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-5">#</a></h3>
 <ul>
 <li><code>booster run</code> prints one line per hop to standard error while it works: the hop's position in the plan, its id, its status, the number of files it changed and the seconds it took, and a closing line totals the hops run, the stops and the whole run. The lines go to standard error so the report on standard output is unchanged and <code>--format json</code> stays valid JSON.</li>
 <li><code>--path</code> accepts a leading <code>~</code> for your home folder: <code>~</code> and <code>~/...</code> (or <code>~\...</code> on Windows) are rewritten from <code>HOME</code>, or <code>USERPROFILE</code> on Windows, because the shell does not expand a tilde after <code>=</code> or inside quotes. <code>~user/...</code> stays as typed.</li>
@@ -226,7 +230,7 @@
 </ul>
 <h2 id="1-7-0-2026-11-01">[1.7.0] - 2026-11-01<a class="docs-heading-link" aria-label="Link to this section" href="#1-7-0-2026-11-01">#</a></h2>
 <p>WayneUI joins the stack: a hop for the 1.x to 2.x move, and ten more behavior-change warnings.</p>
-<h3 id="added-5">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-5">#</a></h3>
+<h3 id="added-6">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-6">#</a></h3>
 <ul>
 <li>The <code>wayneui-1-to-2</code> hop, opt-in with <code>--wayneui</code>, for apps that require <code>cit-web-infra/wayne-ui</code>. It runs after the last Laravel hop and before the Vue hops and only when the plan reaches Laravel 11 or later (WayneUI 2.x supports 11 and newer); a plan that ends lower warns and leaves the hop out, and an app that uses WayneUI 1.x without the flag gets a nudge.</li>
 <li>The hop rewrites only the one-to-one items of WayneUI's <code>MIGRATING.md</code>, about 57 percent of the mapping: Bootstrap 3 class tokens in class attributes (whole tokens only), Font Awesome icons without size modifiers, five brand colors in CSS and Blade, the Breadcrumbs renames and three <code>config/wayne-ui.php</code> keys. It swaps the Composer requirement to <code>waynestate/wayne-ui</code> <code>^2.0</code>.</li>
@@ -247,7 +251,7 @@
 </ul>
 <h2 id="1-5-0-2026-10-31">[1.5.0] - 2026-10-31<a class="docs-heading-link" aria-label="Link to this section" href="#1-5-0-2026-10-31">#</a></h2>
 <p>Behavior-change warnings, from the second real-use report: a hop can pass every gate and still change what users see.</p>
-<h3 id="added-6">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-6">#</a></h3>
+<h3 id="added-7">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-7">#</a></h3>
 <ul>
 <li>Behavior changes to check: <code>booster plan</code>, the run report and <code>--format=json</code> (<code>behaviour_changes</code>) now name the
 silent changes a step brings: things that still pass every gate but behave differently, such as Carbon 3 reading
@@ -261,7 +265,7 @@ on the plan's last step, compared against the lock as it was before the run.</li
 </ul>
 <h2 id="1-4-0-2026-10-30">[1.4.0] - 2026-10-30<a class="docs-heading-link" aria-label="Link to this section" href="#1-4-0-2026-10-30">#</a></h2>
 <p>Fixes from the second real-use report (two apps taken to PHP 7.4/Laravel 8 and PHP 8.5/Laravel 13 with SESAME).</p>
-<h3 id="added-7">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-7">#</a></h3>
+<h3 id="added-8">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-8">#</a></h3>
 <ul>
 <li><code>--test-env KEY=VALUE</code> (repeatable) passes settings, such as a database host, to the baseline and every gate.
 Reports name the keys only, never the values.</li>
@@ -327,7 +331,7 @@ that skipped every PHPUnit hop.</li>
 <li>The SESAME report says what the swap actually wrote to each model.</li>
 <li>Laravel hops remove the imports their Rector rules left unused.</li>
 </ul>
-<h3 id="added-8">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-8">#</a></h3>
+<h3 id="added-9">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-9">#</a></h3>
 <ul>
 <li><code>plan</code> checks each direct dependency's newest release (Packagist, and composer-type repositories the app lists)
 against every planned hop: it names the first hop a package blocks and flags abandoned packages.
@@ -353,7 +357,7 @@ oci8, so the first build takes a few minutes.</li>
 <li>Target image tags are stamped with a short hash of <code>docker/Dockerfile</code> (<code>booster-target:&lt;php&gt;-&lt;stamp&gt;</code>), so an
 edited recipe rebuilds the image instead of reusing a stale tag.</li>
 </ul>
-<h3 id="added-9">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-9">#</a></h3>
+<h3 id="added-10">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-10">#</a></h3>
 <ul>
 <li><code>--image</code> for <code>run</code>: run the gate in a Docker image of your own instead of building <code>booster-target</code>. The image
 needs <code>php</code> and <code>composer</code> on <code>PATH</code>; Booster uses it when it is present locally and pulls it otherwise.</li>
@@ -373,7 +377,7 @@ explicit hard limit that never prompts, and <code>0</code> lifts the limit entir
 instead of the deprecated release-cli.</li>
 </ul>
 <h2 id="1-0-0-2026-10-30">[1.0.0] - 2026-10-30<a class="docs-heading-link" aria-label="Link to this section" href="#1-0-0-2026-10-30">#</a></h2>
-<h3 id="added-10">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-10">#</a></h3>
+<h3 id="added-11">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-11">#</a></h3>
 <ul>
 <li>The PROCTOR policy gate: a baseline before the first hop and a final check after the last, so only findings new
 against the baseline block the run. The report groups New, Already present and Fixed; <code>--proctor-advisory</code> makes it
@@ -436,7 +440,7 @@ script: the policy comes from the <code>waynestate/creed</code> package.</li>
 <li><code>vue-compat-codemod</code> keeps unrecognised output lines whole and cuts long output on a character boundary.</li>
 </ul>
 <h2 id="0-1-3-2026-10-29">[0.1.3] - 2026-10-29<a class="docs-heading-link" aria-label="Link to this section" href="#0-1-3-2026-10-29">#</a></h2>
-<h3 id="added-11">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-11">#</a></h3>
+<h3 id="added-12">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-12">#</a></h3>
 <ul>
 <li>Added: agent-ready site (prompt blocks, Markdown twins, llms.txt), from Squire's kit.</li>
 </ul>
@@ -454,7 +458,7 @@ script: the policy comes from the <code>waynestate/creed</code> package.</li>
 <li>CREED reader re-exported from CREED 0.1.2: versions older than the oldest listed line are now end of life instead of refused.</li>
 </ul>
 <h2 id="0-1-1-2026-10-29">[0.1.1] - 2026-10-29<a class="docs-heading-link" aria-label="Link to this section" href="#0-1-1-2026-10-29">#</a></h2>
-<h3 id="added-12">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-12">#</a></h3>
+<h3 id="added-13">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-13">#</a></h3>
 <ul>
 <li><code>data/versions.json</code>, the hop data file (shipped in the PHAR), and <code>bin/refresh-hop-data.php</code>, which rewrites it
 from the Packagist, endoflife.date and npm feeds plus CREED's policy. <code>composer ci</code> ends with the offline <code>--check</code>
@@ -473,7 +477,7 @@ installed gets no hop.</li>
 major) and runs its npm work in the matching <code>node:</code> container.</li>
 </ul>
 <h2 id="0-1-0-2026-10-29">[0.1.0] - 2026-10-29<a class="docs-heading-link" aria-label="Link to this section" href="#0-1-0-2026-10-29">#</a></h2>
-<h3 id="added-13">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-13">#</a></h3>
+<h3 id="added-14">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-14">#</a></h3>
 <ul>
 <li><code>booster plan</code>, <code>run</code>, <code>hops</code>, <code>detect</code> and <code>init</code> commands (also <code>vendor/bin/booster</code>).</li>
 <li>App-type detection for the five stack permutations from <code>composer.json</code> and <code>package.json</code>.</li>
@@ -531,7 +535,7 @@ PHP_CodeSniffer carries the PHPCompatibility standard.</li>
     </main>
     <nav class="docs-pager" aria-label="Pages"><a class="docs-pager__link" href="../docs/next.html"><span class="docs-pager__dir">Previous</span><span class="docs-pager__title">Next</span></a></nav>
   </div>
-  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#unreleased">[Unreleased]</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed">Fixed</a></li><li class="docs-toc__item"><a href="#1-10-0-2026-11-07">[1.10.0] - 2026-11-07</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-1">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-1">Fixed</a></li><li class="docs-toc__item"><a href="#1-9-0-2026-11-06">[1.9.0] - 2026-11-06</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#security">Security</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-1">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-2">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-2">Fixed</a></li><li class="docs-toc__item"><a href="#1-8-3-2026-11-04">[1.8.3] - 2026-11-04</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-3">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-3">Fixed</a></li><li class="docs-toc__item"><a href="#1-8-2-2026-11-04">[1.8.2] - 2026-11-04</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-2">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-4">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-4">Fixed</a></li><li class="docs-toc__item"><a href="#1-8-1-2026-11-03">[1.8.1] - 2026-11-03</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-5">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-3">Added</a></li><li class="docs-toc__item"><a href="#1-8-0-2026-11-03">[1.8.0] - 2026-11-03</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-6">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-4">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-7">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-5">Fixed</a></li><li class="docs-toc__item"><a href="#1-7-0-2026-11-01">[1.7.0] - 2026-11-01</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-5">Added</a></li><li class="docs-toc__item"><a href="#1-6-0-2026-11-01">[1.6.0] - 2026-11-01</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-8">Changed</a></li><li class="docs-toc__item"><a href="#1-5-0-2026-10-31">[1.5.0] - 2026-10-31</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-6">Added</a></li><li class="docs-toc__item"><a href="#1-4-0-2026-10-30">[1.4.0] - 2026-10-30</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-7">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-9">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-6">Fixed</a></li><li class="docs-toc__item"><a href="#1-3-0-2026-10-30">[1.3.0] - 2026-10-30</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-10">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-8">Added</a></li><li class="docs-toc__item"><a href="#1-2-0-2026-10-30">[1.2.0] - 2026-10-30</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-11">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-9">Added</a></li><li class="docs-toc__item"><a href="#1-1-0-2026-10-30">[1.1.0] - 2026-10-30</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-12">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-7">Fixed</a></li><li class="docs-toc__item"><a href="#1-0-0-2026-10-30">[1.0.0] - 2026-10-30</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-10">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-13">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#removed">Removed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-8">Fixed</a></li><li class="docs-toc__item"><a href="#0-1-3-2026-10-29">[0.1.3] - 2026-10-29</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-11">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-9">Fixed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-14">Changed</a></li><li class="docs-toc__item"><a href="#0-1-2-2026-10-29">[0.1.2] - 2026-10-29</a></li><li class="docs-toc__item"><a href="#0-1-1-2026-10-29">[0.1.1] - 2026-10-29</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-12">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-15">Changed</a></li><li class="docs-toc__item"><a href="#0-1-0-2026-10-29">[0.1.0] - 2026-10-29</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-13">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-16">Changed</a></li></ul></nav>
+  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#unreleased">[Unreleased]</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed">Fixed</a></li><li class="docs-toc__item"><a href="#1-10-0-2026-11-07">[1.10.0] - 2026-11-07</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-1">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-1">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-1">Fixed</a></li><li class="docs-toc__item"><a href="#1-9-0-2026-11-06">[1.9.0] - 2026-11-06</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#security">Security</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-2">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-2">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-2">Fixed</a></li><li class="docs-toc__item"><a href="#1-8-3-2026-11-04">[1.8.3] - 2026-11-04</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-3">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-3">Fixed</a></li><li class="docs-toc__item"><a href="#1-8-2-2026-11-04">[1.8.2] - 2026-11-04</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-3">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-4">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-4">Fixed</a></li><li class="docs-toc__item"><a href="#1-8-1-2026-11-03">[1.8.1] - 2026-11-03</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-5">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-4">Added</a></li><li class="docs-toc__item"><a href="#1-8-0-2026-11-03">[1.8.0] - 2026-11-03</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-6">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-5">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-7">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-5">Fixed</a></li><li class="docs-toc__item"><a href="#1-7-0-2026-11-01">[1.7.0] - 2026-11-01</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-6">Added</a></li><li class="docs-toc__item"><a href="#1-6-0-2026-11-01">[1.6.0] - 2026-11-01</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-8">Changed</a></li><li class="docs-toc__item"><a href="#1-5-0-2026-10-31">[1.5.0] - 2026-10-31</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-7">Added</a></li><li class="docs-toc__item"><a href="#1-4-0-2026-10-30">[1.4.0] - 2026-10-30</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-8">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-9">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-6">Fixed</a></li><li class="docs-toc__item"><a href="#1-3-0-2026-10-30">[1.3.0] - 2026-10-30</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-10">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-9">Added</a></li><li class="docs-toc__item"><a href="#1-2-0-2026-10-30">[1.2.0] - 2026-10-30</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-11">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-10">Added</a></li><li class="docs-toc__item"><a href="#1-1-0-2026-10-30">[1.1.0] - 2026-10-30</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-12">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-7">Fixed</a></li><li class="docs-toc__item"><a href="#1-0-0-2026-10-30">[1.0.0] - 2026-10-30</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-11">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-13">Changed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#removed">Removed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-8">Fixed</a></li><li class="docs-toc__item"><a href="#0-1-3-2026-10-29">[0.1.3] - 2026-10-29</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-12">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#fixed-9">Fixed</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-14">Changed</a></li><li class="docs-toc__item"><a href="#0-1-2-2026-10-29">[0.1.2] - 2026-10-29</a></li><li class="docs-toc__item"><a href="#0-1-1-2026-10-29">[0.1.1] - 2026-10-29</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-13">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-15">Changed</a></li><li class="docs-toc__item"><a href="#0-1-0-2026-10-29">[0.1.0] - 2026-10-29</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#added-14">Added</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#changed-16">Changed</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
   <span>Documents Booster <span data-docs-version>1.10.0</span></span>

@@ -11,6 +11,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- Added: Booster checks the Rector config with rector validate-config before a Rector hop changes anything, and the run report records the Rector version.
+
 ### Changed
 
 - Changed: the GitLab pipeline pins the Preflight components to 0.2.0 (was 0.1.4).
