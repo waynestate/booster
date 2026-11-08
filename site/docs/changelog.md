@@ -12,6 +12,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## \[Unreleased\][#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added)
+
+- Added: Booster checks the Rector config with rector validate-config before a Rector hop changes anything, and the run report records the Rector version.
+
 ### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed)
 
 - Changed: the GitLab pipeline pins the Preflight components to 0.2.0 (was 0.1.4).
@@ -30,7 +34,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## \[1.10.0\] - 2026-11-07[#](https://booster.apps.wayne.edu/docs/changelog.html#1-10-0-2026-11-07)
 
-### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added)
+### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-1)
 
 - The first framework hop, `vendored-to-composer`, planned with the new `--vendored` option: it moves an app's hand-copied Doctrine 2, Smarty 3 and Slim 1 out of `vendor/` and onto the maintained Composer releases that keep the same API (`doctrine/orm ^2.20` with `doctrine/annotations ^1.14` and `symfony/cache`, `smarty/smarty ^4.5`, `slim/slim ^4.15` with `slim/psr7`). It deletes the copies, writes or extends `composer.json`, points each file's `require` of a copy at `vendor/autoload.php` and drops the 2012 bootstrap lines (`Setup::registerAutoloadDirectory()`, `define('SMARTY_DIR')`). A Slim 1 app keeps its routes through `slim1-bridge.php`, written at the app root and loaded by Composer's classmap: Slim 1.6's API (`:param` routes and conditions, first match wins, `render()` through the app's `Slim_View`, `halt()`, `redirect()`, the 404, 405 and 500 pages byte for byte) on Slim 4's router. The planner places the hop at the first PHP every release runs on (7.4 with Slim, 7.1 without); anything the hop cannot rewrite exactly (Doctrine's `ClassLoader`, Slim hooks, cookies, middleware or regex routes, a Smarty 2 copy) is a stop sign that leaves the hop out with the file and line. With `--replay`, steps before the hop defer their replay, since the old copies may not run on the new PHP. Libraries without a recipe and nested copies stay where they are and are listed as MANUAL lines. Guide: `docs/guides/framework-hops.md`.
 - The site accessibility gate: `scripts/a11y.sh` (Linux, macOS, Git Bash) and `scripts/a11y.ps1` (Windows PowerShell) run axe-core in Playwright (WCAG 2.2 AA, light and dark, 360 and 1280 px) in Docker over the front page and every page under `site/docs/`; `tools/a11y/check.mjs` takes repeated `--page` values.
@@ -61,7 +65,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 - The front-page deploy layer moves to Symfony 7.4.23 (symfony/http-foundation and symfony/yaml advisories, including CVE-2026-118514).
 
-### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-1)
+### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-2)
 
 - The `vite-major` hop: for an app whose `package.json` lists `vite` below the hop data's Vite major, it pins `vite` to the hop data's version wherever it sits, pins `laravel-vite-plugin` and `@vitejs/plugin-vue` to the hop data's versions when they are already listed, runs `npm install` in the Node container and asks for a build gate. The planner offers it after `node-pin-24` and ahead of `tailwind-3-to-4`, and never alongside `mix-to-vite`, which installs the new Vite itself. It reuses the existing `vite_version`, `laravel_vite_plugin_version` and `vue_plugin_version` keys in `data/versions.json`.
 - A new hop, `typescript-major`: for an app whose `typescript` constraint in `package.json` floors below major 6, it pins `typescript` to `^6.0` wherever it sits, and `vue-tsc` to `^3.0` when the app lists it, then runs the build gate (`npm ci`, `npm run build`) and the tests. Offered after `node-pin-24`, `mix-to-vite` and `tailwind-3-to-4`; running the type check and fixing what the new major flags stay manual work, and the hop says so.
@@ -98,7 +102,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## \[1.8.2\] - 2026-11-04[#](https://booster.apps.wayne.edu/docs/changelog.html#1-8-2-2026-11-04)
 
-### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-2)
+### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-3)
 
 - The Real output page, `site/proof.html`: Booster's own plan and dry-run output on each example app, captured from the real tool, linked from the front page, with a Markdown twin and entries in `llms.txt` and `llms-full.txt`. `composer proof` rebuilds it, `composer proof:capture` re-captures it, and `composer ci` fails when it is stale.
 
@@ -133,7 +137,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - Docs: the front-page samples show waynestate/creed 0.1.6.
 - Tests: phpunit skips tests/docs-fixture, which only feeds the docs examples.
 
-### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-3)
+### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-4)
 
 - The documentation site: `site/docs/` is built from `docs/` by `bin/docs-site.php` (`composer docs`), the built pages are committed, and `composer docs:check` (part of `composer ci`) fails when they drift from the sources.
 - Every shell block in `docs/` is tagged for the examples runner: `booster detect` and the quick start's `booster plan` run against `tests/docs-fixture/` with their output committed beside them, and the rest carry a `docs-test: skip` reason (needs network, needs Docker, installs software, run on your own app).
@@ -147,7 +151,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - The plan and scan text reports speak plainly: an automatic step no longer carries the internal `[target-image-tests]` label and instead says "After this step your tests run in Docker." after its summary; a step you do by hand is marked `[manual: you do this one by hand]`; the advisory scan line reads "PHPCompatibility check for PHP X: N errors, M warnings." with singular counts ("1 error", "1 warning") instead of "Will break on PHP X"; and packages the dependency check cannot reach are reported as "not on Packagist or unreachable" instead of "offline". JSON output is unchanged.
 - User-facing text uses US spelling (behavior, color, license and so on); command and JSON key names are unchanged.
 
-### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-4)
+### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-5)
 
 - `booster run` prints one line per hop to standard error while it works: the hop's position in the plan, its id, its status, the number of files it changed and the seconds it took, and a closing line totals the hops run, the stops and the whole run. The lines go to standard error so the report on standard output is unchanged and `--format json` stays valid JSON.
 - `--path` accepts a leading `~` for your home folder: `~` and `~/...` (or `~\...` on Windows) are rewritten from `HOME`, or `USERPROFILE` on Windows, because the shell does not expand a tilde after `=` or inside quotes. `~user/...` stays as typed.
@@ -181,7 +185,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 WayneUI joins the stack: a hop for the 1.x to 2.x move, and ten more behavior-change warnings.
 
-### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-5)
+### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-6)
 
 - The `wayneui-1-to-2` hop, opt-in with `--wayneui`, for apps that require `cit-web-infra/wayne-ui`. It runs after the last Laravel hop and before the Vue hops and only when the plan reaches Laravel 11 or later (WayneUI 2.x supports 11 and newer); a plan that ends lower warns and leaves the hop out, and an app that uses WayneUI 1.x without the flag gets a nudge.
 - The hop rewrites only the one-to-one items of WayneUI's `MIGRATING.md`, about 57 percent of the mapping: Bootstrap 3 class tokens in class attributes (whole tokens only), Font Awesome icons without size modifiers, five brand colors in CSS and Blade, the Breadcrumbs renames and three `config/wayne-ui.php` keys. It swaps the Composer requirement to `waynestate/wayne-ui` `^2.0`.
@@ -206,7 +210,7 @@ The cas-to-sesame hop now finishes what a person had to do by hand on a real app
 
 Behavior-change warnings, from the second real-use report: a hop can pass every gate and still change what users see.
 
-### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-6)
+### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-7)
 
 - Behavior changes to check: `booster plan`, the run report and `--format=json` (`behaviour_changes`) now name the silent changes a step brings: things that still pass every gate but behave differently, such as Carbon 3 reading timestamps as UTC, Laravel 8's Tailwind paginator, or a SweetAlert toast that now closes on a new key. Each entry shows where the app is affected (up to 5 `file:line` hits and a count), the setting that keeps the old behaviour when there is one, and what to check by hand. Advisory only: it never blocks or fails a step.
 - `data/behaviour-changes.json`: 63 curated entries (Laravel 5.8 to 13 and Carbon 3, PHP 7.1 to 8.5, and package majors of sweet-alert, Guzzle and Sanctum), each with its source link. An entry fires only when the app's code, config or composer.json shows it is affected; three apply to every app crossing their step. Package entries print on the plan's last step, compared against the lock as it was before the run.
@@ -215,7 +219,7 @@ Behavior-change warnings, from the second real-use report: a hop can pass every 
 
 Fixes from the second real-use report (two apps taken to PHP 7.4/Laravel 8 and PHP 8.5/Laravel 13 with SESAME).
 
-### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-7)
+### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-8)
 
 - `--test-env KEY=VALUE` (repeatable) passes settings, such as a database host, to the baseline and every gate. Reports name the keys only, never the values.
 - Citadel apps (a `deployments/` folder) get a once-only `deployments/0000_composer_install_<stamp>` script when a run changes `composer.lock`, because Citadel copies the old `vendor/` into each new deployment and never re-runs a deployment script that already ran. It adds `php artisan migrate --force` only when the app has `artisan`.
@@ -257,7 +261,7 @@ Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, L
 - The SESAME report says what the swap actually wrote to each model.
 - Laravel hops remove the imports their Rector rules left unused.
 
-### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-8)
+### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-9)
 
 - `plan` checks each direct dependency's newest release (Packagist, and composer-type repositories the app lists) against every planned hop: it names the first hop a package blocks and flags abandoned packages. `--no-package-check` turns it off for offline use.
 - `--until=<hop>` stops the plan after that hop; `--only=<hop>` runs a single hop.
@@ -273,7 +277,7 @@ Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, L
 - The gate's target image carries the extension set Citadel's apps run with: intl, ldap, soap, zip, gd, pdo_mysql, mysqli, bcmath, pcntl, exif, redis, imagick and oci8 (before: zip, pdo_mysql, mysqli and bcmath). The extensions come from mlocati/php-extension-installer, pinned to 2.13.1 by digest; it also downloads Oracle Instant Client for oci8, so the first build takes a few minutes.
 - Target image tags are stamped with a short hash of `docker/Dockerfile` (`booster-target:<php>-<stamp>`), so an edited recipe rebuilds the image instead of reusing a stale tag.
 
-### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-9)
+### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-10)
 
 - `--image` for `run`: run the gate in a Docker image of your own instead of building `booster-target`. The image needs `php` and `composer` on `PATH`; Booster uses it when it is present locally and pulls it otherwise.
 - `scripts/check-target-image.sh` and `scripts/check-target-image.ps1`: build the target image for each PHP version and verify its extension list.
@@ -290,7 +294,7 @@ Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, L
 
 ## \[1.0.0\] - 2026-10-30[#](https://booster.apps.wayne.edu/docs/changelog.html#1-0-0-2026-10-30)
 
-### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-10)
+### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-11)
 
 - The PROCTOR policy gate: a baseline before the first hop and a final check after the last, so only findings new against the baseline block the run. The report groups New, Already present and Fixed; `--proctor-advisory` makes it report-only; the JSON report carries a `proctor` object with `status`, `blocking`, `new`, `already_present`, `fixed` and `baseline`.
 - The PHPStan advisory scan at the destination PHP, using Pinstripe's `base.neon` preset: `plan` ends with it and `booster scan --phpstan` runs it alone. Findings never change the exit code; a scan that cannot run is reported with the command that enables it.
@@ -331,7 +335,7 @@ Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, L
 
 ## \[0.1.3\] - 2026-10-29[#](https://booster.apps.wayne.edu/docs/changelog.html#0-1-3-2026-10-29)
 
-### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-11)
+### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-12)
 
 - Added: agent-ready site (prompt blocks, Markdown twins, llms.txt), from Squire's kit.
 
@@ -350,7 +354,7 @@ Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, L
 
 ## \[0.1.1\] - 2026-10-29[#](https://booster.apps.wayne.edu/docs/changelog.html#0-1-1-2026-10-29)
 
-### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-12)
+### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-13)
 
 - `data/versions.json`, the hop data file (shipped in the PHAR), and `bin/refresh-hop-data.php`, which rewrites it from the Packagist, endoflife.date and npm feeds plus CREED's policy. `composer ci` ends with the offline `--check` (shape validation against the bundled policy, then a recompute from the frozen feeds in `tests/fixtures/hop-feeds` as of the file's `generated_on` date); `--online` compares against the live feeds without writing the file.
 - A scheduled GitLab pipeline job that runs the refresh against the live feeds and fails when `data/versions.json` would change, so a feed that moved while the file slept is visible until someone commits the refreshed file.
@@ -363,7 +367,7 @@ Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, L
 
 ## \[0.1.0\] - 2026-10-29[#](https://booster.apps.wayne.edu/docs/changelog.html#0-1-0-2026-10-29)
 
-### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-13)
+### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added-14)
 
 - `booster plan`, `run`, `hops`, `detect` and `init` commands (also `vendor/bin/booster`).
 - App-type detection for the five stack permutations from `composer.json` and `package.json`.
