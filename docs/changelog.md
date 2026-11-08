@@ -21,6 +21,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### Changed
 
+- Changed: the dev dependency on PROCTOR moves to ^0.8 (was ^0.3, locked 0.8.0), and the deploy layer requires PROCTOR ^0.8 (locked 0.8.0).
 - Docs: the README's Commands section gains the stack's "Which command when" table, copied word for word from WELD's docs: `booster plan`, `booster replay check`, `booster init --check`, `proctor check` and the other look-alikes, with what each checks, when to run it and where it runs (D-064).
 - Docs: `ADR/` and `DECISIONS.md` record Booster's shape decisions (one CLI, no tools image, PROCTOR from the host, the PNG mark).
 - Changed: the GitLab pipeline pins the Preflight components to 0.2.0 (was 0.1.4).

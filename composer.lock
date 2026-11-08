@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "eaab8df036acdf12ecc2cbda8a8b5847",
+    "content-hash": "5c146bb533726fb35bf7252749cf94d7",
     "packages": [
         {
             "name": "composer/semver",
@@ -2023,16 +2023,16 @@
         },
         {
             "name": "waynestate/proctor",
-            "version": "0.3.0",
+            "version": "0.8.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/proctor.git",
-                "reference": "91e7e9828f8448135315afcf5eda4eb3f6646bc1"
+                "reference": "29a9060e9929af73b0d23869a15fe73cbf46bf9b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/proctor/zipball/91e7e9828f8448135315afcf5eda4eb3f6646bc1",
-                "reference": "91e7e9828f8448135315afcf5eda4eb3f6646bc1",
+                "url": "https://api.github.com/repos/waynestate/proctor/zipball/29a9060e9929af73b0d23869a15fe73cbf46bf9b",
+                "reference": "29a9060e9929af73b0d23869a15fe73cbf46bf9b",
                 "shasum": ""
             },
             "require": {
@@ -2045,14 +2045,24 @@
             "require-dev": {
                 "humbug/box": "4.7.1",
                 "laravel/pint": "^1.32",
+                "league/commonmark": "^2.10",
                 "phpstan/phpstan": "^2.1",
                 "phpunit/phpunit": "^11.5",
+                "waynestate/advisor": "^0.1.6",
                 "waynestate/pinstripe": "^0.1"
+            },
+            "suggest": {
+                "waynestate/advisor": "ADVISOR module: lets your coding agent read proctor_rules and proctor_check, read-only."
             },
             "bin": [
                 "bin/proctor"
             ],
             "type": "library",
+            "extra": {
+                "proctor": {
+                    "wayneui.copies": "fail"
+                }
+            },
             "autoload": {
                 "psr-4": {
                     "Waynestate\\Proctor\\": "src/"
@@ -2070,10 +2080,10 @@
             "description": "A framework-free PHP CLI that measures a PHP app against the version policy.",
             "homepage": "https://proctor.apps.wayne.edu/",
             "support": {
-                "issues": "https://github.com/waynestate/proctor/issues",
+                "issues": "https://git.wayne.edu/enterprise-apps/proctor/-/issues",
                 "source": "https://github.com/waynestate/proctor"
             },
-            "time": "2026-11-01T10:15:12+00:00"
+            "time": "2026-11-08T08:00:24+00:00"
         },
         {
             "name": "webmozart/assert",
