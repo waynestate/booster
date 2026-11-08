@@ -47,6 +47,8 @@ composer-ci:
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/composer:2.10.3
   script:
     - composer install --no-interaction --no-progress --prefer-dist
+    # Booster's Rector config must load before any hop rewrites code; an empty app dir satisfies its BOOSTER_APP_PATH check.
+    - d=$(mktemp -d) && BOOSTER_APP_PATH="$d" php vendor/bin/rector validate-config --no-ansi --config=config/rector.php
     - composer ci
 
 # Hop data freshness: only in scheduled pipelines. The hop data robot

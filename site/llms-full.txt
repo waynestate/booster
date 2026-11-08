@@ -1303,6 +1303,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 #### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added)
 
 - Added: real .vue fixtures under tests/fixtures/vue-compat/ and a Docker-gated test that runs vue-upgrade-tool on them (BOOSTER-21).
+- Added: Booster checks the Rector config with rector validate-config before a Rector hop changes anything, and the run report records the Rector version.
 
 #### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed)
 

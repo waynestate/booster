@@ -35,8 +35,9 @@ final class RectorRunnerTest extends TestCase
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, '{"file_diffs": [], "errors": []}', ''));
         $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), $app, true, '8.0');
 
-        self::assertCount(1, $fake->calls);
-        $skipDirs = json_decode($fake->calls[0]['env']['BOOSTER_RECTOR_SKIP_DIRS'], true);
+        $process = $fake->callsWith('process');
+        self::assertCount(1, $process);
+        $skipDirs = json_decode($process[0]['env']['BOOSTER_RECTOR_SKIP_DIRS'], true);
         self::assertIsArray($skipDirs);
         self::assertContains($app . '/src/vendor', $skipDirs);
         self::assertSame(['src/vendor'], $result->skippedDirs);
@@ -50,8 +51,9 @@ final class RectorRunnerTest extends TestCase
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, '{"file_diffs": [], "errors": []}', ''));
         $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), $app, true, '8.0');
 
-        self::assertCount(1, $fake->calls);
-        $skipFiles = json_decode($fake->calls[0]['env']['BOOSTER_RECTOR_SKIP_FILES'], true);
+        $process = $fake->callsWith('process');
+        self::assertCount(1, $process);
+        $skipFiles = json_decode($process[0]['env']['BOOSTER_RECTOR_SKIP_FILES'], true);
         self::assertIsArray($skipFiles);
         self::assertContains($app . '/b.php', $skipFiles);
         self::assertSame([['file' => 'b.php', 'reason' => 'not valid UTF-8']], $result->excluded);
@@ -76,8 +78,9 @@ final class RectorRunnerTest extends TestCase
         });
         $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), $app, true, '8.0');
 
-        self::assertCount(2, $fake->calls);
-        $skip = json_decode($fake->calls[1]['env']['BOOSTER_RECTOR_SKIP_FILES'], true);
+        $process = $fake->callsWith('process');
+        self::assertCount(2, $process);
+        $skip = json_decode($process[1]['env']['BOOSTER_RECTOR_SKIP_FILES'], true);
         self::assertIsArray($skip);
         self::assertContains($app . '/legacy/Excel.php', $skip);
         self::assertSame([], $result->errors);
@@ -100,7 +103,7 @@ final class RectorRunnerTest extends TestCase
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, $json, ''));
         $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), $app, true, '8.0');
 
-        self::assertCount(1, $fake->calls);
+        self::assertCount(1, $fake->callsWith('process'));
         self::assertSame([
             'legacy/Excel.php: System error: Class "PHPExcel" should be known at this point',
             'src/Bad.php: Syntax error, unexpected token "endif"',
@@ -127,7 +130,7 @@ final class RectorRunnerTest extends TestCase
         });
         $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), $app, true, '8.0');
 
-        self::assertCount(2, $fake->calls);
+        self::assertCount(2, $fake->callsWith('process'));
         self::assertSame(['src/C.php: Something else broke'], $result->errors);
         self::assertSame([
             ['file' => 'legacy/Excel.php', 'reason' => 'Rector could not resolve a class it uses (Class "PHPExcel" should be known at this point)'],
@@ -144,7 +147,7 @@ final class RectorRunnerTest extends TestCase
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, $json, ''));
         $result = (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), $app, true, '8.0');
 
-        self::assertCount(1, $fake->calls);
+        self::assertCount(1, $fake->callsWith('process'));
         self::assertSame(['System error: Class "Mystery" should be known at this point'], $result->errors);
     }
 
@@ -396,7 +399,7 @@ final class RectorRunnerTest extends TestCase
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, '{"file_diffs": [], "errors": []}', ''));
         (new RectorRunner($fake, '/fake/rector'))->run((new HopRegistry())->get('php-74-to-80'), $this->tempDir(), true, '8.0');
 
-        $env = $fake->calls[0]['env'];
+        $env = $fake->callsWith('process')[0]['env'];
         $root = RunScratch::root();
         self::assertNotSame(rtrim(sys_get_temp_dir(), '/'), $root);
         self::assertStringStartsWith(sys_get_temp_dir() . '/booster-run-', $root);
@@ -442,7 +445,9 @@ final class RectorRunnerTest extends TestCase
             $saved[$name] = getenv($name);
         }
         putenv('BOOSTER_APP_PATH=' . $this->tempDir());
-        putenv('BOOSTER_RECTOR_SETS=');
+        // Load the PHP 8.0 set: ChangeSwitchToMatchRector is registered only by it,
+        // and the skip under test travels with that set.
+        putenv('BOOSTER_RECTOR_SETS=' . json_encode(['Rector\Set\ValueObject\SetList::PHP_80']));
         putenv('BOOSTER_CLASS_RENAMES=');
         putenv('BOOSTER_PHP_TARGET=');
         putenv('BOOSTER_BOOTSTRAP=');

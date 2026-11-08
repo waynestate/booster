@@ -25,6 +25,8 @@ final class RectorRunner
     /** The memory limit Rector runs with unless the user raises it. Big apps need more than the old hard-coded gigabyte. */
     public const DEFAULT_MEMORY_LIMIT = '2G';
 
+    private bool $configValidated = false;
+
     public function __construct(
         private readonly ProcessRunner $processes,
         private readonly ?string $rectorBinary = null,
@@ -58,6 +60,13 @@ final class RectorRunner
      */
     public function run(Hop $hop, string $appPath, bool $dryRun, string $phpTarget, ?string $laravelTarget = null, ?string $phpunitTarget = null, string $memoryLimit = self::DEFAULT_MEMORY_LIMIT): RectorResult
     {
+        // The config is checked once per run, before the first hop rewrites code,
+        // so a broken config fails at the door instead of mid-hop.
+        if (!$this->configValidated) {
+            $this->validateConfig();
+            $this->configValidated = true;
+        }
+
         self::assertMemoryLimit($memoryLimit);
         $appPath = rtrim($appPath, '/\\');
         $command = [
@@ -126,6 +135,80 @@ final class RectorRunner
         }
 
         return $first;
+    }
+
+    /**
+     * Checks that config/rector.php loads cleanly before any hop rewrites code,
+     * so a broken config fails the run at the door instead of mid-hop. Runs
+     * `rector validate-config` against an empty app directory: the config insists
+     * on an app directory, but validation reads no app files.
+     */
+    public function validateConfig(): void
+    {
+        $command = [
+            $this->phpBinary ?? PHP_BINARY,
+            $this->binary(),
+            'validate-config',
+            '--config=' . self::configPath(),
+            '--no-ansi',
+        ];
+        $env = [
+            'BOOSTER_APP_PATH' => RunScratch::dir('rector-validate-app'),
+        ] + RunScratch::tempEnv();
+
+        $result = $this->processes->run($command, null, $env, 300);
+        if ($result->exitCode !== 0) {
+            $output = trim($result->stdout);
+            $error = trim($result->stderr);
+            $detail = $output !== '' ? $output : ($error !== '' ? $error : '(no output)');
+            throw new ToolError(sprintf(
+                'The Rector config "%s" failed validation (exit %d):%s%s',
+                self::configPath(),
+                $result->exitCode,
+                PHP_EOL,
+                $detail,
+            ));
+        }
+    }
+
+    /**
+     * The version of rector/rector Booster runs, recorded in the run report. Null
+     * when Rector is somehow not installed (it always is in practice).
+     */
+    public function installedVersion(): ?string
+    {
+        if (!InstalledVersions::isInstalled('rector/rector')) {
+            return null;
+        }
+
+        // Rector bundles its own nested vendor, and that record lists rector without a
+        // pretty version. InstalledVersions::getPrettyVersion() returns the first match
+        // it finds, so in any process that has loaded Rector's autoloader (the test suite)
+        // that empty shadow wins over the real version. Read the main vendor's
+        // installed.json directly: it always carries the real version and is never shadowed.
+        $fileName = (new \ReflectionClass(InstalledVersions::class))->getFileName();
+        if (is_string($fileName)) {
+            $file = \dirname($fileName) . '/installed.json';
+            if (is_file($file)) {
+                $data = json_decode((string) file_get_contents($file), true);
+                if (is_array($data) && isset($data['packages']) && is_array($data['packages'])) {
+                    foreach ($data['packages'] as $package) {
+                        if (!is_array($package) || ($package['name'] ?? null) !== 'rector/rector') {
+                            continue;
+                        }
+                        foreach (['pretty_version', 'version'] as $key) {
+                            if (isset($package[$key]) && is_string($package[$key]) && $package[$key] !== '') {
+                                return $package[$key];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        $version = InstalledVersions::getPrettyVersion('rector/rector');
+
+        return is_string($version) && $version !== '' ? $version : null;
     }
 
     /**
