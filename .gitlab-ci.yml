@@ -17,7 +17,7 @@ include:
     inputs:
       image: "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/php:8.4-cli-trixie@sha256:9cf851bc2c1b37c3e59dfd677a3c3e56d485af5a47c93f629424bb039eafcb69"
       working_dir: deploy
-      proctor_command: vendor/bin/proctor check --policy=vendor/waynestate/creed/policy/policy.json --format=codequality
+      proctor_command: vendor/bin/proctor check --format=codequality
       allow_failure: true
 
 # Dependency caching: images already come through the Dependency Proxy, and
@@ -40,7 +40,7 @@ wayneui-copies:
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/composer:2.10.3
   script:
     - composer install --working-dir=deploy --no-interaction --no-progress --prefer-dist
-    - deploy/vendor/bin/proctor check --path=. --policy=deploy/vendor/waynestate/creed/policy/policy.json
+    - deploy/vendor/bin/proctor check --path=.
 
 composer-ci:
   extends: .composer-cache
