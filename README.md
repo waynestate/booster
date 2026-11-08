@@ -875,8 +875,10 @@ agent-ready check. Nothing needs PHP on the host:
 docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install --no-interaction && composer ci"
 ```
 
-The site's accessibility gate (axe-core in Playwright, WCAG 2.2 AA) checks the front page and every page under
-`site/docs/` in Docker, with no host browser: `sh scripts/a11y.sh` on Linux, macOS and Git Bash, or
+The site's accessibility gate is Preflight's own checker, vendored into `tools/a11y/check.mjs` from Preflight 0.3.1
+and pinned by `tests/A11yCheckerPinTest.php`, so a local run checks exactly what CI checks: axe-core 4.14.0 in a
+real Chromium, every page under `site/` in light and dark at 320 and 1280 px, plus the WCAG 1.4.10 reflow check,
+all at WCAG 2.2 AA. It runs in Docker, with no host browser: `sh scripts/a11y.sh` on Linux, macOS and Git Bash, or
 `scripts\a11y.ps1` on Windows PowerShell.
 
 `contract/expectations.json` says what Booster must detect, plan and change for each example app in `examples/`;
