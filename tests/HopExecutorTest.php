@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Tests;
 
-use Composer\InstalledVersions;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;

@@ -186,17 +186,20 @@ final class RectorRunner
         // it finds, so in any process that has loaded Rector's autoloader (the test suite)
         // that empty shadow wins over the real version. Read the main vendor's
         // installed.json directly: it always carries the real version and is never shadowed.
-        $file = \dirname((new \ReflectionClass(InstalledVersions::class))->getFileName()) . '/installed.json';
-        if (is_file($file)) {
-            $data = json_decode((string) file_get_contents($file), true);
-            if (is_array($data) && isset($data['packages']) && is_array($data['packages'])) {
-                foreach ($data['packages'] as $package) {
-                    if (!is_array($package) || ($package['name'] ?? null) !== 'rector/rector') {
-                        continue;
-                    }
-                    foreach (['pretty_version', 'version'] as $key) {
-                        if (isset($package[$key]) && is_string($package[$key]) && $package[$key] !== '') {
-                            return $package[$key];
+        $fileName = (new \ReflectionClass(InstalledVersions::class))->getFileName();
+        if (is_string($fileName)) {
+            $file = \dirname($fileName) . '/installed.json';
+            if (is_file($file)) {
+                $data = json_decode((string) file_get_contents($file), true);
+                if (is_array($data) && isset($data['packages']) && is_array($data['packages'])) {
+                    foreach ($data['packages'] as $package) {
+                        if (!is_array($package) || ($package['name'] ?? null) !== 'rector/rector') {
+                            continue;
+                        }
+                        foreach (['pretty_version', 'version'] as $key) {
+                            if (isset($package[$key]) && is_string($package[$key]) && $package[$key] !== '') {
+                                return $package[$key];
+                            }
                         }
                     }
                 }

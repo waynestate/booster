@@ -24,9 +24,13 @@ $decode = static function (string $name): array {
 };
 
 $sets = [];
+$hasPhp80Set = false;
 foreach ($decode('BOOSTER_RECTOR_SETS') as $constant) {
     if (!is_string($constant) || !defined($constant)) {
         throw new RuntimeException(sprintf('Rector set "%s" does not exist in the installed Rector.', is_string($constant) ? $constant : '?'));
+    }
+    if ($constant === 'Rector\Set\ValueObject\SetList::PHP_80') {
+        $hasPhp80Set = true;
     }
     $sets[] = constant($constant);
 }
@@ -63,8 +67,10 @@ $skip[] = '*.phpstorm.meta.php';
 // switch into a strict match, so switch ($_GET['col']) with case 1: stops
 // matching the string "1" every query string carries, and every request falls
 // to default without a word. A person may convert a switch they have checked.
+// The rule is registered only while the PHP 8.0 set loads, so the skip travels
+// with it: Rector 2 refuses a config that skips a rule it never registers.
 foreach (['Rector\Php80\Rector\Switch_\ChangeSwitchToMatchRector'] as $rule) {
-    if (class_exists($rule)) {
+    if ($hasPhp80Set && class_exists($rule)) {
         $skip[] = $rule;
     }
 }

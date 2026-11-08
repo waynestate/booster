@@ -78,4 +78,23 @@ final class FakeProcessRunner implements ProcessRunner
 
         return $out;
     }
+
+    /**
+     * The full recorded calls (command, cwd and env) whose command contains
+     * $needle, so a test can read the environment of the Rector process call
+     * without assuming it is the first call the runner made.
+     *
+     * @return list<array{command: list<string>, cwd: ?string, env: array<string, string>}>
+     */
+    public function callsWith(string $needle): array
+    {
+        $out = [];
+        foreach ($this->calls as $call) {
+            if (in_array($needle, $call['command'], true)) {
+                $out[] = $call;
+            }
+        }
+
+        return $out;
+    }
 }
