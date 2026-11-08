@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   ci:
-    # pinned to the Preflight 0.1.2 release tag
+    # pinned to Preflight 0.1.4's commit (the GitHub mirror has no 0.3 tag yet)
     uses: waynestate/preflight/.github/workflows/php-package.yml@79029cc2300702d0d450c42cc699e12af1b731f8 # 0.1.4
     with:
       php-versions: '["8.3","8.4","8.5"]'
