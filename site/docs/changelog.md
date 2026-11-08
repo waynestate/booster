@@ -14,6 +14,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### Changed[#](https://booster.apps.wayne.edu/docs/changelog.html#changed)
 
+- CI caches Composer downloads per lock file (`.composer-cache`, keyed on `composer.lock` and `deploy/composer.lock`), so a pipeline stops fetching every package from Packagist on every run. Images already come through the Dependency Proxy.
 - The lock moves to CREED 0.1.7 (was 0.1.4), the policy every plan reads. The Real output page is captured again (`build-proof.php --capture`), so its plans name `waynestate/creed 0.1.7`; the plan samples in the README, the quick start and the front page match a fresh run.
 
 ### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed)
