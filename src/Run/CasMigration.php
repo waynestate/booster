@@ -269,7 +269,7 @@ final class CasMigration
             return null;
         }
 
-        return [$content, 'Booster\'s bundled SESAME 0.4.0 config'];
+        return [$content, 'Booster\'s bundled SESAME 0.5.0 config'];
     }
 
     /**
