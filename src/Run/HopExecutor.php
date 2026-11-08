@@ -463,7 +463,7 @@ final class HopExecutor
     {
         $hop = $step->hop;
         if ($hop->isManual()) {
-            return new StepResult($step->number, $hop->id, StepResult::MANUAL, [], ['Follow the playbook; BOOSTER has no automatic change for this hop.', ...$hop->notes]);
+            return new StepResult($step->number, $hop->id, StepResult::MANUAL, [], ['Follow the playbook; Booster has no automatic change for this hop.', ...$hop->notes]);
         }
 
         try {
@@ -742,7 +742,7 @@ final class HopExecutor
 
     /**
      * One refusal for a parse error Rector reports as "Syntax error ..." or
-     * "Invalid numeric literal": BOOSTER cannot repair those by tooling, so
+     * "Invalid numeric literal": Booster cannot repair those by tooling, so
      * the file needs a person.
      */
     private static function refusal(string $error): ?string
@@ -759,7 +759,7 @@ final class HopExecutor
                 $where = preg_match('/line (\d+)/i', $message, $m) === 1 ? $file . ' line ' . $m[1] : $file;
             }
 
-            return ($where !== '' ? $where . ': ' : '') . '"' . $message . '" cannot be repaired by tooling, so BOOSTER stops here and the file needs a person.';
+            return ($where !== '' ? $where . ': ' : '') . '"' . $message . '" cannot be repaired by tooling, so Booster stops here and the file needs a person.';
         }
 
         return null;
@@ -1480,7 +1480,7 @@ final class HopExecutor
         }
 
         if ($this->node === null) {
-            return new StepResult($step->number, $hop->id, StepResult::ERROR, [], ['The codemod needs a Node runner, but this BOOSTER has none configured.', ...$hop->notes]);
+            return new StepResult($step->number, $hop->id, StepResult::ERROR, [], ['The codemod needs a Node runner, but this Booster has none configured.', ...$hop->notes]);
         }
 
         $result = $this->node->run($path, ['npx', '--yes', 'vue-upgrade-tool@' . $version, '--files', 'src/**/*']);
@@ -1595,7 +1595,7 @@ final class HopExecutor
     private function runFrontEndGate(string $path): ?array
     {
         if ($this->node === null) {
-            return ['The build gate needs a Node runner, but this BOOSTER has none configured.'];
+            return ['The build gate needs a Node runner, but this Booster has none configured.'];
         }
         $argvs = [['npm', 'ci'], ['npm', 'run', 'build']];
         if ($this->hasNpmTestScript($path)) {
@@ -1631,13 +1631,13 @@ final class HopExecutor
     /**
      * The Tailwind 3 to 4 hop. It runs the official @tailwindcss/upgrade tool
      * in the Node container, then normalizes package.json itself: the tool
-     * rewrites the CSS and the config, BOOSTER owns the dependency pins.
+     * rewrites the CSS and the config, Booster owns the dependency pins.
      */
     private function runTailwindHop(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): StepResult
     {
         $hop = $step->hop;
         if ($this->node === null) {
-            throw new ToolError('The Tailwind hop needs a Node runner, but this BOOSTER has none configured.');
+            throw new ToolError('The Tailwind hop needs a Node runner, but this Booster has none configured.');
         }
         $toolVersion = $this->registry()->tailwindUpgradeVersion();
         $package = '@tailwindcss/upgrade@' . $toolVersion;
@@ -1649,7 +1649,7 @@ final class HopExecutor
         }
 
         // --force: the tool refuses a dirty tree, and its check needs git, which the
-        // slim Node image lacks. BOOSTER started from a clean tree and never commits,
+        // slim Node image lacks. Booster started from a clean tree and never commits,
         // so earlier hops' edits are expected here and the undo line covers them all.
         $tool = $this->node->run($path, ['npx', '-y', $package, '--force']);
         if (!$tool->successful()) {
@@ -1679,7 +1679,7 @@ final class HopExecutor
         if ($changes === []) {
             $changes[] = 'The upgrade tool ran, but package.json already matched the Tailwind 4 pins.';
         } else {
-            // The tool installed its own pins; BOOSTER's edits came after, so the
+            // The tool installed its own pins; Booster's edits came after, so the
             // lock must catch up before the build gate's npm ci can pass.
             $syncFailure = $this->syncNpmLock($this->node, $path, $peerNotes);
             if ($syncFailure !== null) {
@@ -1715,7 +1715,7 @@ final class HopExecutor
     {
         $hop = $step->hop;
         if ($this->node === null) {
-            throw new ToolError('The Vite major hop needs a Node runner, but this BOOSTER has none configured.');
+            throw new ToolError('The Vite major hop needs a Node runner, but this Booster has none configured.');
         }
         [$changes, $files] = $this->applyViteMajorPackages($path, $options->dryRun);
         if ($options->dryRun) {
@@ -1764,7 +1764,7 @@ final class HopExecutor
     {
         $hop = $step->hop;
         if ($this->node === null) {
-            throw new ToolError('The TypeScript hop needs a Node runner, but this BOOSTER has none configured.');
+            throw new ToolError('The TypeScript hop needs a Node runner, but this Booster has none configured.');
         }
         $typescript = $this->registry()->typescriptVersion();
         if ($options->dryRun) {
@@ -1993,7 +1993,7 @@ final class HopExecutor
                 return ($isScript ? ($m[1] ?? '') : ($m[5] ?? '')) . $directive . ($isScript ? ($m[4] ?? '') : ($m[8] ?? ''));
             }, $content);
             if ($rewritten === null || $rewritten === $content) {
-                $changes[] = sprintf('%s: BOOSTER could not rewrite the mix() tags; move them by hand.', $this->relative($path, $file));
+                $changes[] = sprintf('%s: Booster could not rewrite the mix() tags; move them by hand.', $this->relative($path, $file));
 
                 continue;
             }
@@ -2681,7 +2681,7 @@ final class HopExecutor
     private function runBuildGate(string $path): ?array
     {
         if ($this->node === null) {
-            return ['The build gate needs a Node runner, but this BOOSTER has none configured.'];
+            return ['The build gate needs a Node runner, but this Booster has none configured.'];
         }
         foreach ([['npm', 'ci'], ['npm', 'run', 'build']] as $argv) {
             $result = $this->node->run($path, $argv);
@@ -2939,7 +2939,7 @@ final class HopExecutor
     }
 
     /**
-     * Runs npm install in the Node container after BOOSTER edited package.json,
+     * Runs npm install in the Node container after Booster edited package.json,
      * so package-lock.json catches up before any npm ci (found on a real app,
      * 2026-11-06: npm ci refuses a lock that disagrees with package.json).
      *
@@ -3077,7 +3077,7 @@ final class HopExecutor
     {
         $status = $this->processes->run(['git', '-C', $path, 'status', '--porcelain'], null, [], 60);
         if (!$status->successful()) {
-            throw new ToolError('The app is not a git working copy (or git is missing), so BOOSTER cannot make the change reversible. Put it under git, or pass --allow-dirty.');
+            throw new ToolError('The app is not a git working copy (or git is missing), so Booster cannot make the change reversible. Put it under git, or pass --allow-dirty.');
         }
         if (trim($status->stdout) !== '') {
             throw new ToolError('The working copy has uncommitted changes. Commit or stash them so the upgrade diff stands alone, or pass --allow-dirty.');

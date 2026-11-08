@@ -49,7 +49,7 @@ final class ScanCommand extends BaseCommand
         $chain = (new HopRegistry())->phpChain();
         if (preg_match('/^\d+\.\d+$/', $php) !== 1 || !in_array($php, $chain, true)) {
             throw new ToolError(sprintf(
-                '--php "%s" is not a PHP version BOOSTER knows (use major.minor, from %s to %s).',
+                '--php "%s" is not a PHP version Booster knows (use major.minor, from %s to %s).',
                 $php,
                 $chain[0],
                 $chain[count($chain) - 1],

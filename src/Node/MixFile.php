@@ -207,7 +207,7 @@ final class MixFile
 
             // js, sass and postCss take ('<in>', '<out>'); postCss may add a plugin list.
             if (preg_match('/^\(\s*(\x27|\x22)([^\x27\x22]+)\1\s*,\s*(\x27|\x22)([^\x27\x22]+)\3\s*(,\s*\[[^\]]*\])?\s*\)/', substr($code, $after), $args) !== 1) {
-                $violation = self::earlier($violation, $name . '() with arguments BOOSTER cannot read', $pos);
+                $violation = self::earlier($violation, $name . '() with arguments Booster cannot read', $pos);
 
                 return;
             }
@@ -234,7 +234,7 @@ final class MixFile
     private static function refusal(string $reason): string
     {
         return sprintf(
-            'Refusing to convert %s: %s. BOOSTER converts the simple shape only (mix.js(), .vue(), .sass(), .postCss(), .version(), and if (mix.inProduction()) { mix.version(); }); follow the manual Vite migration guide at %s.',
+            'Refusing to convert %s: %s. Booster converts the simple shape only (mix.js(), .vue(), .sass(), .postCss(), .version(), and if (mix.inProduction()) { mix.version(); }); follow the manual Vite migration guide at %s.',
             self::FILE,
             $reason,
             self::GUIDE,

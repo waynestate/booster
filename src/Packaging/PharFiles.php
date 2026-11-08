@@ -54,7 +54,7 @@ final class PharFiles
 
         $pharPath = Phar::running(false);
         if ($pharPath === '') {
-            throw new ToolError('BOOSTER is not running from a phar.');
+            throw new ToolError('Booster is not running from a phar.');
         }
 
         $root = sys_get_temp_dir() . '/booster-phar-' . bin2hex(random_bytes(6));
@@ -66,10 +66,10 @@ final class PharFiles
         try {
             (new Phar($pharPath))->extractTo($root);
         } catch (Throwable $e) {
-            throw new ToolError(sprintf('Could not unpack the BOOSTER phar: %s', $e->getMessage()));
+            throw new ToolError(sprintf('Could not unpack the Booster phar: %s', $e->getMessage()));
         }
         if (!is_dir($root)) {
-            throw new ToolError(sprintf('Could not unpack the BOOSTER phar into "%s".', $root));
+            throw new ToolError(sprintf('Could not unpack the Booster phar into "%s".', $root));
         }
 
         return $root;

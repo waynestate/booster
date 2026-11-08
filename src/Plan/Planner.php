@@ -59,7 +59,7 @@ final class Planner
             }
             $laravelChain = $this->registry->laravelChain();
             if (!in_array($fromLaravel, $laravelChain, true)) {
-                throw new ToolError(sprintf('Laravel %s is outside what BOOSTER can plan (%s to %s).', $fromLaravel, $laravelChain[0], $laravelChain[count($laravelChain) - 1]));
+                throw new ToolError(sprintf('Laravel %s is outside what Booster can plan (%s to %s).', $fromLaravel, $laravelChain[0], $laravelChain[count($laravelChain) - 1]));
             }
             if (!$this->registry->laravelSupportsPhp($fromLaravel, $fromPhp)) {
                 $warnings[] = sprintf('Laravel %s does not list PHP %s; the plan assumes the app really runs on that pair.', $fromLaravel, $fromPhp);
@@ -98,14 +98,14 @@ final class Planner
                     $phpunitManualPending = true;
                     $fromPhpunit = $phpunitChain[0];
                 } else {
-                    throw new ToolError(sprintf('PHPUnit %s is outside what BOOSTER can plan (%s to %s).', $fromPhpunit, $phpunitChain[0], $phpunitChain[count($phpunitChain) - 1]));
+                    throw new ToolError(sprintf('PHPUnit %s is outside what Booster can plan (%s to %s).', $fromPhpunit, $phpunitChain[0], $phpunitChain[count($phpunitChain) - 1]));
                 }
             }
         }
         if ($fromPhpunit !== null) {
             $toPhpunit = $options->toPhpunit ?? $this->newestPhpunitForPhp($toPhp);
             if (!in_array($toPhpunit, $phpunitChain, true)) {
-                throw new ToolError(sprintf('--to-phpunit "%s" is not a PHPUnit version BOOSTER knows (use a major from %s to %s).', $toPhpunit, $phpunitChain[0], $phpunitChain[count($phpunitChain) - 1]));
+                throw new ToolError(sprintf('--to-phpunit "%s" is not a PHPUnit version Booster knows (use a major from %s to %s).', $toPhpunit, $phpunitChain[0], $phpunitChain[count($phpunitChain) - 1]));
             }
             $laravelFloor = $toLaravel !== null ? ($this->registry->laravelPhpunit()[$toLaravel] ?? null) : null;
             if ($laravelFloor !== null && version_compare($toPhpunit, $laravelFloor, '<')) {
@@ -265,7 +265,7 @@ final class Planner
                 }
                 if ($missing !== []) {
                     $warnings[] = sprintf(
-                        'BOOSTER stops short of the target: it has no hop for %s yet because Rector ships no ruleset for it. The plan below is as far as BOOSTER can take you today.',
+                        'Booster stops short of the target: it has no hop for %s yet because Rector ships no ruleset for it. The plan below is as far as Booster can take you today.',
                         implode(', ', $missing),
                     );
                     break;
@@ -589,7 +589,7 @@ final class Planner
     {
         $chain = $this->registry->phpChain();
         if (preg_match('/^\d+\.\d+$/', $version) !== 1 || !in_array($version, $chain, true)) {
-            throw new ToolError(sprintf('%s "%s" is not a PHP version BOOSTER knows (use major.minor, from %s to %s).', $option, $version, $chain[0], $chain[count($chain) - 1]));
+            throw new ToolError(sprintf('%s "%s" is not a PHP version Booster knows (use major.minor, from %s to %s).', $option, $version, $chain[0], $chain[count($chain) - 1]));
         }
 
         return $version;

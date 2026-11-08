@@ -68,7 +68,7 @@ final class CasMigration
             // app reads its keys any more.
             $removeOld = $oldExists && $references === [];
             if ($template === null) {
-                $manual[] = self::NEW_CONFIG . ': BOOSTER has no SESAME config to base it on (no vendor/waynestate/sesame and no bundled copy), so it wrote nothing. Copy SESAME\'s config/sesame.php into the app' . ($root !== null ? " and set its cas.base_url to '" . $root . "'" : '') . '.';
+                $manual[] = self::NEW_CONFIG . ': Booster has no SESAME config to base it on (no vendor/waynestate/sesame and no bundled copy), so it wrote nothing. Copy SESAME\'s config/sesame.php into the app' . ($root !== null ? " and set its cas.base_url to '" . $root . "'" : '') . '.';
             } elseif ($this->writeSesameConfig($newFile, $template[0], $root, $removeOld, $dryRun, $manual)) {
                 $wroteConfig = true;
                 if ($root !== null) {
@@ -88,7 +88,7 @@ final class CasMigration
             }
         }
         if ($root !== null && $hadNewConfig) {
-            $manual[] = self::NEW_CONFIG . ' already exists, so BOOSTER left it alone. Set its cas.base_url to \'' . $root . '\' (the old wayne-cas root) if it differs.';
+            $manual[] = self::NEW_CONFIG . ' already exists, so Booster left it alone. Set its cas.base_url to \'' . $root . '\' (the old wayne-cas root) if it differs.';
         }
         if ($oldExists && !$wroteConfig) {
             $manual[] = self::OLD_CONFIG . ': left in place; remove it once SESAME is verified.';
@@ -143,7 +143,7 @@ final class CasMigration
         foreach ($finals as $relative => $content) {
             if (self::traitStillUsesInterface($content)) {
                 $failures[] = $relative;
-                $manual[] = $relative . ': BOOSTER left ' . self::INTERFACE . ' in a trait use line, so this file failed the step. Move it to implements ' . self::INTERFACE_FQN . ' plus use ' . self::READ_ONLY_FQN . ' by hand.';
+                $manual[] = $relative . ': Booster left ' . self::INTERFACE . ' in a trait use line, so this file failed the step. Move it to implements ' . self::INTERFACE_FQN . ' plus use ' . self::READ_ONLY_FQN . ' by hand.';
             }
         }
 
@@ -168,7 +168,7 @@ final class CasMigration
         $content = (string) file_get_contents($file);
         $root = self::plainString($content, 'root');
         if ($root === null) {
-            $manual[] = self::OLD_CONFIG . ': BOOSTER could not read a plain string for \'root\', so it left ' . self::NEW_CONFIG . ' alone. Set sesame.cas.base_url by hand.';
+            $manual[] = self::OLD_CONFIG . ': Booster could not read a plain string for \'root\', so it left ' . self::NEW_CONFIG . ' alone. Set sesame.cas.base_url by hand.';
         }
         if (self::boolValue($content, 'use2FA') === true) {
             $manual[] = 'MANUAL: the app had use2FA enabled in ' . self::OLD_CONFIG . ', but SESAME does not carry Duo. Re-enable two-factor in the app itself; DUO_HOSTNAME, DUO_IKEY, DUO_SKEY and DUO_AKEY do nothing under SESAME.';
@@ -306,7 +306,7 @@ final class CasMigration
         $baseLine = "'base_url' => Setting::get('SESAME_CAS_BASE_URL'),";
         $resolverLine = "'user_resolver' => env('SESAME_USER_RESOLVER'),";
         if (substr_count($template, $baseLine) !== 1 || substr_count($template, $resolverLine) !== 1) {
-            $manual[] = self::NEW_CONFIG . ': BOOSTER could not find the exact base_url and user_resolver lines in SESAME\'s published config, so it wrote nothing. Copy SESAME\'s config/sesame.php into the app and set user_resolver to \Waynestate\Sesame\WayneCas\UserResolver' . ($root !== null ? " and cas.base_url to '" . $root . "'" : '') . ' by hand.';
+            $manual[] = self::NEW_CONFIG . ': Booster could not find the exact base_url and user_resolver lines in SESAME\'s published config, so it wrote nothing. Copy SESAME\'s config/sesame.php into the app and set user_resolver to \Waynestate\Sesame\WayneCas\UserResolver' . ($root !== null ? " and cas.base_url to '" . $root . "'" : '') . ' by hand.';
 
             return false;
         }
@@ -358,7 +358,7 @@ final class CasMigration
         $entries = self::casEntries($kernel, $groupStart, $groupClose);
         if ($entries === null || $entries === []) {
             if ($entries === null) {
-                $manual[] = self::KERNEL . ': BOOSTER found the wayne.cas middleware mixed with other entries on one line of the web middleware group, so it left the file alone. Move the middleware by hand.';
+                $manual[] = self::KERNEL . ': Booster found the wayne.cas middleware mixed with other entries on one line of the web middleware group, so it left the file alone. Move the middleware by hand.';
             }
 
             return;
@@ -366,7 +366,7 @@ final class CasMigration
 
         $alias = self::aliasRegistration($kernel);
         if ($alias === null) {
-            $manual[] = self::KERNEL . ': BOOSTER found no $routeMiddleware or $middlewareAliases to register the wayne.cas alias in, so it left the middleware where it is. Register the alias by hand.';
+            $manual[] = self::KERNEL . ': Booster found no $routeMiddleware or $middlewareAliases to register the wayne.cas alias in, so it left the middleware where it is. Register the alias by hand.';
 
             return;
         }
@@ -374,13 +374,13 @@ final class CasMigration
 
         $providerFile = $appPath . '/' . self::ROUTE_PROVIDER;
         if (!is_file($providerFile)) {
-            $manual[] = self::ROUTE_PROVIDER . ' is missing, so BOOSTER left ' . self::KERNEL . ' alone. Remove wayne.cas from the web middleware group and add it to the web routes by hand.';
+            $manual[] = self::ROUTE_PROVIDER . ' is missing, so Booster left ' . self::KERNEL . ' alone. Remove wayne.cas from the web middleware group and add it to the web routes by hand.';
 
             return;
         }
         $provider = (string) file_get_contents($providerFile);
         if (preg_match_all(self::WEB_ROUTES_PATTERN, $provider) !== 1) {
-            $manual[] = self::ROUTE_PROVIDER . ": BOOSTER could not find Route::middleware('web') loading routes/web.php, so it left the middleware where it is. Add the wayne.cas middleware to the web routes by hand.";
+            $manual[] = self::ROUTE_PROVIDER . ": Booster could not find Route::middleware('web') loading routes/web.php, so it left the middleware where it is. Add the wayne.cas middleware to the web routes by hand.";
 
             return;
         }
@@ -453,19 +453,19 @@ final class CasMigration
 
         $guards = self::section($content, 'guards');
         if ($guards === null) {
-            $manual[] = self::AUTH_CONFIG . ': BOOSTER could not read the guards section, so it left the file alone. Point the web guard at the sesame driver by hand.';
+            $manual[] = self::AUTH_CONFIG . ': Booster could not read the guards section, so it left the file alone. Point the web guard at the sesame driver by hand.';
 
             return;
         }
         $web = self::entry($content, $guards[0], $guards[1], 'web');
         if ($web === null) {
-            $manual[] = self::AUTH_CONFIG . ': BOOSTER could not find the web guard, so it left the file alone. Point it at the sesame driver by hand.';
+            $manual[] = self::AUTH_CONFIG . ': Booster could not find the web guard, so it left the file alone. Point it at the sesame driver by hand.';
 
             return;
         }
         $guardDriver = self::driverValue($content, $web[0], $web[1]);
         if ($guardDriver === null) {
-            $manual[] = self::AUTH_CONFIG . ": BOOSTER could not read a plain driver for the web guard, so it left the file alone. Set its driver to 'sesame' by hand.";
+            $manual[] = self::AUTH_CONFIG . ": Booster could not read a plain driver for the web guard, so it left the file alone. Set its driver to 'sesame' by hand.";
 
             return;
         }
@@ -473,19 +473,19 @@ final class CasMigration
 
         $providers = self::section($content, 'providers');
         if ($providers === null) {
-            $manual[] = self::AUTH_CONFIG . ': BOOSTER could not read the providers section, so it left the file alone. Point the users provider at the eloquent driver by hand.';
+            $manual[] = self::AUTH_CONFIG . ': Booster could not read the providers section, so it left the file alone. Point the users provider at the eloquent driver by hand.';
 
             return;
         }
         $users = self::entry($content, $providers[0], $providers[1], 'users');
         if ($users === null) {
-            $manual[] = self::AUTH_CONFIG . ': BOOSTER could not find the users provider, so it left the file alone. Point it at the eloquent driver by hand.';
+            $manual[] = self::AUTH_CONFIG . ': Booster could not find the users provider, so it left the file alone. Point it at the eloquent driver by hand.';
 
             return;
         }
         $providerDriver = self::driverValue($content, $users[0], $users[1]);
         if ($providerDriver === null) {
-            $manual[] = self::AUTH_CONFIG . ": BOOSTER could not read a plain driver for the users provider, so it left the file alone. Set its driver to 'eloquent' by hand.";
+            $manual[] = self::AUTH_CONFIG . ": Booster could not read a plain driver for the users provider, so it left the file alone. Set its driver to 'eloquent' by hand.";
 
             return;
         }
@@ -500,7 +500,7 @@ final class CasMigration
             $clauses[] = 'the web guard now uses the sesame driver';
             $diffClauses[] = 'web guard driver session to sesame';
         } elseif ($guardDriverText !== 'sesame') {
-            $manual[] = self::AUTH_CONFIG . ": BOOSTER found the web guard on the {$guardDriverText} driver, which it does not change. Point it at the sesame driver by hand.";
+            $manual[] = self::AUTH_CONFIG . ": Booster found the web guard on the {$guardDriverText} driver, which it does not change. Point it at the sesame driver by hand.";
         }
 
         $modelFqn = is_file($appPath . '/app/Models/User.php') ? 'App\Models\User' : 'App\User';
@@ -509,12 +509,12 @@ final class CasMigration
             $clauses[] = 'the users provider now uses the eloquent driver';
             $diffClauses[] = 'users provider driver wayneCas to eloquent';
         } elseif ($providerDriverText !== 'eloquent') {
-            $manual[] = self::AUTH_CONFIG . ": BOOSTER found the users provider on the {$providerDriverText} driver, which it does not change. Point it at the eloquent driver by hand.";
+            $manual[] = self::AUTH_CONFIG . ": Booster found the users provider on the {$providerDriverText} driver, which it does not change. Point it at the eloquent driver by hand.";
         }
 
         if (in_array($providerDriverText, ['wayneCas', 'eloquent'], true) && !self::modelKey($content, $users[0], $users[1])) {
             if (substr_count(substr($content, $users[0], $users[1] - $users[0]), "\n") === 0) {
-                $manual[] = self::AUTH_CONFIG . ': BOOSTER found the users provider on one line, so it could not add a model key. Add the model key by hand.';
+                $manual[] = self::AUTH_CONFIG . ': Booster found the users provider on one line, so it could not add a model key. Add the model key by hand.';
             } else {
                 [$insertAt, $indent] = self::entryInsertion($content, $users[0], $users[1]);
                 $ops[] = [$insertAt, $insertAt, $indent . "'model' => " . $modelFqn . "::class," . "\n"];
@@ -862,7 +862,7 @@ final class CasMigration
         $region = $this->classRegion($content);
         if ($region === null) {
             if (self::referencesTrait($content)) {
-                $manual[] = $relative . ': BOOSTER could not find the class that uses ' . self::INTERFACE . ', so it left the file alone. Move the trait to implements ' . self::INTERFACE_FQN . ' plus use ' . self::READ_ONLY_FQN . ' by hand.';
+                $manual[] = $relative . ': Booster could not find the class that uses ' . self::INTERFACE . ', so it left the file alone. Move the trait to implements ' . self::INTERFACE_FQN . ' plus use ' . self::READ_ONLY_FQN . ' by hand.';
             }
 
             return null;
@@ -870,7 +870,7 @@ final class CasMigration
         [$classStart, $bracePos] = $region;
         $decl = substr($content, $classStart, $bracePos - $classStart);
         if (str_contains($decl, '{') || preg_match_all('/\b(class|interface|trait|enum)\b/', $decl) !== 1) {
-            $manual[] = $relative . ': BOOSTER could not read the class declaration around the ' . self::INTERFACE . ' trait use, so it left the file alone. Move the trait to implements ' . self::INTERFACE_FQN . ' plus use ' . self::READ_ONLY_FQN . ' by hand.';
+            $manual[] = $relative . ': Booster could not read the class declaration around the ' . self::INTERFACE . ' trait use, so it left the file alone. Move the trait to implements ' . self::INTERFACE_FQN . ' plus use ' . self::READ_ONLY_FQN . ' by hand.';
 
             return null;
         }
@@ -895,7 +895,7 @@ final class CasMigration
             return null;
         }
         if ($interfaceCount > 1) {
-            $manual[] = $relative . ': BOOSTER found ' . $interfaceCount . ' ' . self::INTERFACE . ' trait uses, so it left the file alone. Keep one, move it to implements ' . self::INTERFACE_FQN . ' plus use ' . self::READ_ONLY_FQN . ' by hand.';
+            $manual[] = $relative . ': Booster found ' . $interfaceCount . ' ' . self::INTERFACE . ' trait uses, so it left the file alone. Keep one, move it to implements ' . self::INTERFACE_FQN . ' plus use ' . self::READ_ONLY_FQN . ' by hand.';
 
             return null;
         }
@@ -906,7 +906,7 @@ final class CasMigration
             $oldImport = 'use ' . self::OLD_NAMESPACE . '\\' . self::INTERFACE . ';';
             $newImport = 'use ' . self::NEW_NAMESPACE . '\\' . self::INTERFACE . ';';
             if (!str_contains($head, $oldImport) && !str_contains($head, $newImport)) {
-                $manual[] = $relative . ': BOOSTER found no import for ' . self::INTERFACE . ', so it left the file alone. Add the import and move the trait to implements ' . self::INTERFACE_FQN . ' by hand.';
+                $manual[] = $relative . ': Booster found no import for ' . self::INTERFACE . ', so it left the file alone. Add the import and move the trait to implements ' . self::INTERFACE_FQN . ' by hand.';
 
                 return null;
             }

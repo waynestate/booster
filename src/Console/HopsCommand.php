@@ -15,7 +15,7 @@ final class HopsCommand extends BaseCommand
 {
     protected function configure(): void
     {
-        $this->setName('hops')->setDescription('List every hop BOOSTER knows.');
+        $this->setName('hops')->setDescription('List every hop Booster knows.');
         $this->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format (text, json).', 'text');
     }
 

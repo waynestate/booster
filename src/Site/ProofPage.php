@@ -110,7 +110,7 @@ final class ProofPage
      */
     private static function rewriteChrome(string $chunk): string
     {
-        $title = preg_replace('/<title>.*?<\/title>/s', '<title>BOOSTER proof: real output</title>', $chunk, 1);
+        $title = preg_replace('/<title>.*?<\/title>/s', '<title>Booster proof: real output</title>', $chunk, 1);
         if ($title === null) {
             throw new ToolError('Could not rewrite the index page chrome.');
         }

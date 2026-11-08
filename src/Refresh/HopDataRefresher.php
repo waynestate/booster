@@ -55,14 +55,14 @@ final class HopDataRefresher
         self::FEED_VUE_UPGRADE_TOOL,
     ];
 
-    /** The oldest PHP BOOSTER plans upgrades from, kept ahead of the policy. */
+    /** The oldest PHP Booster plans upgrades from, kept ahead of the policy. */
     public const PHP_FLOOR_PREFIX = ['5.5'];
 
-    /** The oldest Laravel majors BOOSTER plans upgrades from, kept ahead of the policy. */
+    /** The oldest Laravel majors Booster plans upgrades from, kept ahead of the policy. */
     public const LARAVEL_FLOOR_PREFIX = ['5.8', '6', '7'];
 
     /**
-     * Exact @tailwindcss/upgrade release BOOSTER runs; no feed drives it. Exact on
+     * Exact @tailwindcss/upgrade release Booster runs; no feed drives it. Exact on
      * purpose: 4.3.4 added tree-sitter, a native module that needs Python and a
      * compiler to install, so npx fails silently in the slim Node image
      * (found on a real app, 2026-11-06). Move it only after trying the new
@@ -70,16 +70,16 @@ final class HopDataRefresher
      */
     public const FIXED_TAILWIND_UPGRADE_VERSION = '4.3.3';
 
-    /** Fixed Tailwind pin BOOSTER writes into the app's package.json; no feed drives it. */
+    /** Fixed Tailwind pin Booster writes into the app's package.json; no feed drives it. */
     public const FIXED_TAILWIND_VERSION = '^4.1';
 
-    /** Fixed TypeScript pin BOOSTER writes into the app's package.json; no feed drives it. */
+    /** Fixed TypeScript pin Booster writes into the app's package.json; no feed drives it. */
     public const FIXED_TYPESCRIPT_VERSION = '^6.0';
 
-    /** Fixed vue-tsc pin BOOSTER writes when the app lists it; no feed drives it. */
+    /** Fixed vue-tsc pin Booster writes when the app lists it; no feed drives it. */
     public const FIXED_VUE_TSC_VERSION = '^3.0';
 
-    /** Inertia composer constraint per Laravel major; null means BOOSTER pins nothing there. */
+    /** Inertia composer constraint per Laravel major; null means Booster pins nothing there. */
     public const FIXED_INERTIA_LARAVEL = [
         '5.8' => null,
         '6' => null,
@@ -92,7 +92,7 @@ final class HopDataRefresher
         '13' => '^2.0',
     ];
 
-    /** Inertia npm constraint per Laravel major; null means BOOSTER pins nothing there. */
+    /** Inertia npm constraint per Laravel major; null means Booster pins nothing there. */
     public const FIXED_INERTIA_VUE3 = [
         '5.8' => null,
         '6' => null,
@@ -114,7 +114,7 @@ final class HopDataRefresher
     /**
      * Companion composer constraints a Laravel hop raises alongside
      * laravel/framework, keyed by the major the hop moves to; null means
-     * BOOSTER pins nothing there. No feed drives it: which companions a major
+     * Booster pins nothing there. No feed drives it: which companions a major
      * pairs with is a human decision.
      */
     public const FIXED_LARAVEL_COMPANION_PINS = [
@@ -139,7 +139,7 @@ final class HopDataRefresher
      * Companion composer constraints a PHPUnit hop raises alongside
      * phpunit/phpunit, keyed by the PHPUnit major the hop moves to: Pest and
      * its Laravel plugin, whose majors pair one to one with PHPUnit's. No feed
-     * drives it; null means BOOSTER pins nothing there.
+     * drives it; null means Booster pins nothing there.
      */
     public const FIXED_PHPUNIT_COMPANION_PINS = [
         '9' => null,
@@ -212,7 +212,7 @@ final class HopDataRefresher
      * Offline shape problems in a hop data file judged against the policy as
      * of $today: one line per problem, empty when the shape is sound. The PHP
      * and Laravel chains must carry every version the policy supports and the
-     * oldest version BOOSTER plans upgrades from, and each table must cover
+     * oldest version Booster plans upgrades from, and each table must cover
      * every major from its own floor to the top of its chain: no gaps, and
      * the newest major included. Majors below a table's floor are allowed,
      * because a refresh never back-fills majors the table never covered.
@@ -246,14 +246,14 @@ final class HopDataRefresher
         if ($phpChain !== null) {
             foreach (self::PHP_FLOOR_PREFIX as $floor) {
                 if (!in_array($floor, $phpChain, true)) {
-                    $problems[] = sprintf('BOOSTER plans PHP upgrades from %s, but the php chain does not list it.', $floor);
+                    $problems[] = sprintf('Booster plans PHP upgrades from %s, but the php chain does not list it.', $floor);
                 }
             }
         }
         if ($laravelChain !== null) {
             foreach (self::LARAVEL_FLOOR_PREFIX as $floor) {
                 if (!in_array($floor, $laravelChain, true)) {
-                    $problems[] = sprintf('BOOSTER plans Laravel upgrades from %s, but the laravel chain does not list it.', $floor);
+                    $problems[] = sprintf('Booster plans Laravel upgrades from %s, but the laravel chain does not list it.', $floor);
                 }
             }
         }

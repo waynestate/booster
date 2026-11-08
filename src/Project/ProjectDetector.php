@@ -108,7 +108,7 @@ final class ProjectDetector
 
     /**
      * The Laravel major a constraint floors at, keeping the minor for 5.x
-     * ("^5.8" becomes "5.8") because BOOSTER plans the 5.8 to 6 hop, and whole
+     * ("^5.8" becomes "5.8") because Booster plans the 5.8 to 6 hop, and whole
      * majors otherwise ("^10.0" becomes "10"). Null when the constraint cannot
      * be parsed.
      */

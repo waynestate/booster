@@ -325,7 +325,7 @@ final class HopRegistry
 
     /**
      * The inertia-laravel constraint each Laravel major pairs with, or null
-     * where BOOSTER pins nothing and the app keeps what it has.
+      * where Booster pins nothing and the app keeps what it has.
      *
      * @return array<string, string|null>
      */
@@ -336,7 +336,7 @@ final class HopRegistry
 
     /**
      * The @inertiajs/vue3 constraint each Laravel major pairs with, or null
-     * where BOOSTER pins nothing and the app keeps what it has.
+      * where Booster pins nothing and the app keeps what it has.
      *
      * @return array<string, string|null>
      */
@@ -359,7 +359,7 @@ final class HopRegistry
 
     /**
      * The Inertia constraints a Laravel hop should raise for an Inertia/Vue
-     * app moving to $laravelTo: composer and npm maps (empty where BOOSTER
+     * app moving to $laravelTo: composer and npm maps (empty where Booster
      * pins nothing for that major) plus the note to surface when neither is
      * pinned. One source of truth for the executor and the hop's notes.
      *
@@ -379,7 +379,7 @@ final class HopRegistry
         }
         $notes = [];
         if ($composer === [] && $npm === []) {
-            $notes[] = sprintf('Inertia: BOOSTER pins no inertia-laravel or @inertiajs/vue3 constraint for Laravel %s; check the Inertia docs for the versions that support it.', $laravelTo);
+            $notes[] = sprintf('Inertia: Booster pins no inertia-laravel or @inertiajs/vue3 constraint for Laravel %s; check the Inertia docs for the versions that support it.', $laravelTo);
         }
 
         return ['composer' => $composer, 'npm' => $npm, 'notes' => $notes];
@@ -403,7 +403,7 @@ final class HopRegistry
 
     /**
      * The companion composer constraints a Laravel hop moving to $laravelTo
-     * raises alongside laravel/framework, empty when BOOSTER pins nothing for
+     * raises alongside laravel/framework, empty when Booster pins nothing for
      * that major. One source of truth for the hop's data and the executor.
      *
      * @return array<string, string>
@@ -539,7 +539,7 @@ final class HopRegistry
     }
 
     /**
-     * A table whose values may be null: null means BOOSTER pins nothing for
+     * A table whose values may be null: null means Booster pins nothing for
      * that major, which is a decision, not a missing entry.
      *
      * @param array<string, mixed> $data
@@ -564,7 +564,7 @@ final class HopRegistry
     }
 
     /**
-     * A table whose values are package maps or null: null means BOOSTER pins
+     * A table whose values are package maps or null: null means Booster pins
      * no companion packages for that major, which is a decision, not a missing
      * entry.
      *
@@ -986,7 +986,7 @@ final class HopRegistry
     /**
      * The Tailwind 3 to 4 hop. It runs the official @tailwindcss/upgrade tool
      * in the Node container, then normalizes package.json itself: the tool
-     * rewrites the CSS and the config, BOOSTER owns the dependency pins.
+     * rewrites the CSS and the config, Booster owns the dependency pins.
      */
     private function tailwindHop(): Hop
     {

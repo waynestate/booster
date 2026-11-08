@@ -19,7 +19,7 @@ use RecursiveIteratorIterator;
  */
 final class WayneUiMigration
 {
-    /** Directories BOOSTER never touches, even when they hold 1.x markup. */
+    /** Directories Booster never touches, even when they hold 1.x markup. */
     private const SKIP_PREFIXES = [
         '.git/',
         'vendor/',

@@ -63,7 +63,7 @@ final class ProctorRunner
             // PROCTOR's bin finds Booster's autoloader three levels up.
             $binary = PharFiles::path('vendor') . '/waynestate/proctor/bin/proctor';
             if (!is_file($binary)) {
-                throw new ToolError('PROCTOR is not installed in the BOOSTER phar.');
+                throw new ToolError('PROCTOR is not installed in the Booster phar.');
             }
 
             return $binary;
@@ -74,7 +74,7 @@ final class ProctorRunner
             : null;
         $binary = ($root ?? dirname(__DIR__, 2) . '/vendor/waynestate/proctor') . '/bin/proctor';
         if (!is_file($binary)) {
-            throw new ToolError('PROCTOR is not installed. Run `composer install` in BOOSTER first.');
+            throw new ToolError('PROCTOR is not installed. Run `composer install` in Booster first.');
         }
 
         return $binary;

@@ -97,7 +97,7 @@ final class TextWriter
     }
 
     /**
-     * The hand-copied libraries block: BOOSTER names the cargo it refuses to
+     * The hand-copied libraries block: Booster names the cargo it refuses to
      * rewrite, the Composer package that would carry the same load, and why
      * the app still has to prove the copies run on the new PHP itself. Empty
      * when the plan found none.
@@ -110,7 +110,7 @@ final class TextWriter
             return [];
         }
         $target = $plan->targetPhp !== null ? self::clean($plan->targetPhp) : 'the target PHP';
-        $lines = [sprintf('Warning: hand-copied libraries found. BOOSTER never rewrites them and cannot show they run on PHP %s:', $target)];
+        $lines = [sprintf('Warning: hand-copied libraries found. Booster never rewrites them and cannot show they run on PHP %s:', $target)];
         foreach ($plan->vendoredLibraries as $library) {
             $name = self::clean($library->name);
             $version = $library->version !== null ? self::clean($library->version) : 'version unknown';
@@ -118,7 +118,7 @@ final class TextWriter
             $replace = $library->replaceWith !== null ? ': replace with the Composer package ' . self::clean($library->replaceWith) : '';
             $lines[] = sprintf('  - %s (%s)%s', $label, self::clean($library->path), $replace);
         }
-        $lines[] = "Libraries copied in by hand are often written for an older PHP and can crash even when BOOSTER's changes to your own code are clean. Replace them with Composer packages, then run your tests on the new PHP.";
+        $lines[] = "Libraries copied in by hand are often written for an older PHP and can crash even when Booster's changes to your own code are clean. Replace them with Composer packages, then run your tests on the new PHP.";
         foreach ($plan->steps as $step) {
             if ($step->hop->id === HopRegistry::VENDORED_TO_COMPOSER_ID) {
                 $lines[] = sprintf('Step %d (%s) does that for the Doctrine 2, Smarty 3 and Slim 1 copies; any other copy stays and is listed in its result.', $step->number, $step->hop->id);

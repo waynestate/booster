@@ -176,7 +176,7 @@ final class RectorRunner
             // runtime vendor tree is copied out of the phar, not just Rector.
             $binary = PharFiles::path('vendor') . '/rector/rector/bin/rector';
             if (!is_file($binary)) {
-                throw new ToolError('Rector is not installed in the BOOSTER phar.');
+                throw new ToolError('Rector is not installed in the Booster phar.');
             }
 
             return $binary;
@@ -187,7 +187,7 @@ final class RectorRunner
             : null;
         $binary = ($root ?? dirname(__DIR__, 2) . '/vendor/rector/rector') . '/bin/rector';
         if (!is_file($binary)) {
-            throw new ToolError('Rector is not installed. Run `composer install` in BOOSTER first.');
+            throw new ToolError('Rector is not installed. Run `composer install` in Booster first.');
         }
 
         return $binary;
