@@ -13,7 +13,7 @@ This page lists the environment variables Booster reads; the table is generated 
 | Variable | Meaning | Default | Read in |
 | --- | --- | --- | --- |
 | BOOSTER_BOT_TOKEN | Push token for the hop data robot (bin/hop-data-bot.php). Never in git, never logged, never printed | none | src/Refresh/HopDataBot.php |
-| BOOSTER_POLICY | Path to CREED's policy.json | none (uses the snapshot bundled with BOOSTER) | bin/refresh-hop-data.php |
+| BOOSTER_POLICY | Path to CREED's policy.json | none (uses the snapshot bundled with Booster) | bin/refresh-hop-data.php |
 
 Booster reads the policy straight from the `waynestate/creed` package in its own `vendor/`, so there is no copy to drift: `composer update waynestate/creed` is the whole refresh. `--policy` and `BOOSTER_POLICY` still override it for one run.
 

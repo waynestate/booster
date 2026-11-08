@@ -13,7 +13,7 @@ This page lists every command and option Booster takes; the table is generated f
 | Command | What it does |
 | --- | --- |
 | `booster detect` | Say which of the five stack permutations an app is, and its PHP, Laravel and Vue versions. |
-| `booster hops` | List every hop BOOSTER knows. |
+| `booster hops` | List every hop Booster knows. |
 | `booster init` | Write the coding-tab playbooks (.agents/skills). With --check, fail when they are stale. |
 | `booster plan` | Show the ordered hops from the app to a supported version. Changes nothing. |
 | `booster replay` | The replay gate on its own: init drafts booster-replay.json, record saves how the app answers now, check fails when an answer changed. |
@@ -34,7 +34,7 @@ Usage: `booster detect [--path PATH] [--format FORMAT]`
 
 ### `booster hops` [#](https://booster.apps.wayne.edu/docs/reference/commands.html#booster-hops)
 
-List every hop BOOSTER knows.
+List every hop Booster knows.
 
 Usage: `booster hops [--format FORMAT]`
 
