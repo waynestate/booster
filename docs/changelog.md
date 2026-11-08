@@ -23,6 +23,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### Fixed
 
+- Fixed: the README art build hides the sticky masthead before the gallery cuts, so `card.jpg` shows the whole record card.
 - The README art kit rebuilds `record.svg` again: it accepts package hops such as `phpunit-10-to-11` on the record card and still fails on an id Booster does not plan.
 - The audit allows one abandoned package, `symplify/rule-doc-generator-contracts`, which `driftingly/rector-laravel` 2.7.3 still requires: composer.json ignores it and `policy-overrides.json` backs the ignore with a reason and a 2027-02-07 expiry, so PROCTOR flags it again if it outlives the approval.
 - The pipeline's PROCTOR jobs no longer pass `--policy`, which PROCTOR 0.7 refuses in CI; PROCTOR checks against the CREED policy it bundles.

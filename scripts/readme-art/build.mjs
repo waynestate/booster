@@ -464,6 +464,8 @@ async function buildRecord(page) {
 // finished (reduced-motion) state.
 async function buildGallery(page) {
   console.log("gallery:");
+  // The sticky masthead would sit over the top of a tall card; hide it as the hero cut does.
+  await page.addStyleTag({ content: ".masthead { display: none !important; }" });
   await assertClean(page, "article.card", "card");
   await cutJpg(page, ".record__body", "card.jpg");
   await assertClean(page, "#pairs", "pairs");
