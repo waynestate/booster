@@ -7,8 +7,11 @@
 # scripts/parity.sh and parity.ps1 build it for you with `--fallback`:
 #   docker build -f .squire/base-fallback.Dockerfile -t squire/php-parity-base:8.4 .squire
 
-ARG PHP_IMAGE=php:8.4.27-apache
-ARG NODE_IMAGE=node:22-trixie-slim
+# Pinned by the digest of each multi-arch list (SQUIRE-30), so the same bytes build on an arm64 laptop or CI runner
+# and an amd64 server. To bump one, see Image hardening in the docs: read the new list's digest with
+# `docker buildx imagetools inspect`, check it lists linux/amd64 and linux/arm64, and replace the whole reference.
+ARG PHP_IMAGE=php:8.4.27-apache@sha256:884f64b47174de2c0e813270fe7b24a18605729fcebe201302d98c38805530d0
+ARG NODE_IMAGE=node:22.23.4-trixie-slim@sha256:be1e2a3dc2c4fd68cdfadad2a696a280e0d2749098bee509230174d72fb768c6
 FROM ${NODE_IMAGE} AS node
 
 FROM ${PHP_IMAGE}
@@ -59,6 +62,11 @@ RUN { \
     } | tee "$APACHE_CONFDIR/conf-available/docker-php.conf" \
     && a2enconf docker-php
 
+# Apache says less about itself: ServerTokens Prod, ServerSignature Off, TraceEnable Off (SQUIRE-9). The zz- name loads
+# it after Debian's security.conf, so its values win.
+COPY apache-hardening.conf "$APACHE_CONFDIR/conf-available/zz-squire-hardening.conf"
+RUN a2enconf zz-squire-hardening
+
 # The extensions Citadel adds, minus oci8 and imagick.
 RUN set -eux; \
     savedAptMark="$(apt-mark showmanual)"; \
@@ -80,11 +88,15 @@ RUN set -eux; \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
     rm -rf /var/lib/apt/lists/*
 
+# opcache (SQUIRE-10): newer official images load it already and PHP 8.5 builds it in; enable it only when missing.
+# The settings are in .squire/php.ini, which the app image copies in.
+RUN php -m | grep -qx 'Zend OPcache' || docker-php-ext-enable opcache
+
 # Composer's runtime tooling, plus Composer itself (Citadel downloads it at first boot; locally it is copied from the
 # pinned Composer image so the container does not need the network to start).
 RUN apt-get update && apt-get install -y --no-install-recommends git openssh-client wget zip unzip curl \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=composer:2.10.3 /usr/bin/composer /usr/local/bin/composer
+COPY --from=composer:2.10.3@sha256:2cf275428757e5435a667bfc0d038b14520ca02be2b1b70d44a05c8c19e2de48 /usr/bin/composer /usr/local/bin/composer
 
 # Node 22 and corepack, copied from the official Node image instead of piping a setup script into a shell (S4).
 COPY --from=node /usr/local/bin/node /usr/local/bin/node

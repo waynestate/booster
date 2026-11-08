@@ -6,8 +6,8 @@
 # file, and `composer install` / `npm ci` go in scripts/release.sh, where the lock files exist.
 #
 # A non-zero exit fails the image build, and on an Update the old container keeps serving (S2).
-# Citadel can reuse a cached build layer even after you edit this file. After a change, read the build log and
-# confirm the new version ran (S6). The marker below says which one it was.
+# An edited build.sh rebuilds its own image step on Citadel (tested on a full Update, 2026-11-07; S6). A Quick
+# Update never runs this file. After a change, the marker below shows in the build log which version ran.
 #
 # Knights wear plate armour for the same reason this script is boring: everything exposed gets a layer of protection.
 set -eu

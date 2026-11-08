@@ -7,8 +7,8 @@
 #   Quick Update post-script in the Citadel dashboard:  user `citadel`, script `./scripts/release.sh`
 #
 # Steps: preconditions, composer install from the lock file without dev packages, composer audit (report),
-# PROCTOR's deploy gate, frontend install and build, Laravel migrate and optimize, an Oracle connection check (report
-# only), and a smoke test of /up.
+# PROCTOR's deploy gate, frontend install and build, Laravel migrate, optimize and the restart of the long-lived
+# processes, an Oracle connection check (report only), an opcache report, and a smoke test of /up.
 # PROCTOR runs `proctor gate` (or `proctor check` on a PROCTOR without the gate): a go or no-go for this commit,
 # ratcheted against the verdict of the last release that went on, so only a new failure blocks. The verdict is kept in
 # SQUIRE_PROCTOR_RECORD_DIR. By default a no-go is a report here, never a stop: a failing post-script cannot undo a
@@ -27,9 +27,11 @@
 #   SQUIRE_COMPOSER_AUDIT=report     report | fail | skip
 #   SQUIRE_NPM=auto                  auto | skip
 #   SQUIRE_NPM_IGNORE_SCRIPTS=1      1 runs the installer with --ignore-scripts (S57)
+#   SQUIRE_NPM_REBUILD=              packages (space-separated) whose install scripts run after the install (SQUIRE-26)
 #   SQUIRE_NPM_BUILD_SCRIPT=build    the package.json script to run after install
 #   SQUIRE_MIGRATE=1                 Laravel: run `migrate --force`
 #   SQUIRE_ARTISAN_OPTIMIZE=1        Laravel: run `optimize` after the environment is in place (S16)
+#   SQUIRE_ARTISAN_RESTART=1         Laravel: tell queue workers and schedule:work to restart on the new code (reload, or queue:restart and schedule:interrupt)
 #   SQUIRE_PROCTOR=auto              auto | skip | enforce (report only by default; enforce stops the release on a no-go)
 #   SQUIRE_PROCTOR_BIN=              path to proctor (default: vendor/bin/proctor, then `proctor` on PATH)
 #   SQUIRE_PROCTOR_POLICY=           path to the CREED policy.json (when unset: the one CREED ships, if installed; otherwise PROCTOR's own default)
@@ -38,6 +40,7 @@
 #   SQUIRE_SMOKE_URL=                full URL (default: http://127.0.0.1:80/up for Laravel, /up.php for raw PHP)
 #   SQUIRE_SMOKE_RETRIES=5           attempts
 #   SQUIRE_SMOKE_DELAY=2             seconds between attempts
+#   SQUIRE_SECRETS_DIR=/run/secrets  a folder of secret files; each file named like a variable becomes one (SQUIRE-18)
 #
 # A release script that is not idempotent is just a rehearsal that happens to ship.
 set -euo pipefail
@@ -72,6 +75,43 @@ on_error() {
 }
 trap 'on_error $? $LINENO' ERR
 
+# squire-secrets: begin
+# Secrets arrive as files at run time, never in an image layer (SQUIRE-18). Each regular file in SQUIRE_SECRETS_DIR
+# (default /run/secrets, where Docker, Compose and Kubernetes mount them) whose name is an environment variable name
+# becomes that variable, with one trailing line ending trimmed. A variable the environment already sets wins. Only names
+# are ever printed, never values. This block is the same in scripts/release.sh and the fallback entrypoint.
+squire_load_secrets() {
+    local dir="${SQUIRE_SECRETS_DIR:-/run/secrets}" file name value loaded=""
+    [ -d "$dir" ] || return 0
+    for file in "$dir"/*; do
+        [ -f "$file" ] || continue
+        name="${file##*/}"
+        case "$name" in
+            '' | [!A-Za-z_]* | *[!A-Za-z0-9_]*) continue ;;
+            PATH | HOME | IFS | ENV | BASH_ENV | SHELL | SHELLOPTS | PS4 | LD_* | SQUIRE_SECRETS_DIR) continue ;;
+        esac
+        # The name holds only letters, digits and underscores, so this eval only tests whether it is already set.
+        if eval "[ \"\${$name+set}\" = set ]"; then
+            continue
+        fi
+        if [ ! -r "$file" ]; then
+            printf '[squire] WARNING: secret %s in %s is not readable by this user; skipped\n' "$name" "$dir" >&2
+            continue
+        fi
+        value="$(cat "$file"; printf x)"
+        value="${value%x}"
+        value="${value%$'\n'}"
+        value="${value%$'\r'}"
+        export "$name=$value"
+        loaded="$loaded $name"
+    done
+    if [ -n "$loaded" ]; then
+        printf '[squire] secrets from %s:%s\n' "$dir" "$loaded" >&2
+    fi
+    return 0
+}
+# squire-secrets: end
+
 # --- settings file --------------------------------------------------------------------------------------------------
 
 # Citadel has no environment field, so release options reach this script as a configuration file it writes into the
@@ -89,9 +129,10 @@ squire_load_settings() {
         value="${line#*=}"
         case "$key" in
             SQUIRE_FRAMEWORK | SQUIRE_ALLOW_ROOT | SQUIRE_REQUIRE_ENV | SQUIRE_WRITABLE_DIRS | \
-                SQUIRE_COMPOSER_AUDIT | SQUIRE_NPM | SQUIRE_NPM_IGNORE_SCRIPTS | SQUIRE_NPM_BUILD_SCRIPT | \
-                SQUIRE_MIGRATE | SQUIRE_ARTISAN_OPTIMIZE | SQUIRE_PROCTOR | SQUIRE_PROCTOR_BIN | \
-                SQUIRE_PROCTOR_POLICY | SQUIRE_PROCTOR_RECORD_DIR | SQUIRE_SMOKE | SQUIRE_SMOKE_URL | SQUIRE_SMOKE_RETRIES | SQUIRE_SMOKE_DELAY) ;;
+                SQUIRE_COMPOSER_AUDIT | SQUIRE_NPM | SQUIRE_NPM_IGNORE_SCRIPTS | SQUIRE_NPM_REBUILD | SQUIRE_NPM_BUILD_SCRIPT | \
+                SQUIRE_MIGRATE | SQUIRE_ARTISAN_OPTIMIZE | SQUIRE_ARTISAN_RESTART | SQUIRE_PROCTOR | SQUIRE_PROCTOR_BIN | \
+                SQUIRE_PROCTOR_POLICY | SQUIRE_PROCTOR_RECORD_DIR | SQUIRE_SMOKE | SQUIRE_SMOKE_URL | SQUIRE_SMOKE_RETRIES | SQUIRE_SMOKE_DELAY | \
+                SQUIRE_SECRETS_DIR) ;;
             *) continue ;;
         esac
         # The key is one of the names above, so this eval only tests whether that variable is already set.
@@ -112,6 +153,8 @@ if [ -z "$SQUIRE_APP_DIR" ]; then
 fi
 cd "$SQUIRE_APP_DIR"
 squire_load_settings ./.env.squire
+# su -l resets the environment the entrypoint built, so the release reads the mounted secrets itself (SQUIRE-18).
+squire_load_secrets
 
 : "${SQUIRE_FRAMEWORK:=auto}"
 : "${SQUIRE_ALLOW_ROOT:=0}"
@@ -120,9 +163,11 @@ squire_load_settings ./.env.squire
 : "${SQUIRE_COMPOSER_AUDIT:=report}"
 : "${SQUIRE_NPM:=auto}"
 : "${SQUIRE_NPM_IGNORE_SCRIPTS:=1}"
+: "${SQUIRE_NPM_REBUILD:=}"
 : "${SQUIRE_NPM_BUILD_SCRIPT:=build}"
 : "${SQUIRE_MIGRATE:=1}"
 : "${SQUIRE_ARTISAN_OPTIMIZE:=1}"
+: "${SQUIRE_ARTISAN_RESTART:=1}"
 : "${SQUIRE_PROCTOR:=auto}"
 : "${SQUIRE_PROCTOR_BIN:=}"
 : "${SQUIRE_PROCTOR_POLICY:=}"
@@ -175,6 +220,10 @@ fi
 case "$framework" in
     laravel | raw) ;;
     *) fail "SQUIRE_FRAMEWORK must be auto, laravel or raw; got '$framework'" ;;
+esac
+case "$SQUIRE_ARTISAN_RESTART" in
+    0 | 1) ;;
+    *) fail "SQUIRE_ARTISAN_RESTART must be 0 or 1; got '$SQUIRE_ARTISAN_RESTART'" ;;
 esac
 note "framework: $framework"
 
@@ -338,16 +387,50 @@ else
     if [ "$SQUIRE_NPM_IGNORE_SCRIPTS" = "1" ]; then
         ignore_flag="--ignore-scripts"
     fi
+    # The escape hatch for a package that needs its install script (SQUIRE-26): name it, and only it runs its scripts.
+    # read -a splits on spaces without expanding globs, and each word must look like an npm package name.
+    rebuild=()
+    read -r -a rebuild_words <<<"$SQUIRE_NPM_REBUILD" || true
+    for package in "${rebuild_words[@]}"; do
+        case "$package" in
+            [!a-z0-9@]* | *[!a-z0-9@/._-]* | *..* | ?*@* | @*/*/* | [!@]*/* | @ | @/* | */)
+                fail "SQUIRE_NPM_REBUILD takes package names separated by spaces; got '$package'" ;;
+        esac
+        rebuild+=("$package")
+    done
     if [ -f package-lock.json ]; then
         command -v npm >/dev/null 2>&1 || fail "package-lock.json found but npm is not on PATH"
-        npm --version
+        npm_version="$(npm --version)"
+        printf '%s\n' "$npm_version"
+        # min-release-age in .npmrc holds back versions younger than its days when a lock file is written; npm reads it
+        # from 11.10 on. npm ci installs the lock exactly either way, so the release itself never picks a new version.
+        npm_major="${npm_version%%.*}"
+        npm_minor="${npm_version#*.}"
+        npm_minor="${npm_minor%%.*}"
+        npm_reads_age=0
+        case "$npm_major$npm_minor" in
+            '' | *[!0-9]*) ;;
+            *) npm_reads_age=$((npm_major > 11 || (npm_major == 11 && npm_minor >= 10))) ;;
+        esac
+        if [ "$npm_reads_age" = "0" ] && [ -f .npmrc ] && grep -q '^min-release-age' .npmrc; then
+            note "npm $npm_version ignores min-release-age in .npmrc (npm 11.10 or later reads it); the lock file still decides what installs"
+        fi
         # shellcheck disable=SC2086  # the flag is empty or one word
         npm ci $ignore_flag
+        if [ "${#rebuild[@]}" -gt 0 ]; then
+            note "running install scripts for: ${rebuild[*]}"
+            npm rebuild --ignore-scripts=false "${rebuild[@]}"
+        fi
         run_build=(npm run "$SQUIRE_NPM_BUILD_SCRIPT")
     elif [ -f pnpm-lock.yaml ]; then
         command -v corepack >/dev/null 2>&1 || fail "pnpm-lock.yaml found but corepack is not on PATH"
         # shellcheck disable=SC2086  # the flag is empty or one word
         corepack pnpm install --frozen-lockfile $ignore_flag
+        if [ "${#rebuild[@]}" -gt 0 ]; then
+            # pnpm 10 also runs a dependency's build only when package.json lists it in pnpm.onlyBuiltDependencies.
+            note "running install scripts for: ${rebuild[*]}"
+            corepack pnpm rebuild "${rebuild[@]}"
+        fi
         run_build=(corepack pnpm run "$SQUIRE_NPM_BUILD_SCRIPT")
     else
         fail "package.json has no package-lock.json or pnpm-lock.yaml; commit a lock file, or set SQUIRE_NPM=skip if the built assets are committed"
@@ -374,6 +457,42 @@ if [ "$framework" = "laravel" ]; then
     else
         note "skipped (SQUIRE_ARTISAN_OPTIMIZE=0)"
     fi
+
+    step "laravel restart long-lived processes"
+    if [ "$SQUIRE_ARTISAN_RESTART" = "0" ]; then
+        note "skipped (SQUIRE_ARTISAN_RESTART=0)"
+    elif php artisan reload --help >/dev/null 2>&1; then
+        # A queue worker and a running schedule:work keep the old code in memory until they are told to stop. reload
+        # tells them (and any other long-lived services) to exit after their current work, and the supervisor starts
+        # them again on the new code.
+        restart_status=0
+        php artisan reload || restart_status=$?
+        if [ "$restart_status" -ne 0 ]; then
+            warn "php artisan reload exited $restart_status (report only; the release goes on)"
+        fi
+    else
+        # Older Laravel has no reload: run the two commands it knows, each when its own --help answers.
+        found_restart_command=0
+        if php artisan queue:restart --help >/dev/null 2>&1; then
+            found_restart_command=1
+            restart_status=0
+            php artisan queue:restart || restart_status=$?
+            if [ "$restart_status" -ne 0 ]; then
+                warn "php artisan queue:restart exited $restart_status (report only; the release goes on)"
+            fi
+        fi
+        if php artisan schedule:interrupt --help >/dev/null 2>&1; then
+            found_restart_command=1
+            restart_status=0
+            php artisan schedule:interrupt || restart_status=$?
+            if [ "$restart_status" -ne 0 ]; then
+                warn "php artisan schedule:interrupt exited $restart_status (report only; the release goes on)"
+            fi
+        fi
+        if [ "$found_restart_command" -eq 0 ]; then
+            note "this Laravel has no restart commands (no reload, queue:restart or schedule:interrupt); nothing to restart"
+        fi
+    fi
 fi
 
 step "check Oracle (never fails the release)"
@@ -383,6 +502,25 @@ if [ -f oracle-check.php ]; then
 else
     note "skipped (no oracle-check.php in the app root; the app does not use Oracle)"
 fi
+
+step "check opcache (never fails the release)"
+# Apache keeps the PHP it compiled. The kit's php.ini checks files again every 2 seconds (SQUIRE_OPCACHE_VALIDATE=1, the
+# default wherever code is pulled in place); with 0, for an image that bakes its code in, it never looks at them
+# again, so a release that changed files in place is not served until Apache restarts. Say so in the log.
+# shellcheck disable=SC2016  # the PHP program is single-quoted on purpose
+opcache_state="$(php -r 'if (!extension_loaded("Zend OPcache")) { echo "off"; } elseif (ini_get("opcache.validate_timestamps")) { echo "checks"; } else { echo "frozen"; }' 2>/dev/null || true)"
+case "$opcache_state" in
+    off) note "opcache is not loaded in this image" ;;
+    checks) note "opcache.validate_timestamps=1: the web server sees changed files by itself (within opcache.revalidate_freq seconds)" ;;
+    frozen)
+        if [ "$SQUIRE_SMOKE" = "1" ]; then
+            warn "opcache.validate_timestamps=0: Apache keeps serving the PHP it compiled before this release until it restarts; restart it, or set SQUIRE_OPCACHE_VALIDATE=1 where releases change files in place"
+        else
+            note "opcache.validate_timestamps=0: fine here, Apache starts after this hook and compiles this release"
+        fi
+        ;;
+    *) note "could not read the opcache settings" ;;
+esac
 
 step "smoke test the health endpoint"
 if [ "$SQUIRE_SMOKE" != "1" ]; then

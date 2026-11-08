@@ -1,29 +1,31 @@
 {
-    "squire": "Written by SQUIRE. Commit this file: `vendor/bin/squire init --check` reads it to report drift.",
-    "version": "0.6.0",
+    "squire": "Written by Squire. Commit this file: `vendor/bin/squire init --check` reads it to report drift.",
+    "version": "0.7.1",
     "target": "raw",
     "groups": [
         "release",
         "parity"
     ],
     "files": {
-        ".env.squire.example": "09ca4fbd7337c811e8b016e740008af240ae842c7d91c28fa24f2ab2378a126a",
-        ".squire/Dockerfile": "460ceb25f47481b9a209ec28db709565022c601a3ee3a603d3ff8dbc45ff47fa",
+        ".env.squire.example": "cc09d2c4d5187f5db2516c793a6835d231b50b2d35f0df205590562a2ada7b67",
+        ".squire/Dockerfile": "2d0f1eafbb78fa10741b3abe400fd254a21ad8b3605ca0860aef1bcac5923d2e",
         ".squire/Dockerfile.dockerignore": "6ccbb5a302475dd6322dc9f46057f98d0a5db59e5cfcc334d956df862d5da6fe",
-        ".squire/base-fallback.Dockerfile": "10c4cb9e70bf2e8d89fcf4ec07494b91e0166f2d028d05edb263a10338cd06b9",
-        ".squire/fallback/citadel-apache-entrypoint": "c91ed1bbdc3982769f3c3364e9e4f32baef13f25d42e8c34bb261f3d157a9305",
+        ".squire/apache-hardening.conf": "1f4f8dbcb70ad69a9ac91d852780a3e811527098c8bbf90416076ded25c52a40",
+        ".squire/base-fallback.Dockerfile": "dd1b169d0c6c117bab00d0899e1cae43386b609555c7dfd5ecf42fd00719c580",
+        ".squire/fallback/citadel-apache-entrypoint": "5586d39815a2f5f2bb29b07dd326cc8651ec61962160af942e5762783791af70",
         ".squire/fallback/citadel-deploy": "4203eb9458ab6910156622735da2ca026e2ac50420598c64e98cf3ef66603b90",
         ".squire/haproxy.cfg": "bcbc3ea3a8fb19c991900a1275e0d6954b41a6a3c6ccaef1934eeebf9f6ab901",
-        ".squire/php.ini": "2d8a40ce470b17ecd815e76afdfe591dfbe09a390f49aa99cde47997c13849ce",
+        ".squire/php-web.ini": "f3e43476913592928b41082ee5ee4b84a5e888a9ac8eb12d929304669d832e31",
+        ".squire/php.ini": "73cb813157a68331fec2ac1ff0ef802c7ec48158153be95910513dbc420b4301",
         ".squire/vhost.conf": "0197be7c59f4caf10ade0ae223f5ddc75b9b0c962fec76d8e9dabd27408f35ff",
-        "build.sh": "7fc37e4a0618d8f5c1fd1941200f80809af4241daf78fdd2172144ce2cf1e810",
+        "build.sh": "9a96113fe031eb15c4d3006e04df098646e07d7293a7decd6c4aac470295db1d",
         "deployments/001-first-release.sh": "adb3a9eb9a7d5b6cfa3f50043169b97253bab90c40ff37adba44201326557803",
-        "docker-compose.squire.yml": "b63f411697c670625fb375822e4a393a05e5a1bcc0d08ae50763096a5cacb075",
+        "docker-compose.squire.yml": "ec3f1982cfb72b41d7a8c9650603c789e00294a97a7950f5c6a5ad88e1bc2627",
         "health.php": "b691e07f29b900750d1c4c9ebb93916998e97502155effb2c2fe69691cf17a04",
         "oracle-check.php": "44dae9fbf0ef3ffe840cd374488fee9f26a63db3ac653a029f49849665ad9640",
         "public/up.php": "84d1b3d8823fcd5519fbe92988f822ce68cdc05eff2c889814deb3f33982600a",
         "scripts/parity.ps1": "da69deebe08280a5054a4b3724ceaeb61aa22b73febb9bcc2cdc913177414736",
         "scripts/parity.sh": "f0fb6a963277bde29b77e8b7869a1775acd517ea8d4f2774567469bf77235eae",
-        "scripts/release.sh": "e33b401bf0142cc8cf32cb9e82f56d29215b03f89a3e990b3719fefff08fb16c"
+        "scripts/release.sh": "a0406f9a94d36a78acd909a05eacb00924a5c9aa064f29c7e77498a88810829b"
     }
 }

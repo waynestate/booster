@@ -3,6 +3,46 @@
 # Mirrors the platform's entrypoint without the Composer download.
 set -u
 
+# squire-secrets: begin
+# Secrets arrive as files at run time, never in an image layer (SQUIRE-18). Each regular file in SQUIRE_SECRETS_DIR
+# (default /run/secrets, where Docker, Compose and Kubernetes mount them) whose name is an environment variable name
+# becomes that variable, with one trailing line ending trimmed. A variable the environment already sets wins. Only names
+# are ever printed, never values. This block is the same in scripts/release.sh and the fallback entrypoint.
+squire_load_secrets() {
+    local dir="${SQUIRE_SECRETS_DIR:-/run/secrets}" file name value loaded=""
+    [ -d "$dir" ] || return 0
+    for file in "$dir"/*; do
+        [ -f "$file" ] || continue
+        name="${file##*/}"
+        case "$name" in
+            '' | [!A-Za-z_]* | *[!A-Za-z0-9_]*) continue ;;
+            PATH | HOME | IFS | ENV | BASH_ENV | SHELL | SHELLOPTS | PS4 | LD_* | SQUIRE_SECRETS_DIR) continue ;;
+        esac
+        # The name holds only letters, digits and underscores, so this eval only tests whether it is already set.
+        if eval "[ \"\${$name+set}\" = set ]"; then
+            continue
+        fi
+        if [ ! -r "$file" ]; then
+            printf '[squire] WARNING: secret %s in %s is not readable by this user; skipped\n' "$name" "$dir" >&2
+            continue
+        fi
+        value="$(cat "$file"; printf x)"
+        value="${value%x}"
+        value="${value%$'\n'}"
+        value="${value%$'\r'}"
+        export "$name=$value"
+        loaded="$loaded $name"
+    done
+    if [ -n "$loaded" ]; then
+        printf '[squire] secrets from %s:%s\n' "$dir" "$loaded" >&2
+    fi
+    return 0
+}
+# squire-secrets: end
+
+# Load the mounted secrets first, so Apache and the PHP it runs inherit them.
+squire_load_secrets || exit 1
+
 if [ -d "${CITADEL_DEPLOYMENTS:-}" ]; then
     echo "Running deployments in $(pwd)"
     su -l citadel -c "TZ=$TZ CITADEL_DEPLOYMENTS=$CITADEL_DEPLOYMENTS CITADEL_SERVER_NAME=${CITADEL_SERVER_NAME:-} citadel-deploy"
