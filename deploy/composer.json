@@ -5,7 +5,7 @@
     "require": {
         "php": "^8.3",
         "waynestate/creed": "^0.1",
-        "waynestate/helmet": "^0.4",
+        "waynestate/helmet": "^1.0",
         "waynestate/proctor": "^0.8"
     },
     "config": {
