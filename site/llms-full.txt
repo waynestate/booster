@@ -1302,6 +1302,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 #### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added)
 
+- Added: a real `booster run` writes `booster-hop.json` at the app root (start and end time, from and to versions, Rector and rule-package versions, each hop's status and rules) for ROLLCALL to read; dry runs write nothing (BOOSTER-24).
 - Added: real .vue fixtures under tests/fixtures/vue-compat/ and a Docker-gated test that runs vue-upgrade-tool on them (BOOSTER-21).
 - Added: Booster checks the Rector config with rector validate-config before a Rector hop changes anything, and the run report records the Rector version.
 
@@ -2945,6 +2946,19 @@ Usage: `booster scan [--path PATH] [--php PHP] [--removals] [--format FORMAT] [-
 | `--ansi` | Force (or disable --no-ansi) ANSI output |  |
 | `--no-ansi` | Negate the "--ansi" option |  |
 | `-n`, `--no-interaction` | Do not ask any interactive question |  |
+
+A real `booster run` (not `--dry-run`) also writes a slim machine-readable hop record, `booster-hop.json`, at the app root, overwriting any earlier one; dry runs write nothing. Its keys, in order:
+
+- `tool`: always `booster`.
+- `version`: the Booster version that ran.
+- `dry_run`: false, since only real runs write the file.
+- `result`: `pass` or `fail`, the run report's own result.
+- `started_at` and `finished_at`: UTC wall clock around the run.
+- `php_from`, `php_to`, `laravel_from`, `laravel_to`: the plan's starting and target versions, null when unknown.
+- `rule_packages`: the installed versions of `rector/rector` and `driftingly/rector-laravel`.
+- `hops`: one entry per step, each with `step`, `hop`, `status` and `rules` (rule name to changed-file count, `{}` when none).
+
+Booster never commits `booster-hop.json`; the developer commits it with the hop. ROLLCALL reads it from the app repo.
 
 Example: an app moving from Laravel 8 to 13 takes the climb in parts. `booster plan --path=../my-app --until=laravel-8-to-9` keeps every hop up to and including the move to Laravel 9, and `booster run` with the same flag applies exactly those hops.
 

@@ -176,6 +176,19 @@ Usage: `booster scan [--path PATH] [--php PHP] [--removals] [--format FORMAT] [-
 | `--no-ansi` | Negate the "--ansi" option |  |
 | `-n`, `--no-interaction` | Do not ask any interactive question |  |
 
+A real `booster run` (not `--dry-run`) also writes a slim machine-readable hop record, `booster-hop.json`, at the app root, overwriting any earlier one; dry runs write nothing. Its keys, in order:
+
+- `tool`: always `booster`.
+- `version`: the Booster version that ran.
+- `dry_run`: false, since only real runs write the file.
+- `result`: `pass` or `fail`, the run report's own result.
+- `started_at` and `finished_at`: UTC wall clock around the run.
+- `php_from`, `php_to`, `laravel_from`, `laravel_to`: the plan's starting and target versions, null when unknown.
+- `rule_packages`: the installed versions of `rector/rector` and `driftingly/rector-laravel`.
+- `hops`: one entry per step, each with `step`, `hop`, `status` and `rules` (rule name to changed-file count, `{}` when none).
+
+Booster never commits `booster-hop.json`; the developer commits it with the hop. ROLLCALL reads it from the app repo.
+
 Example: an app moving from Laravel 8 to 13 takes the climb in parts. `booster plan --path=../my-app --until=laravel-8-to-9` keeps every hop up to and including the move to Laravel 9, and `booster run` with the same flag applies exactly those hops.
 
 ## Exit codes[#](https://booster.apps.wayne.edu/docs/reference/commands.html#exit-codes)

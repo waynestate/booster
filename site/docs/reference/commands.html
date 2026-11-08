@@ -629,6 +629,18 @@
 </tbody>
 </table></div>
 <!-- /generated -->
+<p>A real <code>booster run</code> (not <code>--dry-run</code>) also writes a slim machine-readable hop record, <code>booster-hop.json</code>, at the app root, overwriting any earlier one; dry runs write nothing. Its keys, in order:</p>
+<ul>
+<li><code>tool</code>: always <code>booster</code>.</li>
+<li><code>version</code>: the Booster version that ran.</li>
+<li><code>dry_run</code>: false, since only real runs write the file.</li>
+<li><code>result</code>: <code>pass</code> or <code>fail</code>, the run report's own result.</li>
+<li><code>started_at</code> and <code>finished_at</code>: UTC wall clock around the run.</li>
+<li><code>php_from</code>, <code>php_to</code>, <code>laravel_from</code>, <code>laravel_to</code>: the plan's starting and target versions, null when unknown.</li>
+<li><code>rule_packages</code>: the installed versions of <code>rector/rector</code> and <code>driftingly/rector-laravel</code>.</li>
+<li><code>hops</code>: one entry per step, each with <code>step</code>, <code>hop</code>, <code>status</code> and <code>rules</code> (rule name to changed-file count, <code>{}</code> when none).</li>
+</ul>
+<p>Booster never commits <code>booster-hop.json</code>; the developer commits it with the hop. ROLLCALL reads it from the app repo.</p>
 <p>Example: an app moving from Laravel 8 to 13 takes the climb in parts. <code>booster plan --path=../my-app --until=laravel-8-to-9</code> keeps every hop up to and including the move to Laravel 9, and <code>booster run</code> with the same flag applies exactly those hops.</p>
 <h2 id="exit-codes">Exit codes<a class="docs-heading-link" aria-label="Link to this section" href="#exit-codes">#</a></h2>
 <p>Exit codes: <code>0</code> pass, <code>1</code> the baseline failed, a hop was capped, errored or failed its gate, or the PROCTOR check

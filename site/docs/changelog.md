@@ -14,6 +14,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added)
 
+- Added: a real `booster run` writes `booster-hop.json` at the app root (start and end time, from and to versions, Rector and rule-package versions, each hop's status and rules) for ROLLCALL to read; dry runs write nothing (BOOSTER-24).
 - Added: real .vue fixtures under tests/fixtures/vue-compat/ and a Docker-gated test that runs vue-upgrade-tool on them (BOOSTER-21).
 - Added: Booster checks the Rector config with rector validate-config before a Rector hop changes anything, and the run report records the Rector version.
 

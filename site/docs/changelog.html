@@ -47,6 +47,7 @@
 <h2 id="unreleased">[Unreleased]<a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></h2>
 <h3 id="added">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added">#</a></h3>
 <ul>
+<li>Added: a real <code>booster run</code> writes <code>booster-hop.json</code> at the app root (start and end time, from and to versions, Rector and rule-package versions, each hop's status and rules) for ROLLCALL to read; dry runs write nothing (BOOSTER-24).</li>
 <li>Added: real .vue fixtures under tests/fixtures/vue-compat/ and a Docker-gated test that runs vue-upgrade-tool on them (BOOSTER-21).</li>
 <li>Added: Booster checks the Rector config with rector validate-config before a Rector hop changes anything, and the run report records the Rector version.</li>
 </ul>
