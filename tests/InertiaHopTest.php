@@ -93,7 +93,7 @@ final class InertiaHopTest extends TestCase
         self::assertSame('^1.0', $composer['require']['inertiajs/inertia-laravel']);
 
         $messages = implode("\n", $report->results[0]->messages);
-        self::assertStringContainsString('Inertia: BOOSTER pins no inertia-laravel or @inertiajs/vue3 constraint for Laravel 10', $messages);
+        self::assertStringContainsString('Inertia: Booster pins no inertia-laravel or @inertiajs/vue3 constraint for Laravel 10', $messages);
     }
 
     public function test_a_non_inertia_laravel_app_never_sees_inertia_changes(): void

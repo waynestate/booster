@@ -43,7 +43,7 @@
             "describe": {
                 "BOOSTER_POLICY": [
                     "Path to CREED's policy.json",
-                    "none (uses the snapshot bundled with BOOSTER)"
+                    "none (uses the snapshot bundled with Booster)"
                 ],
                 "BOOSTER_BOT_TOKEN": [
                     "Push token for the hop data robot (bin/hop-data-bot.php). Never in git, never logged, never printed",

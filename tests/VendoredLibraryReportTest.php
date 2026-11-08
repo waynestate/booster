@@ -18,7 +18,7 @@ final class VendoredLibraryReportTest extends TestCase
     /** The heading line for a plan whose target PHP is $targetPhp. */
     private function heading(?string $targetPhp): string
     {
-        return sprintf('Warning: hand-copied libraries found. BOOSTER never rewrites them and cannot show they run on PHP %s:', $targetPhp ?? 'the target PHP');
+        return sprintf('Warning: hand-copied libraries found. Booster never rewrites them and cannot show they run on PHP %s:', $targetPhp ?? 'the target PHP');
     }
 
     /**
@@ -57,7 +57,7 @@ final class VendoredLibraryReportTest extends TestCase
         self::assertStringContainsString('  - Doctrine 2.2.2 (vendor/Doctrine): replace with the Composer package doctrine/orm', $text);
         self::assertStringContainsString('  - Smarty 3.1.8 (vendor/Smarty): replace with the Composer package smarty/smarty', $text);
         self::assertStringContainsString('  - acme-thing, version unknown (vendor/acme-thing)', $text);
-        self::assertStringContainsString("Libraries copied in by hand are often written for an older PHP and can crash even when BOOSTER's changes to your own code are clean. Replace them with Composer packages, then run your tests on the new PHP.", $text);
+        self::assertStringContainsString("Libraries copied in by hand are often written for an older PHP and can crash even when Booster's changes to your own code are clean. Replace them with Composer packages, then run your tests on the new PHP.", $text);
         // With no composer.json the plan starts where --from-php says it does,
         // not at "unknown".
         self::assertStringContainsString('PHP: 5.5 -> ', $text);
@@ -99,7 +99,7 @@ final class VendoredLibraryReportTest extends TestCase
         self::assertIsInt($heading);
         self::assertIsInt($result);
         self::assertLessThan($result, $heading);
-        self::assertContains("Libraries copied in by hand are often written for an older PHP and can crash even when BOOSTER's changes to your own code are clean. Replace them with Composer packages, then run your tests on the new PHP.", $lines);
+        self::assertContains("Libraries copied in by hand are often written for an older PHP and can crash even when Booster's changes to your own code are clean. Replace them with Composer packages, then run your tests on the new PHP.", $lines);
     }
 
     public function test_to_array_carries_the_library_shapes_as_json(): void

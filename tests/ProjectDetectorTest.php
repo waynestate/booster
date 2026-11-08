@@ -283,7 +283,7 @@ final class ProjectDetectorTest extends TestCase
     public static function laravelConstraints(): array
     {
         return [
-            // 5.x keeps its minor: BOOSTER plans the 5.8 to 6 hop.
+            // 5.x keeps its minor: Booster plans the 5.8 to 6 hop.
             ['^5.8', '5.8'],
             ['~5.8', '5.8'],
             ['^6.0', '6'],

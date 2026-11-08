@@ -65,7 +65,7 @@ final class ProofPageTest extends TestCase
     {
         $page = ProofPage::render(self::DATA_DIR, $this->indexHtml());
 
-        self::assertStringContainsString('<title>BOOSTER proof: real output</title>', $page);
+        self::assertStringContainsString('<title>Booster proof: real output</title>', $page);
         self::assertStringNotContainsString('<title>Booster: Boosts your versions.</title>', $page);
         // Page-local anchors in the chrome point back at the front page; the
         // #main skip link stays where it is.

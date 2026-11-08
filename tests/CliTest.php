@@ -395,7 +395,7 @@ final class CliTest extends TestCase
     {
         [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $this->example('raw-php'), '--php' => 'banana']);
         self::assertSame(2, $exit);
-        self::assertStringContainsString('not a PHP version BOOSTER knows', $out);
+        self::assertStringContainsString('not a PHP version Booster knows', $out);
 
         [$exit, $out] = $this->booster(['command' => 'scan', '--path' => $this->example('raw-php')]);
         self::assertSame(2, $exit);

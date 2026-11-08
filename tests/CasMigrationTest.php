@@ -886,7 +886,7 @@ final class CasMigrationTest extends TestCase
         $result = $this->migrate($dir);
 
         self::assertSame($source, (string) file_get_contents($dir . '/app/Ghost.php'));
-        self::assertStringContainsString('app/Ghost.php: BOOSTER found no import for WayneCasable', implode(' ', $result->manual));
+        self::assertStringContainsString('app/Ghost.php: Booster found no import for WayneCasable', implode(' ', $result->manual));
         self::assertSame(['app/Ghost.php'], $result->failures);
     }
 

@@ -198,7 +198,7 @@ final class HopRegistryTest extends PhpUnitTestCase
         $oldNotes = $registry->get(HopRegistry::laravelHopId('9', '10'))->notes;
         $newNotes = $registry->get(HopRegistry::laravelHopId('12', '13'))->notes;
 
-        self::assertContains('Inertia: BOOSTER pins no inertia-laravel or @inertiajs/vue3 constraint for Laravel 10; check the Inertia docs for the versions that support it.', $oldNotes);
+        self::assertContains('Inertia: Booster pins no inertia-laravel or @inertiajs/vue3 constraint for Laravel 10; check the Inertia docs for the versions that support it.', $oldNotes);
         foreach ($newNotes as $note) {
             self::assertStringStartsNotWith('Inertia:', $note);
         }

@@ -200,7 +200,7 @@ final class TailwindUpgradeTest extends TestCase
 
     public function test_npm_install_syncs_the_lock_after_the_pins_and_before_npm_ci(): void
     {
-        // Found on a real app: the tool installs its own pins, BOOSTER's edits
+        // Found on a real app: the tool installs its own pins, Booster's edits
         // come after, and npm ci refused the stale lock.
         $dir = $this->app();
         $fake = $this->fake($dir);

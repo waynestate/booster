@@ -1456,8 +1456,8 @@ final class HopExecutorTest extends TestCase
 
         self::assertSame(['error', 'not-run'], $this->statuses($report));
         $messages = implode("\n", $report->results[0]->messages);
-        self::assertStringContainsString("src/Broken.php: \"Syntax error, unexpected ';'\" cannot be repaired by tooling, so BOOSTER stops here and the file needs a person.", $messages);
-        self::assertStringContainsString('src/Numeric.php: "Invalid numeric literal" cannot be repaired by tooling, so BOOSTER stops here and the file needs a person.', $messages);
+        self::assertStringContainsString("src/Broken.php: \"Syntax error, unexpected ';'\" cannot be repaired by tooling, so Booster stops here and the file needs a person.", $messages);
+        self::assertStringContainsString('src/Numeric.php: "Invalid numeric literal" cannot be repaired by tooling, so Booster stops here and the file needs a person.', $messages);
         self::assertStringNotContainsString('src/Broken.php: Syntax error', $messages);
     }
 

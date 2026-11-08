@@ -352,12 +352,12 @@ function buildRecordSvg(rec, fonts) {
   ).join("\n");
 
   const desc =
-    `${rec.form}. ${rec.title}. A short countdown, then a stamp lands on each hop BOOSTER plans, one row at a time: ` +
+    `${rec.form}. ${rec.title}. A short countdown, then a stamp lands on each hop Booster plans, one row at a time: ` +
     rec.doses.map((d) => `${d.hop} (${d.pair}, ${d.stampTop.toLowerCase()})`).join("; ") +
     `. ${rec.pass}. ${rec.note}`;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="rec-title rec-desc">
-  <title id="rec-title">BOOSTER's immunization record: one stamp per planned hop</title>
+  <title id="rec-title">Booster's immunization record: one stamp per planned hop</title>
   <desc id="rec-desc">${esc(desc)}</desc>
   <style>
 ${fontFace}

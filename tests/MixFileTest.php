@@ -336,7 +336,7 @@ final class MixFileTest extends TestCase
         } catch (ToolError $e) {
             self::assertStringContainsString('unsupported Mix call "options"', $e->getMessage());
             self::assertStringContainsString(
-                'BOOSTER converts the simple shape only (mix.js(), .vue(), .sass(), .postCss(), .version(), and if (mix.inProduction()) { mix.version(); })',
+                'Booster converts the simple shape only (mix.js(), .vue(), .sass(), .postCss(), .version(), and if (mix.inProduction()) { mix.version(); })',
                 $e->getMessage(),
             );
             self::assertStringContainsString('https://laravel.com/docs/9.x/upgrade#vite', $e->getMessage());
