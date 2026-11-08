@@ -242,6 +242,9 @@
   border-radius: calc(var(--dk-radius) / 2);
   padding: 0.2rem 0.5rem;
   cursor: pointer;
+  /* One line, always: docs.js lets Copied or Failed widen the button only where it stays clear of the code;
+     over the code it keeps its resting width and swaps a word that does not fit for a mark. */
+  white-space: nowrap;
 }
 
 .docs-copy__button:hover {

@@ -57,6 +57,35 @@
     }
   }
 
+  // True when the button stays clear of the code: beside the block (a theme's gutter; a long line scrolls right up
+  // to the block's edge, so the edge counts, within a pixel) or in a band above or below its lines (the padding).
+  function clearsCode(button, pre) {
+    var b = button.getBoundingClientRect();
+    var p = pre.getBoundingClientRect();
+    var cs = window.getComputedStyle(pre);
+    var top = p.top + (parseFloat(cs.paddingTop) || 0);
+    var bottom = p.bottom - (parseFloat(cs.paddingBottom) || 0);
+    return b.right <= p.left + 1 || b.left >= p.right - 1 || b.bottom <= top || b.top >= bottom;
+  }
+
+  // Each theme sizes the button's place for its resting "Copy". A longer state word may grow it only while it
+  // stays clear of the code; otherwise the button keeps its resting width, and a word that does not fit that
+  // width gives way to a mark (the live region still says it in words), so the button never covers code.
+  function showState(button, pre, word, mark) {
+    var rest = button.getBoundingClientRect().width;
+    button.style.inlineSize = '';
+    button.textContent = word;
+    if (clearsCode(button, pre)) {
+      return;
+    }
+    if (rest > 0) {
+      button.style.inlineSize = rest + 'px';
+    }
+    if (button.scrollWidth > button.clientWidth + 1) {
+      button.textContent = mark;
+    }
+  }
+
   function addCopyButtons() {
     var blocks = Array.prototype.slice.call(document.querySelectorAll('.docs-article pre'));
     if (blocks.length > 0) {
@@ -97,13 +126,14 @@
       var timer = null;
       button.addEventListener('click', function () {
         copyText(text).then(function (ok) {
-          button.textContent = ok ? 'Copied' : 'Copy failed';
+          showState(button, pre, ok ? 'Copied' : 'Failed', ok ? '✓' : '✕');
           status.textContent = ok ? 'Code copied.' : 'Could not copy the code.';
           if (timer !== null) {
             clearTimeout(timer);
           }
           timer = setTimeout(function () {
             button.textContent = 'Copy';
+            button.style.inlineSize = '';
             status.textContent = '';
             timer = null;
           }, 2000);
