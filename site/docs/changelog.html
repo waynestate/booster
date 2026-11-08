@@ -45,6 +45,9 @@
 <h1 id="changelog">Changelog<a class="docs-heading-link" aria-label="Link to this section" href="#changelog">#</a></h1>
 <p>All notable changes to Booster are recorded here. The format follows Keep a Changelog.</p>
 <h2 id="unreleased">[Unreleased]<a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></h2>
+<ul>
+<li>Changed: the deploy layer runs Squire's kit 0.7.1 (was 0.6.0): <code>.squire/php.ini</code> no longer sets the deprecated <code>session.sid_*</code> lines, web requests get a <code>disable_functions</code> list and Apache hardening (<code>.squire/php-web.ini</code>, <code>.squire/apache-hardening.conf</code>), and opcache gets production settings with <code>SQUIRE_OPCACHE_VALIDATE</code> as the one switch.</li>
+</ul>
 <h2 id="1-12-0-2026-11-08">[1.12.0] - 2026-11-08<a class="docs-heading-link" aria-label="Link to this section" href="#1-12-0-2026-11-08">#</a></h2>
 <ul>
 <li>Changed: the cas-to-sesame hop writes waynestate/sesame ^0.6 (was ^0.5), the current SESAME line; 0.6.0 has no breaking change for an app that keeps its driver.</li>
