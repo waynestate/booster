@@ -1,21 +1,21 @@
 # composer ci is the contract: the checks are defined there, and this pipeline only wraps them.
 # Booster's pipeline, built from the Preflight components on this GitLab.
-# Pinned to Preflight 0.2.0. Never use ~latest.
+# Pinned to Preflight 0.3.0. Never use ~latest.
 # Booster requires PHP ^8.3, so the test matrix starts at 8.3.
 # Docker Hub images go through the GitLab Dependency Proxy to avoid the anonymous pull limit.
 include:
-  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/php-test@0.2.0
+  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/php-test@0.3.0
     inputs:
       php_versions: ["8.3", "8.4", "8.5"]
-      image: "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/php:${PHP_VERSION}-cli-trixie"
-  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/composer-audit@0.2.0
+      image: "php:${PHP_VERSION}-cli-trixie"
+  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/composer-audit@0.3.0
     inputs:
-      image: "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/composer:2@sha256:b6dcd72ca98fa19d0e5b8476de179859704891fad06dd9e0b96833d4c430a5fc"
+      image: "composer:2@sha256:b6dcd72ca98fa19d0e5b8476de179859704891fad06dd9e0b96833d4c430a5fc"
   # The front page deploy layer (ADR-0017): PROCTOR checks deploy/ against CREED's policy.
   # allow_failure: current findings: unbounded dev-main constraints; CI files missing in deploy/.
-  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/proctor@0.2.0
+  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/proctor@0.3.0
     inputs:
-      image: "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/php:8.4-cli-trixie@sha256:9cf851bc2c1b37c3e59dfd677a3c3e56d485af5a47c93f629424bb039eafcb69"
+      image: "php:8.4-cli-trixie@sha256:9cf851bc2c1b37c3e59dfd677a3c3e56d485af5a47c93f629424bb039eafcb69"
       working_dir: deploy
       proctor_command: vendor/bin/proctor check --format=codequality
       allow_failure: true
