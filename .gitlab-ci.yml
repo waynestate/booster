@@ -19,6 +19,14 @@ include:
       working_dir: deploy
       proctor_command: vendor/bin/proctor check --format=codequality
       allow_failure: true
+  # Accessibility: Preflight's a11y component serves site/ and checks every page with axe-core 4.14.0, light and
+  # dark, at 320 and 1280 px, plus WCAG 1.4.10 reflow, at WCAG 2.2 AA. Its Playwright image comes from
+  # mcr.microsoft.com, which the Dependency Proxy does not front, so it takes no image_prefix.
+  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/a11y@0.3.1
+    inputs:
+      site_dir: site
+      pages: ["**/*.html"]
+      wcag_tags: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]
 
 # Dependency caching: images already come through the Dependency Proxy, and
 # every job that installs packages extends a cache under a fixed key, not a
