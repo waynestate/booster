@@ -24,6 +24,8 @@ include:
 # every job that installs packages extends a cache under a fixed key, not a
 # lock-file hash (D-072): Composer's and npm's caches are additive, so a lock
 # change downloads only what changed instead of everything.
+# The cache saves even when a job fails (when: always), so a dropped download
+# still keeps every package that finished, and the retry fetches only the rest.
 variables:
   COMPOSER_CACHE_DIR: "$CI_PROJECT_DIR/.cache/composer"
 
@@ -31,6 +33,7 @@ variables:
   cache:
     key: composer
     paths: [.cache/composer/]
+    when: always
 
 # WayneUI strict copies: PROCTOR runs on the project root so it sees site/assets/wayne-ui/.
 # The setting extra.proctor."wayneui.copies" = "fail" in composer.json makes a stale copy fail.
