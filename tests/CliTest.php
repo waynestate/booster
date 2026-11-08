@@ -1082,6 +1082,8 @@ final class CliTest extends TestCase
         });
 
         $dir = $this->copyExample('raw-php');
+        // A real run against the example source leaves a record there; start from a clean app.
+        @unlink($dir . '/booster-hop.json');
         [$exit, $out] = $this->booster([
             'command' => 'run', '--path' => $dir, '--today' => self::TODAY, '--dry-run' => true, '--goal' => 'php-74-to-84',
         ], $fake);
