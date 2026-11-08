@@ -47,6 +47,7 @@
 <h2 id="unreleased">[Unreleased]<a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></h2>
 <h3 id="changed">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed">#</a></h3>
 <ul>
+<li>Docs: <code>ADR/</code> and <code>DECISIONS.md</code> record Booster's shape decisions (one CLI, no tools image, PROCTOR from the host, the PNG mark).</li>
 <li>Changed: the GitLab pipeline pins the Preflight components to 0.2.0 (was 0.1.4).</li>
 <li>The front page's deploy layer (<code>deploy/</code>) runs Squire's kit 0.6.0 (was 0.5.0): <code>scripts/release.sh</code> asks PROCTOR's deploy gate for a go or no-go on each release (a report, not a stop, unless <code>SQUIRE_PROCTOR=enforce</code>), and <code>.env.squire.example</code> lists the new setting. The layer's pins move to HELMET <code>^0.4</code> (locked 0.4.0) and PROCTOR <code>^0.7</code> (locked 0.7.0).</li>
 <li>Changed: the <code>cas-to-sesame</code> step requires SESAME <code>^0.5</code> (SESAME 0.5.0 is out), and the SESAME config Booster falls back on when the app has no vendor copy is SESAME 0.5.0's: it gains <code>cas.require_pending_login</code> and <code>gateway.jwks_file</code>. The step's notes say Laravel apps need no code change for 0.5's sign-in binding and that Laravel 13 resolvers must implement <code>RefreshesUser</code>.</li>
