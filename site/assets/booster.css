@@ -241,6 +241,11 @@ h2 {
 .masthead__nav {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  /* Above 640 px every link is visible, and between roughly 640 and 840 px
+     brand plus links outgrow the container. Wrap the links, right aligned,
+     instead of running past the viewport (html and body no longer clip). */
+  flex-wrap: wrap;
   gap: 0.25rem;
 }
 
