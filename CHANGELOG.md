@@ -4,6 +4,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Changed: the cas-to-sesame hop writes waynestate/sesame ^0.6 (was ^0.5), the current SESAME line; 0.6.0 has no breaking change for an app that keeps its driver.
 - Changed: the front page deploy layer requires HELMET ^1.0 (lock at 1.0.1, was 0.4.0), like the rest of the stack; its shared front controller already runs on HELMET 1.0 in Squire, Sourdough and Pinstripe.
 - Fixed: the front page stops hiding sideways overflow behind a page-wide `overflow-x: clip` on `html` and `body`, so the 320 px reflow check (WCAG 1.4.10) can see real overflow; the masthead nav now wraps, right aligned, between roughly 640 and 840 px instead of running past the viewport.
 - Changed: the local a11y scripts run Preflight's own checker (vendored from 0.3.1 and pinned by a test), so they check what CI checks: axe-core 4.14.0, 320 and 1280 px, and the reflow check.
