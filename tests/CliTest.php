@@ -1053,7 +1053,8 @@ final class CliTest extends TestCase
         self::assertSame(BoosterApplication::VERSION, $record['version']);
         self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$/', $record['started_at']);
         self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$/', $record['finished_at']);
-        self::assertLessThanOrEqual($record['started_at'], $record['finished_at']);
+        // The run cannot finish before it started (PHPUnit's first argument is the limit).
+        self::assertLessThanOrEqual($record['finished_at'], $record['started_at']);
         self::assertIsList($record['hops']);
         self::assertNotEmpty($record['hops']);
         foreach ($record['hops'] as $hop) {
