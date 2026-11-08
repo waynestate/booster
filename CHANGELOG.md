@@ -4,6 +4,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- Added: real .vue fixtures under tests/fixtures/vue-compat/ and a Docker-gated test that runs vue-upgrade-tool on them (BOOSTER-21).
+
 ### Changed
 
 - Docs: `ADR/` and `DECISIONS.md` record Booster's shape decisions (one CLI, no tools image, PROCTOR from the host, the PNG mark).

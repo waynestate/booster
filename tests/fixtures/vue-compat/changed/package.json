@@ -1,0 +1,11 @@
+{
+    "name": "example-vue-compat-changed",
+    "private": true,
+    "dependencies": {
+        "vue": "^2.7.16",
+        "@vue/compat": "^3.5"
+    },
+    "scripts": {
+        "build": "echo build"
+    }
+}

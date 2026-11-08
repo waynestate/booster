@@ -1,0 +1,10 @@
+{
+    "name": "example-vue-compat-keep",
+    "private": true,
+    "dependencies": {
+        "vue": "^3.5"
+    },
+    "scripts": {
+        "build": "echo build"
+    }
+}
