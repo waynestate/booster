@@ -1,4 +1,4 @@
-/* BOOSTER front page behaviour.
+/* Booster front page behaviour.
  *
  * Small, vanilla, no build. Three jobs:
  *   1. The launch pad in the hero: T-3, T-2, T-1, lift-off, altimeter 7.4 -> 8.5.
@@ -94,7 +94,7 @@
     dose("php-84-to-85", "Move PHP 8.4 code to PHP 8.5.", "8.5", "13")
   ];
 
-  var PASS = '<span class="result result--pass">RESULT: PASS</span> Review with <code>git diff</code>, run your own checks, then commit. BOOSTER never commits or pushes.';
+  var PASS = '<span class="result result--pass">RESULT: PASS</span> Review with <code>git diff</code>, run your own checks, then commit. Booster never commits or pushes.';
 
   /* Next booster due: when the last version in the course leaves security
      support, from CREED's policy (Laravel 13: 2028-03-17, PHP 8.5: 2029-12-31). */

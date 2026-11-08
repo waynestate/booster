@@ -26,7 +26,7 @@ What Rector cannot do (check these by hand):
 
 - If your database server is old, check its version against the minimum MySQL (or other database) version Laravel 9 needs before you apply this hop.
 - Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.
-- Inertia: BOOSTER pins no inertia-laravel or @inertiajs/vue3 constraint for Laravel 9; check the Inertia docs for the versions that support it.
+- Inertia: Booster pins no inertia-laravel or @inertiajs/vue3 constraint for Laravel 9; check the Inertia docs for the versions that support it.
 - Check app/Http/Middleware/TrustProxies.php after the hop: the stock file is rewritten to the framework middleware, and a customized one is left alone.
 
 Official notes:

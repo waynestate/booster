@@ -26,7 +26,7 @@ What Rector cannot do (check these by hand):
 
 - If your database server is old, check its version against the minimum MySQL (or other database) version Laravel 10 needs before you apply this hop.
 - Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.
-- Inertia: BOOSTER pins no inertia-laravel or @inertiajs/vue3 constraint for Laravel 10; check the Inertia docs for the versions that support it.
+- Inertia: Booster pins no inertia-laravel or @inertiajs/vue3 constraint for Laravel 10; check the Inertia docs for the versions that support it.
 
 Official notes:
 

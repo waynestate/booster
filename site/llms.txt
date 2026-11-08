@@ -35,7 +35,7 @@ Every page below is Markdown. The HTML pages send the same Markdown to a client 
 - [Commands | Booster docs](https://booster.apps.wayne.edu/docs/reference/commands.md): Every Booster command and option, generated from the tool itself.
 - [Configuration | Booster docs](https://booster.apps.wayne.edu/docs/reference/configuration.md): The environment variables Booster reads, and where it gets the policy.
 - [Hops | Booster docs](https://booster.apps.wayne.edu/docs/reference/hops.md): Every hop Booster knows, generated from the hop data.
-- [BOOSTER proof: real output](https://booster.apps.wayne.edu/proof.md): Booster plans and runs PHP and Laravel upgrades one hop at a time on Rector, gates every hop with your tests on the target PHP, and never commits or pushes for you.
+- [Booster proof: real output](https://booster.apps.wayne.edu/proof.md): Booster plans and runs PHP and Laravel upgrades one hop at a time on Rector, gates every hop with your tests on the target PHP, and never commits or pushes for you.
 
 ## Prompts
 

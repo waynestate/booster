@@ -1,5 +1,5 @@
 ---
-title: "BOOSTER proof: real output"
+title: "Booster proof: real output"
 description: "Booster plans and runs PHP and Laravel upgrades one hop at a time on Rector, gates every hop with your tests on the target PHP, and never commits or pushes for you."
 url: https://booster.apps.wayne.edu/proof.html
 llms: https://booster.apps.wayne.edu/llms.txt
