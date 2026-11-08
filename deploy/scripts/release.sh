@@ -7,11 +7,14 @@
 #   Quick Update post-script in the Citadel dashboard:  user `citadel`, script `./scripts/release.sh`
 #
 # Steps: preconditions, composer install from the lock file without dev packages, composer audit (report),
-# frontend install and build, Laravel migrate and optimize, PROCTOR, an Oracle connection check (report only),
-# and a smoke test of /up.
-# By default PROCTOR is a report here, never a gate: a failing post-script cannot undo a Quick Update, because the
-# new commit is already live (S20). With SQUIRE_PROCTOR=enforce a failed check stops the release: the first release
-# never comes up healthy, and a Quick Update keeps the new commit checked out, so fix the findings and re-run.
+# PROCTOR's deploy gate, frontend install and build, Laravel migrate and optimize, an Oracle connection check (report
+# only), and a smoke test of /up.
+# PROCTOR runs `proctor gate` (or `proctor check` on a PROCTOR without the gate): a go or no-go for this commit,
+# ratcheted against the verdict of the last release that went on, so only a new failure blocks. The verdict is kept in
+# SQUIRE_PROCTOR_RECORD_DIR. By default a no-go is a report here, never a stop: a failing post-script cannot undo a
+# Quick Update, because the new commit is already live (S20). With SQUIRE_PROCTOR=enforce a no-go stops the release
+# before the frontend build and the migrations: the first release never comes up healthy, and a Quick Update keeps the
+# new commit checked out, so fix the findings and re-run. The squire holds the gate; the proctor says who may pass.
 #
 # Configuration is environment variables, all optional, or the same names in ./.env.squire in the app root. On Citadel
 # add that file as a configuration file (the configuration-files step after the wizard; the wizard has no environment
@@ -27,9 +30,10 @@
 #   SQUIRE_NPM_BUILD_SCRIPT=build    the package.json script to run after install
 #   SQUIRE_MIGRATE=1                 Laravel: run `migrate --force`
 #   SQUIRE_ARTISAN_OPTIMIZE=1        Laravel: run `optimize` after the environment is in place (S16)
-#   SQUIRE_PROCTOR=auto              auto | skip | enforce (report only by default; enforce stops the release)
+#   SQUIRE_PROCTOR=auto              auto | skip | enforce (report only by default; enforce stops the release on a no-go)
 #   SQUIRE_PROCTOR_BIN=              path to proctor (default: vendor/bin/proctor, then `proctor` on PATH)
 #   SQUIRE_PROCTOR_POLICY=           path to the CREED policy.json (when unset: the one CREED ships, if installed; otherwise PROCTOR's own default)
+#   SQUIRE_PROCTOR_RECORD_DIR=storage/squire  where the gate's verdict (proctor-gate.json) and baseline are kept
 #   SQUIRE_SMOKE=1                   1 requests the health URL at the end and fails if it is not 200 (S21)
 #   SQUIRE_SMOKE_URL=                full URL (default: http://127.0.0.1:80/up for Laravel, /up.php for raw PHP)
 #   SQUIRE_SMOKE_RETRIES=5           attempts
@@ -87,7 +91,7 @@ squire_load_settings() {
             SQUIRE_FRAMEWORK | SQUIRE_ALLOW_ROOT | SQUIRE_REQUIRE_ENV | SQUIRE_WRITABLE_DIRS | \
                 SQUIRE_COMPOSER_AUDIT | SQUIRE_NPM | SQUIRE_NPM_IGNORE_SCRIPTS | SQUIRE_NPM_BUILD_SCRIPT | \
                 SQUIRE_MIGRATE | SQUIRE_ARTISAN_OPTIMIZE | SQUIRE_PROCTOR | SQUIRE_PROCTOR_BIN | \
-                SQUIRE_PROCTOR_POLICY | SQUIRE_SMOKE | SQUIRE_SMOKE_URL | SQUIRE_SMOKE_RETRIES | SQUIRE_SMOKE_DELAY) ;;
+                SQUIRE_PROCTOR_POLICY | SQUIRE_PROCTOR_RECORD_DIR | SQUIRE_SMOKE | SQUIRE_SMOKE_URL | SQUIRE_SMOKE_RETRIES | SQUIRE_SMOKE_DELAY) ;;
             *) continue ;;
         esac
         # The key is one of the names above, so this eval only tests whether that variable is already set.
@@ -122,6 +126,7 @@ squire_load_settings ./.env.squire
 : "${SQUIRE_PROCTOR:=auto}"
 : "${SQUIRE_PROCTOR_BIN:=}"
 : "${SQUIRE_PROCTOR_POLICY:=}"
+: "${SQUIRE_PROCTOR_RECORD_DIR:=storage/squire}"
 : "${SQUIRE_SMOKE:=1}"
 : "${SQUIRE_SMOKE_URL:=}"
 : "${SQUIRE_SMOKE_RETRIES:=5}"
@@ -219,6 +224,112 @@ case "$SQUIRE_COMPOSER_AUDIT" in
     *) fail "SQUIRE_COMPOSER_AUDIT must be report, fail or skip; got '$SQUIRE_COMPOSER_AUDIT'" ;;
 esac
 
+# PROCTOR runs before the frontend build and the migrations, so an enforced no-go stops the release before it touches
+# the database. With a PROCTOR that has `proctor gate`, the step asks the deploy gate (ADR-0006) for a go or no-go,
+# ratcheted against the verdict of the last release that went on; an older PROCTOR gets `proctor check`, as before.
+proctor_mode="$SQUIRE_PROCTOR"
+case "$proctor_mode" in
+    auto | skip | enforce) ;;
+    *) fail "SQUIRE_PROCTOR must be auto, skip or enforce; got '$proctor_mode'" ;;
+esac
+if [ "$proctor_mode" = "enforce" ]; then
+    step "PROCTOR gate (enforced, a no-go stops the release)"
+else
+    step "PROCTOR gate (report only, never stops the release)"
+fi
+proctor_bin="$SQUIRE_PROCTOR_BIN"
+if [ "$proctor_mode" = "skip" ]; then
+    note "skipped (SQUIRE_PROCTOR=skip)"
+else
+    if [ -z "$proctor_bin" ]; then
+        if [ -x vendor/bin/proctor ]; then
+            proctor_bin="vendor/bin/proctor"
+        elif command -v proctor >/dev/null 2>&1; then
+            proctor_bin="proctor"
+        fi
+    fi
+    if [ "$proctor_mode" = "enforce" ] && [ -n "$SQUIRE_PROCTOR_BIN" ] && [ ! -x "$SQUIRE_PROCTOR_BIN" ]; then
+        fail "SQUIRE_PROCTOR_BIN is not an executable file: $SQUIRE_PROCTOR_BIN"
+    fi
+    if [ -z "$proctor_bin" ]; then
+        if [ "$proctor_mode" = "enforce" ]; then
+            fail "proctor not found (it is a dev dependency, so --no-dev leaves it out); set SQUIRE_PROCTOR_BIN to use it here"
+        fi
+        note "proctor not found (it is a dev dependency, so --no-dev leaves it out); set SQUIRE_PROCTOR_BIN to use it here"
+    else
+        # An explicit policy wins. When none is set, the policy CREED ships is used when it is installed; otherwise
+        # PROCTOR runs on its own default policy. A missing CREED file never stops the release.
+        policy_args=()
+        if [ -n "$SQUIRE_PROCTOR_POLICY" ]; then
+            policy_args=(--policy "$SQUIRE_PROCTOR_POLICY")
+        elif [ -f vendor/waynestate/creed/policy/policy.json ]; then
+            policy_args=(--policy vendor/waynestate/creed/policy/policy.json)
+        else
+            printf '%s\n' 'squire: CREED policy not installed; PROCTOR uses its own default policy'
+        fi
+
+        if "$proctor_bin" gate --help >/dev/null 2>&1; then
+            # The verdict of every gated release is kept in the record folder; the verdict of the last release that
+            # went on is the next baseline, so a failure already live is held and only a new one blocks.
+            record_dir="$SQUIRE_PROCTOR_RECORD_DIR"
+            mkdir -p "$record_dir"
+            [ -f "$record_dir/.gitignore" ] || printf '%s\n' '*' >"$record_dir/.gitignore"
+            verdict_file="$record_dir/proctor-gate.json"
+            baseline_file="$record_dir/proctor-gate-baseline.json"
+            gate_args=(gate --path . ${policy_args[@]+"${policy_args[@]}"} --record "$verdict_file")
+            if [ -f "$baseline_file" ]; then
+                gate_args+=(--baseline "$baseline_file")
+                note "baseline: $baseline_file (the verdict of the last release that went on)"
+            else
+                note "no baseline yet: this is the first gated release, so every failure blocks"
+            fi
+            proctor_status=0
+            "$proctor_bin" "${gate_args[@]}" || proctor_status=$?
+            [ -f "$verdict_file" ] && note "verdict recorded in $verdict_file"
+            case "$proctor_status" in
+                0)
+                    note "proctor gate: go"
+                    if [ -f "$verdict_file" ]; then cp "$verdict_file" "$baseline_file"; fi
+                    ;;
+                1)
+                    if [ "$proctor_mode" = "enforce" ]; then
+                        fail "proctor gate: no-go (exit 1). The release stops before the frontend build and the migrations. Fix the BLOCK lines above, or record a dated override in policy-overrides.json, then re-run"
+                    fi
+                    warn "proctor gate: no-go (exit 1); the release goes on (report only; set SQUIRE_PROCTOR=enforce to stop it). Fix the BLOCK lines above in CI"
+                    # The commit goes live anyway, so its verdict is the baseline the next release is measured against.
+                    if [ -f "$verdict_file" ]; then cp "$verdict_file" "$baseline_file"; fi
+                    ;;
+                *)
+                    if [ "$proctor_mode" = "enforce" ]; then
+                        fail "proctor gate could not decide (exit $proctor_status)"
+                    fi
+                    warn "proctor gate could not decide (exit $proctor_status); the release goes on"
+                    ;;
+            esac
+        else
+            proctor_version="$("$proctor_bin" --version 2>/dev/null | head -n 1 || true)"
+            warn "this PROCTOR (${proctor_version:-version unknown}) has no \`proctor gate\`, so the release runs \`proctor check\` instead, with no ratchet. Update waynestate/proctor to a release that has the gate"
+            proctor_status=0
+            "$proctor_bin" check --path . ${policy_args[@]+"${policy_args[@]}"} || proctor_status=$?
+            case "$proctor_status" in
+                0) note "proctor: pass" ;;
+                1)
+                    if [ "$proctor_mode" = "enforce" ]; then
+                        fail "proctor reported failures (exit 1)"
+                    fi
+                    warn "proctor reported failures (exit 1); the release goes on, fix them in CI"
+                    ;;
+                *)
+                    if [ "$proctor_mode" = "enforce" ]; then
+                        fail "proctor itself failed (exit $proctor_status)"
+                    fi
+                    warn "proctor itself failed (exit $proctor_status); the release goes on"
+                    ;;
+            esac
+        fi
+    fi
+fi
+
 step "frontend install and build"
 if [ "$SQUIRE_NPM" = "skip" ] || [ ! -f package.json ]; then
     note "skipped (no package.json, or SQUIRE_NPM=skip)"
@@ -262,67 +373,6 @@ if [ "$framework" = "laravel" ]; then
         php artisan optimize
     else
         note "skipped (SQUIRE_ARTISAN_OPTIMIZE=0)"
-    fi
-fi
-
-proctor_mode="$SQUIRE_PROCTOR"
-case "$proctor_mode" in
-    auto | skip | enforce) ;;
-    *) fail "SQUIRE_PROCTOR must be auto, skip or enforce; got '$proctor_mode'" ;;
-esac
-if [ "$proctor_mode" = "enforce" ]; then
-    step "PROCTOR check (enforced, stops the release)"
-else
-    step "PROCTOR report (report only, never a gate)"
-fi
-proctor_bin="$SQUIRE_PROCTOR_BIN"
-if [ "$proctor_mode" = "skip" ]; then
-    note "skipped (SQUIRE_PROCTOR=skip)"
-else
-    if [ -z "$proctor_bin" ]; then
-        if [ -x vendor/bin/proctor ]; then
-            proctor_bin="vendor/bin/proctor"
-        elif command -v proctor >/dev/null 2>&1; then
-            proctor_bin="proctor"
-        fi
-    fi
-    if [ "$proctor_mode" = "enforce" ] && [ -n "$SQUIRE_PROCTOR_BIN" ] && [ ! -x "$SQUIRE_PROCTOR_BIN" ]; then
-        fail "SQUIRE_PROCTOR_BIN is not an executable file: $SQUIRE_PROCTOR_BIN"
-    fi
-    if [ -z "$proctor_bin" ]; then
-        if [ "$proctor_mode" = "enforce" ]; then
-            fail "proctor not found (it is a dev dependency, so --no-dev leaves it out); set SQUIRE_PROCTOR_BIN to use it here"
-        fi
-        note "proctor not found (it is a dev dependency, so --no-dev leaves it out); set SQUIRE_PROCTOR_BIN to use it here"
-    else
-        # An explicit policy wins. When none is set, the policy CREED ships is used when it is installed; otherwise
-        # PROCTOR runs on its own default policy. A missing CREED file never stops the release.
-        if [ -n "$SQUIRE_PROCTOR_POLICY" ]; then
-            proctor_status=0
-            "$proctor_bin" check --path . --policy "$SQUIRE_PROCTOR_POLICY" || proctor_status=$?
-        elif [ -f vendor/waynestate/creed/policy/policy.json ]; then
-            proctor_status=0
-            "$proctor_bin" check --path . --policy vendor/waynestate/creed/policy/policy.json || proctor_status=$?
-        else
-            printf '%s\n' 'squire: CREED policy not installed; PROCTOR uses its own default policy'
-            proctor_status=0
-            "$proctor_bin" check --path . || proctor_status=$?
-        fi
-        case "$proctor_status" in
-            0) note "proctor: pass" ;;
-            1)
-                if [ "$proctor_mode" = "enforce" ]; then
-                    fail "proctor reported failures (exit 1)"
-                fi
-                warn "proctor reported failures (exit 1); the release goes on, fix them in CI"
-                ;;
-            *)
-                if [ "$proctor_mode" = "enforce" ]; then
-                    fail "proctor itself failed (exit $proctor_status)"
-                fi
-                warn "proctor itself failed (exit $proctor_status); the release goes on"
-                ;;
-        esac
     fi
 fi
 

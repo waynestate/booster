@@ -1,13 +1,13 @@
 {
     "squire": "Written by SQUIRE. Commit this file: `vendor/bin/squire init --check` reads it to report drift.",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "target": "raw",
     "groups": [
         "release",
         "parity"
     ],
     "files": {
-        ".env.squire.example": "48a660a9052290cd388e9ddd3914b0324ac99ed967adcfbed69bf2db6f72a4a6",
+        ".env.squire.example": "09ca4fbd7337c811e8b016e740008af240ae842c7d91c28fa24f2ab2378a126a",
         ".squire/Dockerfile": "460ceb25f47481b9a209ec28db709565022c601a3ee3a603d3ff8dbc45ff47fa",
         ".squire/Dockerfile.dockerignore": "6ccbb5a302475dd6322dc9f46057f98d0a5db59e5cfcc334d956df862d5da6fe",
         ".squire/base-fallback.Dockerfile": "10c4cb9e70bf2e8d89fcf4ec07494b91e0166f2d028d05edb263a10338cd06b9",
@@ -24,6 +24,6 @@
         "public/up.php": "84d1b3d8823fcd5519fbe92988f822ce68cdc05eff2c889814deb3f33982600a",
         "scripts/parity.ps1": "da69deebe08280a5054a4b3724ceaeb61aa22b73febb9bcc2cdc913177414736",
         "scripts/parity.sh": "f0fb6a963277bde29b77e8b7869a1775acd517ea8d4f2774567469bf77235eae",
-        "scripts/release.sh": "e9ead3363c2948510abad10b2aa5bc2a9335162599e30ae9a33c64372271ba1f"
+        "scripts/release.sh": "e33b401bf0142cc8cf32cb9e82f56d29215b03f89a3e990b3719fefff08fb16c"
     }
 }
