@@ -3,7 +3,7 @@
  * The pages are complete without this file. It adds three conveniences: a copy button on every code block,
  * an accessible tablist on every code tab set (with the choice remembered per set key), and a mobile menu
  * that closes when you pick a page. No dependencies, no globals, nothing that breaks the reading of a single
- * page if it fails to load.
+ * page if it fails to load. Escape closes the open mobile menu.
  */
 (function () {
   'use strict';
@@ -274,6 +274,19 @@
           }
           target = target.parentNode;
         }
+      });
+      // Escape closes the open menu and hands focus back to its summary, so a keyboard user is not left inside a
+      // list they wanted to dismiss. Enter and Space already open and close it: that part is the browser's.
+      menu.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape' || !menu.open) {
+          return;
+        }
+        menu.open = false;
+        var summary = menu.querySelector('summary');
+        if (summary) {
+          summary.focus();
+        }
+        event.preventDefault();
       });
     });
   }
