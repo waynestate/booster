@@ -15,6 +15,7 @@ use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Replay\ReplayFile;
 use Waynestate\Booster\Replay\ReplayGate;
+use Waynestate\Booster\Report\HopRecord;
 use Waynestate\Booster\Report\JsonWriter;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\ComposerEditor;
@@ -137,8 +138,10 @@ final class RunCommand extends BaseCommand
             };
         }
 
+        $dryRun = (bool) $input->getOption('dry-run');
+        $startedAt = gmdate(DATE_ATOM);
         $report = $executor->execute($plan, new RunOptions(
-            dryRun: (bool) $input->getOption('dry-run'),
+            dryRun: $dryRun,
             skipGate: (bool) $input->getOption('skip-gate'),
             allowDirty: (bool) $input->getOption('allow-dirty'),
             allowFailingBaseline: (bool) $input->getOption('allow-failing-baseline'),
@@ -155,10 +158,32 @@ final class RunCommand extends BaseCommand
             replayOut: $this->stringOption($input, 'replay-out'),
         ));
 
-        $output->writeln(
-            $format === 'json' ? (new JsonWriter())->write($report->toArray()) : (new TextWriter())->run($report, $this->pathAsTyped($input)),
-            OutputInterface::OUTPUT_RAW,
-        );
+        $finishedAt = gmdate(DATE_ATOM);
+
+        // A real run leaves its machine-readable hop record at the app root for
+        // ROLLCALL to read from the app repo. A dry run changes nothing, so it
+        // writes none. Booster never commits the file; the developer does.
+        $recordFile = null;
+        if (!$dryRun) {
+            $appPath = realpath($report->plan->project->path);
+            if ($appPath === false) {
+                throw new ToolError(sprintf('Could not resolve the app path "%s" to write the hop record.', $report->plan->project->path));
+            }
+            $recordFile = HopRecord::write($appPath, HopRecord::build(
+                $report,
+                $startedAt,
+                $finishedAt,
+                RectorRunner::installedVersions(HopRecord::RULE_PACKAGES),
+            ));
+        }
+
+        $body = $format === 'json'
+            ? (new JsonWriter())->write($report->toArray())
+            : (new TextWriter())->run($report, $this->pathAsTyped($input));
+        if ($format === 'text' && $recordFile !== null) {
+            $body .= PHP_EOL . sprintf('Hop record: %s (commit it with the hop).', $recordFile);
+        }
+        $output->writeln($body, OutputInterface::OUTPUT_RAW);
 
         return $report->failed() ? self::EXIT_FAIL : self::EXIT_PASS;
     }

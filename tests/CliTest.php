@@ -1019,6 +1019,78 @@ final class CliTest extends TestCase
         self::assertStringContainsString('Booster never commits or pushes.', $out);
     }
 
+    public function test_run_writes_a_hop_record_that_rollcall_can_read(): void
+    {
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            if (self::isProctorCommand($command)) {
+                return new ProcessResult(0, self::proctorFixture('pass-report.json'), '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        $dir = $this->copyExample('raw-php');
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $dir, '--today' => self::TODAY, '--goal' => 'php-74-to-84',
+        ], $fake);
+
+        self::assertSame(0, $exit);
+        $file = $dir . '/booster-hop.json';
+        self::assertFileExists($file);
+        $json = (string) file_get_contents($file);
+        self::assertStringNotContainsString('"files"', $json);
+        $record = json_decode($json, true);
+        self::assertIsArray($record);
+        self::assertSame('booster', $record['tool']);
+        self::assertFalse($record['dry_run']);
+        self::assertContains($record['result'], ['pass', 'fail']);
+        self::assertSame(BoosterApplication::VERSION, $record['version']);
+        self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$/', $record['started_at']);
+        self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$/', $record['finished_at']);
+        self::assertLessThanOrEqual($record['started_at'], $record['finished_at']);
+        self::assertIsList($record['hops']);
+        self::assertNotEmpty($record['hops']);
+        foreach ($record['hops'] as $hop) {
+            self::assertArrayHasKey('step', $hop);
+            self::assertArrayHasKey('hop', $hop);
+            self::assertArrayHasKey('status', $hop);
+            self::assertArrayHasKey('rules', $hop);
+        }
+        self::assertStringContainsString('Hop record: booster-hop.json (commit it with the hop).', $out);
+    }
+
+    public function test_a_dry_run_writes_no_hop_record(): void
+    {
+        $fake = new FakeProcessRunner(static function (array $command): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+            if (self::isProctorCommand($command)) {
+                return new ProcessResult(0, self::proctorFixture('pass-report.json'), '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        $dir = $this->copyExample('raw-php');
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $dir, '--today' => self::TODAY, '--dry-run' => true, '--goal' => 'php-74-to-84',
+        ], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertFileDoesNotExist($dir . '/booster-hop.json');
+        self::assertStringNotContainsString('Hop record:', $out);
+    }
+
     public function test_a_passing_real_run_that_changes_nothing_says_nothing_changed(): void
     {
         $dir = $this->copyExample('raw-php');

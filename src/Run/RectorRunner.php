@@ -172,12 +172,44 @@ final class RectorRunner
     }
 
     /**
+     * The installed versions of the given Composer packages as a name to
+     * version map, read from Booster's own vendor composer/installed.json. A
+     * package that is not installed is left out of the map.
+     *
+     * @param list<string> $packages
+     *
+     * @return array<string, string>
+     */
+    public static function installedVersions(array $packages): array
+    {
+        $versions = [];
+        foreach ($packages as $package) {
+            $version = self::installedVersionOf($package);
+            if ($version !== null) {
+                $versions[$package] = $version;
+            }
+        }
+
+        return $versions;
+    }
+
+    /**
      * The version of rector/rector Booster runs, recorded in the run report. Null
      * when Rector is somehow not installed (it always is in practice).
      */
     public function installedVersion(): ?string
     {
-        if (!InstalledVersions::isInstalled('rector/rector')) {
+        return self::installedVersions(['rector/rector'])['rector/rector'] ?? null;
+    }
+
+    /**
+     * The version of one Composer package from the main vendor's
+     * installed.json. Null when the package is not installed or carries no
+     * version.
+     */
+    private static function installedVersionOf(string $package): ?string
+    {
+        if (!InstalledVersions::isInstalled($package)) {
             return null;
         }
 
@@ -192,13 +224,13 @@ final class RectorRunner
             if (is_file($file)) {
                 $data = json_decode((string) file_get_contents($file), true);
                 if (is_array($data) && isset($data['packages']) && is_array($data['packages'])) {
-                    foreach ($data['packages'] as $package) {
-                        if (!is_array($package) || ($package['name'] ?? null) !== 'rector/rector') {
+                    foreach ($data['packages'] as $entry) {
+                        if (!is_array($entry) || ($entry['name'] ?? null) !== $package) {
                             continue;
                         }
                         foreach (['pretty_version', 'version'] as $key) {
-                            if (isset($package[$key]) && is_string($package[$key]) && $package[$key] !== '') {
-                                return $package[$key];
+                            if (isset($entry[$key]) && is_string($entry[$key]) && $entry[$key] !== '') {
+                                return $entry[$key];
                             }
                         }
                     }
@@ -206,7 +238,7 @@ final class RectorRunner
             }
         }
 
-        $version = InstalledVersions::getPrettyVersion('rector/rector');
+        $version = InstalledVersions::getPrettyVersion($package);
 
         return is_string($version) && $version !== '' ? $version : null;
     }
