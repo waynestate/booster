@@ -60,14 +60,12 @@
 }
 
 html {
-  overflow-x: clip;
   scroll-behavior: smooth;
   scroll-padding-top: 80px;
 }
 
 body {
   margin: 0;
-  overflow-x: clip;
   color: var(--b-ink);
   background-color: var(--b-white);
   font-family: var(--wsu-font-family-body);
