@@ -55,7 +55,8 @@
 </ul>
 <h3 id="fixed">Fixed<a class="docs-heading-link" aria-label="Link to this section" href="#fixed">#</a></h3>
 <ul>
-<li>the pipeline's PROCTOR jobs no longer pass <code>--policy</code>, which PROCTOR 0.7 refuses in CI; PROCTOR checks against the CREED policy it bundles.</li>
+<li>The audit allows one abandoned package, <code>symplify/rule-doc-generator-contracts</code>, which <code>driftingly/rector-laravel</code> 2.7.3 still requires: composer.json ignores it and <code>policy-overrides.json</code> backs the ignore with a reason and a 2027-02-07 expiry, so PROCTOR flags it again if it outlives the approval.</li>
+<li>The pipeline's PROCTOR jobs no longer pass <code>--policy</code>, which PROCTOR 0.7 refuses in CI; PROCTOR checks against the CREED policy it bundles.</li>
 <li>The front page's &quot;Next&quot; label reads Version 1.10 (it said 1.8, beside a 1.10 masthead), and its cast says Sourdough starts new apps in all five shapes, not raw PHP only.</li>
 </ul>
 <h2 id="1-10-0-2026-11-07">[1.10.0] - 2026-11-07<a class="docs-heading-link" aria-label="Link to this section" href="#1-10-0-2026-11-07">#</a></h2>

@@ -22,7 +22,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### Fixed[#](https://booster.apps.wayne.edu/docs/changelog.html#fixed)
 
-- the pipeline's PROCTOR jobs no longer pass `--policy`, which PROCTOR 0.7 refuses in CI; PROCTOR checks against the CREED policy it bundles.
+- The audit allows one abandoned package, `symplify/rule-doc-generator-contracts`, which `driftingly/rector-laravel` 2.7.3 still requires: composer.json ignores it and `policy-overrides.json` backs the ignore with a reason and a 2027-02-07 expiry, so PROCTOR flags it again if it outlives the approval.
+- The pipeline's PROCTOR jobs no longer pass `--policy`, which PROCTOR 0.7 refuses in CI; PROCTOR checks against the CREED policy it bundles.
 - The front page's "Next" label reads Version 1.10 (it said 1.8, beside a 1.10 masthead), and its cast says Sourdough starts new apps in all five shapes, not raw PHP only.
 
 ## \[1.10.0\] - 2026-11-07[#](https://booster.apps.wayne.edu/docs/changelog.html#1-10-0-2026-11-07)
