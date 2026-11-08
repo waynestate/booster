@@ -47,6 +47,7 @@
 <h2 id="unreleased">[Unreleased]<a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></h2>
 <h3 id="changed">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed">#</a></h3>
 <ul>
+<li>Changed: the <code>cas-to-sesame</code> step requires SESAME <code>^0.5</code> (SESAME 0.5.0 is out), and the SESAME config Booster falls back on when the app has no vendor copy is SESAME 0.5.0's: it gains <code>cas.require_pending_login</code> and <code>gateway.jwks_file</code>. The step's notes say Laravel apps need no code change for 0.5's sign-in binding and that Laravel 13 resolvers must implement <code>RefreshesUser</code>.</li>
 <li>CI caches Composer downloads per lock file (<code>.composer-cache</code>, keyed on <code>composer.lock</code> and <code>deploy/composer.lock</code>), so a pipeline stops fetching every package from Packagist on every run. Images already come through the Dependency Proxy.</li>
 <li>The lock moves to CREED 0.1.7 (was 0.1.4), the policy every plan reads. The Real output page is captured again (<code>build-proof.php --capture</code>), so its plans name <code>waynestate/creed 0.1.7</code>; the plan samples in the README, the quick start and the front page match a fresh run.</li>
 </ul>
