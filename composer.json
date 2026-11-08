@@ -37,7 +37,8 @@
     "config": {
         "process-timeout": 900,
         "audit": {
-            "abandoned": "report"
+            "abandoned": "report",
+            "ignore-abandoned": ["symplify/rule-doc-generator-contracts"]
         },
         "allow-plugins": {
             "dealerdirect/phpcodesniffer-composer-installer": true,

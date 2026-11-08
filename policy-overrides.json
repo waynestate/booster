@@ -1,0 +1,9 @@
+[
+    {
+        "check": "composer-audit",
+        "package": "symplify/rule-doc-generator-contracts",
+        "reason": "abandoned upstream with no replacement; required by driftingly/rector-laravel 2.7.3, which has no release without it. Remove when rector-laravel drops it.",
+        "expires": "2027-02-07",
+        "approved_by": "Booster maintainers"
+    }
+]
