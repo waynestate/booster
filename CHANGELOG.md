@@ -6,12 +6,16 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### Changed
 
+- Changed: the GitLab pipeline pins the Preflight components to 0.2.0 (was 0.1.4).
+- The front page's deploy layer (`deploy/`) runs Squire's kit 0.6.0 (was 0.5.0): `scripts/release.sh` asks PROCTOR's deploy gate for a go or no-go on each release (a report, not a stop, unless `SQUIRE_PROCTOR=enforce`), and `.env.squire.example` lists the new setting. The layer's pins move to HELMET `^0.4` (locked 0.4.0) and PROCTOR `^0.7` (locked 0.7.0).
+- Changed: the `cas-to-sesame` step requires SESAME `^0.5` (SESAME 0.5.0 is out), and the SESAME config Booster falls back on when the app has no vendor copy is SESAME 0.5.0's: it gains `cas.require_pending_login` and `gateway.jwks_file`. The step's notes say Laravel apps need no code change for 0.5's sign-in binding and that Laravel 13 resolvers must implement `RefreshesUser`.
 - CI caches Composer downloads per lock file (`.composer-cache`, keyed on `composer.lock` and `deploy/composer.lock`), so a pipeline stops fetching every package from Packagist on every run. Images already come through the Dependency Proxy.
 - The lock moves to CREED 0.1.7 (was 0.1.4), the policy every plan reads. The Real output page is captured again (`build-proof.php --capture`), so its plans name `waynestate/creed 0.1.7`; the plan samples in the README, the quick start and the front page match a fresh run.
 
 ### Fixed
 
 - The audit allows one abandoned package, `symplify/rule-doc-generator-contracts`, which `driftingly/rector-laravel` 2.7.3 still requires: composer.json ignores it and `policy-overrides.json` backs the ignore with a reason and a 2027-02-07 expiry, so PROCTOR flags it again if it outlives the approval.
+- The pipeline's PROCTOR jobs no longer pass `--policy`, which PROCTOR 0.7 refuses in CI; PROCTOR checks against the CREED policy it bundles.
 - The front page's "Next" label reads Version 1.10 (it said 1.8, beside a 1.10 masthead), and its cast says Sourdough starts new apps in all five shapes, not raw PHP only.
 
 ## [1.10.0] - 2026-11-07

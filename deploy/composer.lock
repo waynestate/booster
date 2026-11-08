@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7ac4a740af66a592de01a49de729f132",
+    "content-hash": "1ccab43c10176bad4c355fc03dfbef9e",
     "packages": [
         {
             "name": "composer/semver",
@@ -247,16 +247,16 @@
         },
         {
             "name": "opis/json-schema",
-            "version": "2.6.0",
+            "version": "2.6.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/opis/json-schema.git",
-                "reference": "8458763e0dd0b6baa310e04f1829fc73da4e8c8a"
+                "reference": "7d8685a78db131eb6a1571cc7b4db8f4b59e8628"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/opis/json-schema/zipball/8458763e0dd0b6baa310e04f1829fc73da4e8c8a",
-                "reference": "8458763e0dd0b6baa310e04f1829fc73da4e8c8a",
+                "url": "https://api.github.com/repos/opis/json-schema/zipball/7d8685a78db131eb6a1571cc7b4db8f4b59e8628",
+                "reference": "7d8685a78db131eb6a1571cc7b4db8f4b59e8628",
                 "shasum": ""
             },
             "require": {
@@ -306,9 +306,9 @@
             ],
             "support": {
                 "issues": "https://github.com/opis/json-schema/issues",
-                "source": "https://github.com/opis/json-schema/tree/2.6.0"
+                "source": "https://github.com/opis/json-schema/tree/2.6.1"
             },
-            "time": "2025-10-17T12:46:48+00:00"
+            "time": "2026-11-06T04:25:16+00:00"
         },
         {
             "name": "opis/string",
@@ -437,16 +437,16 @@
         },
         {
             "name": "paragonie/constant_time_encoding",
-            "version": "v3.1.3",
+            "version": "v3.1.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/paragonie/constant_time_encoding.git",
-                "reference": "d5b01a39b3415c2cd581d3bd3a3575c1ebbd8e77"
+                "reference": "5efef6e6cb43e088ccab7d0c1e2f2ab25b9e8b54"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/paragonie/constant_time_encoding/zipball/d5b01a39b3415c2cd581d3bd3a3575c1ebbd8e77",
-                "reference": "d5b01a39b3415c2cd581d3bd3a3575c1ebbd8e77",
+                "url": "https://api.github.com/repos/paragonie/constant_time_encoding/zipball/5efef6e6cb43e088ccab7d0c1e2f2ab25b9e8b54",
+                "reference": "5efef6e6cb43e088ccab7d0c1e2f2ab25b9e8b54",
                 "shasum": ""
             },
             "require": {
@@ -502,7 +502,7 @@
                 "issues": "https://github.com/paragonie/constant_time_encoding/issues",
                 "source": "https://github.com/paragonie/constant_time_encoding"
             },
-            "time": "2025-09-24T15:06:41+00:00"
+            "time": "2026-11-06T20:31:19+00:00"
         },
         {
             "name": "paragonie/csp-builder",
@@ -1800,16 +1800,16 @@
         },
         {
             "name": "waynestate/creed",
-            "version": "0.1.6",
+            "version": "0.1.7",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/creed.git",
-                "reference": "e1f9feefe6f57ea649b0c7ff3cd069cb793308af"
+                "reference": "58d9891122cb9abc98bc3270f03df845f23e121e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/creed/zipball/e1f9feefe6f57ea649b0c7ff3cd069cb793308af",
-                "reference": "e1f9feefe6f57ea649b0c7ff3cd069cb793308af",
+                "url": "https://api.github.com/repos/waynestate/creed/zipball/58d9891122cb9abc98bc3270f03df845f23e121e",
+                "reference": "58d9891122cb9abc98bc3270f03df845f23e121e",
                 "shasum": ""
             },
             "require": {
@@ -1846,23 +1846,23 @@
             "description": "The Wayne State app stack version policy as data, with a framework-free PHP reader.",
             "homepage": "https://creed.apps.wayne.edu/",
             "support": {
-                "issues": "https://nougat.snu.gs/enterprise-apps/creed/-/issues",
-                "source": "https://nougat.snu.gs/enterprise-apps/creed"
+                "issues": "https://git.wayne.edu/enterprise-apps/creed/-/issues",
+                "source": "https://github.com/waynestate/creed"
             },
-            "time": "2026-11-03T15:13:26+00:00"
+            "time": "2026-11-07T23:07:33+00:00"
         },
         {
             "name": "waynestate/helmet",
-            "version": "0.3.0",
+            "version": "0.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/helmet.git",
-                "reference": "a8b29f6ec083fcaf0b717494fdea8c99cf02df32"
+                "reference": "966fad6f0401d76df3e69f97bd7daeb359bc88f8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/helmet/zipball/a8b29f6ec083fcaf0b717494fdea8c99cf02df32",
-                "reference": "a8b29f6ec083fcaf0b717494fdea8c99cf02df32",
+                "url": "https://api.github.com/repos/waynestate/helmet/zipball/966fad6f0401d76df3e69f97bd7daeb359bc88f8",
+                "reference": "966fad6f0401d76df3e69f97bd7daeb359bc88f8",
                 "shasum": ""
             },
             "require": {
@@ -1877,14 +1877,17 @@
             },
             "require-dev": {
                 "laravel/pint": "^1.32",
+                "league/commonmark": "^2.10",
                 "nyholm/psr7": "^1.8",
                 "orchestra/testbench": "^10.0 || ^11.0",
                 "phpstan/phpstan": "^2.1",
                 "phpunit/phpunit": "^11.5",
+                "waynestate/advisor": "^0.1.6",
                 "waynestate/pinstripe": "^0.1"
             },
             "suggest": {
                 "laravel/framework": "For the Laravel adapter (step 2)",
+                "waynestate/advisor": "ADVISOR module: lets your coding agent read helmet_headers and helmet_php_support, read-only.",
                 "waynestate/playbook": "WSU's shared values (CAS, Entra, gateway); private, git.wayne.edu"
             },
             "type": "library",
@@ -1919,23 +1922,23 @@
             "description": "Wayne State's baseline runtime: security headers, session hardening, trusted proxies, a health check and structured logs for web apps.",
             "homepage": "https://helmet.apps.wayne.edu/",
             "support": {
-                "issues": "https://nougat.snu.gs/enterprise-apps/helmet/-/issues",
-                "source": "https://nougat.snu.gs/enterprise-apps/helmet"
+                "issues": "https://git.wayne.edu/enterprise-apps/helmet/-/issues",
+                "source": "https://github.com/waynestate/helmet"
             },
-            "time": "2026-11-03T15:53:01+00:00"
+            "time": "2026-11-07T23:01:01+00:00"
         },
         {
             "name": "waynestate/proctor",
-            "version": "0.4.0",
+            "version": "0.7.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/proctor.git",
-                "reference": "db63379a6873c7a63e0ffed60028676bea090fcc"
+                "reference": "695bfb022a5e4441939a2f4b3a2e3c27454add46"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/proctor/zipball/db63379a6873c7a63e0ffed60028676bea090fcc",
-                "reference": "db63379a6873c7a63e0ffed60028676bea090fcc",
+                "url": "https://api.github.com/repos/waynestate/proctor/zipball/695bfb022a5e4441939a2f4b3a2e3c27454add46",
+                "reference": "695bfb022a5e4441939a2f4b3a2e3c27454add46",
                 "shasum": ""
             },
             "require": {
@@ -1948,6 +1951,7 @@
             "require-dev": {
                 "humbug/box": "4.7.1",
                 "laravel/pint": "^1.32",
+                "league/commonmark": "^2.10",
                 "phpstan/phpstan": "^2.1",
                 "phpunit/phpunit": "^11.5",
                 "waynestate/pinstripe": "^0.1"
@@ -1978,10 +1982,10 @@
             "description": "A framework-free PHP CLI that measures a PHP app against the version policy.",
             "homepage": "https://proctor.apps.wayne.edu/",
             "support": {
-                "issues": "https://nougat.snu.gs/enterprise-apps/proctor/-/issues",
-                "source": "https://nougat.snu.gs/enterprise-apps/proctor"
+                "issues": "https://git.wayne.edu/enterprise-apps/proctor/-/issues",
+                "source": "https://github.com/waynestate/proctor"
             },
-            "time": "2026-11-03T15:15:39+00:00"
+            "time": "2026-11-07T23:01:02+00:00"
         }
     ],
     "packages-dev": [],
