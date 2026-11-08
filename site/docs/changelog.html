@@ -45,6 +45,9 @@
 <h1 id="changelog">Changelog<a class="docs-heading-link" aria-label="Link to this section" href="#changelog">#</a></h1>
 <p>All notable changes to Booster are recorded here. The format follows Keep a Changelog.</p>
 <h2 id="unreleased">[Unreleased]<a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></h2>
+<ul>
+<li>Changed: the pipeline pins every Preflight CI component to 0.3.0 (<a rel="noopener" href="mailto:preflight@0.3.0">preflight@0.3.0</a>); component image inputs are plain image names, since Preflight adds the Dependency Proxy prefix itself.</li>
+</ul>
 <h3 id="added">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added">#</a></h3>
 <ul>
 <li>Added: a real <code>booster run</code> writes <code>booster-hop.json</code> at the app root (start and end time, from and to versions, Rector and rule-package versions, each hop's status and rules) for ROLLCALL to read; dry runs write nothing (BOOSTER-24).</li>

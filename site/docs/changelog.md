@@ -12,6 +12,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## \[Unreleased\][#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Changed: the pipeline pins every Preflight CI component to 0.3.0 ([preflight@0.3.0](mailto:preflight@0.3.0)); component image inputs are plain image names, since Preflight adds the Dependency Proxy prefix itself.
+
 ### Added[#](https://booster.apps.wayne.edu/docs/changelog.html#added)
 
 - Added: a real `booster run` writes `booster-hop.json` at the app root (start and end time, from and to versions, Rector and rule-package versions, each hop's status and rules) for ROLLCALL to read; dry runs write nothing (BOOSTER-24).
