@@ -6,6 +6,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### Changed
 
+- The front page's deploy layer (`deploy/`) runs Squire's kit 0.6.0 (was 0.5.0): `scripts/release.sh` asks PROCTOR's deploy gate for a go or no-go on each release (a report, not a stop, unless `SQUIRE_PROCTOR=enforce`), and `.env.squire.example` lists the new setting. The layer's pins move to HELMET `^0.4` (locked 0.4.0) and PROCTOR `^0.7` (locked 0.7.0).
 - Changed: the `cas-to-sesame` step requires SESAME `^0.5` (SESAME 0.5.0 is out), and the SESAME config Booster falls back on when the app has no vendor copy is SESAME 0.5.0's: it gains `cas.require_pending_login` and `gateway.jwks_file`. The step's notes say Laravel apps need no code change for 0.5's sign-in binding and that Laravel 13 resolvers must implement `RefreshesUser`.
 - CI caches Composer downloads per lock file (`.composer-cache`, keyed on `composer.lock` and `deploy/composer.lock`), so a pipeline stops fetching every package from Packagist on every run. Images already come through the Dependency Proxy.
 - The lock moves to CREED 0.1.7 (was 0.1.4), the policy every plan reads. The Real output page is captured again (`build-proof.php --capture`), so its plans name `waynestate/creed 0.1.7`; the plan samples in the README, the quick start and the front page match a fresh run.
