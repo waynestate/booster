@@ -4,6 +4,7 @@
 *.cmd text eol=crlf
 /tests export-ignore
 *.sh text eol=lf
+tools/a11y/check.mjs text eol=lf
 /docs/readme export-ignore
 /scripts/readme-art export-ignore
 /bin/agent-ready.php export-ignore
