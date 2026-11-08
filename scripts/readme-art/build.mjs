@@ -438,11 +438,13 @@ async function buildRecord(page) {
   const rec = await readRecord(page);
   if (rec.doses.length < 3) fail("the record card has fewer than three dose rows");
   // Every hop id must be a hop Booster really plans: the ids are the page's
-  // own words, and the registry must still build php- and laravel- hops.
+  // own words, shaped <name>-<from>-to-<to> (php-82-to-83, laravel-10-to-11,
+  // phpunit-10-to-11, tailwind-3-to-4, ...), and the registry must still
+  // build hops with that name, so a family Booster does not plan fails here.
   const reg = read("src/Hop/HopRegistry.php");
   for (const d of rec.doses) {
-    const m = d.hop.match(/^(php|laravel)-(\d+)-to-(\d+)$/);
-    if (!m) fail(`hop id ${d.hop} is not a php-/laravel- hop`);
+    const m = d.hop.match(/^([a-z][a-z0-9-]*)-(\d+)-to-(\d+)$/);
+    if (!m) fail(`hop id ${d.hop} is not a Booster hop id of the shape <name>-<from>-to-<to>`);
     if (!reg.includes(m[1] + "-")) fail(`HopRegistry no longer builds ${m[1]} hops`);
   }
   assertCleanText(JSON.stringify(rec), "record text");
