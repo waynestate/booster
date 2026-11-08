@@ -103,6 +103,12 @@ final class HopExecutor
      */
     private bool $reportedVendored = false;
 
+    /**
+     * True once a Rector hop actually ran, so the run report records the
+     * rector/rector version only when Rector did the work.
+     */
+    private bool $ranRector = false;
+
     private function registry(): HopRegistry
     {
         return $this->registry ?? new HopRegistry();
@@ -137,6 +143,7 @@ final class HopExecutor
     public function execute(Plan $plan, RunOptions $options): RunReport
     {
         $this->reportedVendored = false;
+        $this->ranRector = false;
         $path = realpath($plan->project->path);
         if ($path === false) {
             throw new ToolError(sprintf('Path "%s" does not exist.', $plan->project->path));
@@ -271,7 +278,7 @@ final class HopExecutor
             ? null
             : (new CitadelDeployScript())->writeIfLockChanged($path, $lockBefore, (new \DateTimeImmutable('now'))->format('YmdHi'));
 
-        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys, deployScript: $deployScript, replay: $replay);
+        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys, deployScript: $deployScript, replay: $replay, rectorVersion: $this->ranRector ? $this->rector->installedVersion() : null);
     }
 
     /**
@@ -495,6 +502,7 @@ final class HopExecutor
             $keepPrepass = false;
             try {
                 $phpunitTarget = $hop->kind === HopKind::Phpunit ? $hop->to : null;
+                $this->ranRector = true;
                 $preview = $this->rector->run($hop, $path, true, $step->phpAfter ?? '', $step->laravelAfter, $phpunitTarget, $options->memoryLimit);
                 [$stopErrors, $notes] = self::splitRepairedNotes($preview->errors);
                 // Say once per run which nested vendored libraries Rector left alone.

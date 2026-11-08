@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Tests;
 
+use Composer\InstalledVersions;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -470,6 +471,10 @@ final class HopExecutorTest extends TestCase
 
         self::assertSame(['previewed', 'previewed'], $this->statuses($report));
         foreach ($fake->calls as $call) {
+            // The config check runs before any hop and carries no --dry-run flag.
+            if (FakeProcessRunner::isRectorValidate($call['command'])) {
+                continue;
+            }
             self::assertNotSame('git', $call['command'][0]);
             self::assertNotSame('docker', $call['command'][0]);
             self::assertContains('--dry-run', $call['command']);
@@ -694,6 +699,47 @@ final class HopExecutorTest extends TestCase
 
         $array = $report->toArray();
         self::assertArrayNotHasKey('rules', $array['results'][0]);
+    }
+
+    public function test_run_report_records_the_rector_version(): void
+    {
+        $fake = $this->fake();
+        $report = $this->execute($fake, new RunOptions(dryRun: true));
+
+        self::assertNotNull($report->rectorVersion);
+        self::assertMatchesRegularExpression('/^\d+\.\d+\.\d+/', (string) $report->rectorVersion);
+        self::assertSame((new RectorRunner($fake, '/fake/rector'))->installedVersion(), $report->rectorVersion);
+        self::assertSame($report->rectorVersion, $report->toArray()['rector_version']);
+    }
+
+    public function test_a_broken_rector_config_stops_the_run_before_any_change(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        $before = $this->snapshot($dir);
+        $fake = $this->fake();
+        $fake->rectorValidateResponse = new ProcessResult(1, 'The Rector config failed validation.', '');
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions(dryRun: true));
+
+        self::assertSame(StepResult::ERROR, $report->results[0]->status);
+        self::assertStringContainsString(RectorRunner::configPath(), implode(' ', $report->results[0]->messages));
+        self::assertSame([], $fake->commandsContaining('process'));
+        self::assertSame($before, $this->snapshot($dir));
+    }
+
+    public function test_rector_version_is_null_when_no_rector_hop_runs(): void
+    {
+        $dir = $this->copyExample('vue-spa');
+        $fake = $this->fake();
+        $step = new PlanStep(1, (new HopRegistry())->get(HopRegistry::VUE_2_TO_3_ID), '8.3', '8.3', null, null, null, null, [Planner::GATE_MANUAL]);
+        $plan = new Plan((new ProjectDetector())->detect($dir), '2026-10-28', 'test', '8.3', null, null, [$step], []);
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))
+            ->execute($plan, new RunOptions(skipGate: true));
+
+        self::assertNull($report->rectorVersion);
+        self::assertNull($report->toArray()['rector_version']);
     }
 
     /**

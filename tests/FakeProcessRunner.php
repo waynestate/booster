@@ -28,6 +28,13 @@ final class FakeProcessRunner implements ProcessRunner
     public ?ProcessResult $auditResponse = null;
 
     /**
+     * The canned answer for the pre-hop Rector config validation. Null answers
+     * clean (exit 0), so a test that does not seed it lets the run proceed to
+     * the hops; a test that seeds a failure makes the run stop at the door.
+     */
+    public ?ProcessResult $rectorValidateResponse = null;
+
+    /**
      * @param callable(list<string>, array<string, string>, ?string): ProcessResult $handler
      */
     public function __construct(private $handler) {}
@@ -38,6 +45,9 @@ final class FakeProcessRunner implements ProcessRunner
         if (self::isComposerAudit($command)) {
             return $this->auditResponse ??= new ProcessResult(0, self::CLEAN_AUDIT_JSON, '');
         }
+        if (self::isRectorValidate($command)) {
+            return $this->rectorValidateResponse ??= new ProcessResult(0, '', '');
+        }
 
         return ($this->handler)($command, $env, $cwd);
     }
@@ -46,6 +56,12 @@ final class FakeProcessRunner implements ProcessRunner
     public static function isComposerAudit(array $command): bool
     {
         return ($command[0] ?? '') === 'composer' && ($command[1] ?? '') === 'audit';
+    }
+
+    /** Whether $command is the pre-hop Rector config validation (rector validate-config). */
+    public static function isRectorValidate(array $command): bool
+    {
+        return in_array('validate-config', $command, true);
     }
 
     /**

@@ -26,6 +26,8 @@ final readonly class RunReport
         public ?string $deployScript = null,
         /** The replay baseline (--replay): recorded, failed or skipped; null when the run did not replay. */
         public ?ReplayOutcome $replay = null,
+        /** The rector/rector version that ran the hops, or null when no Rector hop ran. */
+        public ?string $rectorVersion = null,
     ) {}
 
     public function failed(): bool
@@ -62,6 +64,7 @@ final readonly class RunReport
             'proctor' => $this->proctorArray(),
             'proctor_advisory' => $this->proctorAdvisory,
             'deploy_script' => $this->deployScript,
+            'rector_version' => $this->rectorVersion,
         ];
         // Only runs with --replay carry the key, so every other report keeps its shape.
         if ($this->replay !== null) {
