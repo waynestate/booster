@@ -12,6 +12,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## \[Unreleased\][#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Fixed: the hop record test checked finished_at \<= started_at (arguments swapped), so it failed whenever a run crossed a second boundary.
 - Changed: CI saves its Composer and npm caches even when a job fails, so a retry after a dropped download fetches only what is missing (D-072).
 - Changed: CI caches Composer and npm downloads under a fixed key, so a lock change downloads only what changed (D-072).
 - Fixed: docs and comments caught up with the code: the Rector pilot's measured runs, the Preflight 0.3.0 pins, Node 26 in two comments, and the full GitLab pipeline list.
