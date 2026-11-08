@@ -89,5 +89,5 @@ tag for how Booster holds each rule today.
 
 ## Not yet
 
-Rector pilot measurements on real apps. Merge-request automation on app code is a closed decision, not a gap:
+The Rector pilot has run on real apps twice (2026-10-28 and 2026-11-01, Booster 1.6.0, 95 units); the aggregates are on the proof site, which needs an employee sign-in. A re-run on the current release is still open. Merge-request automation on app code is a closed decision, not a gap:
 Booster never commits to or pushes an app, and opens no merge request on app code (its own hop-data refresh opens one on Booster itself, and a person merges it). See `OPEN_QUESTIONS.md`.

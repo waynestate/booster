@@ -44,7 +44,7 @@ Composer kills any script process after 300 seconds by default; Booster's compos
 
 ## CI
 
-- **GitLab:** Preflight's `php-test` (PHP 8.3, 8.4, 8.5) and `composer-audit` components, plus a `composer-ci` job.
+- **GitLab:** Preflight's `php-test` (PHP 8.3, 8.4, 8.5), `composer-audit` and `proctor` (the deploy gate) components, a `composer-ci` job, a `wayneui-copies` job that checks the vendored WayneUI copies, the scheduled `refresh-hop-data` robot (it opens a merge request on Booster itself), and, on tags, the `phar` build and the `release` job.
 - **GitHub:** `.github/workflows/ci.yml` calls Preflight's reusable workflow with `composer ci`.
 - Green means `composer ci` passed on all three PHP versions on both.
 

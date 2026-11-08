@@ -19,7 +19,7 @@ final readonly class Hop
      * @param list<string>          $composerRemove       packages to drop from require
      * @param list<string>          $notes                what Rector cannot do; the person reviewing the diff reads these
      * @param list<string>          $links                official migration notes
-     * @param array<string, string> $npmSet               package.json dot-path to value, for example "engines.node" to ">=24"
+     * @param array<string, string> $npmSet               package.json dot-path to value, for example "engines.node" to ">=26"
      * @param array<string, string> $npmSetIfPresent      same as npmSet, but only when the package is already listed
      * @param list<string>          $npmRemove            packages to drop from dependencies and devDependencies
      * @param bool                  $pinNode              also write .nvmrc with the hop's target version
