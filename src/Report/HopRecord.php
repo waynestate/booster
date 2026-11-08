@@ -62,6 +62,8 @@ final class HopRecord
     /**
      * Writes the record to booster-hop.json at the app root, overwriting any
      * earlier one, and returns the file name.
+     *
+     * @param array<string, mixed> $record
      */
     public static function write(string $appPath, array $record): string
     {
