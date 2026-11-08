@@ -126,7 +126,7 @@ function runCapture(string $root, string $data, ?string $date): void
     }
     $examples = $root . '/examples';
     if (!is_dir($examples)) {
-        fail(sprintf('The examples folder %s does not exist; --capture needs a full BOOSTER checkout.', $examples));
+        fail(sprintf('The examples folder %s does not exist; --capture needs a full Booster checkout.', $examples));
     }
     $apps = [];
     foreach (scandir($examples) ?: [] as $entry) {

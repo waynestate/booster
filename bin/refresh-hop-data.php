@@ -199,7 +199,7 @@ function runCheck(HopDataRefresher $refresher, array $existing, array $files): n
 
     $fixtures = dirname(__DIR__) . '/tests/fixtures/hop-feeds';
     if (!is_dir($fixtures)) {
-        fail(sprintf('The frozen feed fixtures in %s are missing; --check needs a full BOOSTER checkout.', $fixtures));
+        fail(sprintf('The frozen feed fixtures in %s are missing; --check needs a full Booster checkout.', $fixtures));
     }
     $feeds = [];
     foreach ($files as $name => $file) {

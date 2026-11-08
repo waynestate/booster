@@ -11,7 +11,7 @@
  *
  * Usage:  node tools/a11y/check.mjs [--root=site] [--page=index.html]...
  *         Repeat --page to check several pages; with no --page it checks
- *         index.html alone, the way ROLLCALL's gate does.
+ *         index.html alone, the way Rollcall's gate does.
  * Exit:   0 clean, 1 violations found, 2 tool error.
  */
 import { createServer } from "node:http";
