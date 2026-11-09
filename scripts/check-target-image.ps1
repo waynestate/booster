@@ -10,12 +10,19 @@
 
     For each version the script:
       1. builds docker/Dockerfile with PHP_VERSION=<v>, tagged booster-target-check:<v>,
+         with the Composer Booster itself passes (2.2 below PHP 7.2),
       2. runs `php -m` in the image,
       3. fails naming any of the 13 extensions missing from the output,
-      4. prints `OK <v>` when every extension is present.
+      4. fails when Composer does not run in the image,
+      5. on an archived Debian release other than jessie, runs `apt-get update` in
+         the image and fails when apt cannot verify the archive's signatures
+         (jessie's archive is signed only by expired keys, so it is skipped),
+      6. prints `OK <v>` when all of that holds.
 
     Usage: .\scripts\check-target-image.ps1 [-PhpVersion 8.3 8.4 8.5]
     (the default is 8.3 8.4 8.5)
+    The old images: .\scripts\check-target-image.ps1 -PhpVersion '5.5', '5.6', '7.0', '7.1', '7.2', '7.3', '7.4', '8.0'
+    Quote each version: PowerShell reads a bare 8.0 as the number 8, which would build php:8-cli.
 
     The first build downloads Oracle Instant Client for oci8, so allow a few
     minutes per version. This is not part of composer ci on purpose: it needs
@@ -61,11 +68,33 @@ function Invoke-Docker {
     }
 }
 
+# Runs in the image: archived releases other than jessie must verify their
+# archive. apt prints a GPG error or "not signed" when it cannot.
+$AptProbe = @'
+. /etc/os-release
+codename="${VERSION_CODENAME:-$(printf "%s" "${VERSION:-}" | sed -n "s/.*(\([a-z]*\)).*/\1/p")}"
+case "$codename" in
+    stretch|buster|bullseye) out="$(apt-get update 2>&1)" || { printf "%s\n" "$out"; exit 1; }
+        if printf "%s\n" "$out" | grep -E "GPG error|not signed|NO_PUBKEY|EXPKEYSIG" >&2; then exit 1; fi
+        rm -rf /var/lib/apt/lists/*; echo "apt verified $codename" ;;
+    jessie) echo "apt not checked on jessie (its archive keys have all expired)" ;;
+    *) echo "apt untouched on $codename" ;;
+esac
+'@ -replace "`r", ''
+
 foreach ($V in $PhpVersion) {
+    if ($V -notmatch '^\d+\.\d+$') {
+        Write-Error "FAIL $V : not a major.minor PHP version (quote it: '8.0', not 8.0)"
+        exit 1
+    }
     Write-Host "==> Building booster-target-check:$V ..."
-    Invoke-Docker -DockerArgs @(
-        'build', '--build-arg', "PHP_VERSION=$V", '-t', "booster-target-check:$V", 'docker/'
-    )
+    # What Booster passes (TargetImageRunner): Composer 2.3 and later need PHP
+    # 7.2.5, so builds below 7.2 get the 2.2 line; the rest keep the recipe default.
+    $BuildArgs = @('build', '--build-arg', "PHP_VERSION=$V")
+    if ($V -match '^(5\.\d+|7\.0|7\.1)$') {
+        $BuildArgs += @('--build-arg', 'COMPOSER_VERSION=2.2')
+    }
+    Invoke-Docker -DockerArgs ($BuildArgs + @('-t', "booster-target-check:$V", 'docker/'))
 
     $Modules = @(Invoke-Docker -Capture -DockerArgs @('run', '--rm', "booster-target-check:$V", 'php', '-m'))
 
@@ -74,6 +103,18 @@ foreach ($V in $PhpVersion) {
 
     if ($Missing.Count -gt 0) {
         Write-Error "FAIL $V : missing extensions: $($Missing -join ' ')"
+        exit 1
+    }
+
+    & docker run --rm "booster-target-check:$V" composer --version
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "FAIL $V : composer does not run in the image"
+        exit 1
+    }
+
+    & docker run --rm "booster-target-check:$V" sh -c $AptProbe
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "FAIL $V : apt cannot verify the Debian archive in the image"
         exit 1
     }
 
