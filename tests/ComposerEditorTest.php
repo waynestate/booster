@@ -186,7 +186,7 @@ final class ComposerEditorTest extends TestCase
 
         $require = $this->read($dir)['require'];
         self::assertArrayNotHasKey('cit-web-infra/wayne-cas', $require);
-        self::assertSame('^0.6', $require['waynestate/sesame']);
+        self::assertSame('^0.7', $require['waynestate/sesame']);
     }
 
     public function test_the_sesame_swap_drops_a_wayne_cas_repository_list_entry(): void

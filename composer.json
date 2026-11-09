@@ -24,8 +24,8 @@
         "symfony/console": "^7.1",
         "symfony/process": "^7.1",
         "waynestate/proctor": "^0.11",
-        "waynestate/creed": "^0.1",
-        "waynestate/pinstripe": "^0.1"
+        "waynestate/creed": "^0.1.8",
+        "waynestate/pinstripe": "^0.1.4"
     },
     "require-dev": {
         "laravel/pint": "^1.32",

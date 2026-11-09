@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b768321f88e460694a2a150453076fe2",
+    "content-hash": "410505d4f9977d435257a2eeae100fe8",
     "packages": [
         {
             "name": "composer/semver",
@@ -385,7 +385,8 @@
                 "issues": "https://github.com/nette/neon/issues",
                 "source": "https://github.com/nette/neon/tree/v3.4.10"
             },
-            "time": "2026-10-25T22:35:03+00:00"
+            "time": "2026-10-25T22:35:03+00:00",
+            "published-time": "2026-10-25T23:02:33+00:00"
         },
         {
             "name": "nikic/php-parser",
@@ -442,7 +443,8 @@
                 "issues": "https://github.com/nikic/PHP-Parser/issues",
                 "source": "https://github.com/nikic/PHP-Parser/tree/v5.9.0"
             },
-            "time": "2026-09-13T18:51:52+00:00"
+            "time": "2026-09-13T18:51:52+00:00",
+            "published-time": "2026-09-13T18:53:16+00:00"
         },
         {
             "name": "phpcompatibility/php-compatibility",
@@ -673,7 +675,8 @@
                 "issues": "https://github.com/phpstan/extension-installer/issues",
                 "source": "https://github.com/phpstan/extension-installer/tree/1.4.3"
             },
-            "time": "2024-09-04T20:21:43+00:00"
+            "time": "2024-09-04T20:21:43+00:00",
+            "published-time": "2024-09-04T20:22:27+00:00"
         },
         {
             "name": "phpstan/phpstan",
@@ -788,7 +791,8 @@
                 "issues": "https://github.com/phpstan/phpstan-deprecation-rules/issues",
                 "source": "https://github.com/phpstan/phpstan-deprecation-rules/tree/2.0.5"
             },
-            "time": "2026-07-22T06:50:43+00:00"
+            "time": "2026-07-22T06:50:43+00:00",
+            "published-time": "2026-07-27T15:18:00+00:00"
         },
         {
             "name": "phpstan/phpstan-strict-rules",
@@ -840,7 +844,8 @@
                 "issues": "https://github.com/phpstan/phpstan-strict-rules/issues",
                 "source": "https://github.com/phpstan/phpstan-strict-rules/tree/2.1.1"
             },
-            "time": "2026-11-02T08:16:15+00:00"
+            "time": "2026-11-02T08:16:15+00:00",
+            "published-time": "2026-11-02T10:55:07+00:00"
         },
         {
             "name": "psr/container",
@@ -1198,7 +1203,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-09-16T14:15:10+00:00"
+            "time": "2026-09-16T14:15:10+00:00",
+            "published-time": "2026-11-04T11:25:34+00:00"
         },
         {
             "name": "symfony/polyfill-ctype",
@@ -1281,7 +1287,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-04-10T16:19:22+00:00"
+            "time": "2026-04-10T16:19:22+00:00",
+            "published-time": "2026-04-26T14:44:50+00:00"
         },
         {
             "name": "symfony/polyfill-intl-grapheme",
@@ -1852,7 +1859,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-11-04T08:27:22+00:00"
+            "time": "2026-11-04T08:27:22+00:00",
+            "published-time": "2026-11-04T11:28:41+00:00"
         },
         {
             "name": "symplify/rule-doc-generator-contracts",
@@ -1916,16 +1924,16 @@
         },
         {
             "name": "waynestate/creed",
-            "version": "0.1.7",
+            "version": "0.1.8",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/creed.git",
-                "reference": "58d9891122cb9abc98bc3270f03df845f23e121e"
+                "reference": "ec325a4619d0ec33afee02cd975c868e18435585"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/creed/zipball/58d9891122cb9abc98bc3270f03df845f23e121e",
-                "reference": "58d9891122cb9abc98bc3270f03df845f23e121e",
+                "url": "https://api.github.com/repos/waynestate/creed/zipball/ec325a4619d0ec33afee02cd975c868e18435585",
+                "reference": "ec325a4619d0ec33afee02cd975c868e18435585",
                 "shasum": ""
             },
             "require": {
@@ -1965,20 +1973,21 @@
                 "issues": "https://git.wayne.edu/enterprise-apps/creed/-/issues",
                 "source": "https://github.com/waynestate/creed"
             },
-            "time": "2026-11-07T23:07:33+00:00"
+            "time": "2026-11-09T07:41:10+00:00",
+            "published-time": "2026-11-09T07:58:31+00:00"
         },
         {
             "name": "waynestate/pinstripe",
-            "version": "0.1.1",
+            "version": "0.1.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/pinstripe.git",
-                "reference": "116b0f571188805c0d0d1c226e88620aa0ff6334"
+                "reference": "eb030787b2b9558e31b3e571a341675c34309c7f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/pinstripe/zipball/116b0f571188805c0d0d1c226e88620aa0ff6334",
-                "reference": "116b0f571188805c0d0d1c226e88620aa0ff6334",
+                "url": "https://api.github.com/repos/waynestate/pinstripe/zipball/eb030787b2b9558e31b3e571a341675c34309c7f",
+                "reference": "eb030787b2b9558e31b3e571a341675c34309c7f",
                 "shasum": ""
             },
             "require": {
@@ -1993,6 +2002,7 @@
             "require-dev": {
                 "larastan/larastan": "^3.13",
                 "laravel/framework": "^11 || ^12 || ^13",
+                "league/commonmark": "^2.10",
                 "phpunit/phpunit": "^12",
                 "rector/rector": "^2.8"
             },
@@ -2004,6 +2014,11 @@
                 "bin/pinstripe-baseline"
             ],
             "type": "library",
+            "extra": {
+                "proctor": {
+                    "wayneui.copies": "fail"
+                }
+            },
             "autoload": {
                 "psr-4": {
                     "WayneState\\Pinstripe\\": "src/"
@@ -2016,23 +2031,24 @@
             "description": "The coding standard for the Wayne State app stack: shared Pint and PHPStan presets.",
             "homepage": "https://pinstripe.apps.wayne.edu/",
             "support": {
-                "issues": "https://github.com/waynestate/pinstripe/issues",
-                "source": "https://github.com/waynestate/pinstripe"
+                "issues": "https://nougat.snu.gs/enterprise-apps/pinstripe/-/issues",
+                "source": "https://nougat.snu.gs/enterprise-apps/pinstripe"
             },
-            "time": "2026-10-29T05:49:45+00:00"
+            "time": "2026-11-07T00:59:25+00:00",
+            "published-time": "2026-11-07T01:31:49+00:00"
         },
         {
             "name": "waynestate/proctor",
-            "version": "0.11.0",
+            "version": "0.11.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/proctor.git",
-                "reference": "a10f6ab99c8e579bcf0022eb756a6727f6a5323d"
+                "reference": "6a1aa83c0ed1d68b357eab2e014005252863265d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/proctor/zipball/a10f6ab99c8e579bcf0022eb756a6727f6a5323d",
-                "reference": "a10f6ab99c8e579bcf0022eb756a6727f6a5323d",
+                "url": "https://api.github.com/repos/waynestate/proctor/zipball/6a1aa83c0ed1d68b357eab2e014005252863265d",
+                "reference": "6a1aa83c0ed1d68b357eab2e014005252863265d",
                 "shasum": ""
             },
             "require": {
@@ -2083,7 +2099,8 @@
                 "issues": "https://git.wayne.edu/enterprise-apps/proctor/-/issues",
                 "source": "https://github.com/waynestate/proctor"
             },
-            "time": "2026-11-09T08:38:41+00:00"
+            "time": "2026-11-09T14:51:03+00:00",
+            "published-time": "2026-11-09T15:03:46+00:00"
         },
         {
             "name": "webmozart/assert",
@@ -5047,5 +5064,5 @@
     "platform-overrides": {
         "php": "8.3.0"
     },
-    "plugin-api-version": "2.9.0"
+    "plugin-api-version": "2.11.0"
 }
