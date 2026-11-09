@@ -1,4 +1,4 @@
-# MAINTAINING: refuelling the rocket
+# MAINTAINING: refueling the rocket
 
 How to build, test, release and keep Booster current. Booster plans and runs upgrade hops (PHP and Laravel versions,
 PHPUnit, Node pins, Mix to Vite, Vite major, old CAS clients to SESAME) on top of Rector, using CREED's policy to know
@@ -45,7 +45,7 @@ Composer kills any script process after 300 seconds by default; Booster's compos
 
 ## CI
 
-- **GitLab:** Preflight's `php-test` (PHP 8.3, 8.4, 8.5), `composer-audit`, `proctor` (the deploy gate on `deploy/`, blocking) and `a11y` (every page under `site/`, blocking) components at 0.4.0, a `composer-ci` job (it also runs `rector validate-config` on Booster's Rector config), a `wayneui-copies` job that checks the vendored WayneUI copies, the scheduled `refresh-hop-data` robot (it opens a merge request on Booster itself), and, on tags, the `phar` build and the `release` job.
+- **GitLab:** Preflight's `php-test` (PHP 8.3, 8.4, 8.5), `composer-audit`, `proctor` (the deploy gate on `deploy/`, blocking) and `a11y` (every page under `site/`, blocking) components at 0.5.0, a `composer-ci` job (it also runs `rector validate-config` on Booster's Rector config), a `wayneui-copies` job that checks the vendored WayneUI copies, the scheduled `refresh-hop-data` robot (it opens a merge request on Booster itself), and, on tags, the `phar` build and the `release` job.
 - **GitHub:** `.github/workflows/ci.yml` calls Preflight's reusable workflow with `composer ci`.
 - Green means `composer ci` passed on all three PHP versions on both.
 

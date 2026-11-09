@@ -5,6 +5,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 ## [Unreleased]
 
 - Changed: Booster locks Pinstripe 0.1.5 (was 0.1.4), whose package metadata names git.wayne.edu, so `composer.lock` no longer carries an internal hostname in Pinstripe's support links. No other package moved.
+- Changed: CI pins the Preflight components to 0.5.0 (was 0.4.0). The composer-audit include drops its `image` input and runs 0.5.0's default, Composer 2.11.1 by its multi-arch list digest (it ran a floating `composer:2` digest), and the proctor job now keeps PROCTOR's JSON report as `proctor.json` in its artifact for ROLLCALL. The vendored a11y checker is byte for byte the same at 0.5.0, so its pin test, the a11y scripts, the README and MAINTAINING name the new tag. The GitHub workflow stays on 0.1.4's commit, since the GitHub mirror has no 0.5.0.
 
 ## [1.13.1] - 2026-11-09
 

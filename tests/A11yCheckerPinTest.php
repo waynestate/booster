@@ -7,14 +7,14 @@ namespace Waynestate\Booster\Tests;
 /**
  * The a11y gate runs Preflight's own checker, vendored into this repo so that
  * local runs and CI runs cannot drift apart. This test pins that vendor copy:
- * the SHA-256 of tools/a11y/check.mjs must match Preflight tag 0.3.1, and the
- * image, playwright version and axe-core version in the a11y scripts and
+ * the SHA-256 of tools/a11y/check.mjs must match the Preflight tag below, and
+ * the image, playwright version and axe-core version in the a11y scripts and
  * tools/a11y/package.json must match the component defaults of that tag.
  */
 final class A11yCheckerPinTest extends TestCase
 {
-    /** Preflight tag the vendored checker comes from. */
-    private const PREFLIGHT_TAG = '0.4.0';
+    /** Preflight tag the vendored checker comes from (the checker is unchanged since 0.3.1). */
+    private const PREFLIGHT_TAG = '0.5.0';
 
     /** SHA-256 of tools/a11y/check.mjs at that tag. */
     private const CHECKER_SHA256 = '2b814c18fb90186d96a4f05ed4fb75bec5074e3344502995e80c25a27a69286a';
