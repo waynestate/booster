@@ -22,6 +22,7 @@ use Waynestate\Booster\Refresh\HopDataRefresher;
 use Waynestate\Booster\Replay\ReplayGate;
 use Waynestate\Booster\Replay\ReplayOutcome;
 use Waynestate\Booster\Replay\ReplayRunner;
+use Waynestate\Booster\Replay\ReplaySuggestion;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Scan\BehaviourScan;
 use Waynestate\Booster\Scan\ComposerAuditScan;
@@ -206,6 +207,10 @@ final class HopExecutor
 
             return new RunReport($plan, $options->dryRun, $baseline, $results, testEnvKeys: $testEnvKeys, replay: $replay);
         }
+        // A gate that only parses the code (or only runs Laravel's stock
+        // examples) proves little, so a run without --replay names the
+        // characterization answers it could be recording instead. Advisory.
+        $replaySuggestion = ReplaySuggestion::for($plan, $baseline, $path, $options->replay !== null, $options->skipGate);
 
         $results = [];
         // Measure the app against the CREED policy on the PHP it is on now, so
@@ -278,7 +283,7 @@ final class HopExecutor
             ? null
             : (new CitadelDeployScript())->writeIfLockChanged($path, $lockBefore, (new \DateTimeImmutable('now'))->format('YmdHi'));
 
-        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys, deployScript: $deployScript, replay: $replay, rectorVersion: $this->ranRector ? $this->rector->installedVersion() : null);
+        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys, deployScript: $deployScript, replay: $replay, rectorVersion: $this->ranRector ? $this->rector->installedVersion() : null, replaySuggestion: $replaySuggestion);
     }
 
     /**

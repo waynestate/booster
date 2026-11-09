@@ -93,6 +93,9 @@ final class HopExecutorReplayTest extends TestCase
         self::assertStringContainsString("Replay: recorded 2 answers on PHP 8.1 from booster-replay-compare.json.\n", $text);
         self::assertSame('replay', array_key_last($report->toArray()));
         self::assertSame('recorded', $report->toArray()['replay']['status']);
+        // A run that replays is never nudged toward the replay.
+        self::assertNull($report->replaySuggestion);
+        self::assertStringNotContainsString('Replay: off', $text);
     }
 
     public function test_a_changed_answer_fails_the_hop_and_stops_the_run(): void

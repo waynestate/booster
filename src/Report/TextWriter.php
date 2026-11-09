@@ -432,6 +432,10 @@ final class TextWriter
         foreach ($report->replay->lines ?? [] as $line) {
             $lines[] = self::clean($line);
         }
+        // Without --replay, on a gate that proves little: the nudge toward it.
+        foreach ($report->replaySuggestion?->lines($program, Invocation::pathArg($path)) ?? [] as $line) {
+            $lines[] = self::clean($line);
+        }
         $lines[] = '';
         $previewedFiles = [];
         foreach ($report->results as $r) {

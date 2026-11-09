@@ -703,7 +703,7 @@ final class HopRegistry
             '7.0' => ['Rector cannot replace the removed mysql_* functions; move to PDO or mysqli by hand.'],
             '8.0' => [
                 'Largest risk hop: loose comparison of numbers and strings changed, many warnings became thrown errors, and arithmetic on arrays throws.',
-                'Write or extend tests before applying this hop; only tests and review find behavior changes here.',
+                'Write or extend tests before applying this hop, or record what the pages answer with the replay gate (`booster replay init`, then `booster run --replay`); only tests, the replay and review find behavior changes here.',
             ],
             '8.1' => [
                 'mysqli now throws on errors by default; PDO on MySQL returns native int and float types; htmlspecialchars() now escapes single quotes.',

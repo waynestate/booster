@@ -83,7 +83,7 @@ final class SkillRenderer
         foreach ($hop->links as $link) {
             $links .= '- ' . $link . "\n";
         }
-        $review = $hop->extraReview ? "This is the riskiest PHP hop. Ask for extra tests before you apply it.\n\n" : '';
+        $review = $hop->extraReview ? "This is the riskiest PHP hop. Ask for extra tests, or a replay file (`booster replay init`, then `booster run --replay`), before you apply it.\n\n" : '';
         $how = $hop->isManual()
             ? "Booster has no automatic change for this hop. Follow the official guide below, then run the tests.\n"
             : "1. `booster run --path=<app> --dry-run` and read every diff.\n2. `booster run --path=<app>` applies the plan and stops at the first failing gate.\n3. If a hop is over the review threshold (200 files), read its per-rule summary, then apply it with `--max-changes=N`. Use `--skip` to leave a rule out.\n";

@@ -6,6 +6,7 @@ namespace Waynestate\Booster\Run;
 
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Replay\ReplayOutcome;
+use Waynestate\Booster\Replay\ReplaySuggestion;
 
 final readonly class RunReport
 {
@@ -28,6 +29,8 @@ final readonly class RunReport
         public ?ReplayOutcome $replay = null,
         /** The rector/rector version that ran the hops, or null when no Rector hop ran. */
         public ?string $rectorVersion = null,
+        /** The nudge toward --replay when the gate proves little and the run does not replay; null otherwise. Advisory. */
+        public ?ReplaySuggestion $replaySuggestion = null,
     ) {}
 
     public function failed(): bool
@@ -69,6 +72,10 @@ final readonly class RunReport
         // Only runs with --replay carry the key, so every other report keeps its shape.
         if ($this->replay !== null) {
             $data['replay'] = $this->replay->toArray();
+        }
+        // Likewise only a run that was nudged toward --replay carries this key.
+        if ($this->replaySuggestion !== null) {
+            $data['replay_suggestion'] = $this->replaySuggestion->toArray();
         }
 
         return $data;

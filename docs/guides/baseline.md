@@ -23,3 +23,5 @@ with the exit code and the last 20 lines of output).
   outside `vendor/` and `node_modules/` must still parse on the target PHP (`php -l`). That proves the code loads on
   the new PHP, not that it works: click through the app before you ship. Pass `--test-command` to run something else,
   or add a smoke test ([A smoke test for WSU apps](smoke-test.md)) to get the real gate back.
+  Without `--replay`, the run also says so under the baseline and names `booster replay init`, because [the replay gate](replay-gate.md)
+  records what the pages answer and fails a hop that changes one.

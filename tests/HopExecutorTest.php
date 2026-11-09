@@ -15,6 +15,7 @@ use Waynestate\Booster\Plan\PlanOptions;
 use Waynestate\Booster\Plan\PlanStep;
 use Waynestate\Booster\Plan\Planner;
 use Waynestate\Booster\Project\ProjectDetector;
+use Waynestate\Booster\Replay\ReplaySuggestion;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\BaselineResult;
 use Waynestate\Booster\Run\ComposerEditor;
@@ -323,6 +324,86 @@ final class HopExecutorTest extends TestCase
         self::assertSame(1, substr_count($text, 'No tests found'));
         self::assertStringContainsString('Gate passed: syntax check is clean on PHP 8.3.', $text);
         self::assertStringNotContainsString('tests are green', $text);
+    }
+
+    public function test_a_syntax_gate_without_replay_points_at_the_replay_gate(): void
+    {
+        $report = $this->execute($this->fake(), new RunOptions());
+
+        $suggestion = $report->replaySuggestion;
+        self::assertNotNull($suggestion);
+        self::assertSame(ReplaySuggestion::REASON_SYNTAX, $suggestion->reason);
+        self::assertFalse($suggestion->fileExists);
+        // Neither step of 8.1 to 8.3 is the PHP 8.0 hop, so no step is singled out.
+        self::assertNull($suggestion->riskiestStep);
+        self::assertSame(['reason' => 'syntax', 'file_exists' => false, 'riskiest_step' => null, 'riskiest_hop' => null], $report->toArray()['replay_suggestion']);
+        // Advisory: the run still passes.
+        self::assertFalse($report->failed());
+
+        $text = (new TextWriter())->run($report, '/apps/demo', 'booster');
+        self::assertStringContainsString('Replay: off, and the gate only proves every PHP file parses, so a hop can change what a page answers and still pass.', $text);
+        self::assertStringContainsString('Record the answers first: booster replay init --path=/apps/demo drafts booster-replay.json from the routes; fill in its todo items, then run again with --replay.', $text);
+        self::assertSame(1, substr_count($text, 'Replay: off'));
+        // Right under the baseline, before the first step.
+        self::assertLessThan(strpos($text, "\n1. "), strpos($text, 'Replay: off'));
+        self::assertGreaterThan(strpos($text, 'Baseline: PASS'), strpos($text, 'Replay: off'));
+    }
+
+    public function test_the_replay_nudge_shows_on_a_dry_run_too(): void
+    {
+        $report = $this->execute($this->fake(), new RunOptions(dryRun: true));
+
+        self::assertSame(ReplaySuggestion::REASON_SYNTAX, $report->replaySuggestion?->reason);
+        self::assertStringContainsString('Replay: off', (new TextWriter())->run($report));
+    }
+
+    public function test_the_replay_nudge_names_the_php_8_0_hop_as_the_riskiest_step(): void
+    {
+        $report = $this->execute($this->fake(), new RunOptions(dryRun: true), plan: new PlanOptions(fromPhp: '7.4', toPhp: '8.3'));
+
+        self::assertSame(1, $report->replaySuggestion?->riskiestStep);
+        self::assertSame('php-74-to-80', $report->replaySuggestion->riskiestHop);
+        self::assertStringContainsString('Step 1 (php-74-to-80) is the hop most likely to change an answer: loose comparisons of numbers and strings, and warnings that now throw.', (new TextWriter())->run($report));
+    }
+
+    public function test_a_replay_file_already_in_the_app_only_asks_for_the_flag(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        file_put_contents($dir . '/booster-replay.json', '{"version": 1, "requests": [{"path": "/"}]}');
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $fake = $this->fake();
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))->execute($plan, new RunOptions(dryRun: true));
+
+        self::assertTrue($report->replaySuggestion?->fileExists);
+        $text = (new TextWriter())->run($report);
+        self::assertStringContainsString('booster-replay.json is already in the app: run again with --replay to record its answers before the first hop and compare them after every hop.', $text);
+        self::assertStringNotContainsString('replay init', $text);
+    }
+
+    public function test_no_replay_nudge_with_a_test_command_or_a_skipped_gate(): void
+    {
+        $custom = $this->execute($this->fake(), new RunOptions(testCommand: 'vendor/bin/pest'));
+        self::assertNull($custom->replaySuggestion);
+        self::assertArrayNotHasKey('replay_suggestion', $custom->toArray());
+        self::assertStringNotContainsString('Replay: off', (new TextWriter())->run($custom));
+
+        self::assertNull($this->execute($this->fake(), new RunOptions(skipGate: true))->replaySuggestion);
+    }
+
+    public function test_no_replay_nudge_when_the_app_has_real_tests(): void
+    {
+        $report = $this->executePrepared($this->stockExample(true), new RunOptions(dryRun: true));
+
+        self::assertSame(BaselineResult::GATE_TESTS, $report->baseline->gateKind);
+        self::assertNull($report->replaySuggestion);
+    }
+
+    public function test_stock_example_tests_get_the_replay_nudge(): void
+    {
+        $report = $this->executePrepared($this->stockExample(), new RunOptions(dryRun: true));
+
+        self::assertSame(ReplaySuggestion::REASON_STOCK_TESTS, $report->replaySuggestion?->reason);
+        self::assertStringContainsString("Replay: off, and the gate is only Laravel's stock example tests, so a hop can change what a page answers and still pass.", (new TextWriter())->run($report));
     }
 
     public function test_a_failing_syntax_baseline_says_a_php_file_does_not_parse(): void

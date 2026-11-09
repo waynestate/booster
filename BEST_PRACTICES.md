@@ -39,8 +39,12 @@ tag for how Booster holds each rule today.
   `booster replay init` drafts a request file (`booster-replay.json`) from the app's routes, and `booster run --replay`
   records how the app answers those requests on its current PHP before the first hop, replays them after every hop,
   and fails the hop on a changed answer (`src/Replay/ReplayGate.php`, `tests/HopExecutorReplayTest.php`,
-  `tests/ReplayDockerTest.php`; guide: `docs/guides/replay-gate.md`). It is off unless asked for, and the PHP 8.0
-  playbook asks for extra tests before that hop.
+  `tests/ReplayDockerTest.php`; guide: `docs/guides/replay-gate.md`). It is off unless asked for, so a run whose gate
+  proves little (the built-in `php -l` check, or only Laravel's stock example tests) and that does not replay says so
+  under the baseline, names `booster replay init` (or `--replay`, when the file is already there) and the step most
+  likely to change an answer (the PHP 8.0 hop), in the text and JSON reports (`src/Replay/ReplaySuggestion.php`,
+  `tests/HopExecutorTest.php`). Advisory: it never changes the exit code. The PHP 8.0 hop's notes and playbook ask
+  for extra tests or a replay file before that hop.
 
 ## Rector
 
