@@ -21,7 +21,7 @@ open until the Citadel platform owner answers.
 | 12 | Which Composer release introduced the `config.policy` key the design guide mentions for `composer audit`? | CREED owner | Policy-driven audit settings | Not used. | Closed: not used. |
 | 13 | A first measured Rector pilot on a few real apps: what file cap and what time budget are right? | Stack lead | Tuning `--max-changes` | A 200-file review threshold; `--max-changes` is an explicit hard limit (`0` = none). | Closed: review threshold of 200 files; `--max-changes` is an explicit hard limit (0 = none). |
 | 14 | `composer audit` reports `symplify/rule-doc-generator-contracts` (a Rector dependency) as abandoned. Accept it? | Stack lead | `composer ci` | `config.audit.abandoned` is `report`: advisories still fail the build, an abandoned transitive does not. Revisit when Rector drops it. | Closed: report. |
-| 15 | Where does the GitHub Preflight reusable workflow get its release tag? | Preflight owner | Replacing the commit pin | Preflight publishes release tags now; the GitLab components pin `@0.3.1`; the GitHub reusable workflow is pinned to Preflight 0.1.4's commit until that mirror gets a 0.3 tag. | Closed: tag pin. |
+| 15 | Where does the GitHub Preflight reusable workflow get its release tag? | Preflight owner | Replacing the commit pin | Preflight publishes release tags now; the GitLab components pin `@0.4.0`; the GitHub reusable workflow is pinned to Preflight 0.1.4's commit until that mirror gets a 0.3 tag. | Closed: tag pin. |
 
 ## Missing configuration
 
@@ -30,7 +30,7 @@ open until the Citadel platform owner answers.
 | `BOOSTER_POLICY` (optional) | CREED's released `policy.json` | Empty in `.env.example`; the copy in the `waynestate/creed` package is used |
 | Docker daemon on the machine that runs `booster run` | Developer machine or runner | None; without it the gate fails closed and `--skip-gate` is the way out |
 | Network access to Docker Hub for `php:<version>-cli` and `composer:2.10.3` | Developer machine or runner | None; a mirror would need the `FROM` lines in `docker/Dockerfile` changed |
-| Preflight components `@0.3.1` on GitLab, and the reusable workflow pinned to Preflight 0.1.4's commit on GitHub | Preflight | As in the sibling projects |
+| Preflight components `@0.4.0` on GitLab, and the reusable workflow pinned to Preflight 0.1.4's commit on GitHub | Preflight | As in the sibling projects |
 | The app's `vendor/` for Laravel hops | `composer install` in the app | None |
 
 Booster holds no secrets and calls no API.
