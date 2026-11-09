@@ -11,6 +11,9 @@ use Waynestate\Booster\Project\Project;
 use Waynestate\Booster\Project\ProjectDetector;
 use Waynestate\Booster\Report\JsonWriter;
 use Waynestate\Booster\Report\TextWriter;
+use Waynestate\Booster\Run\VendoredMigration;
+use Waynestate\Booster\Scan\VendoredLibraries;
+use Waynestate\Booster\Scan\VendoredLibrary;
 use Waynestate\Booster\Scan\WayneAuthScan;
 
 final class DetectCommand extends BaseCommand
@@ -32,9 +35,12 @@ final class DetectCommand extends BaseCommand
     protected function handle(InputInterface $input, OutputInterface $output): int
     {
         $project = (new ProjectDetector())->detect($this->stringOption($input, 'path') ?? '.');
+        $libraries = VendoredLibraries::find($project->path);
 
         if ($this->format($input) === 'json') {
-            $output->writeln((new JsonWriter())->write($project->toArray()), OutputInterface::OUTPUT_RAW);
+            $array = $project->toArray();
+            $array['hand_copied_libraries'] = array_map(static fn(VendoredLibrary $l): array => $l->toArray(), $libraries);
+            $output->writeln((new JsonWriter())->write($array), OutputInterface::OUTPUT_RAW);
 
             return self::EXIT_PASS;
         }
@@ -59,7 +65,10 @@ final class DetectCommand extends BaseCommand
             $output->writeln(sprintf('%-14s %s', $key, TextWriter::clean($shown)), OutputInterface::OUTPUT_RAW);
         }
         $output->writeln('', OutputInterface::OUTPUT_RAW);
-        $output->writeln($this->footer($input, $project), OutputInterface::OUTPUT_RAW);
+        foreach (self::librariesLines($libraries) as $line) {
+            $output->writeln(TextWriter::clean($line), OutputInterface::OUTPUT_RAW);
+        }
+        $output->writeln($this->footer($input, $project, self::movable($libraries) !== []), OutputInterface::OUTPUT_RAW);
 
         return self::EXIT_PASS;
     }
@@ -69,7 +78,7 @@ final class DetectCommand extends BaseCommand
      * command that goes next. With no PHP to read, plan stops without
      * --from-php, so the Next line carries one and says to fix its value.
      */
-    private function footer(InputInterface $input, Project $project): string
+    private function footer(InputInterface $input, Project $project, bool $movable): string
     {
         $lines = [
             'Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version',
@@ -85,9 +94,63 @@ final class DetectCommand extends BaseCommand
             );
             $flags[] = '--from-php=' . self::GUESS_PHP;
         }
+        if ($movable) {
+            $flags[] = '--vendored';
+        }
         $lines[] = sprintf('Next: %s plan --path=%s%s', Invocation::program(), Invocation::pathArg($this->pathAsTyped($input)), Invocation::flagsText($flags));
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * The hand-copied libraries, named where a person first looks: a real
+     * run found them only at plan time, three commands in. Like spotting
+     * the stowaways before the countdown, not in orbit.
+     *
+     * @param list<VendoredLibrary> $libraries
+     *
+     * @return list<string>
+     */
+    private static function librariesLines(array $libraries): array
+    {
+        if ($libraries === []) {
+            return [];
+        }
+        $lines = ['Hand-copied libraries (committed into a vendor folder, no Composer behind them):'];
+        foreach ($libraries as $library) {
+            $lines[] = sprintf('  - %s (%s)', $library->name . ($library->version !== null ? ' ' . $library->version : ', version unknown'), $library->path);
+        }
+        $movable = self::movable($libraries);
+        if ($movable !== []) {
+            $last = array_pop($movable);
+            $lines[] = sprintf(
+                'Booster can move %s onto Composer, so the line below adds --vendored.',
+                $movable === [] ? $last : implode(', ', $movable) . ' and ' . $last,
+            );
+        }
+        $lines[] = '';
+
+        return $lines;
+    }
+
+    /**
+     * The names of the libraries the vendored move has a recipe for and that
+     * sit in the app root's vendor/, the only ones it moves.
+     *
+     * @param list<VendoredLibrary> $libraries
+     *
+     * @return list<string>
+     */
+    private static function movable(array $libraries): array
+    {
+        $names = [];
+        foreach ($libraries as $library) {
+            if (VendoredMigration::floorFor($library) !== null && dirname($library->path) === 'vendor') {
+                $names[] = $library->name;
+            }
+        }
+
+        return array_values(array_unique($names));
     }
 
     /**

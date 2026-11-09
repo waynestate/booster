@@ -19,12 +19,14 @@ final readonly class VendoredInspection
      * @param list<VendoredLibrary> $leftAlone libraries Booster has no recipe for, or that sit in a nested vendor/
      * @param list<string>          $refusals  stop signs; any one makes the hop refuse and change nothing
      * @param string|null           $floor     the lowest PHP every moved library's Composer release runs on
+     * @param array<string, int>    $compiledTemplates folder to how many Smarty compiled templates it holds, left out of the rewrite
      */
     public function __construct(
         public array $moves,
         public array $leftAlone,
         public array $refusals,
         public ?string $floor,
+        public array $compiledTemplates = [],
     ) {}
 
     /** True when there is something to move and nothing stops the move. */

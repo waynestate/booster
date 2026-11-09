@@ -29,6 +29,12 @@ final class VendoredMigration
     /** Where the Slim 1 bridge lands, at the app root, loaded by Composer's classmap. */
     public const BRIDGE_FILE = 'slim1-bridge.php';
 
+    /** The header Smarty 2 and 3 write at the top of every compiled template. */
+    private const COMPILED_TEMPLATE = '/\/\*\s*Smarty version\b.{0,200}?compiled from\b/s';
+
+    /** A path segment that names a cache or a compile folder (templates_c, tmp/template_compile, cache/). */
+    private const CACHE_FOLDER = '#/(?:[^/]*_c|[^/]*compile[^/]*|[^/]*cache[^/]*)/#i';
+
     /**
      * One recipe per library, keyed by the hand copy's lowercased folder
      * name. major: the only major line the recipe accepts. floor: the lowest
@@ -232,10 +238,22 @@ final class VendoredMigration
             $refusals[] = sprintf('%s already exists; Booster will not overwrite it with the Slim 1 bridge.', self::BRIDGE_FILE);
         }
 
+        // Smarty's compiled templates are a cache of the old copy: they name
+        // SMARTY_DIR and the copy's plugin paths on every page, and Smarty
+        // rebuilds them. A real app's tmp/template_compile/ raised a stop
+        // sign that never said it was looking at a cache, so they stay out
+        // of the rewrite and get a MANUAL line instead.
         $sources = [];
+        $compiled = [];
         foreach (self::phpFiles($appPath) as $file) {
-            $sources[$file] = (string) file_get_contents($appPath . '/' . $file);
+            $source = (string) file_get_contents($appPath . '/' . $file);
+            if (preg_match(self::COMPILED_TEMPLATE, substr($source, 0, 2048)) === 1) {
+                $compiled[dirname($file)] = ($compiled[dirname($file)] ?? 0) + 1;
+                continue;
+            }
+            $sources[$file] = $source;
         }
+        ksort($compiled);
         $slimVars = isset($moved['slim']) ? self::slimVariables($sources) : [];
 
         $edits = [];
@@ -247,7 +265,7 @@ final class VendoredMigration
             }
         }
 
-        return ['inspection' => new VendoredInspection($moves, $leftAlone, $refusals, $floor), 'edits' => $edits];
+        return ['inspection' => new VendoredInspection($moves, $leftAlone, $refusals, $floor, $compiled), 'edits' => $edits];
     }
 
     /**
@@ -300,7 +318,8 @@ final class VendoredMigration
                 continue;
             }
             if (isset($moved['smarty']) && str_contains($line, 'SMARTY_DIR')) {
-                $stops[] = sprintf('%s:%d uses SMARTY_DIR, which pointed at the hand copy: %s', $file, $number, trim($line));
+                $stops[] = sprintf('%s:%d uses SMARTY_DIR, which pointed at the hand copy: %s', $file, $number, trim($line))
+                    . (preg_match(self::CACHE_FOLDER, '/' . $file) === 1 ? ' (the file sits in a cache folder: if it is a compiled template, delete the cache, Smarty rebuilds it, and plan again)' : '');
             }
             if ($copy !== null) {
                 if (preg_match(self::REQUIRE_LINE, $line) !== 1) {
@@ -498,6 +517,14 @@ final class VendoredMigration
         if (in_array('doctrine', $keys, true)) {
             $manual[] = 'MANUAL: Doctrine ORM 2.20 is stricter than a 2012 copy in two places a real app\'s replay found: DISTINCT(alias.field) in DQL now reads as an expression (name the field instead), and an entity whose id holds a date needs a custom column type. Fix what the replay shows.';
             $manual[] = 'MANUAL: ORM 2.20 is the last line that reads docblock annotations, and doctrine/annotations 1.x is abandoned. Moving the entities to attributes on ORM 3 (PHP 8.1 or newer) is the next step, by hand for now.';
+        }
+        foreach ($inspection->compiledTemplates as $folder => $count) {
+            $manual[] = sprintf(
+                'MANUAL: %s/ holds %d of Smarty\'s compiled templates, a cache the hand copy wrote; Booster left %s alone. Delete the compiled files (Smarty rebuilds them on the next request) and keep the folder out of git.',
+                $folder,
+                $count,
+                $count === 1 ? 'it' : 'them',
+            );
         }
         if (in_array('smarty', $keys, true)) {
             $manual[] = 'MANUAL: Smarty 4 keeps the Smarty 3 API. Since 4.3 it logs a deprecation when a template uses a PHP function as a modifier without registering it ({$x|json_encode}); register those with registerPlugin() when the log names them.';

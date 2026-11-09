@@ -1214,6 +1214,29 @@ final class CliTest extends TestCase
         self::assertSame(0, $planExit);
     }
 
+    public function test_detect_names_the_hand_copied_libraries_and_plans_their_move(): void
+    {
+        $app = __DIR__ . '/fixtures/vendored-2012';
+
+        [, $out] = $this->booster(['command' => 'detect', '--path' => $app]);
+        [, $json] = $this->booster(['command' => 'detect', '--path' => $app, '--format' => 'json']);
+        [, $plain] = $this->booster(['command' => 'detect', '--path' => $this->example('raw-php')]);
+
+        self::assertStringContainsString(implode("\n", [
+            'Hand-copied libraries (committed into a vendor folder, no Composer behind them):',
+            '  - Doctrine 2.2.2 (vendor/Doctrine)',
+            '  - Slim 1.6.0 (vendor/Slim)',
+            '  - Smarty 3.1.8 (vendor/Smarty)',
+            'Booster can move Doctrine, Slim and Smarty onto Composer, so the line below adds --vendored.',
+        ]), $out);
+        self::assertSame(1, preg_match('/^Next: php bin\/booster plan .* --from-php=5\.6 --vendored$/m', $out), $out);
+        $decoded = json_decode($json, true);
+        self::assertIsArray($decoded);
+        self::assertSame(['name' => 'Smarty', 'path' => 'vendor/Smarty', 'version' => '3.1.8', 'replace_with' => 'smarty/smarty'], $decoded['hand_copied_libraries'][2]);
+        self::assertStringNotContainsString('Hand-copied', $plain);
+        self::assertStringNotContainsString('--vendored', $plain);
+    }
+
     public function test_a_dry_run_that_previews_nothing_only_says_nothing_changed(): void
     {
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, (string) json_encode(['file_diffs' => []]), ''));

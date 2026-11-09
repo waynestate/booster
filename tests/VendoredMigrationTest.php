@@ -263,6 +263,36 @@ final class VendoredMigrationTest extends TestCase
         self::assertSame(['Found no hand-copied library under vendor/ that Booster knows how to move.'], $result->refusals);
     }
 
+    public function test_compiled_templates_are_a_cache_not_a_stop_sign(): void
+    {
+        $app = $this->app();
+        $compiled = "<?php /* Smarty version Smarty-3.1.8, created on 2013-02-01 10:00:00\n         compiled from \"templates/home.tpl\" */ ?>\n<?php require_once SMARTY_DIR . 'plugins/modifier.escape.php';\n";
+        self::put($app . '/tmp/template_compile/1a2b3c.file.home.tpl.php', $compiled);
+        self::put($app . '/tmp/template_compile/4d5e6f.file.batch.tpl.php', $compiled);
+
+        $result = (new VendoredMigration())->migrate($app, false, '7.4');
+
+        self::assertFalse($result->refused(), implode("\n", $result->refusals));
+        self::assertContains(
+            "MANUAL: tmp/template_compile/ holds 2 of Smarty's compiled templates, a cache the hand copy wrote; Booster left them alone. Delete the compiled files (Smarty rebuilds them on the next request) and keep the folder out of git.",
+            $result->manual,
+        );
+        self::assertSame($compiled, file_get_contents($app . '/tmp/template_compile/1a2b3c.file.home.tpl.php'));
+    }
+
+    public function test_smarty_dir_in_a_cache_folder_says_the_cache_is_the_likely_fix(): void
+    {
+        $app = $this->app();
+        self::put($app . '/cache/templates_c/home.php', "<?php\nrequire SMARTY_DIR . 'plugins/function.html_options.php';\n");
+
+        $refusals = (new VendoredMigration())->inspect($app)->refusals;
+
+        self::assertSame(
+            ["cache/templates_c/home.php:2 uses SMARTY_DIR, which pointed at the hand copy: require SMARTY_DIR . 'plugins/function.html_options.php'; (the file sits in a cache folder: if it is a compiled template, delete the cache, Smarty rebuilds it, and plan again)"],
+            $refusals,
+        );
+    }
+
     public function test_a_commented_out_call_is_not_a_stop_sign(): void
     {
         // The fixture's index.php mentions $app->flash() in a comment.
