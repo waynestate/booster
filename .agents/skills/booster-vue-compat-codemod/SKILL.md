@@ -13,6 +13,15 @@ Run the vue-upgrade-tool codemod over the front end and keep every manual item i
 2. `booster run --path=<app>` applies the plan and stops at the first failing gate.
 3. If a hop is over the review threshold (200 files), read its per-rule summary, then apply it with `--max-changes=N`. Use `--skip` to leave a rule out.
 
+When a gate fails, the run stops and leaves this hop's changes in place:
+
+1. Read the report for this hop: the phase that failed and the last lines of output. Work from that exact output, the files it names, their tests and the notes below, not from a summary of them.
+2. Fix one cause: code the hop could not change, a package that blocks the hop (`booster plan` names it), or a test that depends on old behavior.
+3. Commit the fix on its own, then run `booster run --path=<app>` again. Booster plans from the versions the app is on now, so finished hops are not repeated.
+4. Stop after 3 tries at the same failure, or sooner when a try changes nothing. Show the person the last output and what you tried.
+
+Never delete, skip or loosen a test to turn a gate green, and never add `--skip-gate`, `--allow-failing-baseline` or `--skip` unless the person asks for it.
+
 Only if the app has Laravel Boost (`booster detect` says so):
 
 - Use `search-docs` for the Vite front-end docs and check the app's build config against them.

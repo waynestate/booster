@@ -86,6 +86,11 @@ tag for how Booster holds each rule today.
 - **Deterministic tools first, model second.** `Enforced`: the playbooks (`booster init`) tell an assistant to drive
   the same `plan` and `run` commands a person types, to stop at every gate, and to leave the merge to a person. They are
   generated from the hop registry, and `booster init --check` fails CI when one is stale.
+- **Retry with the real error, cap the tries, then stop.** `Documented`: every hop playbook has a "When a gate fails"
+  section that feeds the fix the gate's own output and the files it names, allows one cause per try, forbids loosening
+  a test or skipping the gate, and hands the hop back to a person after 3 tries at one failure
+  (`SkillRenderer::MAX_TRIES`, `tests/SkillRendererTest.php`). Booster runs no model loop itself, so the cap is an
+  instruction the coding tool follows, not something Booster can enforce.
 
 ## Not yet
 

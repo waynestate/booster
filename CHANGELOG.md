@@ -4,6 +4,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Added: every hop playbook from `booster init` says what an AI coding tool does when a gate fails: work from the real output and the files it names, fix one cause per try, never loosen a test or add `--skip-gate`, and stop after 3 tries at one failure to hand the hop back to a person. Run `booster init` again to pick it up (`booster init --check` reports the old playbooks as stale).
 - Changed: CI pins the Preflight components to 0.4.0 (the proctor job clones the full history, so the override-approver check can read git blame).
 - Docs: OPEN_QUESTIONS and the GitHub workflow comment name the pins in use (Preflight 0.3.1 on GitLab, 0.1.4's commit on GitHub).
 - Changed: the deploy layer runs Squire's kit 0.7.1 (was 0.6.0): `.squire/php.ini` no longer sets the deprecated `session.sid_*` lines, web requests get a `disable_functions` list and Apache hardening (`.squire/php-web.ini`, `.squire/apache-hardening.conf`), and opcache gets production settings with `SQUIRE_OPCACHE_VALIDATE` as the one switch.

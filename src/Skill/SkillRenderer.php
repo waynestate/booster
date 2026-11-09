@@ -17,6 +17,13 @@ use Waynestate\Booster\Hop\HopRegistry;
 final class SkillRenderer
 {
     /**
+     * Tries an assistant gets at one failure before it hands the hop back to a
+     * person. Booster is deterministic, so a fourth identical run is not
+     * persistence, it is a screensaver.
+     */
+    public const MAX_TRIES = 3;
+
+    /**
      * @return array<string, string> relative path (name/SKILL.md) to file content
      */
     public function render(HopRegistry $registry): array
@@ -35,6 +42,7 @@ final class SkillRenderer
         foreach ($registry->all() as $hop) {
             $list .= sprintf("- `booster-%s`: %s\n", $hop->id, $hop->summary);
         }
+        $tries = self::MAX_TRIES;
 
         return <<<MD
         ---
@@ -49,7 +57,8 @@ final class SkillRenderer
         1. Run `booster detect --path=<app>` and read the app type and versions.
         2. Run `booster plan --path=<app>` (or `--goal=php-74-to-84`) and show the plan to the person.
         3. For each step, follow the matching playbook below. Never skip a gate.
-        4. Stop when the plan is done. A person reviews the diff and merges. Never push.
+        4. When a gate fails, follow the playbook's "When a gate fails" steps: work from the real output, and after {$tries} tries at one failure, stop and hand it to the person.
+        5. Stop when the plan is done. A person reviews the diff and merges. Never push.
 
         Optional: ADVISOR gives the agent read-only answers about the WSU stack (supported versions, CREED rules, which project owns what). Add it to the app when the person wants it:
 
@@ -78,6 +87,7 @@ final class SkillRenderer
         $how = $hop->isManual()
             ? "Booster has no automatic change for this hop. Follow the official guide below, then run the tests.\n"
             : "1. `booster run --path=<app> --dry-run` and read every diff.\n2. `booster run --path=<app>` applies the plan and stops at the first failing gate.\n3. If a hop is over the review threshold (200 files), read its per-rule summary, then apply it with `--max-changes=N`. Use `--skip` to leave a rule out.\n";
+        $failure = $this->failureSection($hop);
         $boost = $this->boostSection($hop);
 
         return <<<MD
@@ -93,6 +103,7 @@ final class SkillRenderer
         {$hop->summary}
 
         {$review}{$how}
+        {$failure}
         {$boost}What Rector cannot do (check these by hand):
 
         {$notes}
@@ -100,6 +111,41 @@ final class SkillRenderer
 
         {$links}
         MD . "\n";
+    }
+
+    /**
+     * What an assistant does when the hop's gate goes red: feed the fix the real
+     * output and the files it names (not a summary), fix one cause per try, and
+     * hand the hop back to a person after MAX_TRIES tries at one failure. The
+     * recipe it follows is the one people get in docs/recipes.md ("After a stop").
+     * A manual hop has no Booster gate, so its gate is the tests the assistant
+     * runs after its own change.
+     */
+    private function failureSection(Hop $hop): string
+    {
+        $tries = self::MAX_TRIES;
+        $stop = sprintf('Stop after %d tries at the same failure, or sooner when a try changes nothing. Show the person the last output and what you tried.', $tries);
+
+        $lines = $hop->isManual()
+            ? [
+                'When a gate fails (for this hop, the tests you run after your change):',
+                '',
+                '1. Work from the exact failing output, the files it names, their tests and the notes below, not from a summary of them.',
+                '2. Fix one cause, then run the tests again.',
+                '3. ' . $stop,
+            ]
+            : [
+                "When a gate fails, the run stops and leaves this hop's changes in place:",
+                '',
+                '1. Read the report for this hop: the phase that failed and the last lines of output. Work from that exact output, the files it names, their tests and the notes below, not from a summary of them.',
+                '2. Fix one cause: code the hop could not change, a package that blocks the hop (`booster plan` names it), or a test that depends on old behavior.',
+                '3. Commit the fix on its own, then run `booster run --path=<app>` again. Booster plans from the versions the app is on now, so finished hops are not repeated.',
+                '4. ' . $stop,
+            ];
+        $lines[] = '';
+        $lines[] = 'Never delete, skip or loosen a test to turn a gate green, and never add `--skip-gate`, `--allow-failing-baseline` or `--skip` unless the person asks for it.';
+
+        return implode("\n", $lines) . "\n";
     }
 
     /**

@@ -81,6 +81,55 @@ final class SkillRendererTest extends TestCase
         self::assertStringContainsString('Run `last-error` and `read-log-entries` after the build and the tests.', $files['booster-node-pin-24/SKILL.md']);
     }
 
+    public function test_every_hop_playbook_says_what_to_do_when_a_gate_fails(): void
+    {
+        $registry = new HopRegistry();
+        $files = (new SkillRenderer())->render($registry);
+        $stop = 'Stop after 3 tries at the same failure, or sooner when a try changes nothing. Show the person the last output and what you tried.';
+        $never = 'Never delete, skip or loosen a test to turn a gate green, and never add `--skip-gate`, `--allow-failing-baseline` or `--skip` unless the person asks for it.';
+
+        self::assertSame(3, SkillRenderer::MAX_TRIES);
+        $manualSeen = false;
+        $automaticSeen = false;
+        foreach ($registry->all() as $hop) {
+            $path = 'booster-' . $hop->id . '/SKILL.md';
+            $text = $files[$path];
+
+            self::assertStringContainsString($stop, $text, $path);
+            self::assertStringContainsString($never, $text, $path);
+            self::assertStringContainsString('the files it names, their tests and the notes below, not from a summary of them.', $text, $path);
+
+            // The section sits after the how-to steps and before the optional Boost help.
+            $failure = strpos($text, 'When a gate fails');
+            self::assertIsInt($failure, $path);
+            self::assertLessThan(strpos($text, self::BOOST_OPEN), $failure, $path);
+            self::assertSame(1, substr_count($text, 'When a gate fails'), $path);
+
+            if ($hop->isManual()) {
+                $manualSeen = true;
+                self::assertStringContainsString('When a gate fails (for this hop, the tests you run after your change):', $text, $path);
+                self::assertStringContainsString("2. Fix one cause, then run the tests again.\n3. " . $stop, $text, $path);
+                self::assertStringNotContainsString('Finished hops are not repeated', $text, $path);
+            } else {
+                $automaticSeen = true;
+                self::assertStringContainsString("When a gate fails, the run stops and leaves this hop's changes in place:", $text, $path);
+                self::assertStringContainsString('3. Commit the fix on its own, then run `booster run --path=<app>` again. Booster plans from the versions the app is on now, so finished hops are not repeated.', $text, $path);
+                self::assertStringContainsString("\n4. " . $stop, $text, $path);
+            }
+        }
+
+        // Both shapes are in the registry, so both branches above really ran.
+        self::assertTrue($manualSeen, 'the registry has no manual hop');
+        self::assertTrue($automaticSeen, 'the registry has no automatic hop');
+    }
+
+    public function test_the_index_points_at_the_failure_steps_and_the_cap(): void
+    {
+        $text = $this->files()['booster/SKILL.md'];
+
+        self::assertStringContainsString("4. When a gate fails, follow the playbook's \"When a gate fails\" steps: work from the real output, and after 3 tries at one failure, stop and hand it to the person.\n5. Stop when the plan is done.", $text);
+    }
+
     public function test_the_index_stays_clean_of_the_boost_section(): void
     {
         self::assertStringNotContainsString(self::BOOST_OPEN, $this->files()['booster/SKILL.md']);

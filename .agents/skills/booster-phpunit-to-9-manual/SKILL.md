@@ -11,6 +11,14 @@ Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gate
 
 Booster has no automatic change for this hop. Follow the official guide below, then run the tests.
 
+When a gate fails (for this hop, the tests you run after your change):
+
+1. Work from the exact failing output, the files it names, their tests and the notes below, not from a summary of them.
+2. Fix one cause, then run the tests again.
+3. Stop after 3 tries at the same failure, or sooner when a try changes nothing. Show the person the last output and what you tried.
+
+Never delete, skip or loosen a test to turn a gate green, and never add `--skip-gate`, `--allow-failing-baseline` or `--skip` unless the person asks for it.
+
 Only if the app has Laravel Boost (`booster detect` says so):
 
 - Use `search-docs` for the PHPUnit 9 migration notes and list the changes that touch this app's tests.
