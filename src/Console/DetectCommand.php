@@ -10,6 +10,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Waynestate\Booster\Project\ProjectDetector;
 use Waynestate\Booster\Report\JsonWriter;
 use Waynestate\Booster\Report\TextWriter;
+use Waynestate\Booster\Scan\WayneAuthScan;
 
 final class DetectCommand extends BaseCommand
 {
@@ -36,6 +37,13 @@ final class DetectCommand extends BaseCommand
             $output->writeln('Warning: ' . TextWriter::clean($warning), OutputInterface::OUTPUT_RAW);
             $output->writeln('', OutputInterface::OUTPUT_RAW);
         }
+        $stopSign = WayneAuthScan::stopSign($project->wayneAuthHits);
+        if ($stopSign !== []) {
+            // Before the keys: a sign-in that dies on the first PHP hop
+            // outranks everything detect has to say.
+            $output->writeln('Warning: ' . TextWriter::clean(implode(' ', $stopSign)), OutputInterface::OUTPUT_RAW);
+            $output->writeln('', OutputInterface::OUTPUT_RAW);
+        }
 
         foreach ($project->toArray() as $key => $value) {
             $shown = is_array($value)
@@ -55,7 +63,7 @@ final class DetectCommand extends BaseCommand
         return implode("\n", [
             'Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version',
             'composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan).',
-            'Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.',
+            'Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayne_auth = the old Wayne Auth sign-in in the app\'s own code, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.',
             sprintf('Next: %s plan --path=%s', Invocation::program(), Invocation::pathArg($this->pathAsTyped($input))),
         ]);
     }

@@ -14,6 +14,7 @@ use Waynestate\Booster\Refresh\HopDataRefresher;
 use Waynestate\Booster\Run\StrictSession;
 use Waynestate\Booster\Run\VendoredMigration;
 use Waynestate\Booster\Scan\VendoredLibraries;
+use Waynestate\Booster\Scan\WayneAuthScan;
 use Waynestate\Booster\ToolError;
 use Waynestate\Creed\State;
 
@@ -386,6 +387,13 @@ final class Planner
 
         if ($steps === []) {
             $warnings[] = 'Nothing to do: the app is already at the target.';
+        }
+
+        // Wayne Auth first: every other warning is about one hop, this one is
+        // about whether anybody can sign in once the first hop ships.
+        $wayneAuth = WayneAuthScan::stopSign($project->wayneAuthHits);
+        if ($wayneAuth !== []) {
+            array_unshift($warnings, implode(' ', $wayneAuth));
         }
 
         $packageChecks = [];

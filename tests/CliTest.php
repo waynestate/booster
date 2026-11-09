@@ -8,6 +8,7 @@ use Symfony\Component\Console\Tester\ApplicationTester;
 use Waynestate\Booster\Console\BoosterApplication;
 use Waynestate\Booster\Policy\PolicyLocator;
 use Waynestate\Booster\Run\ProcessResult;
+use Waynestate\Booster\Scan\WayneAuthScan;
 
 final class CliTest extends TestCase
 {
@@ -745,8 +746,28 @@ final class CliTest extends TestCase
         [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $app]);
 
         self::assertSame(0, $exit);
-        self::assertStringContainsString('Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.', $out);
+        self::assertStringContainsString('Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayne_auth = the old Wayne Auth sign-in in the app\'s own code, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.', $out);
         self::assertLessThan(strpos($out, 'Next: '), strpos($out, 'Keys: '), 'the Keys line comes before the Next line');
+    }
+
+    public function test_detect_and_plan_raise_the_wayne_auth_stop_sign(): void
+    {
+        $app = __DIR__ . '/fixtures/wayne-auth-2012';
+
+        [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $app]);
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Warning: Stop sign: the app signs people in through Wayne Auth (config/config.ini.example:2 points at the Wayne Auth server (sso_host);', $out);
+        self::assertMatchesRegularExpression('/^wayne_auth\s+yes$/m', $out);
+        self::assertLessThan(strpos($out, 'app_type'), strpos($out, 'Stop sign:'), 'the stop sign comes before the keys');
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $app, '--from-php' => '5.6', '--no-scan' => true, '--no-package-check' => true]);
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Warning: Stop sign: the app signs people in through Wayne Auth', $out);
+        self::assertStringContainsString(WayneAuthScan::GUIDE, $out);
+
+        [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $this->example('raw-php')]);
+        self::assertMatchesRegularExpression('/^wayne_auth\s+no$/m', $out);
+        self::assertStringNotContainsString('Stop sign', $out);
     }
 
     public function test_detect_expands_a_leading_tilde_in_path(): void

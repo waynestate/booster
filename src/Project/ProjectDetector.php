@@ -7,6 +7,7 @@ namespace Waynestate\Booster\Project;
 use Composer\Semver\Constraint\Bound;
 use Composer\Semver\VersionParser;
 use Throwable;
+use Waynestate\Booster\Scan\WayneAuthScan;
 use Waynestate\Booster\ToolError;
 
 /**
@@ -103,6 +104,7 @@ final class ProjectDetector
             lockCeilingPackage: $lock['ceilingPackage'],
             lockCeilingConstraint: $lock['ceilingConstraint'],
             usesWayneUi1: array_key_exists(self::WAYNE_UI_PACKAGE, $all),
+            wayneAuthHits: WayneAuthScan::find($path),
         );
     }
 

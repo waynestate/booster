@@ -44,6 +44,8 @@ final readonly class Project
         public ?string $lockCeilingPackage = null,
         public ?string $lockCeilingConstraint = null,
         public bool $usesWayneUi1 = false,
+        /** @var list<string> the old Wayne Auth sign-in lines, "file:line what" (WayneAuthScan) */
+        public array $wayneAuthHits = [],
     ) {}
 
     /**
@@ -62,6 +64,7 @@ final readonly class Project
             'node' => $this->nodeMajor,
             'mix_file' => $this->hasMixFile,
             'wayne_cas' => $this->usesWayneCas,
+            'wayne_auth' => $this->wayneAuthHits !== [],
             'wayneui_1' => $this->usesWayneUi1,
             'boost' => $this->hasBoost,
             'helmet' => $this->hasHelmet,

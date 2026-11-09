@@ -1,0 +1,6 @@
+[wayneauth]
+sso_host = sso.example.invalid
+sso_port = 10144
+
+[auth]
+login_url = https://login.example.invalid/?forward_url=
