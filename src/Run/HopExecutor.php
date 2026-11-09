@@ -735,7 +735,7 @@ final class HopExecutor
                         return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...($proxies->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...($proxies->manual ?? []), ...$why, ...$gate->lines, ...$notes], false, $prepass?->files() ?? []);
                     }
                     $messages = [...$messages, ...$gate->lines];
-                    $messages[] = $this->gatePassedLine($step->phpAfter, $baseline->gateKind);
+                    $messages[] = $this->gatePassedLine($step->phpAfter, $this->stepGateKind($step, $baseline->gateKind));
                     if ($update !== []) {
                         $messages[] = $lockReason === null
                             ? sprintf('The gate refreshed composer.lock (%s).', self::lockCommand($update))
@@ -1203,8 +1203,48 @@ final class HopExecutor
      */
     private function runTestGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, ?array $update = null): GateReport
     {
+        if (!$this->testsDeferred($step, $baseline->gateKind)) {
+            return $this->runTestGateWith($step, $path, $options, $baseline, $update, $options->testCommand ?? $this->defaultTestCommand($path));
+        }
+        // Before vendored-to-composer the app still loads its hand copies,
+        // and a 2012 Slim dies on PHP 7 before a single test runs: a real
+        // app's test gate would have stopped the run at hop 1, three hops
+        // before the hop that fixes it. Those steps get the syntax check;
+        // the tests take over from the move on, like the replay does.
+        $gate = $this->runTestGateWith($step, $path, $options, $baseline, $update, self::SYNTAX_CHECK_COMMAND);
+
+        return new GateReport($gate->passed, [sprintf(
+            'Tests deferred to step %d (%s): the app still loads its hand-copied libraries, which may not run on PHP %s. This step ran the syntax check; the tests run from that step on.',
+            (int) $this->replayFrom,
+            HopRegistry::VENDORED_TO_COMPOSER_ID,
+            $step->phpAfter ?? '?',
+        ), ...$gate->lines]);
+    }
+
+    /**
+     * True when this step runs before the vendored move and the run's gate
+     * is a test suite, so the step gets the syntax check instead.
+     */
+    private function testsDeferred(PlanStep $step, string $gateKind): bool
+    {
+        return $this->replayFrom !== null && $step->number < $this->replayFrom && $gateKind !== BaselineResult::GATE_SYNTAX;
+    }
+
+    /**
+     * The gate kind a step's closing line names: the syntax check on a step
+     * whose tests were deferred, the run's own gate otherwise.
+     */
+    private function stepGateKind(PlanStep $step, string $gateKind): string
+    {
+        return $this->testsDeferred($step, $gateKind) ? BaselineResult::GATE_SYNTAX : $gateKind;
+    }
+
+    /**
+     * @param list<string>|null $update
+     */
+    private function runTestGateWith(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, ?array $update, string $test): GateReport
+    {
         $php = $step->phpAfter ?? '';
-        $test = $options->testCommand ?? $this->defaultTestCommand($path);
         $update = $update ?? $this->lockUpdatePackages($step, $path);
         $unblock = [];
         $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, $update, $options->testEnv);
@@ -1413,7 +1453,7 @@ final class HopExecutor
             if (!$gate->passed) {
                 return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
             }
-            $changes = [...$changes, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $baseline->gateKind)];
+            $changes = [...$changes, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $this->stepGateKind($step, $baseline->gateKind))];
         } else {
             $changes[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
         }
@@ -1457,7 +1497,7 @@ final class HopExecutor
             if (!$gate->passed) {
                 return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $migration->files, [...$messages, ...$migration->changes, $migration->summary(), ...$migration->manual, ...$gate->lines]);
             }
-            $messages = [...$messages, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $baseline->gateKind)];
+            $messages = [...$messages, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $this->stepGateKind($step, $baseline->gateKind))];
         } else {
             $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
         }
@@ -1499,7 +1539,7 @@ final class HopExecutor
             if (!$gate->passed) {
                 return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $migration->files, [...$messages, ...$migration->manual, ...$gate->lines]);
             }
-            $messages = [...$messages, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $baseline->gateKind)];
+            $messages = [...$messages, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $this->stepGateKind($step, $baseline->gateKind))];
         } else {
             $messages[] = sprintf('Gate skipped. Run composer install and the tests on PHP %s before the next step.', $php);
         }
@@ -1537,7 +1577,7 @@ final class HopExecutor
             if (!$gate->passed) {
                 return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $migration->files, [...$messages, ...$migration->manual, ...$gate->lines]);
             }
-            $messages = [...$messages, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $baseline->gateKind)];
+            $messages = [...$messages, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $this->stepGateKind($step, $baseline->gateKind))];
         } else {
             $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
         }
@@ -1613,7 +1653,7 @@ final class HopExecutor
             if (!$gate->passed) {
                 return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
             }
-            $changes = [...$changes, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $baseline->gateKind)];
+            $changes = [...$changes, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $this->stepGateKind($step, $baseline->gateKind))];
         } else {
             $changes[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
         }
@@ -2784,7 +2824,7 @@ final class HopExecutor
             if (!$gate->passed) {
                 return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
             }
-            $changes = [...$changes, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $baseline->gateKind)];
+            $changes = [...$changes, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $this->stepGateKind($step, $baseline->gateKind))];
         } else {
             $changes[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
         }

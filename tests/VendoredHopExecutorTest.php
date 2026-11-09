@@ -165,6 +165,29 @@ final class VendoredHopExecutorTest extends TestCase
         self::assertCount(3, $replays, 'The baseline, then the vendored hop and the PHP hop after it.');
     }
 
+    public function test_the_tests_wait_for_the_vendored_hop_like_the_replay(): void
+    {
+        $dir = $this->app();
+        $fake = $this->fake();
+
+        $report = $this->execute($dir, $fake, new RunOptions(testCommand: 'php tests/run.php'), new PlanOptions(fromPhp: '7.3', toPhp: '8.0', vendored: true));
+
+        self::assertFalse($report->failed());
+        $scripts = self::gateScripts($fake);
+        self::assertCount(4, $scripts);
+        self::assertStringContainsString('php tests/run.php', $scripts[0], 'The baseline runs the tests on the PHP the app starts from.');
+        self::assertStringContainsString("xargs -0 -r -n1 php -l", $scripts[1]);
+        self::assertStringNotContainsString('php tests/run.php', $scripts[1]);
+        self::assertStringContainsString('php tests/run.php', $scripts[2]);
+        self::assertStringContainsString('php tests/run.php', $scripts[3]);
+        self::assertSame(
+            'Tests deferred to step 2 (vendored-to-composer): the app still loads its hand-copied libraries, which may not run on PHP 7.4. This step ran the syntax check; the tests run from that step on.',
+            $report->results[0]->messages[array_search('Gate passed: syntax check is clean on PHP 7.4.', $report->results[0]->messages, true) - 1] ?? null,
+        );
+        self::assertContains('Gate passed: your test command passed on PHP 7.4.', $report->results[1]->messages);
+        self::assertContains('Gate passed: your test command passed on PHP 8.0.', $report->results[2]->messages);
+    }
+
     public function test_a_stop_sign_found_at_run_time_refuses_the_step(): void
     {
         $dir = $this->app();
