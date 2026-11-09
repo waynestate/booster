@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Tests;
 
 use RuntimeException;
+use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\Run\ProcessRunner;
 use Waynestate\Booster\Scan\ComposerAuditScan;
@@ -140,6 +141,36 @@ final class ComposerAuditScanTest extends TestCase
 
         self::assertFalse($result->ok);
         self::assertStringContainsString('exited 2 without a JSON report', (string) $result->error);
+    }
+
+    public function test_exit_2_for_abandoned_packages_is_a_result_not_a_failure(): void
+    {
+        // What Composer 2.8 and later print for an app whose only findings are
+        // abandoned packages: exit 2 (the abandoned bit) and a full report.
+        $report = '{"advisories": [], "abandoned": {"doctrine/annotations": "", "doctrine/cache": "", "doctrine/common": "doctrine/persistence"}}';
+        $fake = new FakeProcessRunner(static fn(array $command): ProcessResult => new ProcessResult(0, '', ''));
+        $fake->auditResponse = new ProcessResult(2, $report, '');
+        $result = (new ComposerAuditScan($fake))->scan('/tmp/app');
+
+        self::assertTrue($result->ok);
+        self::assertNull($result->error);
+        self::assertSame(['doctrine/annotations' => '', 'doctrine/cache' => '', 'doctrine/common' => 'doctrine/persistence'], $result->abandoned);
+
+        $lines = implode("\n", (new TextWriter())->composerAudit($result));
+        self::assertStringNotContainsString('could not run', $lines);
+        self::assertStringContainsString('Composer audit after this hop: 0 advisories, 3 abandoned packages', $lines);
+        self::assertStringContainsString('doctrine/common is abandoned (use doctrine/persistence instead).', $lines);
+    }
+
+    public function test_exit_3_carries_advisories_and_abandoned_packages(): void
+    {
+        $fake = new FakeProcessRunner(static fn(array $command): ProcessResult => new ProcessResult(0, '', ''));
+        $fake->auditResponse = new ProcessResult(3, self::FINDINGS_JSON, '');
+        $result = (new ComposerAuditScan($fake))->scan('/tmp/app');
+
+        self::assertTrue($result->ok);
+        self::assertCount(2, $result->advisories);
+        self::assertCount(2, $result->abandoned);
     }
 
     public function test_a_crashing_process_runner_is_an_error_not_an_exception(): void

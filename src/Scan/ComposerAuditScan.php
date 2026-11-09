@@ -26,6 +26,9 @@ final class ComposerAuditScan
     /** The command the error message tells the human to run by hand. */
     public const MANUAL_COMMAND = 'composer audit --format=json --no-interaction';
 
+    /** The highest exit a finished audit gives: advisories (1) and abandoned packages (2) together. */
+    private const FOUND_EVERYTHING = 3;
+
     public function __construct(
         private readonly ProcessRunner $processes,
         private readonly ?string $composerBinary = null,
@@ -53,15 +56,19 @@ final class ComposerAuditScan
     }
 
     /**
-     * Turn the JSON report into findings. Composer exits 1 both when it found
-     * advisories and when there is nothing installed to audit, so the exit
-     * code cannot tell the two apart: a parseable report is the truth, and
-     * anything else is a skip with the reason from the process output.
+     * Turn the JSON report into findings. Composer's exit code is a bit mask
+     * of what it found (1 advisories, 2 abandoned packages, 3 both), and it
+     * also exits 1 when there is nothing installed to audit, so the exit code
+     * cannot tell a finding from a failure: a parseable report is the truth,
+     * and anything else is a skip with the reason from the process output.
+     * A real app hit exit 2 on every hop after its libraries moved to
+     * Composer (abandoned doctrine/annotations, cache and common), and the
+     * report used to say "could not run" with the JSON right there in it.
      */
     private function parse(ProcessResult $result): ComposerAuditResult
     {
         $data = json_decode($result->stdout, true);
-        if ($result->exitCode > 1 || !is_array($data) || !array_key_exists('advisories', $data)) {
+        if ($result->exitCode > self::FOUND_EVERYTHING || !is_array($data) || (!array_key_exists('advisories', $data) && !array_key_exists('abandoned', $data))) {
             return $this->noReport($result);
         }
 
