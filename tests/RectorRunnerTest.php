@@ -43,6 +43,24 @@ final class RectorRunnerTest extends TestCase
         self::assertSame(['src/vendor'], $result->skippedDirs);
     }
 
+    public function test_rector_stays_off_boosters_own_bridge_until_a_person_edits_it(): void
+    {
+        $app = $this->tempDir();
+        $bridge = (string) file_get_contents(dirname(__DIR__) . '/resources/slim1/slim1-bridge.php');
+        file_put_contents($app . '/slim1-bridge.php', str_replace("\n", "\r\n", $bridge));
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, '{"file_diffs": [], "errors": []}', ''));
+        $runner = new RectorRunner($fake, '/fake/rector');
+
+        $result = $runner->run((new HopRegistry())->get('php-80-to-81'), $app, true, '8.1');
+        file_put_contents($app . '/slim1-bridge.php', $bridge . "// the app's own route helper\n");
+        $runner->run((new HopRegistry())->get('php-81-to-82'), $app, true, '8.2');
+
+        $process = $fake->callsWith('process');
+        self::assertSame([$app . '/slim1-bridge.php'], json_decode($process[0]['env']['BOOSTER_RECTOR_SKIP_FILES'], true));
+        self::assertSame([], $result->excluded, 'Skipping our own file is not manual work.');
+        self::assertSame([], json_decode($process[1]['env']['BOOSTER_RECTOR_SKIP_FILES'], true), 'An edited bridge is the app\'s code.');
+    }
+
     public function test_run_excludes_php_files_that_are_not_valid_utf8_and_names_them(): void
     {
         $app = $this->tempDir();

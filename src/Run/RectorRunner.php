@@ -53,6 +53,27 @@ final class RectorRunner
     }
 
     /**
+     * The Slim 1 bridge the vendored move wrote, while it is still exactly
+     * the file Booster shipped (line endings aside): Rector stays off it, so
+     * it does not pick up 8.0, 8.1 and 8.4 syntax and churn in every later
+     * hop's diff. A rocket does not repaint its own booster mid-flight. Once
+     * a person edits it, it is the app's code and gets the hops like the rest.
+     *
+     * @return list<string>
+     */
+    private static function untouchedBridge(string $appPath): array
+    {
+        $file = $appPath . '/' . VendoredMigration::BRIDGE_FILE;
+        $theirs = is_file($file) ? @file_get_contents($file) : false;
+        $ours = @file_get_contents(PharFiles::path('resources/slim1/' . VendoredMigration::BRIDGE_FILE));
+        if (!is_string($theirs) || !is_string($ours)) {
+            return [];
+        }
+
+        return str_replace("\r\n", "\n", $theirs) === str_replace("\r\n", "\n", $ours) ? [$file] : [];
+    }
+
+    /**
      * @param string  $phpTarget     the PHP version the rules may assume (major.minor); Rector otherwise reads the old version from the app composer.json and skips the new rules
      * @param ?string $laravelTarget the Laravel major the version-bound rules should assume, or null for a non-Laravel app
      * @param ?string $phpunitTarget the PHPUnit major the version-bound rules should assume, or null for a non-PhpUnit hop
@@ -103,7 +124,7 @@ final class RectorRunner
             'BOOSTER_RECTOR_CACHE' => RunScratch::dir('rector-cache/' . $hop->id),
             'BOOSTER_RECTOR_CONTAINER_CACHE' => RunScratch::dir('rector-container'),
             'BOOSTER_RECTOR_SKIP_DIRS' => json_encode(array_map(static fn(string $d): string => $appPath . '/' . $d, $vendored), JSON_THROW_ON_ERROR),
-            'BOOSTER_RECTOR_SKIP_FILES' => json_encode(array_map(static fn(string $f): string => $appPath . '/' . $f, $invalid), JSON_THROW_ON_ERROR),
+            'BOOSTER_RECTOR_SKIP_FILES' => json_encode([...array_map(static fn(string $f): string => $appPath . '/' . $f, $invalid), ...self::untouchedBridge($appPath)], JSON_THROW_ON_ERROR),
         ] + RunScratch::tempEnv();
 
         // Laravel rules need Laravel's classes to recognise a Model or a Controller, so a Laravel
@@ -520,7 +541,7 @@ final class RectorRunner
      */
     private function retryWithoutUnknownClasses(RectorResult $first, array $eligible, array $command, array $env, string $appPath, ?string $laravelTarget, ?string $phpunitTarget, string $memoryLimit, array $vendored, array $invalid): RectorResult
     {
-        $skipFiles = array_map(static fn(string $f): string => $appPath . '/' . $f, $invalid);
+        $skipFiles = [...array_map(static fn(string $f): string => $appPath . '/' . $f, $invalid), ...self::untouchedBridge($appPath)];
         foreach ($eligible as $entry) {
             $skipFiles[] = $appPath . '/' . $entry['file'];
         }
