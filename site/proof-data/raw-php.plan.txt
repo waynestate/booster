@@ -1,7 +1,7 @@
 BOOSTER plan for examples/raw-php
   app type: raw-php
   PHP: 7.4 -> 8.5
-  policy: waynestate/creed 0.1.7 (today 2026-11-08)
+  policy: waynestate/creed 0.1.7 (today 2026-11-09)
 
 1. php-74-to-80
    Move PHP 7.4 code to PHP 8.0.

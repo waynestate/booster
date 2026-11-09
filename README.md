@@ -300,6 +300,13 @@ BOOSTER plan for examples/laravel-blade
 6. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
    After this step your tests run in Docker.
+   Behavior changes to check:
+   When the app does not set its session cookie name, Laravel 13 derives the fallback name from APP_NAME differently, so the name can change and every signed-in user is signed out once after the deploy (config/session.php)
+     keep old: set SESSION_COOKIE in .env to the cookie name the app sends today
+     check: Compare the session cookie name in the browser before and after the hop
+   When the app does not set a cache prefix, Laravel 13's fallback changes from app_name_cache_ to app-name-cache- (and the Redis prefix from _database_ to -database-), so every cached value misses once after the deploy and keys shared with other code stop matching (config/cache.php)
+     keep old: set CACHE_PREFIX (and REDIS_PREFIX when the app uses Redis) in .env to the values the app uses today
+     check: Compare a cache key in the store before and after the hop
 7. php-83-to-84
    Move PHP 8.3 code to PHP 8.4.
    After this step your tests run in Docker.
@@ -951,7 +958,7 @@ browser. The private proof site has the hop-by-hop table.
 
 ## Status
 
-Version 1.12. See [CHANGELOG.md](CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) for what stays
+Version 1.13. See [CHANGELOG.md](CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) for what stays
 open, and [BEST_PRACTICES.md](BEST_PRACTICES.md) for the rules Booster follows.
 
 ## License

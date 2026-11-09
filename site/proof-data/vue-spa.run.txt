@@ -1,6 +1,8 @@
 BOOSTER dry run (nothing was changed)
 
 Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+Replay: off, and the gate only proves every PHP file parses, so a hop can change what a page answers and still pass.
+Record the answers first: php bin/booster replay init --path=examples/vue-spa drafts booster-replay.json from the routes; fill in its todo items, then run again with --replay.
 
 1. php-80-to-81: PREVIEWED (0 files)
    No edits needed for this step (dry run).

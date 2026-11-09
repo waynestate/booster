@@ -1,12 +1,21 @@
 BOOSTER dry run (nothing was changed)
 
 Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+Replay: off, and the gate only proves every PHP file parses, so a hop can change what a page answers and still pass.
+Record the answers first: php bin/booster replay init --path=examples/laravel-wayne-cas drafts booster-replay.json from the routes; fill in its todo items, then run again with --replay.
 
 1. laravel-12-to-13: PREVIEWED (incomplete)
    would run: composer update -W laravel/framework
    Preview incomplete: laravel-12-to-13 needs the app's vendor/ to recognize Laravel classes, and it is missing. Run composer install in the app, then dry-run again.
    If your database server is old, check its version against the minimum MySQL (or other database) version Laravel 13 needs before you apply this hop.
    Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.
+   Behavior changes to check:
+   When the app does not set its session cookie name, Laravel 13 derives the fallback name from APP_NAME differently, so the name can change and every signed-in user is signed out once after the deploy (config/session.php)
+     keep old: set SESSION_COOKIE in .env to the cookie name the app sends today
+     check: Compare the session cookie name in the browser before and after the hop
+   When the app does not set a cache prefix, Laravel 13's fallback changes from app_name_cache_ to app-name-cache- (and the Redis prefix from _database_ to -database-), so every cached value misses once after the deploy and keys shared with other code stop matching (config/cache.php)
+     keep old: set CACHE_PREFIX (and REDIS_PREFIX when the app uses Redis) in .env to the values the app uses today
+     check: Compare a cache key in the store before and after the hop
 2. php-83-to-84: PREVIEWED (0 files)
    No edits needed for this step (dry run).
    General notes for this step (nothing found in your app, just good to know):

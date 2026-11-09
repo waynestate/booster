@@ -8,7 +8,7 @@ generator: Squire agent-ready
 
 # Real output, from Booster's own example apps
 
-Captured on 2026-11-08 with Booster 1.12.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
+Captured on 2026-11-09 with Booster 1.13.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
 
 ## laravel-blade
 
@@ -22,7 +22,7 @@ BOOSTER plan for examples/laravel-blade
   PHP: 8.2 -> 8.5
   Laravel: 10 -> 13
   PHPUnit: 10 -> 13
-  policy: waynestate/creed 0.1.7 (today 2026-11-08)
+  policy: waynestate/creed 0.1.7 (today 2026-11-09)
 
 1. phpunit-10-to-11
    Move PHPUnit 10 tests to PHPUnit 11.
@@ -47,6 +47,13 @@ BOOSTER plan for examples/laravel-blade
 6. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
    After this step your tests run in Docker.
+   Behavior changes to check:
+   When the app does not set its session cookie name, Laravel 13 derives the fallback name from APP_NAME differently, so the name can change and every signed-in user is signed out once after the deploy (config/session.php)
+     keep old: set SESSION_COOKIE in .env to the cookie name the app sends today
+     check: Compare the session cookie name in the browser before and after the hop
+   When the app does not set a cache prefix, Laravel 13's fallback changes from app_name_cache_ to app-name-cache- (and the Redis prefix from _database_ to -database-), so every cached value misses once after the deploy and keys shared with other code stop matching (config/cache.php)
+     keep old: set CACHE_PREFIX (and REDIS_PREFIX when the app uses Redis) in .env to the values the app uses today
+     check: Compare a cache key in the store before and after the hop
 7. php-83-to-84
    Move PHP 8.3 code to PHP 8.4.
    After this step your tests run in Docker.
@@ -161,6 +168,13 @@ Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests a
    Preview incomplete: laravel-12-to-13 needs the app's vendor/ to recognize Laravel classes, and it is missing. Run composer install in the app, then dry-run again.
    If your database server is old, check its version against the minimum MySQL (or other database) version Laravel 13 needs before you apply this hop.
    Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.
+   Behavior changes to check:
+   When the app does not set its session cookie name, Laravel 13 derives the fallback name from APP_NAME differently, so the name can change and every signed-in user is signed out once after the deploy (config/session.php)
+     keep old: set SESSION_COOKIE in .env to the cookie name the app sends today
+     check: Compare the session cookie name in the browser before and after the hop
+   When the app does not set a cache prefix, Laravel 13's fallback changes from app_name_cache_ to app-name-cache- (and the Redis prefix from _database_ to -database-), so every cached value misses once after the deploy and keys shared with other code stop matching (config/cache.php)
+     keep old: set CACHE_PREFIX (and REDIS_PREFIX when the app uses Redis) in .env to the values the app uses today
+     check: Compare a cache key in the store before and after the hop
 7. php-83-to-84: PREVIEWED (0 files)
    No edits needed for this step (dry run).
    General notes for this step (nothing found in your app, just good to know):
@@ -228,11 +242,18 @@ BOOSTER plan for examples/laravel-blade-vue
   app type: laravel-blade-vue
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.7 (today 2026-11-08)
+  policy: waynestate/creed 0.1.7 (today 2026-11-09)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
    After this step your tests run in Docker.
+   Behavior changes to check:
+   When the app does not set its session cookie name, Laravel 13 derives the fallback name from APP_NAME differently, so the name can change and every signed-in user is signed out once after the deploy (config/session.php)
+     keep old: set SESSION_COOKIE in .env to the cookie name the app sends today
+     check: Compare the session cookie name in the browser before and after the hop
+   When the app does not set a cache prefix, Laravel 13's fallback changes from app_name_cache_ to app-name-cache- (and the Redis prefix from _database_ to -database-), so every cached value misses once after the deploy and keys shared with other code stop matching (config/cache.php)
+     keep old: set CACHE_PREFIX (and REDIS_PREFIX when the app uses Redis) in .env to the values the app uses today
+     check: Compare a cache key in the store before and after the hop
 2. php-83-to-84
    Move PHP 8.3 code to PHP 8.4.
    After this step your tests run in Docker.
@@ -266,12 +287,21 @@ Preview the edits: php bin/booster run --path=examples/laravel-blade-vue --dry-r
 BOOSTER dry run (nothing was changed)
 
 Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+Replay: off, and the gate only proves every PHP file parses, so a hop can change what a page answers and still pass.
+Record the answers first: php bin/booster replay init --path=examples/laravel-blade-vue drafts booster-replay.json from the routes; fill in its todo items, then run again with --replay.
 
 1. laravel-12-to-13: PREVIEWED (incomplete)
    would run: composer update -W laravel/framework
    Preview incomplete: laravel-12-to-13 needs the app's vendor/ to recognize Laravel classes, and it is missing. Run composer install in the app, then dry-run again.
    If your database server is old, check its version against the minimum MySQL (or other database) version Laravel 13 needs before you apply this hop.
    Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.
+   Behavior changes to check:
+   When the app does not set its session cookie name, Laravel 13 derives the fallback name from APP_NAME differently, so the name can change and every signed-in user is signed out once after the deploy (config/session.php)
+     keep old: set SESSION_COOKIE in .env to the cookie name the app sends today
+     check: Compare the session cookie name in the browser before and after the hop
+   When the app does not set a cache prefix, Laravel 13's fallback changes from app_name_cache_ to app-name-cache- (and the Redis prefix from _database_ to -database-), so every cached value misses once after the deploy and keys shared with other code stop matching (config/cache.php)
+     keep old: set CACHE_PREFIX (and REDIS_PREFIX when the app uses Redis) in .env to the values the app uses today
+     check: Compare a cache key in the store before and after the hop
 2. php-83-to-84: PREVIEWED (0 files)
    No edits needed for this step (dry run).
    General notes for this step (nothing found in your app, just good to know):
@@ -302,11 +332,18 @@ BOOSTER plan for examples/laravel-inertia-vue
   app type: laravel-inertia-vue
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.7 (today 2026-11-08)
+  policy: waynestate/creed 0.1.7 (today 2026-11-09)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
    After this step your tests run in Docker.
+   Behavior changes to check:
+   When the app does not set its session cookie name, Laravel 13 derives the fallback name from APP_NAME differently, so the name can change and every signed-in user is signed out once after the deploy (config/session.php)
+     keep old: set SESSION_COOKIE in .env to the cookie name the app sends today
+     check: Compare the session cookie name in the browser before and after the hop
+   When the app does not set a cache prefix, Laravel 13's fallback changes from app_name_cache_ to app-name-cache- (and the Redis prefix from _database_ to -database-), so every cached value misses once after the deploy and keys shared with other code stop matching (config/cache.php)
+     keep old: set CACHE_PREFIX (and REDIS_PREFIX when the app uses Redis) in .env to the values the app uses today
+     check: Compare a cache key in the store before and after the hop
 2. php-83-to-84
    Move PHP 8.3 code to PHP 8.4.
    After this step your tests run in Docker.
@@ -343,12 +380,21 @@ Preview the edits: php bin/booster run --path=examples/laravel-inertia-vue --dry
 BOOSTER dry run (nothing was changed)
 
 Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+Replay: off, and the gate only proves every PHP file parses, so a hop can change what a page answers and still pass.
+Record the answers first: php bin/booster replay init --path=examples/laravel-inertia-vue drafts booster-replay.json from the routes; fill in its todo items, then run again with --replay.
 
 1. laravel-12-to-13: PREVIEWED (incomplete)
    would run: composer update -W laravel/framework
    Preview incomplete: laravel-12-to-13 needs the app's vendor/ to recognize Laravel classes, and it is missing. Run composer install in the app, then dry-run again.
    If your database server is old, check its version against the minimum MySQL (or other database) version Laravel 13 needs before you apply this hop.
    Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.
+   Behavior changes to check:
+   When the app does not set its session cookie name, Laravel 13 derives the fallback name from APP_NAME differently, so the name can change and every signed-in user is signed out once after the deploy (config/session.php)
+     keep old: set SESSION_COOKIE in .env to the cookie name the app sends today
+     check: Compare the session cookie name in the browser before and after the hop
+   When the app does not set a cache prefix, Laravel 13's fallback changes from app_name_cache_ to app-name-cache- (and the Redis prefix from _database_ to -database-), so every cached value misses once after the deploy and keys shared with other code stop matching (config/cache.php)
+     keep old: set CACHE_PREFIX (and REDIS_PREFIX when the app uses Redis) in .env to the values the app uses today
+     check: Compare a cache key in the store before and after the hop
 2. php-83-to-84: PREVIEWED (0 files)
    No edits needed for this step (dry run).
    General notes for this step (nothing found in your app, just good to know):
@@ -405,11 +451,18 @@ BOOSTER plan for examples/laravel-wayne-cas
   app type: laravel-blade
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.7 (today 2026-11-08)
+  policy: waynestate/creed 0.1.7 (today 2026-11-09)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
    After this step your tests run in Docker.
+   Behavior changes to check:
+   When the app does not set its session cookie name, Laravel 13 derives the fallback name from APP_NAME differently, so the name can change and every signed-in user is signed out once after the deploy (config/session.php)
+     keep old: set SESSION_COOKIE in .env to the cookie name the app sends today
+     check: Compare the session cookie name in the browser before and after the hop
+   When the app does not set a cache prefix, Laravel 13's fallback changes from app_name_cache_ to app-name-cache- (and the Redis prefix from _database_ to -database-), so every cached value misses once after the deploy and keys shared with other code stop matching (config/cache.php)
+     keep old: set CACHE_PREFIX (and REDIS_PREFIX when the app uses Redis) in .env to the values the app uses today
+     check: Compare a cache key in the store before and after the hop
 2. php-83-to-84
    Move PHP 8.3 code to PHP 8.4.
    After this step your tests run in Docker.
@@ -449,12 +502,21 @@ Preview the edits: php bin/booster run --path=examples/laravel-wayne-cas --dry-r
 BOOSTER dry run (nothing was changed)
 
 Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+Replay: off, and the gate only proves every PHP file parses, so a hop can change what a page answers and still pass.
+Record the answers first: php bin/booster replay init --path=examples/laravel-wayne-cas drafts booster-replay.json from the routes; fill in its todo items, then run again with --replay.
 
 1. laravel-12-to-13: PREVIEWED (incomplete)
    would run: composer update -W laravel/framework
    Preview incomplete: laravel-12-to-13 needs the app's vendor/ to recognize Laravel classes, and it is missing. Run composer install in the app, then dry-run again.
    If your database server is old, check its version against the minimum MySQL (or other database) version Laravel 13 needs before you apply this hop.
    Update first-party packages (Sanctum, Livewire, Inertia) and your own forks by hand; Rector does not touch them.
+   Behavior changes to check:
+   When the app does not set its session cookie name, Laravel 13 derives the fallback name from APP_NAME differently, so the name can change and every signed-in user is signed out once after the deploy (config/session.php)
+     keep old: set SESSION_COOKIE in .env to the cookie name the app sends today
+     check: Compare the session cookie name in the browser before and after the hop
+   When the app does not set a cache prefix, Laravel 13's fallback changes from app_name_cache_ to app-name-cache- (and the Redis prefix from _database_ to -database-), so every cached value misses once after the deploy and keys shared with other code stop matching (config/cache.php)
+     keep old: set CACHE_PREFIX (and REDIS_PREFIX when the app uses Redis) in .env to the values the app uses today
+     check: Compare a cache key in the store before and after the hop
 2. php-83-to-84: PREVIEWED (0 files)
    No edits needed for this step (dry run).
    General notes for this step (nothing found in your app, just good to know):
@@ -480,7 +542,7 @@ Nothing was changed.
 BOOSTER plan for examples/raw-php
   app type: raw-php
   PHP: 7.4 -> 8.5
-  policy: waynestate/creed 0.1.7 (today 2026-11-08)
+  policy: waynestate/creed 0.1.7 (today 2026-11-09)
 
 1. php-74-to-80
    Move PHP 7.4 code to PHP 8.0.
@@ -536,10 +598,13 @@ Preview the edits: php bin/booster run --path=examples/raw-php --dry-run
 BOOSTER dry run (nothing was changed)
 
 Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+Replay: off, and the gate only proves every PHP file parses, so a hop can change what a page answers and still pass.
+Record the answers first: php bin/booster replay init --path=examples/raw-php drafts booster-replay.json from the routes; fill in its todo items, then run again with --replay.
+Step 1 (php-74-to-80) is the hop most likely to change an answer: loose comparisons of numbers and strings, and warnings that now throw.
 
 1. php-74-to-80: PREVIEWED (1 file)
    Largest risk hop: loose comparison of numbers and strings changed, many warnings became thrown errors, and arithmetic on arrays throws.
-   Write or extend tests before applying this hop; only tests and review find behavior changes here.
+   Write or extend tests before applying this hop, or record what the pages answer with the replay gate (`booster replay init`, then `booster run --replay`); only tests, the replay and review find behavior changes here.
    Behavior changes to check:
    Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; < / <= against negative numbers also flip for such strings
      check: Audit loose comparisons of request parameters and string DB columns
@@ -626,7 +691,7 @@ Next, if the edits look right: php bin/booster run --path=examples/raw-php
 BOOSTER plan for examples/vue-spa
   app type: raw-php-vue
   PHP: 8.0 -> 8.5
-  policy: waynestate/creed 0.1.7 (today 2026-11-08)
+  policy: waynestate/creed 0.1.7 (today 2026-11-09)
 
 1. php-80-to-81
    Move PHP 8.0 code to PHP 8.1.
@@ -677,6 +742,8 @@ Preview the edits: php bin/booster run --path=examples/vue-spa --dry-run
 BOOSTER dry run (nothing was changed)
 
 Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+Replay: off, and the gate only proves every PHP file parses, so a hop can change what a page answers and still pass.
+Record the answers first: php bin/booster replay init --path=examples/vue-spa drafts booster-replay.json from the routes; fill in its todo items, then run again with --replay.
 
 1. php-80-to-81: PREVIEWED (0 files)
    No edits needed for this step (dry run).
