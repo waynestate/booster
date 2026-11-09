@@ -95,6 +95,9 @@ changes nothing.
   pattern with regular-expression characters, which Slim 4's router reads differently.
 - A copy whose major the recipe does not cover (Smarty 2, Doctrine 1, Slim 2), an existing `slim1-bridge.php`, or a
   `composer.json` that is not valid JSON.
+- A copy whose version Booster cannot read. It reads the version the code states (`const VERSION` in Doctrine's
+  `Version.php`, `SMARTY_VERSION` in `Smarty.class.php`), else the `@version 1.6.0` tag in the main file's docblock,
+  which is the only place Slim 1 says it.
 
 A commented-out call is not a stop sign. Booster reads the line, not the vibe.
 
