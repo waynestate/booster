@@ -8,7 +8,7 @@ generator: Squire agent-ready
 
 # Hand-copied libraries to Composer[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#hand-copied-libraries-to-composer)
 
-This page covers the first framework hop, `vendored-to-composer`: what it moves, what it writes, what makes it refuse, and how the replay gate proves the app still answers the same. Before this: [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html). Next: [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html).
+This page covers the first framework hop, `vendored-to-composer`: what it moves, what it writes, what makes it refuse, and how the replay gate proves the app still answers the same. Before this: [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html). Next: [Strict session IDs for raw PHP apps](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html).
 
 Some apps never met Composer. In 2012 a real WSU app copied Doctrine 2.2, Smarty 3.1 and Slim 1.6 straight into `vendor/`, loaded them with `require` lines, and ran happily until PHP moved on. The PHP hops cannot help it: Booster never edits a library's files, and a 2012 copy of Doctrine crashes on PHP 7.4 before the app's own code runs. So this hop moves the app instead. The hand copies leave, `composer.json` asks for the maintained release of the same library, and the lines that loaded the copies load Composer's autoloader. Every other hop lifts the engine; this one finally gets the parts from a dealer instead of the junkyard.
 

@@ -28,6 +28,7 @@ Every page below is Markdown. The HTML pages send the same Markdown to a client 
 - [The replay gate | Booster docs](https://booster.apps.wayne.edu/docs/guides/replay-gate.md): Record how the app answers before an upgrade, replay the same requests after every hop, and fail the hop when an answer changes.
 - [The scans | Booster docs](https://booster.apps.wayne.edu/docs/guides/scans.md): The two advisory scans Booster runs, and how to run either one alone.
 - [A smoke test for WSU apps | Booster docs](https://booster.apps.wayne.edu/docs/guides/smoke-test.md): One small test that proves the app boots and its front door still sends guests to CAS.
+- [Strict session IDs for raw PHP apps | Booster docs](https://booster.apps.wayne.edu/docs/guides/strict-sessions.md): The session-strict-mode hop turns on session.use_strict_mode and session.use_only_cookies in a raw PHP app that calls session_start() itself, with one guarded line before each call.
 - [Booster | Booster docs](https://booster.apps.wayne.edu/docs/index.md): What Booster is, and the first command to run on your app today.
 - [Install | Booster docs](https://booster.apps.wayne.edu/docs/install.md): Every route to get Booster running, from a single file to Docker only.
 - [Next | Booster docs](https://booster.apps.wayne.edu/docs/next.md): What Booster does not do yet, and what it decided not to build.

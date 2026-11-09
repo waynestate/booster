@@ -209,7 +209,7 @@ Some hops come along by default, and some only when you ask:
 
 - The front-end Node hops (Mix to Vite, Vite major, Tailwind, TypeScript, Vue) are in the plan by default. Pass any target (`--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php`, `--from-laravel`) and they drop out with a warning, unless you add `--with-node`.
 - An app on PHPUnit 8 or older gets a manual PHPUnit 9 step before the first PHP 8 hop.
-- The SESAME move (`--sesame`), the WayneUI move (`--wayneui`) and the move of hand-copied libraries to Composer (`--vendored`) are opt-in only.
+- The SESAME move (`--sesame`), the WayneUI move (`--wayneui`), the move of hand-copied libraries to Composer (`--vendored`) and strict session IDs for a raw PHP app (`--strict-session`) are opt-in only.
 - `--skip ` drops a hop you do not want.
 - If a target is past security support, the plan stops at the policy limit and warns. If Rector has no ruleset for a step yet, the plan stops short and warns.
 
@@ -329,6 +329,7 @@ Options shared by `plan` and `run`:
 | `--sesame` | Include the `wayne-cas` to SESAME swap |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move |
 | `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of `vendor/` and onto Composer ([the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/framework-hops.md)) |
+| `--strict-session` | Include the hop that turns on `session.use_strict_mode` and `session.use_only_cookies` before each `session_start()` in a raw PHP app ([the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/strict-sessions.md)) |
 | `--skip` | A hop id to leave out (repeat it) |
 | `--no-package-check` | Skip the Packagist dependency check (for offline use) |
 | `--until` | Cut the plan after this hop id: that step and everything before it stay, and the plan's targets move to where it lands |
@@ -607,6 +608,19 @@ hop writes), and the `require` lines load Composer's autoloader. Hooks, cookies 
 `--replay`; the replay waits for this hop, then compares every step. The recipes, the stop signs and the bridge are in
 [the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/framework-hops.md).
 
+#### Strict session IDs for raw PHP apps
+
+PHP ships with `session.use_strict_mode` off, so it accepts a session ID the server never issued, which is how session
+fixation works. HELMET turns it on for apps that boot it, and Laravel runs its own sessions, but an older raw PHP app
+that calls plain `session_start()` gets neither. `--strict-session` plans `session-strict-mode` first, on the PHP the
+app runs today: before the statement that holds each `session_start()` call it adds one guarded line that sets
+`session.use_strict_mode` and `session.use_only_cookies` to 1 while no session is active and no output has gone out.
+It is a line in the code because Citadel's PHP (an Apache module) never reads `.user.ini`, and `.htaccess` PHP flags
+break under PHP-FPM. Laravel apps, apps that boot HELMET, and files or folders that already set it are left alone, so a
+second run changes nothing. An app that hands out IDs some other way (`session_id($id)`, the `SID` constant,
+`use_trans_sid` on, cookies off) is a stop sign: it refuses and changes nothing. Without the flag, the plan says how
+many calls it found. Details in [the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/strict-sessions.md).
+
 #### What a hop does
 
 On PHP hops a pre-pass runs first: PHP 4 era `$a = &new Foo();` becomes a plain assignment, because PHP 7 and newer
@@ -713,7 +727,7 @@ three: skipping it skips them, and a person finishes the job, because Rector doe
 
 #### Hops Booster knows
 
-Thirty-eight hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
+Thirty-nine hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
 major at a time from 9 to 13, each list read from `data/versions.json` and trimmed to the majors whose Rector ruleset
 is installed ([Hop data](#hop-data)). An app whose PHPUnit is below 9 gets `phpunit-to-9-manual`, a manual move to
 `^9.5` placed before the first hop that targets PHP 8.0 (PHPUnit 7 and 8 do not run on PHP 8), and the regular
@@ -764,7 +778,11 @@ Doctrine 2, Smarty 3 or Slim 1 into its root `vendor/`, at the first PHP every C
 Slim, 7.1 without): deletes the hand copies, writes `composer.json` for `doctrine/orm ^2.20`, `smarty/smarty ^4.5` and
 `slim/slim ^4.15`, points the app's `require` lines at `vendor/autoload.php`, and keeps a Slim 1 app's routes running on
 Slim 4 through `slim1-bridge.php`; anything it cannot rewrite exactly is a stop sign that leaves it out, and the
-replay waits for it ([the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/framework-hops.md)). `booster hops` prints them all.
+replay waits for it ([the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/framework-hops.md)). `session-strict-mode` (planned with
+`--strict-session` for a raw PHP app that calls `session_start()` without strict session IDs, first, on the PHP the
+app runs today; never for Laravel): adds one guarded `ini_set()` line for `session.use_strict_mode` and
+`session.use_only_cookies` before each call, skips what is already covered, and refuses on a stop sign
+([the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/strict-sessions.md)). `booster hops` prints them all.
 
 > Every other hop lifts the engine; `wayneui-1-to-2` is the one that repaints the bodywork.
 
@@ -1327,6 +1345,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### \[Unreleased\][#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Added: the `session-strict-mode` hop, planned with the new `--strict-session` option, turns on `session.use_strict_mode` and `session.use_only_cookies` in a raw PHP app that calls plain `session_start()`. PHP ships with strict mode off, so it accepts session IDs the server never issued. Before the statement that holds each call, the hop adds one guarded `ini_set()` line that runs only while no session is active and no output has gone out, so it never adds a warning. It is a line in the code because Citadel's PHP runs as an Apache module and never reads `.user.ini`, and `.htaccess` PHP flags break under PHP-FPM. The planner puts it first, on the PHP the app runs today, with its own gate. It skips Laravel apps, apps that boot HELMET, and files or folders that already set strict mode, so a second run changes nothing. It refuses and changes nothing on a stop sign: `session_id($id)`, the `SID` constant, `use_trans_sid` on, or cookies off. Custom session handlers without `validateId()` are listed as MANUAL lines. Without the flag, the plan says how many calls it found. `booster init --check` reports the playbooks as stale until `booster init` runs again. Guide: `docs/guides/strict-sessions.md`.
 - Added: a run whose gate proves little (the built-in `php -l` check for an app with no tests, or only Laravel's stock example tests) and that does not pass `--replay` says so under the baseline, with the `booster replay init` command that drafts the request file (or just `--replay`, when `booster-replay.json` is already there) and the step most likely to change an answer, the PHP 8.0 hop; the JSON report gains `replay_suggestion`. Advisory: it never changes the exit code. The PHP 8.0 hop's notes and playbook now name the replay gate next to extra tests, so `booster init --check` reports that playbook as stale until `booster init` runs again.
 - Docs: BEST_PRACTICES catches up with the code: characterization tests are `Checked` by the replay gate (`booster run --replay`), and "Pin Rector" names the `rector validate-config` check (in `run` and in CI) and the hop record's rule-package versions. The Next page says what the pilot runs and the `cas-to-sesame` hop already shipped, as OPEN_QUESTIONS does.
 - Added: the Laravel 12 to 13 hop's behavior-changes block gains three rows from the upgrade guide: a lone `array_last()` call (the polyfill row only looked for `array_first()`), and an app that leaves its session cookie name or cache prefix to the framework fallback, whose names change in 13 (everyone is signed out once, the cache starts cold). Set `SESSION_COOKIE` and `CACHE_PREFIX` to today's values to keep them.
@@ -1897,7 +1916,7 @@ Source: https://booster.apps.wayne.edu/docs/guides/framework-hops.html
 
 ## Hand-copied libraries to Composer[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#hand-copied-libraries-to-composer)
 
-This page covers the first framework hop, `vendored-to-composer`: what it moves, what it writes, what makes it refuse, and how the replay gate proves the app still answers the same. Before this: [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html). Next: [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html).
+This page covers the first framework hop, `vendored-to-composer`: what it moves, what it writes, what makes it refuse, and how the replay gate proves the app still answers the same. Before this: [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html). Next: [Strict session IDs for raw PHP apps](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html).
 
 Some apps never met Composer. In 2012 a real WSU app copied Doctrine 2.2, Smarty 3.1 and Slim 1.6 straight into `vendor/`, loaded them with `require` lines, and ran happily until PHP moved on. The PHP hops cannot help it: Booster never edits a library's files, and a 2012 copy of Doctrine crashes on PHP 7.4 before the app's own code runs. So this hop moves the app instead. The hand copies leave, `composer.json` asks for the maintained release of the same library, and the lines that loaded the copies load Composer's autoloader. Every other hop lifts the engine; this one finally gets the parts from a dealer instead of the junkyard.
 
@@ -2417,6 +2436,89 @@ booster run --path=<app> --test-env DB_CONNECTION=sqlite --test-env DB_DATABASE=
 
 ---
 
+Source: https://booster.apps.wayne.edu/docs/guides/strict-sessions.html
+
+## Strict session IDs for raw PHP apps[#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#strict-session-ids-for-raw-php-apps)
+
+This page covers `session-strict-mode`: which apps it is for, the line it adds, what counts as already covered, and what makes it refuse. Before this: [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html). Next: [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html).
+
+PHP ships with `session.use_strict_mode` off. With it off, PHP takes any session ID a browser sends, even one the server never handed out, and starts a session under it. That is the door session fixation walks through: someone plants an ID on a victim, waits for the victim to sign in, and then rides the same session. With strict mode on, PHP throws an unknown ID away and issues a fresh one. `session.use_only_cookies` (on by default) keeps the ID out of URLs.
+
+HELMET sets both for apps that boot it, and Laravel runs its own session store, so neither needs this hop. It is for the older raw PHP apps that call plain `session_start()` and use none of the stack's packages.
+
+### In two commands[#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#in-two-commands)
+
+```sh
+booster plan --path=<app> --strict-session            # the calls it would cover, or the stop signs that block it
+booster run --path=<app> --strict-session --dry-run   # read the diff, then run again without --dry-run
+```
+
+Without `--strict-session` the plan still finds the calls and says so:
+
+```
+The app starts PHP sessions without strict session IDs (3 session_start() calls in 2 files). Add --strict-session to plan the hop that turns them on.
+```
+
+`--only session-strict-mode` (with `--strict-session`) runs just this hop. The planner puts it first, on the PHP the app runs today, so its gate proves this one change, and the hardening lands even when a later hop stalls.
+
+### The line it adds[#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#the-line-it-adds)
+
+Before the statement that holds each `session_start()` call, Booster adds one comment and one guarded line, at the same indent:
+
+```php
+// Booster: strict session IDs, set before the session starts (refuses IDs this server never issued).
+if (session_status() === PHP_SESSION_NONE && !headers_sent()) { ini_set('session.use_strict_mode', '1'); ini_set('session.use_only_cookies', '1'); }
+session_start();
+```
+
+The guard matters. PHP warns when a session setting changes while a session is active or after output has gone out, and in both cases `session_start()` would not start a new session anyway, so the line simply steps aside. The hop never adds a warning to a page.
+
+"Before the statement" means the whole statement: a braceless `if (...) session_start();` gets the line above the `if`, an `else session_start();` gets it above the `if` it belongs to, and a call inside a `match` arm gets it above the `match`. A call that shares its line with other code (minified files, `<?php session_start(); ?>` in a template) gets the guard inline, right before it. Booster reads the file with PHP's own tokenizer, skips comments, strings and methods named `session_start`, and checks that every file it edits still parses.
+
+### Why a line in the code, not a config file[#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#why-a-line-in-the-code-not-a-config-file)
+
+- **Not `.user.ini`.** PHP reads `.user.ini` files only under CGI and FastCGI. Citadel runs PHP as an Apache module, which never reads one, so a `.user.ini` would look like a fix and do nothing.
+- **Not `.htaccess`.** `php_flag` lines work under the Apache module but are a server error under PHP-FPM, and Booster's changes must keep working off Citadel too.
+- **Not HELMET.** `helmet_boot()` sets both options and much more, but it also renames the session cookie, which signs everyone out once, and it adds headers. That is a bigger change than this hop promises, so an app that requires HELMET gets a MANUAL line suggesting it instead.
+
+A php.ini change on Citadel would cover every app at once. That is a separate proposal, not this hop.
+
+### Already covered, left alone[#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#already-covered-left-alone)
+
+The hop changes nothing for:
+
+- a Laravel app (the planner skips it and says why),
+- an app that calls `helmet_boot()` or `SessionHardening::apply()`,
+- an app whose root `.htaccess` or `.squire/php.ini` sets `session.use_strict_mode`,
+- files under a folder whose own `.htaccess` sets it,
+- a file that already names `session.use_strict_mode` (including the line this hop wrote),
+- `vendor/` and `node_modules/`.
+
+So a second run changes nothing. Any other `php.ini` in the repository (a Docker one, say) is noted, but Citadel's PHP does not read it, so the hop still adds the lines.
+
+### Stop signs[#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#stop-signs)
+
+Strict mode changes how some apps hand out session IDs. When Booster finds one of these, it refuses, changes nothing, and names each one:
+
+| Stop sign | Why |
+| --- | --- |
+| `session_id($id)` with an argument | The app sets the ID itself; strict mode would replace an ID the server never issued |
+| The `SID` constant | It carries the session ID in URLs, which cookie-only IDs drop |
+| `session.use_trans_sid` on | Session IDs travel in URLs |
+| `session.use_only_cookies` or `session.use_cookies` off | The app expects IDs to arrive some other way |
+| `<?= session_start() ?>` | No statement can go inside an echo tag |
+
+These are read from `ini_set()` calls, `session_start([...])` options, `.htaccess` and ini files. A value Booster cannot read (a variable, say) counts as a stop sign. Settings that keep IDs in cookies, such as `ini_set('session.use_trans_sid', false)`, are fine. After fixing or reviewing each one, set the two options by hand where it is safe.
+
+### By hand, after the run[#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#by-hand-after-the-run)
+
+- **Sign in on pre-production.** Sign in, use a page that keeps session data, and sign out. A session the server already holds keeps working; a browser that sends an ID the server never issued gets a fresh one.
+- **Custom session handlers.** An app that calls `session_set_save_handler()` only gets strict mode when its handler implements `validateId()` (`SessionUpdateTimestampHandlerInterface`). PHP's own `SessionHandler` class does not. The hop names each handler as a MANUAL line.
+
+Official notes: [session.use_strict_mode](https://www.php.net/manual/en/session.configuration.php#ini.session.use-strict-mode) and [session management basics](https://www.php.net/manual/en/features.session.security.management.php).
+
+---
+
 Source: https://booster.apps.wayne.edu/docs/
 
 ## Booster[#](https://booster.apps.wayne.edu/docs/#booster)
@@ -2814,6 +2916,8 @@ Without the flag, `plan` only warns that your app uses `wayne-cas` or WayneUI 1.
 
 An app that hand-copied Doctrine 2, Smarty 3 or Slim 1 into `vendor/` has a third opt-in move, `--vendored`, which puts those libraries on Composer; see [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html).
 
+A raw PHP app that calls `session_start()` itself has a fourth, `--strict-session`, which turns on strict session IDs before each call (Laravel apps are skipped); see [Strict session IDs for raw PHP apps](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html).
+
 ### 13. Plan for a future date, or a different policy[#](https://booster.apps.wayne.edu/docs/recipes.html#13-plan-for-a-future-date-or-a-different-policy)
 
 ```
@@ -2900,7 +3004,7 @@ Usage: `booster init [--path PATH] [--dir DIR] [--check]`
 
 Show the ordered hops from the app to a supported version. Changes nothing.
 
-Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--vendored] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--no-scan]`
+Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--no-scan]`
 
 | Option | Meaning | Default |
 | --- | --- | --- |
@@ -2918,6 +3022,7 @@ Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today 
 | `--sesame` | Include the wayne-cas to SESAME swap. |  |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move. |  |
 | `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto Composer. |  |
+| `--strict-session` | Include the hop that turns on strict session IDs before each session_start() in a raw PHP app. |  |
 | `--skip=VALUE` | Hop id to leave out (repeatable). |  |
 | `--no-package-check` | Skip the Packagist dependency check (for offline use). |  |
 | `--until=VALUE` | Cut the plan after this hop id: that step and everything before it stay. |  |
@@ -2952,7 +3057,7 @@ Usage: `booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recordin
 
 Run the plan: Rector, composer.json edits and a test gate per hop. Edits the working copy only.
 
-Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--vendored] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory] [--replay [REPLAY]] [--replay-out REPLAY-OUT]`
+Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory] [--replay [REPLAY]] [--replay-out REPLAY-OUT]`
 
 | Option | Meaning | Default |
 | --- | --- | --- |
@@ -2970,6 +3075,7 @@ Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today T
 | `--sesame` | Include the wayne-cas to SESAME swap. |  |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move. |  |
 | `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto Composer. |  |
+| `--strict-session` | Include the hop that turns on strict session IDs before each session_start() in a raw PHP app. |  |
 | `--skip=VALUE` | Hop id to leave out (repeatable). |  |
 | `--no-package-check` | Skip the Packagist dependency check (for offline use). |  |
 | `--until=VALUE` | Cut the plan after this hop id: that step and everything before it stay. |  |
@@ -3092,6 +3198,7 @@ This page lists every hop Booster knows; the list is generated from the hop data
 | `cas-to-sesame` | sesame | wayne-cas | sesame | Swap the wayne-cas package for SESAME using its compatibility classes. |
 | `wayneui-1-to-2` | wayneui | 1 | 2 | Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. |
 | `vendored-to-composer` | framework | hand-copied | composer | Move hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto their maintained Composer releases (doctrine/orm 2.20, smarty/smarty 4.5, slim/slim 4 through a Slim 1 bridge). |
+| `session-strict-mode` | session | off | strict | Turn on strict session IDs in a raw PHP app: set session.use_strict_mode and session.use_only_cookies before each session_start() call. |
 | `node-pin-24` | node | any | 26 | Pin the app to Node 26: set engines.node in package.json and write .nvmrc. |
 | `mix-to-vite` | node | laravel-mix | vite | Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). |
 | `vite-major` | node | any | 8 | Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions. |
