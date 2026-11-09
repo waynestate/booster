@@ -31,7 +31,9 @@ under `Pre-pass fixes:`.
    them (`git checkout .` undoes them). With `--replay`, the gate also replays the requests recorded before the
    first hop and fails on a changed answer: see [The replay gate](replay-gate.md). To check the image itself,
    `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and
-   verifies its extension list; it needs Docker and a few minutes per version, so it is not part of `composer ci`.
+   verifies its extension list, that Composer runs and, on the archived Debian releases, that apt can verify the
+   archive; it needs Docker and a few minutes per version, so it is not part of `composer ci` (a unit test reads
+   the recipe instead).
 5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package
    the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. A PHP hop on an app
    that pins `config.platform.php` (every Sourdough app does) runs `composer update --lock`: no package moves, but
@@ -70,9 +72,13 @@ The `--image` value names the image the baseline and every gate run in, and it t
 Booster never builds a `--image` image: it must exist locally or be pullable, and each resolved image is pulled at
 most once per run. On an arm64 Mac, Citadel's published images such as `citadel/php-apache:8.5r3` are amd64 only:
 pass an arm64 build via `--image`, or set `DOCKER_DEFAULT_PLATFORM=linux/amd64` and let Docker emulate.
-`booster-target` itself builds natively on arm64. And the old-PHP images (5.5 through 8.0) point apt at
-archive.debian.org, so they get no security updates: they exist to run the app's tests on the way up, not to serve
-traffic.
+`booster-target` itself builds natively on arm64 for PHP 5.6 and up; the official `php:5.5-cli` image is amd64
+only, so a PHP 5.5 gate on arm64 runs under Docker's emulation (slow) or needs an amd64 machine. And the old-PHP
+images (5.5 through 8.0) point apt at archive.debian.org, so they get no security updates: they exist to run the
+app's tests on the way up, not to serve traffic. apt still checks the archive's signatures there, against Debian's
+current archive keys, which the recipe copies in from pinned Debian images because the keys those old images ship
+with have expired. Jessie (PHP 5.5) is the one exception: its archive is signed only by expired keys, so its image
+installs packages unsigned while it builds, and that setting is removed before the image is done.
 
 `run` refuses to start on a working copy that is not under git or has uncommitted changes, so the upgrade diff stands
 alone. `--dry-run` has no such limit.
