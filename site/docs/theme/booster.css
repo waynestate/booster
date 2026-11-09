@@ -19,8 +19,9 @@
    rubber stamp lands once on the footer's version line. The footer itself is
    the front page's deep green band; green is not the page.
 
-   The front page has no dark mode, so the dark set is derived (2026-11-06):
-   the record room after hours. A graphite desk (#141a19), the same graph
+   The dark set is the record room after hours, shared with the front page's
+   section 12 (site/assets/booster.css): change one, change both. A graphite
+   desk (#141a19), the same graph
    paper drawn in faint mint, cream type, a pale mint for links and titles,
    gold for the highlighter, focus and the current page. Green stays where the
    front page keeps it: the install slab, the footer band and the mark.
@@ -813,7 +814,8 @@ body::before {
 
 /* ---------------------------------------------------------------- 9. dark */
 
-/* Derived: the front page has no dark mode. The record room after hours: a
+/* The same night shift as the front page's section 12 (site/assets/booster.css),
+   so the two read as one place after dark. The record room after hours: a
    graphite desk, the graph paper in faint mint, cream type, a pale mint for
    links and titles, gold for the highlighter, focus and the current page.
    Green keeps the places the front page gives it (install slab, footer band,

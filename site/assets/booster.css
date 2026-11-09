@@ -15,6 +15,7 @@
      3. hero and launch pad    8. install
      4. record card            9. contraindications, care team, not yet
      5. pairs grid            10. responsive, 11. motion (only with .motion)
+                              12. after hours (dark mode)
    ========================================================================== */
 
 /* --------------------------------------------------- 1. tokens, type, frame */
@@ -51,6 +52,22 @@
   --b-ink: #12241f;
   --b-coral: #ff6a55;        /* signal, decoration only */
   --b-coral-ink: #c2341f;    /* signal as text: 5.5:1 on white */
+
+  /* Roles, so section 12's night shift can swap them. By day each is the
+     value its rules always used, so the light page does not change. */
+  --b-page: #ffffff;         /* the page itself */
+  --b-surface: #ffffff;      /* card stock: the record, the pad, the printout */
+  --b-on-fill: #ffffff;      /* type on a green, coral or slate pill */
+  --b-on-gold: #0a2e28;      /* type on gold */
+  --b-fill: #0c5449;         /* the green that stays green: never list, mark tiles */
+  --b-fill-deep: #083d35;
+  --b-slab: #0a2e28;         /* the install slab, the footer, the agent terminal */
+  --b-slab-ink: #e3f2ec;
+  --b-cream-line: #e6e0d2;
+  --b-add: #0b6b3a;          /* an added line on the printout */
+  --b-mint-rgb: 234, 245, 240;
+  --b-masthead-bg: rgba(255, 255, 255, 0.92);
+
   --b-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif-condensed, var(--wsu-font-family-body);
   --b-mono: var(--wsu-font-family-mono);
   --b-radius: 6px;
@@ -67,7 +84,7 @@ html {
 body {
   margin: 0;
   color: var(--b-ink);
-  background-color: var(--b-white);
+  background-color: var(--b-page);
   font-family: var(--wsu-font-family-body);
 }
 
@@ -182,7 +199,7 @@ h2 {
 }
 
 .chip--soon {
-  color: var(--b-green-ink);
+  color: var(--b-on-gold);
   background: var(--b-gold);
 }
 
@@ -192,7 +209,7 @@ h2 {
   position: sticky;
   inset-block-start: 0;
   z-index: 20;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--b-masthead-bg);
   backdrop-filter: saturate(1.4) blur(8px);
   border-block-end: 1px solid var(--b-mint-line);
 }
@@ -267,7 +284,7 @@ h2 {
 }
 
 .masthead__nav .masthead__install {
-  color: var(--b-green-ink);
+  color: var(--b-on-gold);
   background: var(--b-gold);
 }
 
@@ -295,7 +312,7 @@ h2 {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, rgba(234, 245, 240, 0.96) 0%, rgba(234, 245, 240, 0.85) 40%, rgba(234, 245, 240, 0) 75%);
+  background: linear-gradient(100deg, rgba(var(--b-mint-rgb), 0.96) 0%, rgba(var(--b-mint-rgb), 0.85) 40%, rgba(var(--b-mint-rgb), 0) 75%);
   pointer-events: none;
 }
 
@@ -357,7 +374,7 @@ h2 {
   padding: 0.35rem 0.8rem;
   font-size: 0.95rem;
   color: var(--b-slate-ink);
-  background: var(--b-white);
+  background: var(--b-surface);
   border: 1px solid var(--b-mint-line);
   border-radius: 999px;
 }
@@ -406,14 +423,14 @@ h2 {
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--b-white);
+  color: var(--b-on-fill);
   background: var(--b-green);
   border-radius: 999px;
   box-shadow: 0 10px 24px -12px rgba(12, 84, 73, 0.8);
 }
 
 .btn-launch:hover {
-  color: var(--b-white);
+  color: var(--b-on-fill);
   background: var(--b-green-deep);
 }
 
@@ -423,7 +440,7 @@ h2 {
   inline-size: 1.7rem;
   block-size: 1.7rem;
   font-size: 1rem;
-  color: var(--b-green-ink);
+  color: var(--b-on-gold);
   background: var(--b-gold);
   border-radius: 50%;
   transition: translate 0.35s var(--b-ease-spring);
@@ -445,7 +462,7 @@ h2 {
 .pad {
   position: relative;
   overflow: hidden;
-  background: var(--b-white);
+  background: var(--b-surface);
   border: 1px solid var(--b-mint-line);
   border-radius: 18px;
   box-shadow: 0 30px 60px -36px rgba(10, 46, 40, 0.45);
@@ -481,7 +498,7 @@ h2 {
   block-size: clamp(300px, 26vw + 120px, 420px);
   background:
     radial-gradient(circle at 50% 100%, var(--b-mint) 0, transparent 60%),
-    var(--b-white);
+    var(--b-surface);
 }
 
 /* The altimeter scale on the left: 7.4 at the bottom, 8.5 at the top. */
@@ -631,7 +648,7 @@ h2 {
 
 .section--record {
   /* Ruled index-card lines across the whole section. */
-  background-color: var(--b-white);
+  background-color: var(--b-page);
   background-image: repeating-linear-gradient(180deg, transparent 0 31px, var(--b-mint) 31px 32px);
 }
 
@@ -657,7 +674,7 @@ h2 {
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--b-green-ink);
-  background: var(--b-white);
+  background: var(--b-surface);
   border: 1.5px solid var(--b-mint-line);
   border-radius: 999px;
   cursor: pointer;
@@ -670,7 +687,7 @@ h2 {
 }
 
 .patient[aria-pressed="true"] {
-  color: var(--b-white);
+  color: var(--b-on-fill);
   background: var(--b-green);
   border-color: var(--b-green);
 }
@@ -688,7 +705,7 @@ h2 {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--b-green-ink);
+  color: var(--b-on-gold);
   background: var(--b-gold);
   border-radius: 999px;
   box-shadow: 0 0 0 4px var(--b-gold-soft);
@@ -705,7 +722,7 @@ h2 {
 }
 
 .btn-run:hover {
-  color: var(--b-green-ink);
+  color: var(--b-on-gold);
   filter: brightness(0.96);
 }
 
@@ -805,7 +822,7 @@ h2 {
   position: relative;
   overflow: hidden;
   padding: 0 1.5rem 0 3rem;
-  background: var(--b-white);
+  background: var(--b-surface);
   border: 1px solid var(--b-mint-line);
   border-radius: 14px;
   box-shadow:
@@ -1067,12 +1084,12 @@ html:not(.motion) .dose__no,
 }
 
 .result--pass {
-  color: var(--b-white);
+  color: var(--b-on-fill);
   background: var(--b-green);
 }
 
 .result--fail {
-  color: var(--b-white);
+  color: var(--b-on-fill);
   background: var(--b-coral-ink);
 }
 
@@ -1143,7 +1160,7 @@ html:not(.motion) .dose__no,
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   color: var(--b-ink);
-  background: var(--b-white);
+  background: var(--b-surface);
   border-inline-start: 4px solid var(--b-coral);
   border-radius: 0 6px 6px 0;
 }
@@ -1176,14 +1193,14 @@ html:not(.motion) .dose__no,
   border-radius: 3px;
 }
 
-.key--ok { background: var(--b-white); border: 1.5px solid var(--b-green); }
+.key--ok { background: var(--b-surface); border: 1.5px solid var(--b-green); }
 .key--no { background: repeating-linear-gradient(45deg, var(--b-mint-line) 0 2px, transparent 2px 5px); border: 1px solid var(--b-mint-line); }
 .key--path { background: var(--b-gold); border-radius: 50%; }
 
 .grid {
   margin: 0;
   padding: clamp(1rem, 0.5rem + 2vw, 2rem);
-  background: var(--b-white);
+  background: var(--b-surface);
   border: 1px solid var(--b-mint-line);
   border-radius: 18px;
 }
@@ -1241,8 +1258,8 @@ html:not(.motion) .dose__no,
   border-radius: 3px;
 }
 
-.pill--eol { color: var(--b-white); background: var(--b-coral-ink); }
-.pill--sec { color: var(--b-green-ink); background: var(--b-gold); }
+.pill--eol { color: var(--b-on-fill); background: var(--b-coral-ink); }
+.pill--sec { color: var(--b-on-gold); background: var(--b-gold); }
 
 .cell {
   position: relative;
@@ -1272,19 +1289,19 @@ html:not(.motion) .dose__no,
   font-family: var(--b-display);
   font-size: calc(var(--dot) * 0.5);
   font-weight: 800;
-  color: var(--b-green-ink);
+  color: var(--b-on-gold);
   background: var(--b-gold);
   border-radius: 50%;
-  box-shadow: 0 0 0 3px var(--b-white), 0 6px 12px -6px rgba(10, 46, 40, 0.6);
+  box-shadow: 0 0 0 3px var(--b-surface), 0 6px 12px -6px rgba(10, 46, 40, 0.6);
 }
 
 .cell--start b {
-  color: var(--b-white);
+  color: var(--b-on-fill);
   background: var(--b-slate-ink);
 }
 
 .cell--end b {
-  color: var(--b-white);
+  color: var(--b-on-fill);
   background: var(--b-green);
 }
 
@@ -1330,7 +1347,7 @@ html:not(.motion) .dose__no,
 .seq {
   position: relative;
   padding: 1.4rem 1.3rem 1.5rem;
-  background: var(--b-white);
+  background: var(--b-surface);
   border: 1px solid var(--b-mint-line);
   border-block-start: 5px solid var(--b-green);
   border-radius: 4px 4px 12px 12px;
@@ -1382,7 +1399,7 @@ html:not(.motion) .dose__no,
 
 .section--commands {
   background: var(--b-cream);
-  border-block: 1px solid #e6e0d2;
+  border-block: 1px solid var(--b-cream-line);
 }
 
 .commands {
@@ -1419,12 +1436,12 @@ html:not(.motion) .dose__no,
 }
 
 .cmd:hover {
-  background: var(--b-white);
+  background: var(--b-surface);
   translate: 4px 0;
 }
 
 .cmd[aria-selected="true"] {
-  background: var(--b-white);
+  background: var(--b-surface);
   border-color: var(--b-green);
 }
 
@@ -1457,9 +1474,9 @@ html:not(.motion) .dose__no,
 .printout {
   position: relative;
   padding-inline: 26px;
-  background: var(--b-white);
+  background: var(--b-surface);
   border-radius: 4px;
-  box-shadow: 0 30px 50px -34px rgba(60, 50, 30, 0.5), 0 0 0 1px #e6e0d2;
+  box-shadow: 0 30px 50px -34px rgba(60, 50, 30, 0.5), 0 0 0 1px var(--b-cream-line);
   rotate: 0.6deg;
 }
 
@@ -1470,8 +1487,8 @@ html:not(.motion) .dose__no,
   background: radial-gradient(circle, var(--b-cream) 0 5px, transparent 5.5px) 50% 8px / 100% 24px repeat-y;
 }
 
-.printout__feed--l { inset-inline-start: 0; border-inline-end: 1px dashed #e6e0d2; }
-.printout__feed--r { inset-inline-end: 0; border-inline-start: 1px dashed #e6e0d2; }
+.printout__feed--l { inset-inline-start: 0; border-inline-end: 1px dashed var(--b-cream-line); }
+.printout__feed--r { inset-inline-end: 0; border-inline-start: 1px dashed var(--b-cream-line); }
 
 .out {
   min-block-size: 420px;
@@ -1502,7 +1519,7 @@ html:not(.motion) .dose__no,
 }
 
 .out__del { color: var(--b-coral-ink); }
-.out__add { color: #0b6b3a; font-weight: 700; }
+.out__add { color: var(--b-add); font-weight: 700; }
 .out__note { color: var(--b-slate-ink); }
 
 /* ----------------------------------------------------------------- 8. install */
@@ -1544,7 +1561,7 @@ html:not(.motion) .dose__no,
 }
 
 .os__tab[aria-selected="true"] {
-  color: var(--b-white);
+  color: var(--b-on-fill);
   background: var(--b-green);
   border-color: var(--b-green);
 }
@@ -1560,7 +1577,7 @@ html:not(.motion) .dose__no,
 
 .code {
   position: relative;
-  background: var(--b-green-ink);
+  background: var(--b-slab);
   border-radius: 0 12px 12px 12px;
 }
 
@@ -1570,7 +1587,7 @@ html:not(.motion) .dose__no,
   font-family: var(--b-mono);
   font-size: 0.85rem;
   line-height: 1.75;
-  color: #e3f2ec;
+  color: var(--b-slab-ink);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -1586,7 +1603,7 @@ html:not(.motion) .dose__no,
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--b-green-ink);
+  color: var(--b-on-gold);
   background: var(--b-gold);
   border: 0;
   border-radius: 999px;
@@ -1638,7 +1655,7 @@ html:not(.motion) .dose__no,
 }
 
 .soon {
-  background: var(--b-white);
+  background: var(--b-surface);
   border-style: dashed;
 }
 
@@ -1655,7 +1672,7 @@ html:not(.motion) .dose__no,
 
 .section--never {
   color: var(--b-white);
-  background: var(--b-green);
+  background: var(--b-fill);
 }
 
 .section--never h2 {
@@ -1682,12 +1699,12 @@ html:not(.motion) .dose__no,
 .never li {
   position: relative;
   padding: 1.5rem 1.4rem 1.6rem;
-  background: var(--b-green);
+  background: var(--b-fill);
   transition: background-color 0.25s;
 }
 
 .never li:hover {
-  background: var(--b-green-deep);
+  background: var(--b-fill-deep);
 }
 
 .never__x {
@@ -1759,7 +1776,7 @@ html:not(.motion) .dose__no,
   flex-direction: column;
   gap: 0.35rem;
   padding: 1rem 0.85rem 1.1rem;
-  background: var(--b-white);
+  background: var(--b-surface);
   border: 1px solid var(--b-mint-line);
   border-radius: 12px;
   transition: translate 0.3s var(--b-ease-spring), border-color 0.2s;
@@ -1798,7 +1815,7 @@ html:not(.motion) .dose__no,
 .member__mark--tile {
   display: grid;
   place-items: center;
-  background: var(--b-green);
+  background: var(--b-fill);
 }
 
 .member__mark--tile img {
@@ -1840,7 +1857,7 @@ html:not(.motion) .dose__no,
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--b-green-ink);
+  color: var(--b-on-gold);
   background: var(--b-gold);
   border-radius: 3px;
 }
@@ -1888,7 +1905,7 @@ html:not(.motion) .dose__no,
 .foot {
   padding-block: 2rem;
   color: #d3e9e1;
-  background: var(--b-green-ink);
+  background: var(--b-slab);
 }
 
 .foot__row {
@@ -1952,7 +1969,7 @@ html:not(.motion) .dose__no,
   .commands,
   .next,
   .head--split { grid-template-columns: minmax(0, 1fr); }
-  .hero::after { background: rgba(234, 245, 240, 0.86); }
+  .hero::after { background: rgba(var(--b-mint-rgb), 0.86); }
   .pad { max-inline-size: 520px; }
   .record__body { grid-template-columns: minmax(0, 1fr); }
   .alt { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 1.25rem; }
@@ -2166,16 +2183,16 @@ li.member:has(.part-link:hover) img { transform: translateY(-2px); }
    and the green launch pill as the copy button. Doctor's orders: no
    countdowns here, so nothing moves for anyone who asked it not to. */
 :root {
-  --ar-bg: var(--b-white);
+  --ar-bg: var(--b-surface);
   --ar-ink: var(--b-ink);
   --ar-muted: var(--b-slate-ink);
   --ar-rule: var(--b-mint-line);
   --ar-accent: var(--b-green);
-  --ar-on-accent: var(--b-white);
+  --ar-on-accent: var(--b-on-fill);
   --ar-focus: var(--b-green);
   --ar-code-bg: var(--b-mint);
   --ar-code-ink: var(--b-green-ink);
-  --ar-term-bg: var(--b-green-ink);
+  --ar-term-bg: var(--b-slab);
   --ar-term-ink: var(--b-mint);
   --ar-display: var(--b-display);
   --ar-body: var(--wsu-font-family-body);
@@ -2186,7 +2203,7 @@ li.member:has(.part-link:hover) img { transform: translateY(-2px); }
 
 .section--agents {
   background: var(--b-cream);
-  border-block: 1px solid #e6e0d2;
+  border-block: 1px solid var(--b-cream-line);
 }
 
 .orders {
@@ -2202,7 +2219,7 @@ li.member:has(.part-link:hover) img { transform: translateY(-2px); }
   background:
     radial-gradient(circle at 1rem 50%, var(--b-mint-2) 0 5px, transparent 5.5px) 0 12px / 2rem 30px repeat-y,
     linear-gradient(90deg, transparent 0 2rem, var(--b-mint-line) 2rem calc(2rem + 1px), transparent 0) 0 0 / 100% 100% no-repeat,
-    var(--b-white);
+    var(--b-surface);
 }
 .ar-prompt::before {
   content: "";
@@ -2215,7 +2232,7 @@ li.member:has(.part-link:hover) img { transform: translateY(-2px); }
 .ar-prompt__glyph {
   font-family: var(--b-display);
   font-weight: 800;
-  color: var(--b-green-ink);
+  color: var(--b-on-gold);
   background: var(--b-gold);
   border-color: var(--b-gold);
   border-radius: 50%;
@@ -2239,7 +2256,7 @@ li.member:has(.part-link:hover) img { transform: translateY(-2px); }
   border: 1px solid var(--b-mint-line);
   border-inline-start: 3px solid var(--b-green);
   border-radius: 4px;
-  background: repeating-linear-gradient(180deg, var(--b-mint) 0 2.9em, var(--b-white) 2.9em 5.8em);
+  background: repeating-linear-gradient(180deg, var(--b-mint) 0 2.9em, var(--b-surface) 2.9em 5.8em);
 }
 .ar-prompt__more { color: var(--b-green); font-weight: 700; }
 /* The launch pill, minus the countdown. */
@@ -2253,7 +2270,7 @@ li.member:has(.part-link:hover) img { transform: translateY(-2px); }
 }
 .ar-btn--primary { font-weight: 800; box-shadow: 0 10px 24px -12px rgba(12, 84, 73, 0.8); }
 .ar-btn--primary:hover { background: var(--b-green-deep); border-color: var(--b-green-deep); box-shadow: inset 0 -3px 0 var(--b-gold); }
-.ar-chip { background: var(--b-white); border-color: var(--b-mint-line); border-radius: 999px; }
+.ar-chip { background: var(--b-surface); border-color: var(--b-mint-line); border-radius: 999px; }
 .ar-chip:hover { border-color: var(--b-green); }
 .ar-chip[aria-expanded="true"] { background: var(--b-gold-soft); border-color: var(--b-green); box-shadow: inset 0 -3px 0 var(--b-gold); }
 .ar-run__label { font-family: var(--b-display); font-size: 0.85rem; font-weight: 600; letter-spacing: 0.14em; color: var(--b-slate-ink); }
@@ -2261,7 +2278,7 @@ li.member:has(.part-link:hover) img { transform: translateY(-2px); }
 .ar-cmd__title b { font-family: var(--b-display); font-weight: 800; letter-spacing: 0.04em; color: var(--b-gold); }
 .ar-cmd .ar-btn { border-color: var(--b-gold); color: var(--b-gold); }
 .ar-cmd .ar-seg { border-color: rgba(234, 245, 240, 0.5); border-radius: 999px; }
-.ar-cmd .ar-seg__btn[aria-pressed="true"] { background: var(--b-gold); color: var(--b-green-ink); }
+.ar-cmd .ar-seg__btn[aria-pressed="true"] { background: var(--b-gold); color: var(--b-on-gold); }
 .ar-cmd :focus-visible { outline-color: var(--b-gold); }
 
 .orders .ar-prompt:not(.ar-prompt--lead) { --ar-preview-lines: 6; }
@@ -2293,4 +2310,122 @@ li.member:has(.part-link:hover) img { transform: translateY(-2px); }
 @media print {
   .ar-prompt__actions, .ar-cmd, .ar-prompt__more, .hero__agent { display: none; }
   .ar-prompt.is-collapsed .ar-prompt__text { max-height: none; -webkit-mask-image: none; mask-image: none; }
+}
+
+/* ----------------------------------------------------- 12. after hours (dark)
+
+   For readers whose system is set to dark: the record room after hours, the
+   same night shift as the docs (docs/theme/booster.css). A graphite desk, the
+   telemetry paper in faint mint lines, cream type, a pale mint for the ink,
+   gold still the flame. Green keeps the places it owns by day: the never
+   list, the mark tiles, the install slab and the footer stay deep green, so
+   they still read as the clinic's own surfaces. The pad is still an
+   instrument panel, not a night sky; the only new light is the burn under
+   the rocket, which brightens and breathes while it lifts if motion is
+   allowed, and simply glows if not.
+
+   The page sets data-theme="wsu", which pins WayneUI's tokens to light, so
+   the WayneUI parts in play (skip link, buttons, focus floor) are restated
+   too. A root marked data-theme="light" keeps the day shift.
+
+   Contrast on the card stock (#1c2523): body 13:1, slate type 8:1, mint ink
+   9:1, coral 7:1; type on mint, gold and coral pills 9:1 or better.        */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --b-page: #141a19;
+    --b-surface: #1c2523;
+    --b-mint: #16211e;
+    --b-mint-2: #22322e;
+    --b-mint-line: #2c3e39;
+    --b-mint-rgb: 22, 33, 30;
+    --b-cream: #19201f;
+    --b-cream-line: #2c3a36;
+    --b-masthead-bg: rgba(20, 26, 25, 0.9);
+
+    --b-ink: #e6ece9;
+    --b-slate-ink: #a9b9b3;
+    --b-slate: #6f8380;
+    --b-green-ink: #eef3f0;
+    --b-green: #8fd8bf;
+    --b-green-deep: #b4e8d6;
+    --b-coral-ink: #ff9a8a;
+    --b-add: #7fdc9f;
+
+    --b-on-fill: #0c1513;
+    --b-on-gold: #0a2e28;
+    --b-fill: #0c5449;
+    --b-fill-deep: #0a463d;
+    --b-slab: #0a2e28;
+    --b-slab-ink: #e3f2ec;
+
+    --ar-term-ink: var(--b-slab-ink);
+    --ar-shadow: 0 1px 0 var(--b-mint-line), 0 30px 50px -36px rgba(0, 0, 0, 0.7);
+
+    --wsu-surface: var(--b-page);
+    --wsu-text: var(--b-ink);
+    --wsu-text-muted: var(--b-slate-ink);
+    --wsu-brand: var(--b-green);
+    --wsu-brand-hover: var(--b-green-deep);
+    --wsu-on-brand: var(--b-on-fill);
+    --wsu-border: var(--b-mint-line);
+    --wsu-focus-ring: var(--b-green);
+  }
+
+  /* Rubber stamps multiply into white stock by day; on dark stock that would
+     swallow the ink, so at night they are simply pressed on top. */
+  :root:not([data-theme="light"]) .stamp { mix-blend-mode: normal; }
+
+  /* The never list's label sat in pale mint by day; the night mint is a
+     shadow, so it borrows the never list's own sub-line color (7:1). */
+  :root:not([data-theme="light"]) .label--on-green { color: #d3e9e1; }
+
+  :root:not([data-theme="light"]) .dose.is-skipped {
+    background: repeating-linear-gradient(135deg, transparent 0 10px, rgba(143, 216, 191, 0.06) 10px 12px);
+  }
+  :root:not([data-theme="light"]) .countdown { background: rgba(20, 26, 25, 0.82); }
+  :root:not([data-theme="light"]) .copy.is-done { background: var(--b-green); }
+  :root:not([data-theme="light"]) .ar-chip[aria-expanded="true"] { background: rgba(255, 204, 51, 0.16); }
+
+  /* The selected install tab runs straight into its deep green slab. */
+  :root:not([data-theme="light"]) .os__tab[aria-selected="true"] {
+    color: #ffffff;
+    background: var(--b-slab);
+    border-color: var(--b-slab);
+    box-shadow: inset 0 3px 0 var(--b-gold);
+  }
+
+  /* A soft mint lift under the launch pills instead of a shadow lost in the dark. */
+  :root:not([data-theme="light"]) .btn-launch,
+  :root:not([data-theme="light"]) .ar-btn--primary { box-shadow: 0 10px 28px -14px rgba(143, 216, 191, 0.55); }
+  :root:not([data-theme="light"]) .pad,
+  :root:not([data-theme="light"]) .card { box-shadow: 0 1px 0 var(--b-mint-line), 0 30px 60px -34px rgba(0, 0, 0, 0.8); }
+  :root:not([data-theme="light"]) .printout { box-shadow: 0 30px 50px -34px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--b-cream-line); }
+
+  /* The burn under the rocket. */
+  :root:not([data-theme="light"]) .pad__stage::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse 46% 40% at 50% 90%, rgba(255, 204, 51, 0.17), transparent 70%);
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-color-scheme: dark) and (prefers-reduced-motion: no-preference) {
+  :root.motion:not([data-theme="light"]) .pad__stage::before { transition: opacity 0.6s var(--b-ease-out); }
+  :root.motion:not([data-theme="light"]) .pad.is-armed .pad__stage::before { opacity: 0.2; }
+  :root.motion:not([data-theme="light"]) .pad.is-lifting .pad__stage::before,
+  :root.motion:not([data-theme="light"]) .pad.is-flying .pad__stage::before {
+    opacity: 1;
+    transform-origin: 50% 90%;
+    animation: b-burn 0.9s ease-in-out infinite alternate;
+  }
+  @keyframes b-burn {
+    from { opacity: 0.75; scale: 0.94; }
+    to { opacity: 1; scale: 1.06; }
+  }
 }

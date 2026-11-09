@@ -11,6 +11,10 @@ A static page: plain HTML, CSS and a little vanilla JS, no build step. Serve `si
   passes while the version climbs. "A capped hop" shows a dose held at the review threshold. The plans are real
   `booster plan` output for the apps in `examples/`
 - reduced motion: no countdowns or lift-offs; the page loads with every dose already stamped
+- after hours: a reader whose system is set to dark gets the record room after hours (section 12 of
+  `assets/booster.css`, the same night shift as the docs): a graphite desk, faint mint graph paper, cream type, gold
+  still the flame. Green keeps its own places (the never list, the install slab, the footer). The only new light is
+  the burn under the rocket, which breathes while it lifts, and simply glows when motion is reduced
 - marks: `brand/` is Booster's ChatGPT mark (never redrawn); `assets/marks/` holds the other stack parts' marks and
   WayneUI's own mark
 
