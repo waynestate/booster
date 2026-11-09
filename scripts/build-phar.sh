@@ -17,7 +17,7 @@
 # the host. Set BOOSTER_PHAR_NO_DOCKER=1 to run the same steps with the php and
 # composer already on the PATH instead: the CI release jobs use this mode,
 # because their runners may have no Docker daemon (they run inside the
-# composer:2.10.3 image, which ships both). Both modes build the same phar.
+# composer:2.11.1 image, which ships both). Both modes build the same phar.
 # Written for macOS's bash 3.2 and BSD userland, as well as Linux.
 # The booster packs himself: one file, no EOL PHP, no Composer on the target.
 
@@ -36,7 +36,7 @@ else
 fi
 
 # Pinned tool images (the same ones the README's Docker sections use).
-COMPOSER_IMAGE='composer:2.10.3'
+COMPOSER_IMAGE='composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0'
 PHP_IMAGE='php:8.4-cli'
 
 # A unique temp dir for the no-dev build copy.

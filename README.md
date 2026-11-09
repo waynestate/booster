@@ -152,7 +152,7 @@ php bin\booster plan --path=..\my-app
 ```
 git clone https://github.com/waynestate/booster.git
 cd booster
-docker run --rm -v "${PWD}:/booster" -w /booster composer:2.10.3 composer install --no-interaction
+docker run --rm -v "${PWD}:/booster" -w /booster composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0 composer install --no-interaction
 docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-cli php bin/booster plan --path=/app
 ```
 
@@ -930,7 +930,7 @@ agent-ready check, the Real output page check (`bin/build-proof.php --check`) an
 (`composer docs:check`). Nothing needs PHP on the host:
 
 ```
-docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install --no-interaction && composer ci"
+docker run --rm -v "${PWD}:/app" -w /app composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0 sh -c "composer install --no-interaction && composer ci"
 ```
 
 The site's accessibility gate is Preflight's own checker, vendored into `tools/a11y/check.mjs` from Preflight 0.4.0

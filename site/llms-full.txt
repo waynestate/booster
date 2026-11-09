@@ -153,7 +153,7 @@ php bin\booster plan --path=..\my-app
 ```
 git clone https://github.com/waynestate/booster.git
 cd booster
-docker run --rm -v "${PWD}:/booster" -w /booster composer:2.10.3 composer install --no-interaction
+docker run --rm -v "${PWD}:/booster" -w /booster composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0 composer install --no-interaction
 docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-cli php bin/booster plan --path=/app
 ```
 
@@ -914,7 +914,7 @@ agent-ready check, the Real output page check (`bin/build-proof.php --check`) an
 (`composer docs:check`). Nothing needs PHP on the host:
 
 ```
-docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install --no-interaction && composer ci"
+docker run --rm -v "${PWD}:/app" -w /app composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0 sh -c "composer install --no-interaction && composer ci"
 ```
 
 The site's accessibility gate is Preflight's own checker, vendored into `tools/a11y/check.mjs` from Preflight 0.4.0
@@ -1134,7 +1134,7 @@ Both routes need PHP 8.3 or newer on PATH. For a real `run`, git and a Docker da
 
 ```
 # inside the booster clone; the path after the second -v is your app
-docker run --rm -v "${PWD}:/booster" -w /booster composer:2.10.3 composer install --no-interaction
+docker run --rm -v "${PWD}:/booster" -w /booster composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0 composer install --no-interaction
 docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-cli php bin/booster plan --path=/app
 ```
 
@@ -1394,6 +1394,8 @@ Source: https://booster.apps.wayne.edu/docs/changelog.html
 All notable changes to Booster are recorded here. The format follows Keep a Changelog.
 
 ### \[Unreleased\][#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
+
+- Changed: Composer 2.11.1 (was 2.10.3, no longer maintained), pinned by its multi-arch list digest, in the `wayneui-copies`, `composer-ci`, `refresh-hop-data` and `phar` CI jobs, the PHAR build scripts, the Docker lines in the README, the install, checks and MAINTAINING pages and the front page, and the gate's target image for PHP 7.2 and up (builds for older PHP keep Composer 2.2). 2.11 fixes GHSA-c968-33g3-wh7p and GHSA-fm2w-xgf2-f9fh. The target image's recipe stamp changes with it, so the next `run` builds a fresh image.
 
 ### \[1.13.0\] - 2026-11-09[#](https://booster.apps.wayne.edu/docs/changelog.html#1-13-0-2026-11-09)
 
@@ -1841,7 +1843,7 @@ composer ci
 runs `composer validate --strict`, PHPUnit, Pint, PHPStan (Pinstripe's raw preset, inlined; `waynestate/pinstripe` ships with Booster and supplies the preset the advisory scan uses), `composer audit`, the hop data check, the agent-ready check, the Real output page check (`bin/build-proof.php --check`) and the docs site check (`composer docs:check`). Nothing needs PHP on the host:
 
 ```
-docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install --no-interaction && composer ci"
+docker run --rm -v "${PWD}:/app" -w /app composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0 sh -c "composer install --no-interaction && composer ci"
 ```
 
 `contract/expectations.json` says what Booster must detect, plan and change for each example app in `examples/`; `tests/ContractTest.php` enforces it with the real Rector, so a Rector release that changes a hop shows up in CI.
@@ -2750,7 +2752,7 @@ php bin\booster plan --path=..\my-app
 ```
 git clone https://github.com/waynestate/booster.git
 cd booster
-docker run --rm -v "${PWD}:/booster" -w /booster composer:2.10.3 composer install --no-interaction
+docker run --rm -v "${PWD}:/booster" -w /booster composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0 composer install --no-interaction
 docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-cli php bin/booster plan --path=/app
 ```
 

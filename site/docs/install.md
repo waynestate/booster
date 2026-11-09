@@ -76,7 +76,7 @@ php bin\booster plan --path=..\my-app
 ```
 git clone https://github.com/waynestate/booster.git
 cd booster
-docker run --rm -v "${PWD}:/booster" -w /booster composer:2.10.3 composer install --no-interaction
+docker run --rm -v "${PWD}:/booster" -w /booster composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0 composer install --no-interaction
 docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-cli php bin/booster plan --path=/app
 ```
 

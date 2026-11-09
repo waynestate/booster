@@ -34,7 +34,7 @@ issues and merge requests go to git.wayne.edu. Nobody pushes to the mirror.
 With only Docker:
 
 ```
-docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install --no-interaction && composer ci"
+docker run --rm -v "${PWD}:/app" -w /app composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0 sh -c "composer install --no-interaction && composer ci"
 ```
 
 `composer ci` runs `composer validate --strict`, PHPUnit, Pint, PHPStan, `composer audit`, the hop data check, the

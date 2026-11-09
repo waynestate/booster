@@ -154,7 +154,7 @@ final class TargetImageRunnerTest extends TestCase
 
         $build = $fake->calls[1]['command'];
         self::assertSame(
-            ['docker', 'build', '--build-arg', 'PHP_VERSION=8.4', '--build-arg', 'COMPOSER_VERSION=2.10.3', '-t', 'booster-target:8.4-' . $this->stamp(), self::DOCKER_DIR],
+            ['docker', 'build', '--build-arg', 'PHP_VERSION=8.4', '--build-arg', 'COMPOSER_VERSION=2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0', '-t', 'booster-target:8.4-' . $this->stamp(), self::DOCKER_DIR],
             $build,
         );
     }

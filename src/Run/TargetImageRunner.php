@@ -26,8 +26,8 @@ final class TargetImageRunner
     /** Composer 2.3 and later require PHP 7.2.5, so PHP below 7.2 builds get the 2.2 LTS line. */
     public const COMPOSER_VERSION_LEGACY = '2.2';
 
-    /** The recipe default, and what every PHP 7.2 and up build gets. */
-    public const COMPOSER_VERSION_CURRENT = '2.10.3';
+    /** The recipe default, and what every PHP 7.2 and up build gets (pinned by its multi-arch list digest). */
+    public const COMPOSER_VERSION_CURRENT = '2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0';
 
     /**
      * The --image images found locally or pulled, so each resolved image is

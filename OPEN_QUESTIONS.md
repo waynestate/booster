@@ -29,7 +29,7 @@ open until the Citadel platform owner answers.
 |---|---|---|
 | `BOOSTER_POLICY` (optional) | CREED's released `policy.json` | Empty in `.env.example`; the copy in the `waynestate/creed` package is used |
 | Docker daemon on the machine that runs `booster run` | Developer machine or runner | None; without it the gate fails closed and `--skip-gate` is the way out |
-| Network access to Docker Hub for `php:<version>-cli` and `composer:2.10.3` | Developer machine or runner | None; a mirror would need the `FROM` lines in `docker/Dockerfile` changed |
+| Network access to Docker Hub for `php:<version>-cli` and `composer:2.11.1` | Developer machine or runner | None; a mirror would need the `FROM` lines in `docker/Dockerfile` changed |
 | Preflight components `@0.4.0` on GitLab, and the reusable workflow pinned to Preflight 0.1.4's commit on GitHub | Preflight | As in the sibling projects |
 | The app's `vendor/` for Laravel hops | `composer install` in the app | None |
 

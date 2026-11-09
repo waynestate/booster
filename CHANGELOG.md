@@ -4,6 +4,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Changed: Composer 2.11.1 (was 2.10.3, no longer maintained), pinned by its multi-arch list digest, in the `wayneui-copies`, `composer-ci`, `refresh-hop-data` and `phar` CI jobs, the PHAR build scripts, the Docker lines in the README, the install, checks and MAINTAINING pages and the front page, and the gate's target image for PHP 7.2 and up (builds for older PHP keep Composer 2.2). 2.11 fixes GHSA-c968-33g3-wh7p and GHSA-fm2w-xgf2-f9fh. The target image's recipe stamp changes with it, so the next `run` builds a fresh image.
+
 ## [1.13.0] - 2026-11-09
 
 - Changed: the deploy kit is Squire 0.10.1 (was 0.10.0): `.squire/base-fallback.Dockerfile` copies Composer 2.11.1 (was 2.10.3, no longer maintained); every other kit file was already current. PROCTOR moves to ^0.11 (locked 0.11.0, was ^0.8 at 0.8.0) for Booster's own check gate and for the deploy layer.

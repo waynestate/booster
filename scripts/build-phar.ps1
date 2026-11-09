@@ -28,7 +28,7 @@ $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
 
 # Pinned tool images (the same ones the README's Docker sections use).
-$ComposerImage = 'composer:2.10.3'
+$ComposerImage = 'composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0'
 $PhpImage = 'php:8.4-cli'
 
 # Run a docker command with an argument array; fail the script on a non-zero exit.
