@@ -33,6 +33,27 @@ abstract class BaseCommand extends Command
 
     public const EXIT_TOOL_ERROR = 2;
 
+    /** @var array<string, 'value'|'flag'|'list'> the options planFlags() carries, in addAppOptions() order */
+    private const PLAN_FLAGS = [
+        'policy' => 'value',
+        'today' => 'value',
+        'goal' => 'value',
+        'from-php' => 'value',
+        'to-php' => 'value',
+        'from-laravel' => 'value',
+        'to-laravel' => 'value',
+        'to-phpunit' => 'value',
+        'with-node' => 'flag',
+        'sesame' => 'flag',
+        'wayneui' => 'flag',
+        'vendored' => 'flag',
+        'strict-session' => 'flag',
+        'skip' => 'list',
+        'no-package-check' => 'flag',
+        'until' => 'value',
+        'only' => 'value',
+    ];
+
     /**
      * The runner every subprocess goes through: the plan's wayne-cas probe
      * shares it, so tests see every subprocess in one place. Commands that
@@ -145,6 +166,38 @@ abstract class BaseCommand extends Command
         $casReachability = new WayneCasReachability($this->processes);
 
         return (new Planner($policy, new HopRegistry(), new HttpPackageFetcher(), $casReachability))->plan($project, $options, $this->today($input));
+    }
+
+    /**
+     * The plan-shaping options the person typed, as flags for a "Next:" line
+     * (`--from-php=5.6`, `--vendored`), in the order `plan --help` lists
+     * them. A Next line that drops them names a different plan: an app with
+     * no composer.json cannot even plan without its --from-php.
+     *
+     * @return list<string>
+     */
+    protected function planFlags(InputInterface $input): array
+    {
+        $flags = [];
+        foreach (self::PLAN_FLAGS as $name => $kind) {
+            if (!$input->hasOption($name)) {
+                continue;
+            }
+            $value = $input->getOption($name);
+            if ($kind === 'flag') {
+                if ($value === true) {
+                    $flags[] = '--' . $name;
+                }
+                continue;
+            }
+            foreach ($kind === 'list' ? (is_array($value) ? $value : []) : [$value] as $one) {
+                if (is_string($one) && $one !== '') {
+                    $flags[] = '--' . $name . '=' . Invocation::valueArg($one);
+                }
+            }
+        }
+
+        return $flags;
     }
 
     protected function stringOption(InputInterface $input, string $name): ?string

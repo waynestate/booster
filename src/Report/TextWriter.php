@@ -151,9 +151,13 @@ final class TextWriter
 
     /**
      * The closing note after a plan: nothing was changed, what the list means,
-     * and the two commands that go next.
+     * and the two commands that go next, with the plan's own flags so they
+     * run the plan just shown (a 2012 app with no composer.json needs its
+     * --from-php on every line).
+     *
+     * @param list<string> $flags the plan-shaping flags as typed (BaseCommand::planFlags)
      */
-    public function planFooter(Plan $plan, string $path, string $program): string
+    public function planFooter(Plan $plan, string $path, string $program, array $flags = []): string
     {
         if ($plan->steps === []) {
             return 'Nothing was changed. Your app is already at the target, so there is nothing to run.';
@@ -166,7 +170,7 @@ final class TextWriter
                 break;
             }
         }
-        $pathArg = Invocation::pathArg($path);
+        $pathArg = Invocation::pathArg($path) . Invocation::flagsText($flags);
 
         return implode("\n", [
             'Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice',
@@ -415,7 +419,10 @@ final class TextWriter
         return $lines;
     }
 
-    public function run(RunReport $report, ?string $path = null, ?string $program = null): string
+    /**
+     * @param list<string> $flags the flags the real run needs, as typed (RunCommand::runFlags)
+     */
+    public function run(RunReport $report, ?string $path = null, ?string $program = null, array $flags = []): string
     {
         $path ??= $report->plan->project->path;
         $program ??= Invocation::program();
@@ -497,7 +504,7 @@ final class TextWriter
             $lines[] = 'RESULT: ' . ($report->failed() ? 'FAIL' : 'PASS');
         }
         $lines[] = '';
-        foreach (explode("\n", $this->runFooter($report, $path, $program, $previewedFiles)) as $line) {
+        foreach (explode("\n", $this->runFooter($report, $path, $program, $previewedFiles, $flags)) as $line) {
             $lines[] = $line;
         }
 
@@ -511,8 +518,9 @@ final class TextWriter
      * it stopped at, or that it never started.
      *
      * @param array<string, true> $previewedFiles the dry-run files, keyed by name
+     * @param list<string>        $flags          the flags the real run needs, so the Next line runs the run just previewed
      */
-    private function runFooter(RunReport $report, string $path, string $program, array $previewedFiles): string
+    private function runFooter(RunReport $report, string $path, string $program, array $previewedFiles, array $flags = []): string
     {
         if ($report->dryRun) {
             if ($report->failed() || $previewedFiles === []) {
@@ -522,7 +530,7 @@ final class TextWriter
             return implode("\n", [
                 'Dry run: these changes were previewed, none were applied.',
                 'Nothing was changed. RESULT: PASS means the preview worked; no tests ran.',
-                sprintf('Next, if the edits look right: %s run --path=%s', $program, Invocation::pathArg($path)),
+                sprintf('Next, if the edits look right: %s run --path=%s%s', $program, Invocation::pathArg($path), Invocation::flagsText($flags)),
                 '(It needs Docker and a clean git folder. Commit or stash first.)',
             ]);
         }

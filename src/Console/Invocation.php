@@ -46,4 +46,30 @@ final class Invocation
     {
         return str_contains($path, ' ') ? '"' . $path . '"' : $path;
     }
+
+    /**
+     * An option value for a shell line: as typed when it is plain (a version,
+     * a hop id, a path without spaces), else in double quotes with inner
+     * quotes escaped, so `--test-command="php tests/run.php"` survives the
+     * copy and paste.
+     */
+    public static function valueArg(string $value): string
+    {
+        if (preg_match('#^[A-Za-z0-9_.,:/\\\\=@+{}-]+$#', $value) === 1) {
+            return $value;
+        }
+
+        return '"' . str_replace('"', '\\"', $value) . '"';
+    }
+
+    /**
+     * The flags for a "Next:" line, one shell string with a leading space, or
+     * '' when there are none.
+     *
+     * @param list<string> $flags
+     */
+    public static function flagsText(array $flags): string
+    {
+        return $flags === [] ? '' : ' ' . implode(' ', $flags);
+    }
 }

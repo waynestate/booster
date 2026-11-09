@@ -283,8 +283,9 @@ final class CliTest extends TestCase
         self::assertStringContainsString('Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice', $out);
         self::assertStringContainsString('for you to read, not errors.', $out);
         self::assertStringContainsString('Booster does every numbered step above when you run it. Steps marked [manual: you do this one by hand] are yours to do by hand.', $out);
-        self::assertStringContainsString('Preview the edits: php bin/booster run --path=' . $dir . ' --dry-run', $out);
-        self::assertStringContainsString('(The real run needs Docker, and your app committed in git: php bin/booster run --path=' . $dir . ')', $out);
+        // The plan flags ride along, so both lines run the plan just shown.
+        self::assertStringContainsString('Preview the edits: php bin/booster run --path=' . $dir . ' --today=' . self::TODAY . ' --goal=php-74-to-84 --no-package-check --dry-run', $out);
+        self::assertStringContainsString('(The real run needs Docker, and your app committed in git: php bin/booster run --path=' . $dir . ' --today=' . self::TODAY . ' --goal=php-74-to-84 --no-package-check)', $out);
     }
 
     public function test_plan_survives_a_broken_scan(): void
@@ -1164,6 +1165,53 @@ final class CliTest extends TestCase
         self::assertStringContainsString('Nothing was changed. RESULT: PASS means the preview worked; no tests ran.', $out);
         self::assertStringContainsString('Next, if the edits look right: php bin/booster run --path=' . $app, $out);
         self::assertStringContainsString('(It needs Docker and a clean git folder. Commit or stash first.)', $out);
+    }
+
+    public function test_the_dry_run_next_line_keeps_the_flags_the_run_needs(): void
+    {
+        $app = $this->example('raw-php');
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, (string) json_encode([
+            'file_diffs' => [['file' => '/x/src/Legacy.php', 'diff' => "-old\n+new"]],
+        ]), ''));
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $app, '--today' => self::TODAY, '--dry-run' => true, '--from-php' => '7.4', '--to-php' => '8.4',
+            '--vendored' => true, '--skip' => ['php-80-to-81'], '--test-command' => 'php tests/run.php', '--allow-dirty' => true, '--test-env' => ['APP_KEY=secret-value'],
+        ], $fake);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString(
+            'Next, if the edits look right: php bin/booster run --path=' . $app . ' --today=' . self::TODAY . ' --from-php=7.4 --to-php=8.4 --vendored --skip=php-80-to-81 --test-command="php tests/run.php"' . "\n",
+            $out,
+        );
+        self::assertStringNotContainsString('secret-value', $out);
+    }
+
+    public function test_the_plan_footer_keeps_the_plan_flags(): void
+    {
+        $app = __DIR__ . '/fixtures/vendored-2012';
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $app, '--from-php' => '5.6', '--vendored' => true, '--no-scan' => true, '--no-package-check' => true]);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('Preview the edits: php bin/booster run --path=' . $app . ' --from-php=5.6 --vendored --no-package-check --dry-run', $out);
+        self::assertStringContainsString('your app committed in git: php bin/booster run --path=' . $app . ' --from-php=5.6 --vendored --no-package-check)', $out);
+    }
+
+    public function test_detect_with_no_php_prints_a_plan_line_that_works(): void
+    {
+        $app = __DIR__ . '/fixtures/vendored-2012';
+
+        [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $app]);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('There is no composer.json to say which PHP the app needs, so plan needs --from-php', $out);
+        self::assertSame(1, preg_match('/^Next: php bin\/booster (plan .*)$/m', $out, $m));
+        self::assertStringContainsString('--from-php=5.6', $m[1]);
+
+        // The printed line, as typed: it plans instead of stopping at exit 2.
+        [$planExit] = $this->booster(['command' => 'plan', '--path' => $app, '--from-php' => '5.6', '--no-scan' => true, '--no-package-check' => true]);
+        self::assertSame(0, $planExit);
     }
 
     public function test_a_dry_run_that_previews_nothing_only_says_nothing_changed(): void

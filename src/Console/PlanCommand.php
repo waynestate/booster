@@ -115,7 +115,7 @@ final class PlanCommand extends BaseCommand
                 // The plan shows only the first five findings; the scan command lists them all.
                 $text .= "\n\n" . $writer->phpStan($phpstan, true);
             }
-            $text .= "\n\n" . $writer->planFooter($plan, $this->pathAsTyped($input), Invocation::program());
+            $text .= "\n\n" . $writer->planFooter($plan, $this->pathAsTyped($input), Invocation::program(), $this->planFlags($input));
         }
 
         $output->writeln($text, OutputInterface::OUTPUT_RAW);

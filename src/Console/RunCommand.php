@@ -179,13 +179,49 @@ final class RunCommand extends BaseCommand
 
         $body = $format === 'json'
             ? (new JsonWriter())->write($report->toArray())
-            : (new TextWriter())->run($report, $this->pathAsTyped($input));
+            : (new TextWriter())->run($report, $this->pathAsTyped($input), null, $this->runFlags($input));
         if ($format === 'text' && $recordFile !== null) {
             $body .= PHP_EOL . sprintf('Hop record: %s (commit it with the hop).', $recordFile);
         }
         $output->writeln($body, OutputInterface::OUTPUT_RAW);
 
         return $report->failed() ? self::EXIT_FAIL : self::EXIT_PASS;
+    }
+
+    /**
+     * The flags a dry run's "Next:" line hands to the real run: the plan's
+     * own, plus the gate's (--replay, --test-command, --image and the rest),
+     * as typed. --dry-run, --format and --allow-dirty stay behind (the real
+     * run wants a clean folder), and so does --test-env, whose values may be
+     * credentials and never reach a report. One giant leap: the same command,
+     * minus the dry run.
+     *
+     * @return list<string>
+     */
+    private function runFlags(InputInterface $input): array
+    {
+        $flags = $this->planFlags($input);
+        $replay = $input->getOption('replay');
+        if ($replay !== false) {
+            $flags[] = is_string($replay) && $replay !== '' ? '--replay=' . Invocation::valueArg($replay) : '--replay';
+        }
+        foreach (['replay-out', 'test-command', 'proctor-command', 'image', 'max-changes'] as $name) {
+            $value = $input->getOption($name);
+            if (is_string($value) && $value !== '') {
+                $flags[] = '--' . $name . '=' . Invocation::valueArg($value);
+            }
+        }
+        $memory = $input->getOption('memory-limit');
+        if (is_string($memory) && $memory !== '' && $memory !== RectorRunner::DEFAULT_MEMORY_LIMIT) {
+            $flags[] = '--memory-limit=' . Invocation::valueArg($memory);
+        }
+        foreach (['proctor-advisory', 'allow-failing-baseline', 'skip-gate'] as $name) {
+            if ($input->getOption($name) === true) {
+                $flags[] = '--' . $name;
+            }
+        }
+
+        return $flags;
     }
 
     /**
