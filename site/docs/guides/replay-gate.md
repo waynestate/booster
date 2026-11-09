@@ -12,6 +12,16 @@ This page shows how to make the gate prove more than the tests do: Booster recor
 
 The test gate only knows what the tests ask. Plenty of WSU apps have one smoke test, or none, and the code a PHP hop changes most (string to number comparisons, `null` passed to `strlen`, a dynamic property) sits in pages no test visits. The replay gate takes the patient's vitals before the shot and again after every dose: it writes down what the app said on the old PHP, and after every hop it asks again and compares. It is off unless you ask for it.
 
+When the gate proves little (the app has no tests, so the gate is the `php -l` syntax check, or its tests are only Laravel's stock examples) and the run has no `--replay`, `booster run` says so under the baseline, dry runs too:
+
+```
+Replay: off, and the gate only proves every PHP file parses, so a hop can change what a page answers and still pass.
+Record the answers first: booster replay init --path=<app> drafts booster-replay.json from the routes; fill in its todo items, then run again with --replay.
+Step 1 (php-74-to-80) is the hop most likely to change an answer: loose comparisons of numbers and strings, and warnings that now throw.
+```
+
+The last line shows only when the plan has the PHP 8.0 hop, and the second one asks for just `--replay` when `booster-replay.json` is already there. The JSON report carries the same nudge as `replay_suggestion`. It is advice, never a failure: the exit code is the same with or without it.
+
 ## In three commands[#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#in-three-commands)
 
 ```sh

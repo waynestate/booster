@@ -57,7 +57,9 @@ the suite can be red before any hop. Build the assets before the baseline (the a
 <li>When the app has no tests of its own, the baseline and every gate run a built-in check instead: every PHP file
 outside <code>vendor/</code> and <code>node_modules/</code> must still parse on the target PHP (<code>php -l</code>). That proves the code loads on
 the new PHP, not that it works: click through the app before you ship. Pass <code>--test-command</code> to run something else,
-or add a smoke test (<a href="smoke-test.html">A smoke test for WSU apps</a>) to get the real gate back.</li>
+or add a smoke test (<a href="smoke-test.html">A smoke test for WSU apps</a>) to get the real gate back.
+Without <code>--replay</code>, the run also says so under the baseline and names <code>booster replay init</code>, because <a href="replay-gate.html">the replay gate</a>
+records what the pages answer and fails a hop that changes one.</li>
 </ul>
 </article>
     </main>
