@@ -1,13 +1,13 @@
 {
     "squire": "Written by Squire. Commit this file: `vendor/bin/squire init --check` reads it to report drift.",
-    "version": "0.7.1",
+    "version": "0.10.0",
     "target": "raw",
     "groups": [
         "release",
         "parity"
     ],
     "files": {
-        ".env.squire.example": "cc09d2c4d5187f5db2516c793a6835d231b50b2d35f0df205590562a2ada7b67",
+        ".env.squire.example": "9fee40c218f1418a9a3965e33a84ea6cf77d5efa99700ec995ebab0cdf61810c",
         ".squire/Dockerfile": "2d0f1eafbb78fa10741b3abe400fd254a21ad8b3605ca0860aef1bcac5923d2e",
         ".squire/Dockerfile.dockerignore": "6ccbb5a302475dd6322dc9f46057f98d0a5db59e5cfcc334d956df862d5da6fe",
         ".squire/apache-hardening.conf": "1f4f8dbcb70ad69a9ac91d852780a3e811527098c8bbf90416076ded25c52a40",
@@ -17,15 +17,20 @@
         ".squire/haproxy.cfg": "bcbc3ea3a8fb19c991900a1275e0d6954b41a6a3c6ccaef1934eeebf9f6ab901",
         ".squire/php-web.ini": "f3e43476913592928b41082ee5ee4b84a5e888a9ac8eb12d929304669d832e31",
         ".squire/php.ini": "73cb813157a68331fec2ac1ff0ef802c7ec48158153be95910513dbc420b4301",
+        ".squire/portable.Dockerfile": "82298492a8cb7242efaaa50513e45e0934ee2d412c0efd1dbea71ba9b3142379",
+        ".squire/portable.Dockerfile.dockerignore": "04e43dc292811e79ae32be456db8a04ab79f706e1979508ebc416aae669bae0c",
+        ".squire/portable/ports.conf": "64c3d51c548b86aa8ed8886c7ac8ad8455674e9a7b36c6af6718fdae37a654d6",
+        ".squire/portable/squire-entrypoint.sh": "f66641d2793cf3b49020f7c0028612771c8dbef1643bcc4d4c62911ac367e788",
+        ".squire/portable/vhost.conf": "eadc5ab3dd3fc3cc695a38115a8d2b956746cd3036f5793edac130fb1087bce0",
         ".squire/vhost.conf": "0197be7c59f4caf10ade0ae223f5ddc75b9b0c962fec76d8e9dabd27408f35ff",
         "build.sh": "9a96113fe031eb15c4d3006e04df098646e07d7293a7decd6c4aac470295db1d",
         "deployments/001-first-release.sh": "adb3a9eb9a7d5b6cfa3f50043169b97253bab90c40ff37adba44201326557803",
-        "docker-compose.squire.yml": "ec3f1982cfb72b41d7a8c9650603c789e00294a97a7950f5c6a5ad88e1bc2627",
-        "health.php": "b691e07f29b900750d1c4c9ebb93916998e97502155effb2c2fe69691cf17a04",
+        "docker-compose.squire.yml": "e7c9587092f9271db6b7d2137f20403c12abf75e6248a7b33fd431be5b66d149",
+        "health.php": "8d3b203f53bd436ccbe7177471547866b8800471043c979ea2f0251aaae0b3b4",
         "oracle-check.php": "44dae9fbf0ef3ffe840cd374488fee9f26a63db3ac653a029f49849665ad9640",
         "public/up.php": "84d1b3d8823fcd5519fbe92988f822ce68cdc05eff2c889814deb3f33982600a",
         "scripts/parity.ps1": "da69deebe08280a5054a4b3724ceaeb61aa22b73febb9bcc2cdc913177414736",
         "scripts/parity.sh": "f0fb6a963277bde29b77e8b7869a1775acd517ea8d4f2774567469bf77235eae",
-        "scripts/release.sh": "a0406f9a94d36a78acd909a05eacb00924a5c9aa064f29c7e77498a88810829b"
+        "scripts/release.sh": "f2f6339a20257aadb80d0969fcd139a03638eab15b9e18dc5a11d85d2e8d1773"
     }
 }

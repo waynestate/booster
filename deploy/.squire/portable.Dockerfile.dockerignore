@@ -1,0 +1,39 @@
+# The portable image bakes the app in, so its build context is the app: minus anything that must never sit in a layer
+# (env files, credentials, secrets), what the build makes again (vendor/, node_modules/, the built assets' hot file)
+# and local state (logs, caches, compiled views, a local SQLite file). Docker reads this file because it sits next to
+# portable.Dockerfile with the same name. Patterns start at the context root.
+
+# Never in a layer: config and secrets arrive at run time (SQUIRE-18, WELD W9).
+**/.env
+**/.env.*
+**/auth.json
+**/secrets
+**/*.pem
+**/*.key
+
+# History and tooling.
+**/.git
+**/.github
+**/.idea
+**/.vscode
+
+# Rebuilt by the image's release step.
+vendor
+**/node_modules
+public/hot
+public/storage
+.cache
+
+# Local state.
+**/*.log
+**/*.sqlite
+**/*.sqlite-journal
+storage/framework/cache/data
+storage/framework/sessions/*
+storage/framework/views/*.php
+storage/logs/*
+!storage/logs/.gitignore
+bootstrap/cache/*.php
+.phpunit.cache
+.phpunit.result.cache
+coverage

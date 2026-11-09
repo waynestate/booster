@@ -9,6 +9,7 @@
 # Steps: preconditions, composer install from the lock file without dev packages, composer audit (report),
 # PROCTOR's deploy gate, frontend install and build, Laravel migrate, optimize and the restart of the long-lived
 # processes, an Oracle connection check (report only), an opcache report, and a smoke test of /up.
+# A Laravel release also checks its environment before anything installs: APP_KEY must be set, APP_DEBUG must be false in production, and an APP_ENV that is not production earns a warning (Sourdough practice 4.14).
 # PROCTOR runs `proctor gate` (or `proctor check` on a PROCTOR without the gate): a go or no-go for this commit,
 # ratcheted against the verdict of the last release that went on, so only a new failure blocks. The verdict is kept in
 # SQUIRE_PROCTOR_RECORD_DIR. By default a no-go is a report here, never a stop: a failing post-script cannot undo a
@@ -29,6 +30,7 @@
 #   SQUIRE_NPM_IGNORE_SCRIPTS=1      1 runs the installer with --ignore-scripts (S57)
 #   SQUIRE_NPM_REBUILD=              packages (space-separated) whose install scripts run after the install (SQUIRE-26)
 #   SQUIRE_NPM_BUILD_SCRIPT=build    the package.json script to run after install
+#   SQUIRE_CACHE_DIR=.cache/squire   where Composer and npm keep their download caches between releases (off: their defaults)
 #   SQUIRE_MIGRATE=1                 Laravel: run `migrate --force`
 #   SQUIRE_ARTISAN_OPTIMIZE=1        Laravel: run `optimize` after the environment is in place (S16)
 #   SQUIRE_ARTISAN_RESTART=1         Laravel: tell queue workers and schedule:work to restart on the new code (reload, or queue:restart and schedule:interrupt)
@@ -36,6 +38,7 @@
 #   SQUIRE_PROCTOR_BIN=              path to proctor (default: vendor/bin/proctor, then `proctor` on PATH)
 #   SQUIRE_PROCTOR_POLICY=           path to the CREED policy.json (when unset: the one CREED ships, if installed; otherwise PROCTOR's own default)
 #   SQUIRE_PROCTOR_RECORD_DIR=storage/squire  where the gate's verdict (proctor-gate.json) and baseline are kept
+#   SQUIRE_PHP_RUNTIME=auto          auto | skip | X.Y.Z   the PHP version the gate grades (auto: the php that runs this script)
 #   SQUIRE_SMOKE=1                   1 requests the health URL at the end and fails if it is not 200 (S21)
 #   SQUIRE_SMOKE_URL=                full URL (default: http://127.0.0.1:80/up for Laravel, /up.php for raw PHP)
 #   SQUIRE_SMOKE_RETRIES=5           attempts
@@ -129,9 +132,9 @@ squire_load_settings() {
         value="${line#*=}"
         case "$key" in
             SQUIRE_FRAMEWORK | SQUIRE_ALLOW_ROOT | SQUIRE_REQUIRE_ENV | SQUIRE_WRITABLE_DIRS | \
-                SQUIRE_COMPOSER_AUDIT | SQUIRE_NPM | SQUIRE_NPM_IGNORE_SCRIPTS | SQUIRE_NPM_REBUILD | SQUIRE_NPM_BUILD_SCRIPT | \
+                SQUIRE_COMPOSER_AUDIT | SQUIRE_NPM | SQUIRE_NPM_IGNORE_SCRIPTS | SQUIRE_NPM_REBUILD | SQUIRE_NPM_BUILD_SCRIPT | SQUIRE_CACHE_DIR | \
                 SQUIRE_MIGRATE | SQUIRE_ARTISAN_OPTIMIZE | SQUIRE_ARTISAN_RESTART | SQUIRE_PROCTOR | SQUIRE_PROCTOR_BIN | \
-                SQUIRE_PROCTOR_POLICY | SQUIRE_PROCTOR_RECORD_DIR | SQUIRE_SMOKE | SQUIRE_SMOKE_URL | SQUIRE_SMOKE_RETRIES | SQUIRE_SMOKE_DELAY | \
+                SQUIRE_PROCTOR_POLICY | SQUIRE_PROCTOR_RECORD_DIR | SQUIRE_PHP_RUNTIME | SQUIRE_SMOKE | SQUIRE_SMOKE_URL | SQUIRE_SMOKE_RETRIES | SQUIRE_SMOKE_DELAY | \
                 SQUIRE_SECRETS_DIR) ;;
             *) continue ;;
         esac
@@ -165,6 +168,7 @@ squire_load_secrets
 : "${SQUIRE_NPM_IGNORE_SCRIPTS:=1}"
 : "${SQUIRE_NPM_REBUILD:=}"
 : "${SQUIRE_NPM_BUILD_SCRIPT:=build}"
+: "${SQUIRE_CACHE_DIR:=.cache/squire}"
 : "${SQUIRE_MIGRATE:=1}"
 : "${SQUIRE_ARTISAN_OPTIMIZE:=1}"
 : "${SQUIRE_ARTISAN_RESTART:=1}"
@@ -172,6 +176,7 @@ squire_load_secrets
 : "${SQUIRE_PROCTOR_BIN:=}"
 : "${SQUIRE_PROCTOR_POLICY:=}"
 : "${SQUIRE_PROCTOR_RECORD_DIR:=storage/squire}"
+: "${SQUIRE_PHP_RUNTIME:=auto}"
 : "${SQUIRE_SMOKE:=1}"
 : "${SQUIRE_SMOKE_URL:=}"
 : "${SQUIRE_SMOKE_RETRIES:=5}"
@@ -198,6 +203,35 @@ http_status() {
             echo $m[1] ?? "000";
         ' -- "$url" "$host_header"
     fi
+}
+
+# Read one variable for the environment guard: the process environment wins when it is set (it already holds the
+# mounted secrets), otherwise the first KEY=value line in ./.env, parsed the way squire_load_settings parses
+# ./.env.squire: never sourced, no expansion, one pair of surrounding single or double quotes stripped, a trailing
+# CR stripped. Prints nothing when the variable is nowhere to be found.
+squire_env_value() {
+    local name="$1" line value
+    if [ -n "${!name+x}" ]; then
+        printf '%s' "${!name}"
+        return 0
+    fi
+    [ -f ./.env ] || return 0
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="${line%"$(printf '\r')"}"
+        case "$line" in
+            '' | '#'* | *=*) ;;
+            *) continue ;;
+        esac
+        [ "${line%%=*}" = "$name" ] || continue
+        value="${line#*=}"
+        case "$value" in
+            \"*\") value="${value#\"}"; value="${value%\"}" ;;
+            \'*\') value="${value#\'}"; value="${value%\'}" ;;
+        esac
+        printf '%s' "$value"
+        return 0
+    done <./.env
+    return 0
 }
 
 # --- start ----------------------------------------------------------------------------------------------------------
@@ -234,6 +268,25 @@ fi
 if [ "$require_env" = "1" ] && [ ! -f .env ]; then
     fail ".env not found; create it from .env.example in the Citadel dashboard before the first release"
 fi
+if [ "$require_env" = "1" ]; then
+    # Sourdough practice 4.14: the environment a Laravel release is about to cache into config must be sane.
+    app_key="$(squire_env_value APP_KEY)"
+    if [ -z "$app_key" ]; then
+        fail "APP_KEY is not set; set it in .env or as a masked variable in the Citadel dashboard before releasing"
+    fi
+    app_env="$(squire_env_value APP_ENV)"
+    if [ -n "$app_env" ] && [ "$app_env" != "production" ]; then
+        warn "APP_ENV is '$app_env', not production; the release goes on"
+    fi
+    app_debug="$(squire_env_value APP_DEBUG)"
+    case "$app_debug" in
+        true | True | TRUE | 1 | '(true)')
+            if [ -z "$app_env" ] || [ "$app_env" = "production" ]; then
+                fail "APP_DEBUG must be false in production (got '$app_debug')"
+            fi
+            ;;
+    esac
+fi
 
 if [ -z "$SQUIRE_SMOKE_URL" ]; then
     if [ "$framework" = "laravel" ]; then
@@ -252,6 +305,28 @@ for dir in $writable; do
     mkdir -p "$dir"
     note "ready: $dir"
 done
+
+step "package download caches"
+if [ "$SQUIRE_CACHE_DIR" = "off" ]; then
+    note "skipped (SQUIRE_CACHE_DIR=off)"
+else
+    # The app folder survives a Citadel Update, the container home does not, so the caches live there by default; an
+    # absolute path is used as is. A value the host set wins.
+    case "$SQUIRE_CACHE_DIR" in
+        /*) ;;
+        *) SQUIRE_CACHE_DIR="$SQUIRE_APP_DIR/$SQUIRE_CACHE_DIR" ;;
+    esac
+    mkdir -p "$SQUIRE_CACHE_DIR/composer" "$SQUIRE_CACHE_DIR/npm"
+    # Each only when missing, so a rerun leaves them alone.
+    [ -f "$SQUIRE_CACHE_DIR/.gitignore" ] || printf '%s\n' '*' >"$SQUIRE_CACHE_DIR/.gitignore"
+    [ -f "$SQUIRE_CACHE_DIR/.htaccess" ] || printf '%s\n' 'Require all denied' >"$SQUIRE_CACHE_DIR/.htaccess"
+    : "${COMPOSER_CACHE_DIR:=$SQUIRE_CACHE_DIR/composer}"
+    export COMPOSER_CACHE_DIR
+    : "${npm_config_cache:=$SQUIRE_CACHE_DIR/npm}"
+    export npm_config_cache
+    note "composer cache: $COMPOSER_CACHE_DIR"
+    note "npm cache: $npm_config_cache"
+fi
 
 step "composer install from the lock file, without dev packages"
 export COMPOSER_NO_INTERACTION=1
@@ -326,6 +401,31 @@ else
             verdict_file="$record_dir/proctor-gate.json"
             baseline_file="$record_dir/proctor-gate-baseline.json"
             gate_args=(gate --path . ${policy_args[@]+"${policy_args[@]}"} --record "$verdict_file")
+            # The php that runs this script is the one serving the app, so by default the gate grades it for the
+            # unpatched check; SQUIRE_PHP_RUNTIME names another version or skips the grade.
+            case "$SQUIRE_PHP_RUNTIME" in
+                auto)
+                    php_version="$(php -r 'echo PHP_VERSION;' 2>/dev/null || true)"
+                    php_version="${php_version%%[!0-9.]*}"
+                    if [[ "$php_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                        gate_args+=(--php-runtime "$php_version")
+                        note "gate: grading PHP $php_version"
+                    else
+                        note "gate: could not read the PHP version, runtime not graded"
+                    fi
+                    ;;
+                skip)
+                    note "gate: SQUIRE_PHP_RUNTIME=skip, runtime not graded"
+                    ;;
+                *)
+                    if [[ "$SQUIRE_PHP_RUNTIME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                        gate_args+=(--php-runtime "$SQUIRE_PHP_RUNTIME")
+                        note "gate: grading PHP $SQUIRE_PHP_RUNTIME"
+                    else
+                        note "gate: SQUIRE_PHP_RUNTIME is not X.Y.Z, runtime not graded"
+                    fi
+                    ;;
+            esac
             if [ -f "$baseline_file" ]; then
                 gate_args+=(--baseline "$baseline_file")
                 note "baseline: $baseline_file (the verdict of the last release that went on)"
@@ -416,7 +516,9 @@ else
             note "npm $npm_version ignores min-release-age in .npmrc (npm 11.10 or later reads it); the lock file still decides what installs"
         fi
         # shellcheck disable=SC2086  # the flag is empty or one word
-        npm ci $ignore_flag
+        # --prefer-offline takes the lock file's versions from the cache when they are already there; the audit is
+        # Composer's and PROCTOR's job here.
+        npm ci --prefer-offline --no-audit --no-fund $ignore_flag
         if [ "${#rebuild[@]}" -gt 0 ]; then
             note "running install scripts for: ${rebuild[*]}"
             npm rebuild --ignore-scripts=false "${rebuild[@]}"

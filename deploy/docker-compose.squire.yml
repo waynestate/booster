@@ -8,6 +8,17 @@
 # Start it with scripts/parity.sh (Linux, macOS) or scripts/parity.ps1 (Windows), which pass --env-file .env.squire.
 # Every SQUIRE_* variable is documented in .env.squire.example. Secrets are required, not defaulted: compose stops
 # with a message if a password is missing (fail closed).
+#
+# The `portable` profile adds the portable path (ADR-0010): ONE image (.squire/portable.Dockerfile) with the code
+# baked in, run as four services that differ only in SQUIRE_ROLE, as a non-root user in group 0 on port 8080, the
+# way OpenShift, Coolify or raw Docker run it. Nothing in the profile starts unless you name it:
+#
+#   docker compose -f docker-compose.squire.yml --env-file .env.squire --profile portable up -d --build web worker scheduler
+#
+#   migrate    php artisan migrate --force, once, before the others start (a Job or pre-deploy command elsewhere)
+#   web        Apache on 8080, published on 127.0.0.1:${SQUIRE_PORTABLE_HTTP_PORT:-8081}
+#   worker     php artisan queue:work --tries=3 --max-time=3600 --sleep=3
+#   scheduler  php artisan schedule:work, with QUEUE_WORKER_MODE=none because the worker service runs the queue
 
 name: ${SQUIRE_PROJECT:-squire-app}
 
@@ -21,6 +32,60 @@ x-app-build: &app-build
     CITADEL_SERVER_NAME: ${SQUIRE_SERVER_NAME:-app.apps.wayne.test}
     CITADEL_ENVIRONMENT: ${SQUIRE_ENVIRONMENT:-local}
     CITADEL_DEPLOYMENTS: ${SQUIRE_DEPLOYMENTS:-./deployments/}
+
+# The portable image. Its context is the app (the kit's own folder by default; WELD sets SQUIRE_PORTABLE_CONTEXT=..
+# and SQUIRE_KIT_DIR=deploy, because its Laravel app sits one folder up from the kit).
+x-portable-build: &portable-build
+  context: ${SQUIRE_PORTABLE_CONTEXT:-.}
+  dockerfile: ${SQUIRE_KIT_DIR:-.}/.squire/portable.Dockerfile
+  args:
+    BASE_IMAGE: ${SQUIRE_BASE_IMAGE:-citadel/php-apache:8.4r5}
+    SQUIRE_KIT_DIR: ${SQUIRE_KIT_DIR:-.}
+    CITADEL_PUBLIC_DIR: ${SQUIRE_PUBLIC_DIR:-src/public}
+    CITADEL_TIME_ZONE: ${SQUIRE_TZ:-America/Detroit}
+    CITADEL_SERVER_NAME: ${SQUIRE_SERVER_NAME:-app.apps.wayne.test}
+    CITADEL_ENVIRONMENT: ${SQUIRE_ENVIRONMENT:-local}
+
+# Every portable service: the same image, the same environment, the least privilege. It needs no capability at all:
+# it never starts as root, and 8080 is not a privileged port.
+x-portable: &portable
+  build: *portable-build
+  image: squire-local/portable:${SQUIRE_PROJECT:-squire-app}
+  profiles: [portable]
+  # Any UID in group 0 works, because the image gives group 0 what the app writes; try OpenShift's random one with
+  # SQUIRE_PORTABLE_USER=1000123:0.
+  user: "${SQUIRE_PORTABLE_USER:-10001:0}"
+  # The app's own settings (APP_KEY and friends) from its env file, when there is one; never baked into the image.
+  env_file:
+    - path: ${SQUIRE_PORTABLE_ENV_FILE:-.env}
+      required: false
+  environment: &portable-environment
+    # Laravel's names for the local MySQL below; a raw PHP app reads its own and ignores these.
+    DB_CONNECTION: mysql
+    DB_HOST: mysql
+    DB_PORT: "3306"
+    DB_DATABASE: ${SQUIRE_DB_NAME:-app}
+    DB_USERNAME: ${SQUIRE_DB_USER:-app}
+    DB_PASSWORD: ${SQUIRE_DB_PASSWORD:?set SQUIRE_DB_PASSWORD in .env.squire}
+    LOG_CHANNEL: stderr
+    # The kit's switches pass by name only, as on the app service: set in .env.squire, the value reaches the
+    # container; unset, it stays unset there and the image's default holds.
+    SQUIRE_ARTISAN_OPTIMIZE:
+    SQUIRE_WORKER_COMMAND:
+    SQUIRE_SCHEDULER_COMMAND:
+    SQUIRE_MIGRATE_COMMAND:
+    SQUIRE_OPCACHE_VALIDATE:
+    SQUIRE_PHP_DISABLE_FUNCTIONS:
+  cap_drop: [ALL]
+  security_opt:
+    - no-new-privileges:true
+  mem_limit: ${SQUIRE_APP_MEMORY:-512m}
+  pids_limit: 256
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "2"
 
 services:
   # Citadel creates /citadel/logs/deployments on the host; a fresh named volume does not have it. This one-shot
@@ -123,6 +188,53 @@ services:
     mem_limit: ${SQUIRE_DB_MEMORY:-512m}
     pids_limit: 512
     logging: *logging
+
+  # --- the portable profile: one image, four process types (WELD W8) --------------------------------------------
+  # Migrations run once per release, never in every replica (WELD W24): a one-shot service the others wait for.
+  migrate:
+    <<: *portable
+    environment:
+      <<: *portable-environment
+      SQUIRE_ROLE: migrate
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+
+  web:
+    <<: *portable
+    environment:
+      <<: *portable-environment
+      SQUIRE_ROLE: web
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${SQUIRE_PORTABLE_HTTP_PORT:-8081}:8080"
+    restart: unless-stopped
+
+  # queue:work exits after --max-time (an hour), and the restart policy starts it again on the same image.
+  worker:
+    <<: *portable
+    environment:
+      <<: *portable-environment
+      SQUIRE_ROLE: worker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  scheduler:
+    <<: *portable
+    environment:
+      <<: *portable-environment
+      SQUIRE_ROLE: scheduler
+      # Sourdough's Laravel shapes schedule a short queue worker unless told not to; the worker service has the queue.
+      QUEUE_WORKER_MODE: none
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
 
 volumes:
   logs:

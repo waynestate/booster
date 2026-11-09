@@ -17,11 +17,13 @@ declare(strict_types=1);
  *   SQUIRE_HEALTH_PORT     the port (default 80)
  *   SQUIRE_HEALTH_TIMEOUT  seconds to wait (default 5, which stays inside Citadel's 15)
  *   SQUIRE_HEALTH_VENDOR   1 also requires vendor/autoload.php (default 1)
+ *   SQUIRE_APP_DIR         the app root (default: this file's folder); the portable image sets it, so a kit kept in
+ *                          a subfolder (WELD's deploy/) still checks the app it serves
  *
  * A health check is the only exam where "just show up" is the whole syllabus.
  */
 
-$root = __DIR__;
+$root = getenv('SQUIRE_APP_DIR') ?: __DIR__;
 $laravel = is_file($root . '/artisan');
 
 $path = getenv('SQUIRE_HEALTH_PATH') ?: ($laravel ? '/up' : '/up.php');
