@@ -110,7 +110,8 @@ booster init   --path=../my-app        # optional: writes playbooks for AI codin
 <code>require.php</code> floor and the lowest ceiling across <code>packages</code> and <code>packages-dev</code>, raised by a <code>platform-overrides.php</code>
 or <code>config.platform.php</code> pin in <code>composer.json</code> when one is set. If that floor sits above the floor <code>composer.json</code>
 claims, Booster plans from the lock's floor and prints a warning saying so; if the first PHP hop lands at or above
-the lock's ceiling, a second warning notes that hop will need a <code>composer update</code> to keep the lock installable.
+the lock's ceiling, a second warning says that hop's gate updates the locked packages that stop it (item 5 of
+<a href="hops.html">What a hop does</a>).
 Without a lock, <code>composer.json</code> stays the sole source.</p>
 <p>A plan for the bundled Laravel 10 example app on PHP 8.2 looks like this (the order keeps the app on a PHP and
 Laravel pair Laravel supports at every step):</p>

@@ -113,6 +113,13 @@ that pointed at them: <code>Setup::registerAutoloadDirectory(...)</code>, <code>
 <p>The gate then runs <code>composer install</code> on the hop's PHP inside the target image, which resolves the packages and
 writes the app's first <code>composer.lock</code>; an app that already had a lock gets <code>composer update -W</code> for the new packages
 only. Then it runs the app's tests, or the syntax check for an app with none, and the replay.</p>
+<p>That lock is right for the hop's PHP and no newer. On 7.4, Slim 4's <code>psr/container</code> 2.0 holds
+<code>symfony/service-contracts</code> at v1.1.2, which needs PHP below 8.0, so a plain <code>composer install</code> on 8.0 refuses the
+lock. Each later PHP hop therefore reads the lock first and updates just the packages that refuse its PHP (here
+<code>composer update -W symfony/service-contracts</code> on the 8.0 hop, which also lifts <code>symfony/deprecation-contracts</code>),
+inside <code>composer.json</code>'s constraints. On a real app's <code>composer.json</code> that update moved two packages, and nothing in
+the lock refused 8.1 through 8.5 after it. One lock for every PHP from 7.4 to the target is not on offer: Composer picks the newest release each
+PHP allows, so no <code>config.platform.php</code> pin finds that lock on its own, and Booster never creates that key.</p>
 <h2 id="the-slim-1-bridge">The Slim 1 bridge<a class="docs-heading-link" aria-label="Link to this section" href="#the-slim-1-bridge">#</a></h2>
 <p>Slim 4 is not Slim 1: different classes, PSR-7 requests, a different router. Rewriting every route by hand is how a
 framework move eats a semester. Instead the hop writes <code>slim1-bridge.php</code>, about 1,200 lines ported from Slim
@@ -169,8 +176,8 @@ commit <code>vendor/</code> on the deploy branch or let Booster's <code>deployme
 <li>ORM 2.20 is the last line that reads docblock annotations, and <code>doctrine/annotations</code> 1.x is abandoned. ORM 3 (PHP
 8.1 or newer, attributes instead of annotations) is the next move, by hand for now. Smarty 5 likewise, once the
 templates stop using PHP functions as modifiers.</li>
-<li>The lock was resolved on the hop's PHP. Later PHP hops keep it, so run <code>composer update</code> once the app lands on its
-target to pick up the newest releases that PHP allows.</li>
+<li>The lock was resolved on the hop's PHP, and later PHP hops move only the packages that refuse theirs. Run
+<code>composer update</code> once the app lands on its target to pick up the newest releases that PHP allows.</li>
 </ul>
 </article>
     </main>

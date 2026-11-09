@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Run;
 
+use Composer\Semver\Semver;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -175,7 +176,7 @@ final class HopExecutor
             // The suite is red (or never ran) before Booster touches anything, so a later red
             // gate would be unprovable. Stop before the first hop and say so plainly.
             $reason = $baseline->status === BaselineResult::INSTALL_FAILED
-                ? sprintf('composer install failed (exit %d) before the gate ran. Fix the app\'s composer.json and composer.lock, or pass --allow-failing-baseline.', $baseline->exitCode ?? -1)
+                ? $baseline->advice ?? sprintf('composer install failed (exit %d) before the gate ran. Fix the app\'s composer.json and composer.lock, or pass --allow-failing-baseline.', $baseline->exitCode ?? -1)
                 : $this->baselineFailureReason($baseline);
             $results = [];
             foreach ($plan->steps as $step) {
@@ -367,8 +368,75 @@ final class HopExecutor
             $outcome->phase === GateOutcome::PHASE_INSTALL => BaselineResult::INSTALL_FAILED,
             default => BaselineResult::FAILED,
         };
+        $advice = $status === BaselineResult::INSTALL_FAILED ? $this->installAdvice($plan, $path, $php, $outcome->output) : null;
 
-        return new BaselineResult($status, $php, $outcome->exitCode, $outcome->output, $warning, $kind);
+        return new BaselineResult($status, $php, $outcome->exitCode, $outcome->output, $warning, $kind, $advice);
+    }
+
+    /**
+     * What to run when the baseline's composer install failed on the PHP it
+     * starts from, for the two causes Booster can name; null otherwise, so
+     * the report keeps its general advice. Both show up as Composer's "your
+     * php version ... does not satisfy" lines.
+     *
+     * - composer.json already requires a newer PHP than --from-php. That is
+     *   where a run stands after it stopped at a PHP hop's gate: the hop's
+     *   composer.json edit stays, so a rerun from the old PHP can never
+     *   install (found on a real app, 2026-11-09). The rerun starts from the
+     *   PHP composer.json names, and that baseline checks the stopped hop.
+     * - The lock holds packages whose own require.php leaves this PHP out.
+     *
+     * @param list<string> $output
+     */
+    private function installAdvice(Plan $plan, string $path, string $php, array $output): ?string
+    {
+        if (!str_contains(implode("\n", $output), 'your php version')) {
+            return null;
+        }
+        $constraint = self::composerPhpConstraint($path);
+        $detected = $plan->project->phpVersion;
+        if ($constraint !== null && $detected !== null && version_compare($php, $detected, '<')) {
+            try {
+                $refused = !Semver::satisfies($php . '.99', $constraint);
+            } catch (\UnexpectedValueException) {
+                $refused = false;
+            }
+            if ($refused) {
+                return sprintf(
+                    'composer.json already requires php %s, which PHP %s does not meet, so the app is past %s (a run that stopped at a hop leaves that hop\'s composer.json edit in place). Run again without --from-php=%s: Booster then starts from PHP %s%s, and the baseline on %s checks the stopped hop\'s work.',
+                    $constraint,
+                    $php,
+                    $php,
+                    $php,
+                    $detected,
+                    $detected === $plan->project->manifestPhp ? ', as composer.json says' : '',
+                    $detected,
+                );
+            }
+        }
+        $refusing = LockRefusals::find($path, $php);
+        if ($refusing !== []) {
+            return sprintf(
+                'The lock holds packages that do not install on PHP %s: %s. Run composer update -W %s on PHP %s, commit composer.lock, then run again.',
+                $php,
+                LockRefusals::describe($refusing),
+                implode(' ', array_keys($refusing)),
+                $php,
+            );
+        }
+
+        return null;
+    }
+
+    /** composer.json's require.php, or null when the app names none. */
+    private static function composerPhpConstraint(string $path): ?string
+    {
+        $file = rtrim($path, '/\\') . '/composer.json';
+        $raw = is_file($file) ? file_get_contents($file) : false;
+        $data = $raw === false ? null : json_decode($raw, true);
+        $constraint = is_array($data) ? ($data['require']['php'] ?? null) : null;
+
+        return is_string($constraint) && $constraint !== '' ? $constraint : null;
     }
 
     /**
@@ -634,7 +702,10 @@ final class HopExecutor
                 $proxies = $hop->id === HopRegistry::laravelHopId('8', '9') ? $this->trustProxies->rewrite($path, false) : null;
                 [$inertiaChanges, $inertiaFiles] = $this->inertiaChangesFor($hop, $step, $plan, false);
                 $files = [...self::prepassFiles($prepass), ...$applied->files, ...($migration->files ?? []), ...($proxies->files ?? []), ...$inertiaFiles];
-                if (($prepass?->changedCount() ?? 0) === 0 && $applied->changedCount() === 0 && $messages === [] && ($migration->changes ?? []) === [] && ($proxies->changes ?? []) === [] && $inertiaChanges === []) {
+                // A lock that cannot install on the hop's PHP is work for the
+                // gate even when no file changed.
+                $lockRefuses = $hop->kind === HopKind::Php && $step->phpAfter !== null && LockRefusals::find($path, $step->phpAfter) !== [];
+                if (($prepass?->changedCount() ?? 0) === 0 && $applied->changedCount() === 0 && $messages === [] && ($migration->changes ?? []) === [] && ($proxies->changes ?? []) === [] && $inertiaChanges === [] && !$lockRefuses) {
                     // Nothing changed, so there is nothing for the gate to prove; skip it.
                     return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [
                         'Nothing to do: Rector changed no files and composer.json already allows the target, so the gate was skipped.',
@@ -646,15 +717,22 @@ final class HopExecutor
                 }
 
                 if (!$options->skipGate) {
-                    $gate = $this->runGate($step, $path, $options, $baseline);
+                    // Read before the gate: once the lock is refreshed, the
+                    // packages that refused the new PHP are gone from it.
+                    $update = $this->lockUpdatePackages($step, $path);
+                    $lockReason = $this->lockRefusalReason($step, $path);
+                    $gate = $this->runGate($step, $path, $options, $baseline, $update);
                     if (!$gate->passed) {
-                        return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...($proxies->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...($proxies->manual ?? []), ...$gate->lines, ...$notes], false, $prepass?->files() ?? []);
+                        $why = $lockReason === null ? [] : [sprintf('The gate ran %s because %s.', self::lockCommand($update), $lockReason)];
+
+                        return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...($proxies->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...($proxies->manual ?? []), ...$why, ...$gate->lines, ...$notes], false, $prepass?->files() ?? []);
                     }
                     $messages = [...$messages, ...$gate->lines];
                     $messages[] = $this->gatePassedLine($step->phpAfter, $baseline->gateKind);
-                    $update = $this->lockUpdatePackages($step, $path);
                     if ($update !== []) {
-                        $messages[] = sprintf('The gate refreshed composer.lock (%s).', self::lockCommand($update));
+                        $messages[] = $lockReason === null
+                            ? sprintf('The gate refreshed composer.lock (%s).', self::lockCommand($update))
+                            : sprintf('The gate refreshed composer.lock (%s): %s.', self::lockCommand($update), $lockReason);
                     }
                     $unblocked = $this->composer->temporaryUnblocks($path);
                     if ($unblocked !== []) {
@@ -900,12 +978,25 @@ final class HopExecutor
      * 2026-11-06; every Sourdough app pins it). Those get `composer update
      * --lock`, which moves no package but rewrites the hash and overrides.
      *
+     * Either way, when locked packages' own require.php leaves out the hop's
+     * PHP, the lock cannot install there at all, so the gate runs `composer
+     * update -W` for just those packages (inside composer.json's constraints)
+     * and the lock follows the app up one PHP at a time. Found on a real 2012
+     * app (2026-11-09): vendored-to-composer resolved its first lock on 7.4,
+     * and the 8.0 hop's plain install refused symfony/service-contracts
+     * v1.1.2 every time.
+     *
      * @return list<string>
      */
     private function lockUpdatePackages(PlanStep $step, string $path): array
     {
         $hop = $step->hop;
         if ($hop->kind === HopKind::Php) {
+            $refusing = $step->phpAfter === null ? [] : array_keys(LockRefusals::find($path, $step->phpAfter));
+            if ($refusing !== []) {
+                return $refusing;
+            }
+
             return self::pinsPlatformPhp($path) && is_file(rtrim($path, '/\\') . '/composer.lock')
                 ? [TargetImageRunner::LOCK_REFRESH]
                 : [];
@@ -921,6 +1012,28 @@ final class HopExecutor
         }
 
         return $packages;
+    }
+
+    /**
+     * Why a PHP hop's gate updates locked packages, for the report: "the lock
+     * held symfony/service-contracts v1.1.2, which needs php ^7.1.3, not PHP
+     * 8.0". Null when nothing in the lock refuses the hop's PHP.
+     */
+    private function lockRefusalReason(PlanStep $step, string $path): ?string
+    {
+        if ($step->hop->kind !== HopKind::Php || $step->phpAfter === null) {
+            return null;
+        }
+        $refusing = LockRefusals::find($path, $step->phpAfter);
+        if ($refusing === []) {
+            return null;
+        }
+        $held = [];
+        foreach ($refusing as $name => $package) {
+            $held[] = sprintf('%s %s, which needs php %s', $name, $package['version'], $package['constraint']);
+        }
+
+        return sprintf('the lock held %s, not PHP %s', implode(', and ', $held), $step->phpAfter);
     }
 
     /**

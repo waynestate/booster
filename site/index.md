@@ -322,7 +322,7 @@ Task:
 
 Constraints:
 - Plan and dry run only, until I say so. Never commit or push.
-- Laravel and PHPUnit hops refresh composer.lock inside the gate (composer update -W for the package the hop moved), and a Composer-phase failure means the tests never ran. PHP hops keep a plain install: if a committed lock goes stale, say which packages need composer update.
+- Laravel and PHPUnit hops refresh composer.lock inside the gate (composer update -W for the package the hop moved), and a Composer-phase failure means the tests never ran. PHP hops keep a plain install unless a locked package refuses the new PHP; then the gate updates just those packages (composer update -W) and the report names them. Say which ones the dry run lists.
 - Ask me before you guess: a red baseline, a capped hop, or a package that blocks a Laravel major.
 
 Output: the plan with the reason for its order, the SESAME notes if any, the dry-run summary, then your questions.

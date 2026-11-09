@@ -98,8 +98,9 @@ final readonly class Project
 
     /**
      * The warning to show when the first PHP hop lands at or above the lock's
-     * exclusive ceiling, where the lock can no longer install without a
-     * composer update. Null when the lock has no ceiling or the hop stays
+     * exclusive ceiling, where the lock can no longer install as it stands.
+     * The hop's gate updates the packages that stop it, so the warning says
+     * what will move. Null when the lock has no ceiling or the hop stays
      * inside it.
      */
     public function lockCeilingWarning(?string $firstTarget): ?string
@@ -112,7 +113,7 @@ final readonly class Project
         }
 
         return sprintf(
-            'The lock also needs PHP below %s (%s); the first PHP hop will need composer update for it.',
+            'The lock also needs PHP below %s (%s); the first PHP hop\'s gate updates the locked packages that stop it (composer update -W, inside composer.json\'s constraints).',
             $this->lockPhpCeiling,
             self::sourceText($this->lockCeilingPackage, $this->lockCeilingConstraint),
         );

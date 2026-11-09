@@ -33,7 +33,12 @@ under `Pre-pass fixes:`.
    `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and
    verifies its extension list; it needs Docker and a few minutes per version, so it is not part of `composer ci`.
 5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package
-   the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. A PHP hop on an app
+   the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. A PHP hop reads the
+   lock first: a locked package whose own `require.php` leaves out the hop's PHP makes a plain `composer install`
+   refuse the whole lock, so the gate runs `composer update -W` for just those packages, inside `composer.json`'s
+   constraints, and the report names each one (`the lock held symfony/service-contracts v1.1.2, which needs php
+   ^7.1.3, not PHP 8.0`). The lock follows the app up one PHP at a time, and each hop's diff moves only what had to
+   move. Otherwise, a PHP hop on an app
    that pins `config.platform.php` (every Sourdough app does) runs `composer update --lock`: no package moves, but
    the lock's `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check
    the raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain

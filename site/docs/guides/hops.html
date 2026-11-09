@@ -69,7 +69,11 @@ first hop and fails on a changed answer: see <a href="replay-gate.html">The repl
 <code>scripts/check-target-image.sh</code> (or its Windows twin <code>check-target-image.ps1</code>) builds it for each PHP version and
 verifies its extension list; it needs Docker and a few minutes per version, so it is not part of <code>composer ci</code>.</li>
 <li>On Laravel and PHPUnit hops the gate refreshes the lock before the tests: <code>composer update -W</code> for the package
-the hop moved, so <code>composer.lock</code> lands on the new major version next to <code>composer.json</code>. A PHP hop on an app
+the hop moved, so <code>composer.lock</code> lands on the new major version next to <code>composer.json</code>. A PHP hop reads the
+lock first: a locked package whose own <code>require.php</code> leaves out the hop's PHP makes a plain <code>composer install</code>
+refuse the whole lock, so the gate runs <code>composer update -W</code> for just those packages, inside <code>composer.json</code>'s
+constraints, and the report names each one (<code>the lock held symfony/service-contracts v1.1.2, which needs php ^7.1.3, not PHP 8.0</code>). The lock follows the app up one PHP at a time, and each hop's diff moves only what had to
+move. Otherwise, a PHP hop on an app
 that pins <code>config.platform.php</code> (every Sourdough app does) runs <code>composer update --lock</code>: no package moves, but
 the lock's <code>platform-overrides</code> catch up with the new pin, which a plain <code>composer install</code> would otherwise check
 the raised <code>php</code> constraint against and refuse. Every other hop, and the baseline, run a plain
