@@ -33,7 +33,7 @@ final readonly class VendoredInspection
         return $this->moves !== [] && $this->refusals === [];
     }
 
-    /** "Doctrine 2.2.2, Slim 1.6.7 and Smarty 3.1.8", for warnings and messages. */
+    /** "Doctrine 2.2.2, Slim 1.6.0 and Smarty 3.1.8", for warnings and messages. */
     public function summary(): string
     {
         $names = array_map(

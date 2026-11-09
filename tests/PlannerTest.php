@@ -1021,7 +1021,7 @@ final class PlannerTest extends TestCase
         $plan = $this->planVendored(new PlanOptions(fromPhp: '5.6', toPhp: '7.3', vendored: true));
 
         self::assertNotContains('vendored-to-composer', $this->ids($plan));
-        self::assertContains('Moving Doctrine 2.2.2, Slim 1.6.7 and Smarty 3.1.8 to Composer needs PHP 7.4 or newer; the vendored move was left out because the plan ends below that.', $plan->warnings);
+        self::assertContains('Moving Doctrine 2.2.2, Slim 1.6.0 and Smarty 3.1.8 to Composer needs PHP 7.4 or newer; the vendored move was left out because the plan ends below that.', $plan->warnings);
     }
 
     public function test_a_stop_sign_leaves_the_vendored_move_out_and_names_it(): void
