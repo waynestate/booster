@@ -20,7 +20,7 @@ Development happens on git.wayne.edu (the canonical repository); this GitHub rep
 composer ci
 ```
 
-runs `composer validate --strict`, PHPUnit, Pint, PHPStan (Pinstripe's raw preset, inlined; `waynestate/pinstripe` ships with Booster and supplies the preset the advisory scan uses), `composer audit`, the hop data check and the agent-ready check. Nothing needs PHP on the host:
+runs `composer validate --strict`, PHPUnit, Pint, PHPStan (Pinstripe's raw preset, inlined; `waynestate/pinstripe` ships with Booster and supplies the preset the advisory scan uses), `composer audit`, the hop data check, the agent-ready check, the Real output page check (`bin/build-proof.php --check`) and the docs site check (`composer docs:check`). Nothing needs PHP on the host:
 
 ```
 docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install --no-interaction && composer ci"

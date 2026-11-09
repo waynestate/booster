@@ -397,13 +397,13 @@ Side effects are limited to the diff in your working copy. Read it, then merge i
 - ### Start on a dirty tree
   `run` refuses a working copy that is not under git or has uncommitted changes, so the upgrade diff stands alone. Pass `--allow-dirty` if you must.
 - ### Aim at an unsupported version
-  An end-of-life target is refused; a security-only one comes with a warning. The dates come from CREED's `policy.json`, never from Booster's code.
+  A version the policy does not list is refused. A target past security support is only a stop on the way up, with a warning that names the date, and a security-only one gets a warning too. The dates come from CREED's `policy.json`, never from Booster's code.
 - ### Resolve more than the hop moves
   Inside the gate it runs a scoped `composer update -W` for the package a Laravel or PHPUnit hop moved, so the lock follows the constraint. It never resolves anything else; you decide when to update the rest.
 - ### Pass quietly
   An unreadable policy, broken JSON, missing Docker or a Rector error stops the run with exit 1 or 2.
 - ### Trust your file names
-  Subprocesses take argument arrays, and control characters are stripped from everything printed. It reads no secrets and makes no network calls of its own.
+  Subprocesses take argument arrays, and control characters are stripped from everything printed. It reads no secrets, and its own network calls only read: the Packagist dependency check (`--no-package-check` turns it off) and a reachability probe of a wayne-cas repository.
 
 The care team
 
@@ -413,7 +413,7 @@ WELD is the Wayne State application stack. Booster is its upgrade layer, and it 
 
 - [WayneUI](https://wayneui.apps.wayne.edu/)The interface layer under everything, this page included.
 - [CREED](https://creed.apps.wayne.edu/)Writes the version policy Booster reads from the waynestate/creed package.
-- [PROCTOR](https://proctor.apps.wayne.edu/)Measures an app against that policy; the gate runs it after the last hop, and `--proctor-command` overrides the check.
+- [PROCTOR](https://proctor.apps.wayne.edu/)Measures an app against that policy; the gate runs it before the first hop and after the last, and `--proctor-command` adds a check of your own after each hop's tests.
 - [Preflight](https://preflight.apps.wayne.edu/)The CI templates Booster's own checks run on.
 - [SESAME](https://sesame.apps.wayne.edu/)Sign-in; `--sesame` moves wayne-cas apps to it.
 - [HELMET](https://helmet.apps.wayne.edu/)Security headers and session hardening.
@@ -432,8 +432,8 @@ Version 1.12
 
 The six example apps prove the plumbing end to end, and the gate now ends with PROCTOR checking the result against CREED's policy. What stays open, from [OPEN_QUESTIONS.md](https://github.com/waynestate/booster/blob/main/OPEN_QUESTIONS.md):
 
-- Not yet Custom WSU Rector rules beyond the CAS rename, and Rector pilot numbers on real apps
-- Not yet A cas-to-sesame run against a real app; Duo two-factor stays manual work
+- Not yet Custom WSU Rector rules beyond the CAS rename and the PHP 4 `&new` pre-pass, and a Rector pilot re-run on the current release
+- Not yet A signed-in run of an app that cas-to-sesame swapped; Duo two-factor stays manual work
 - Decided No `booster mcp`: ADVISOR is the stack's read-only MCP server
 - Decided No merge-request automation on app code; a person reads the diff and merges it
 - Open The shared MySQL 5.6 database floor (question 8); the hop notes tell the reviewer to check it

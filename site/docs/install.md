@@ -30,10 +30,10 @@ booster run
 On Windows PowerShell, the same single file (`curl.exe` ships with Windows 10 and 11):
 
 ```
-New-Item -ItemType Directory -Force "$HOMEin" | Out-Null
-curl.exe -L -o "$HOMEinooster.phar" https://github.com/waynestate/booster/releases/latest/download/booster.phar
-function booster { php "$HOMEinooster.phar" @args }   # put this line in $PROFILE to keep it
-cd C:\path	o\your-app
+New-Item -ItemType Directory -Force "$HOME\bin" | Out-Null
+curl.exe -L -o "$HOME\bin\booster.phar" https://github.com/waynestate/booster/releases/latest/download/booster.phar
+function booster { php "$HOME\bin\booster.phar" @args }   # put this line in $PROFILE to keep it
+cd C:\path\to\your-app
 booster detect
 booster plan
 booster run --dry-run

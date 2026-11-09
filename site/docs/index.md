@@ -91,5 +91,8 @@ Every route, per OS, is on [Install](https://booster.apps.wayne.edu/docs/install
 - [The baseline](https://booster.apps.wayne.edu/docs/guides/baseline.html)
 - [A smoke test for WSU apps](https://booster.apps.wayne.edu/docs/guides/smoke-test.html)
 - [What a hop does](https://booster.apps.wayne.edu/docs/guides/hops.html)
+- [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html)
+- [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html)
+- [Strict session IDs](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html)
 - [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html)
 - [Deploying on Citadel](https://booster.apps.wayne.edu/docs/guides/citadel.html)

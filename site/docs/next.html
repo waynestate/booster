@@ -46,6 +46,7 @@
 <h2 id="open">Open<a class="docs-heading-link" aria-label="Link to this section" href="#open">#</a></h2>
 <ul>
 <li><strong>The gate needs a real app.</strong> The contract tests cover the bundled example apps. A full <code>run</code> against a real Wayne State application with the gate on has not been proven in CI yet; the proof site carries those runs.</li>
+<li><strong>The shared MySQL 5.6 database floor.</strong> Which PHP and Laravel pairs Citadel's shared MySQL server allows waits on the platform owner (question 8 in OPEN_QUESTIONS.md). Until then each Laravel hop's notes tell the reviewer to check the database version, and Booster does not look at the database.</li>
 </ul>
 <h2 id="decided-not-to-build">Decided not to build<a class="docs-heading-link" aria-label="Link to this section" href="#decided-not-to-build">#</a></h2>
 <ul>

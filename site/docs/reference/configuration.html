@@ -63,7 +63,7 @@
 <tr>
 <td>BOOSTER_POLICY</td>
 <td>Path to CREED's policy.json</td>
-<td>none (uses the snapshot bundled with Booster)</td>
+<td>none (uses the policy.json in the waynestate/creed package)</td>
 <td>bin/refresh-hop-data.php</td>
 </tr>
 </tbody>
@@ -72,8 +72,10 @@
 <p>Booster reads the policy straight from the <code>waynestate/creed</code> package in its own <code>vendor/</code>, so there is no copy to
 drift: <code>composer update waynestate/creed</code> is the whole refresh. <code>--policy</code> and <code>BOOSTER_POLICY</code> still override it for
 one run.</p>
-<p><code>.env.example</code> holds the placeholder. Booster reads no secrets, makes no network calls of its own and talks to no
-Citadel host. Everything it prints from an app (file names, diffs) has control characters stripped.</p>
+<p><code>.env.example</code> holds the placeholder. Booster reads no secrets and talks to no Citadel host. Its own network calls
+only read: the dependency check asks Packagist (and any composer-type repository the app declares) about the app's
+direct dependencies, which <code>--no-package-check</code> turns off, and a plan for an app on <code>wayne-cas</code> with no <code>vendor/</code>
+checks the VCS repository <code>composer.json</code> names for that package with <code>git ls-remote</code>. Everything it prints from an app (file names, diffs) has control characters stripped.</p>
 <p>When Rector runs, Booster passes it a few <code>BOOSTER_*</code> variables of its own (the app path, the sets, the PHP target).
 They are internal; do not set them.</p>
 </article>

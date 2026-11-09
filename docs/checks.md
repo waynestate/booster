@@ -20,8 +20,9 @@ composer ci
 ```
 
 runs `composer validate --strict`, PHPUnit, Pint, PHPStan (Pinstripe's raw preset, inlined; `waynestate/pinstripe`
-ships with Booster and supplies the preset the advisory scan uses), `composer audit`, the hop data check and the
-agent-ready check. Nothing needs PHP on the host:
+ships with Booster and supplies the preset the advisory scan uses), `composer audit`, the hop data check, the
+agent-ready check, the Real output page check (`bin/build-proof.php --check`) and the docs site check
+(`composer docs:check`). Nothing needs PHP on the host:
 
 <!-- docs-test: skip needs Docker -->
 ```

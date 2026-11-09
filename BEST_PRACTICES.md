@@ -17,8 +17,10 @@ tag for how Booster holds each rule today.
 - **Stay inside the PHP and Laravel overlap.** The app never sits on a pair Laravel does not support (Laravel 10 on
   PHP 8.1 to 8.3, 11 on 8.2 to 8.4, 12 on 8.2 to 8.5, 13 on 8.3 or newer). `Enforced`: the planner interleaves the
   hops and refuses a target pair that cannot exist.
-- **Aim at a supported version.** `Enforced`: an EOL target is refused; a security-only target is allowed with a
-  warning. Dates come from CREED's `policy.json`, never from Booster's code.
+- **Aim at a supported version.** `Checked`: a version the policy does not list is refused (exit 2); a target past
+  security support is allowed only as a stop on the way up, with a warning that names the date its support ended, and
+  the run's PROCTOR check turns advisory; a security-only target is allowed with a warning (`Planner::assertTarget()`
+  in `src/Plan/Planner.php`). Dates come from CREED's `policy.json`, never from Booster's code.
 - **Read the official notes for each hop.** `Checked`: every hop prints its notes and links the manual. The PHP 8.0 hop
   is flagged as the one that needs the most review time.
 

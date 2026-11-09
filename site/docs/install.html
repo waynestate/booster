@@ -62,10 +62,10 @@ and changes nothing. <code>run</code> edits files and makes no commit. A real <c
 or stash first) and a Docker daemon for its test gate.</p>
 <p>On Windows PowerShell, the same single file (<code>curl.exe</code> ships with Windows 10 and 11):</p>
 <!-- docs-test: skip needs network -->
-<pre tabindex="0"><code>New-Item -ItemType Directory -Force &quot;$HOMEin&quot; | Out-Null
-curl.exe -L -o &quot;$HOMEinooster.phar&quot; https://github.com/waynestate/booster/releases/latest/download/booster.phar
-function booster { php &quot;$HOMEinooster.phar&quot; @args }   # put this line in $PROFILE to keep it
-cd C:\path	o\your-app
+<pre tabindex="0"><code>New-Item -ItemType Directory -Force &quot;$HOME\bin&quot; | Out-Null
+curl.exe -L -o &quot;$HOME\bin\booster.phar&quot; https://github.com/waynestate/booster/releases/latest/download/booster.phar
+function booster { php &quot;$HOME\bin\booster.phar&quot; @args }   # put this line in $PROFILE to keep it
+cd C:\path\to\your-app
 booster detect
 booster plan
 booster run --dry-run

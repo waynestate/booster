@@ -47,7 +47,7 @@ Some hops come along by default, and some only when you ask:
 - An app on PHPUnit 8 or older gets a manual PHPUnit 9 step before the first PHP 8 hop.
 - The SESAME move (`--sesame`) and the WayneUI move (`--wayneui`) are opt-in only.
 - `--skip <hop id>` drops a hop you do not want.
-- If a target is past security support, the plan stops at the policy limit and warns. If Rector has no ruleset for a step yet, the plan stops short and warns.
+- If you pass a target past security support, the plan still goes there as a stop on the way up and warns with the date its support ended. If Rector has no ruleset for a step yet, the plan stops short and warns.
 
 `run` handles each hop the same way: a Rector preview, then the edits (if a hop would change more than 200 files it asks first, or stops when it cannot ask; `--max-changes` sets a hard limit), then the Composer constraints, then your tests in the target PHP image. That last part is the gate. The first hop that fails stops the run, and the hops after it are reported as "not run". Booster never commits; the changes sit in your working copy for you to review. Progress prints one line per hop, like `hop 3/11 <hop id>: <status>, 12 files, 41 s`, and ends with `run finished: 11 of 11 hops run, 0 stopped, ...`.
 

@@ -101,10 +101,10 @@ or stash first) and a Docker daemon for its test gate.
 On Windows PowerShell, the same single file (`curl.exe` ships with Windows 10 and 11):
 
 ```
-New-Item -ItemType Directory -Force "$HOMEin" | Out-Null
-curl.exe -L -o "$HOMEinooster.phar" https://github.com/waynestate/booster/releases/latest/download/booster.phar
-function booster { php "$HOMEinooster.phar" @args }   # put this line in $PROFILE to keep it
-cd C:\path	o\your-app
+New-Item -ItemType Directory -Force "$HOME\bin" | Out-Null
+curl.exe -L -o "$HOME\bin\booster.phar" https://github.com/waynestate/booster/releases/latest/download/booster.phar
+function booster { php "$HOME\bin\booster.phar" @args }   # put this line in $PROFILE to keep it
+cd C:\path\to\your-app
 booster detect
 booster plan
 booster run --dry-run
@@ -238,7 +238,7 @@ Some hops come along by default, and some only when you ask:
 - An app on PHPUnit 8 or older gets a manual PHPUnit 9 step before the first PHP 8 hop.
 - The SESAME move (`--sesame`), the WayneUI move (`--wayneui`), the move of hand-copied libraries to Composer (`--vendored`) and strict session IDs for a raw PHP app (`--strict-session`) are opt-in only.
 - `--skip <hop id>` drops a hop you do not want.
-- If a target is past security support, the plan stops at the policy limit and warns. If Rector has no ruleset for a step yet, the plan stops short and warns.
+- If you pass a target past security support, the plan still goes there as a stop on the way up and warns with the date its support ended. If Rector has no ruleset for a step yet, the plan stops short and warns.
 
 `run` handles each hop the same way: a Rector preview, then the edits (if a hop would change more than 200 files it asks first, or stops when it cannot ask; `--max-changes` sets a hard limit), then the Composer constraints, then your tests in the target PHP image. That last part is the gate. The first hop that fails stops the run, and the hops after it are reported as "not run". Booster never commits; the changes sit in your working copy for you to review. Progress prints one line per hop, like `hop 3/11 <hop id>: <status>, 12 files, 41 s`, and ends with `run finished: 11 of 11 hops run, 0 stopped, ...`.
 
@@ -844,8 +844,10 @@ Booster reads the policy straight from the `waynestate/creed` package in its own
 drift: `composer update waynestate/creed` is the whole refresh. `--policy` and `BOOSTER_POLICY` still override it for
 one run.
 
-`.env.example` holds the placeholder. Booster reads no secrets, makes no network calls of its own and talks to no
-Citadel host. Everything it prints from an app (file names, diffs) has control characters stripped.
+`.env.example` holds the placeholder. Booster reads no secrets and talks to no Citadel host. Its own network calls
+only read: the dependency check asks Packagist (and any composer-type repository the app declares) about the app's
+direct dependencies, which `--no-package-check` turns off, and a plan for an app on `wayne-cas` with no `vendor/`
+checks the VCS repository `composer.json` names for that package with `git ls-remote`. Everything it prints from an app (file names, diffs) has control characters stripped.
 
 When Rector runs, Booster passes it a few `BOOSTER_*` variables of its own (the app path, the sets, the PHP target).
 They are internal; do not set them.
@@ -916,8 +918,9 @@ composer ci
 ```
 
 runs `composer validate --strict`, PHPUnit, Pint, PHPStan (Pinstripe's raw preset, inlined; `waynestate/pinstripe`
-ships with Booster and supplies the preset the advisory scan uses), `composer audit`, the hop data check and the
-agent-ready check. Nothing needs PHP on the host:
+ships with Booster and supplies the preset the advisory scan uses), `composer audit`, the hop data check, the
+agent-ready check, the Real output page check (`bin/build-proof.php --check`) and the docs site check
+(`composer docs:check`). Nothing needs PHP on the host:
 
 ```
 docker run --rm -v "${PWD}:/app" -w /app composer:2.10.3 sh -c "composer install --no-interaction && composer ci"
