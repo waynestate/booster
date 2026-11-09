@@ -11,14 +11,12 @@ include:
   - component: $CI_SERVER_FQDN/enterprise-apps/preflight/composer-audit@0.4.0
     inputs:
       image: "composer:2@sha256:b6dcd72ca98fa19d0e5b8476de179859704891fad06dd9e0b96833d4c430a5fc"
-  # The front page deploy layer (ADR-0017): PROCTOR checks deploy/ against CREED's policy.
-  # allow_failure: current findings: unbounded dev-main constraints; CI files missing in deploy/.
+  # The front page deploy layer (ADR-0017): PROCTOR checks deploy/ against CREED's policy, and a failure blocks.
   - component: $CI_SERVER_FQDN/enterprise-apps/preflight/proctor@0.4.0
     inputs:
       image: "php:8.4-cli-trixie@sha256:9cf851bc2c1b37c3e59dfd677a3c3e56d485af5a47c93f629424bb039eafcb69"
       working_dir: deploy
       proctor_command: vendor/bin/proctor check --format=codequality
-      allow_failure: true
   # Accessibility: Preflight's a11y component serves site/ and checks every page with axe-core 4.14.0, light and
   # dark, at 320 and 1280 px, plus WCAG 1.4.10 reflow, at WCAG 2.2 AA. Its Playwright image comes from
   # mcr.microsoft.com, which the Dependency Proxy does not front, so it takes no image_prefix.
