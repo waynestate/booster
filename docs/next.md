@@ -18,6 +18,6 @@ This page lists what Booster does not do yet, and what it decided not to build. 
 
 ## Not built yet
 
-- **Custom rules.** Apps sometimes need a rewrite Rector does not ship. Booster has no way to register one yet; until it does, such rewrites stay manual.
-- **Pilot numbers.** No pilot cohort has run yet, so there are no counts of apps upgraded or hops applied to publish.
-- **A `cas-to-sesame` run against a real app.** The hop exists (opt in with `--sesame`) and renames the classes, swaps the Composer requirement, writes `config/sesame.php` from the old config and rewrites the model trait. Duo two-factor stays manual work, and the hop has not been run against a real app yet.
+- **Custom rules** beyond the CAS rename and the PHP 4 era `$a = &new Foo();` pre-pass. Apps sometimes need a rewrite Rector does not ship; the proof corpus found no other pattern worth a rule, so such rewrites stay manual until one shows up.
+- **Pilot numbers on the current release.** The proof ran Booster over 95 Wayne State units on 2026-10-28 and again on 2026-11-01 (1.6.0); the aggregates are on the proof site, which needs an employee sign-in. A re-run on the current release is still open.
+- **A signed-in `cas-to-sesame` run.** The hop (opt in with `--sesame`) has run on a real app's shape since 1.6.0: it renames the classes, swaps the Composer requirement, writes `config/sesame.php` from the old config and rewrites the model trait. Duo two-factor stays manual work, and a signed-in run of the swapped app is still open, because the proof sandbox cannot sign in.

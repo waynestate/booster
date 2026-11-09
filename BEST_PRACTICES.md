@@ -35,8 +35,12 @@ tag for how Booster holds each rule today.
   temporary ignore into `config.policy.advisories.ignore`, retries once, and reports the unblock; PROCTOR keeps
   naming the entry until the app removes it. The unblock never ships: after a gated step passes, Booster warns
   while one of its entries remains, and the plan's last step fails until it is out of `composer.json`.
-- **Write characterization tests for code that has none.** `Documented`: the playbooks ask for it before the PHP 8.0
-  hop.
+- **Write characterization tests for code that has none.** `Checked`: the replay gate is the runnable form.
+  `booster replay init` drafts a request file (`booster-replay.json`) from the app's routes, and `booster run --replay`
+  records how the app answers those requests on its current PHP before the first hop, replays them after every hop,
+  and fails the hop on a changed answer (`src/Replay/ReplayGate.php`, `tests/HopExecutorReplayTest.php`,
+  `tests/ReplayDockerTest.php`; guide: `docs/guides/replay-gate.md`). It is off unless asked for, and the PHP 8.0
+  playbook asks for extra tests before that hop.
 
 ## Rector
 
@@ -49,7 +53,12 @@ tag for how Booster holds each rule today.
 - **Run Rector from its own toolchain.** `Enforced`: Rector and rector-laravel come from Booster's `vendor/`, never
   from the app, so an app on PHP 7.4 can be upgraded.
 - **Pin Rector and its rule packages** for a whole campaign. `Enforced`: `composer.lock` is committed; Rector is
-  bounded `^2.8` and rector-laravel `^2.7`.
+  bounded `^2.8` and rector-laravel `^2.7`. Before the first hop rewrites code, `run` checks Booster's Rector config
+  with `rector validate-config` and stops on a broken one (`RectorRunner::validateConfig()` in
+  `src/Run/RectorRunner.php`), and the `composer-ci` job in `.gitlab-ci.yml` runs the same check. The run report
+  records the Rector version that ran (`rector_version`), and a real run writes the hop record `booster-hop.json` at
+  the app root (`src/Report/HopRecord.php`) with the installed `rector/rector` and `driftingly/rector-laravel`
+  versions, so every app in a campaign shows which rules moved it (`tests/HopExecutorTest.php`, `tests/CliTest.php`).
 - **Use maintained sets before writing rules.** `Enforced`: PHP and Laravel hops use the official per-version sets. The
   only Booster-owned rule set is the `wayne-cas` rename.
 - **Give Rector room to breathe.** `Checked`: the Rector process runs under `--memory-limit` (default `2G`, `-1`
