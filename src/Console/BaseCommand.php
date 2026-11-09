@@ -76,6 +76,7 @@ abstract class BaseCommand extends Command
             ->addOption('sesame', null, InputOption::VALUE_NONE, 'Include the wayne-cas to SESAME swap.')
             ->addOption('wayneui', null, InputOption::VALUE_NONE, 'Include the WayneUI 1.x to 2.x move.')
             ->addOption('vendored', null, InputOption::VALUE_NONE, 'Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto Composer.')
+            ->addOption('strict-session', null, InputOption::VALUE_NONE, 'Include the hop that turns on strict session IDs before each session_start() in a raw PHP app.')
             ->addOption('skip', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hop id to leave out (repeatable).')
             ->addOption('no-package-check', null, InputOption::VALUE_NONE, 'Skip the Packagist dependency check (for offline use).')
             ->addOption('until', null, InputOption::VALUE_REQUIRED, 'Cut the plan after this hop id: that step and everything before it stay.')
@@ -138,6 +139,7 @@ abstract class BaseCommand extends Command
             until: $this->stringOption($input, 'until'),
             only: $this->stringOption($input, 'only'),
             vendored: (bool) $input->getOption('vendored'),
+            strictSession: (bool) $input->getOption('strict-session'),
         );
 
         $casReachability = new WayneCasReachability($this->processes);

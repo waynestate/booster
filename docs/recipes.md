@@ -202,6 +202,9 @@ Without the flag, `plan` only warns that your app uses `wayne-cas` or WayneUI 1.
 
 An app that hand-copied Doctrine 2, Smarty 3 or Slim 1 into `vendor/` has a third opt-in move, `--vendored`, which puts those libraries on Composer; see [Hand-copied libraries to Composer](guides/framework-hops.md).
 
+A raw PHP app that calls `session_start()` itself has a fourth, `--strict-session`, which turns on strict session IDs
+before each call (Laravel apps are skipped); see [Strict session IDs for raw PHP apps](guides/strict-sessions.md).
+
 ## 13. Plan for a future date, or a different policy
 
 <!-- docs-test: skip run on your own app -->

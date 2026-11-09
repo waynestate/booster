@@ -87,6 +87,12 @@ final class SkillRenderer
         $how = $hop->isManual()
             ? "Booster has no automatic change for this hop. Follow the official guide below, then run the tests.\n"
             : "1. `booster run --path=<app> --dry-run` and read every diff.\n2. `booster run --path=<app>` applies the plan and stops at the first failing gate.\n3. If a hop is over the review threshold (200 files), read its per-rule summary, then apply it with `--max-changes=N`. Use `--skip` to leave a rule out.\n";
+        $checks = 'What Rector cannot do (check these by hand):';
+        if ($hop->kind === HopKind::Session) {
+            // No Rector here: Booster edits the files itself, and the flag is opt-in.
+            $how = "1. `booster plan --path=<app> --strict-session` and read every stop sign it names. Booster never guesses past one.\n2. `booster run --path=<app> --strict-session --dry-run` and read every diff.\n3. `booster run --path=<app> --strict-session` applies the plan and stops at the first failing gate.\n";
+            $checks = 'Check these by hand:';
+        }
         $failure = $this->failureSection($hop);
         $boost = $this->boostSection($hop);
 
@@ -104,7 +110,7 @@ final class SkillRenderer
 
         {$review}{$how}
         {$failure}
-        {$boost}What Rector cannot do (check these by hand):
+        {$boost}{$checks}
 
         {$notes}
         Official notes:
@@ -198,7 +204,12 @@ final class SkillRenderer
                 'Use `browser-logs` after a page load to catch front-end errors the change might surface.',
                 'Run `last-error` and `read-log-entries` after the build and the tests.',
             ],
+            // Boost is a Laravel package, and this hop never runs on a Laravel app.
+            HopKind::Session => [],
         };
+        if ($prompts === []) {
+            return '';
+        }
 
         $lines = ["Only if the app has Laravel Boost (`booster detect` says so):", ''];
         foreach ($prompts as $prompt) {

@@ -7,7 +7,7 @@ description: The vendored-to-composer hop moves an app's hand-copied Doctrine 2,
 
 This page covers the first framework hop, `vendored-to-composer`: what it moves, what it writes, what makes it refuse,
 and how the replay gate proves the app still answers the same. Before this: [The replay gate](replay-gate.md). Next:
-[Laravel hops and vendor/](laravel-and-vendor.md).
+[Strict session IDs for raw PHP apps](strict-sessions.md).
 
 Some apps never met Composer. In 2012 a real WSU app copied Doctrine 2.2, Smarty 3.1 and Slim 1.6 straight into
 `vendor/`, loaded them with `require` lines, and ran happily until PHP moved on. The PHP hops cannot help it: Booster

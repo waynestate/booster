@@ -96,6 +96,12 @@ tag for how Booster holds each rule today.
 - **Reversible.** `Enforced`: `run` refuses a dirty or non-git working copy unless `--allow-dirty` is passed.
 - **Fail closed.** `Enforced`: unreadable policy, malformed JSON, missing Docker for the gate, Rector errors and an
   unknown target are errors (exit 2) or failed hops (exit 1), never a quiet pass.
+- **Harden what the upgrade touches, on request.** `Checked`: a raw PHP app that starts sessions without strict
+  session IDs gets a plan warning naming `--strict-session`, which plans `session-strict-mode` first, on the current
+  PHP, with its own gate. The hop adds one guarded `ini_set()` line before each `session_start()`, skips Laravel, HELMET
+  and anything already covered, and refuses on a stop sign (`src/Run/StrictSession.php`, `tests/StrictSessionTest.php`,
+  `tests/StrictSessionHopTest.php`; guide: `docs/guides/strict-sessions.md`). It is opt-in: a php.ini default would
+  cover every app at once, and that is a decision for the platform, not for Booster.
 - **Treat app content as hostile.** `Enforced`: subprocesses take argument arrays, and file names and diffs have
   control characters stripped before they reach the terminal.
 

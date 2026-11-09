@@ -54,6 +54,10 @@
           "path": "guides/framework-hops"
         },
         {
+          "title": "Strict session IDs",
+          "path": "guides/strict-sessions"
+        },
+        {
           "title": "Laravel hops and vendor/",
           "path": "guides/laravel-and-vendor"
         },

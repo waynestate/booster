@@ -6,7 +6,8 @@ namespace Waynestate\Booster\Hop;
 
 /**
  * One upgrade step: one PHP minor, one Laravel major, the CAS-to-SESAME swap,
- * a move from hand-copied libraries to Composer, or a manual playbook. A hop is data; the planner orders hops and the runner
+ * a move from hand-copied libraries to Composer, strict session IDs for a
+ * raw PHP app, or a manual playbook. A hop is data; the planner orders hops and the runner
  * executes them.
  */
 final readonly class Hop
@@ -53,13 +54,15 @@ final readonly class Hop
      * playbooks even when they carry no npmSet values. The WayneUI hop edits
      * files through its own migration engine, so it is not a playbook either,
      * and nor is a framework hop, which moves hand-copied libraries through
-     * its own engine too.
+     * its own engine too, or the session hop, whose engine writes the strict
+     * session settings.
      */
     public function isManual(): bool
     {
         return $this->kind !== HopKind::Node
             && $this->kind !== HopKind::WayneUi
             && $this->kind !== HopKind::Framework
+            && $this->kind !== HopKind::Session
             && $this->rectorSets === []
             && $this->classRenames === []
             && $this->npmSet === [];

@@ -208,7 +208,7 @@ Some hops come along by default, and some only when you ask:
 
 - The front-end Node hops (Mix to Vite, Vite major, Tailwind, TypeScript, Vue) are in the plan by default. Pass any target (`--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php`, `--from-laravel`) and they drop out with a warning, unless you add `--with-node`.
 - An app on PHPUnit 8 or older gets a manual PHPUnit 9 step before the first PHP 8 hop.
-- The SESAME move (`--sesame`), the WayneUI move (`--wayneui`) and the move of hand-copied libraries to Composer (`--vendored`) are opt-in only.
+- The SESAME move (`--sesame`), the WayneUI move (`--wayneui`), the move of hand-copied libraries to Composer (`--vendored`) and strict session IDs for a raw PHP app (`--strict-session`) are opt-in only.
 - `--skip <hop id>` drops a hop you do not want.
 - If a target is past security support, the plan stops at the policy limit and warns. If Rector has no ruleset for a step yet, the plan stops short and warns.
 
@@ -343,6 +343,7 @@ Options shared by `plan` and `run`:
 | `--sesame` | Include the `wayne-cas` to SESAME swap |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move |
 | `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of `vendor/` and onto Composer ([the guide](docs/guides/framework-hops.md)) |
+| `--strict-session` | Include the hop that turns on `session.use_strict_mode` and `session.use_only_cookies` before each `session_start()` in a raw PHP app ([the guide](docs/guides/strict-sessions.md)) |
 | `--skip` | A hop id to leave out (repeat it) |
 | `--no-package-check` | Skip the Packagist dependency check (for offline use) |
 | `--until` | Cut the plan after this hop id: that step and everything before it stay, and the plan's targets move to where it lands |
@@ -623,6 +624,19 @@ hop writes), and the `require` lines load Composer's autoloader. Hooks, cookies 
 `--replay`; the replay waits for this hop, then compares every step. The recipes, the stop signs and the bridge are in
 [the guide](docs/guides/framework-hops.md).
 
+### Strict session IDs for raw PHP apps
+
+PHP ships with `session.use_strict_mode` off, so it accepts a session ID the server never issued, which is how session
+fixation works. HELMET turns it on for apps that boot it, and Laravel runs its own sessions, but an older raw PHP app
+that calls plain `session_start()` gets neither. `--strict-session` plans `session-strict-mode` first, on the PHP the
+app runs today: before the statement that holds each `session_start()` call it adds one guarded line that sets
+`session.use_strict_mode` and `session.use_only_cookies` to 1 while no session is active and no output has gone out.
+It is a line in the code because Citadel's PHP (an Apache module) never reads `.user.ini`, and `.htaccess` PHP flags
+break under PHP-FPM. Laravel apps, apps that boot HELMET, and files or folders that already set it are left alone, so a
+second run changes nothing. An app that hands out IDs some other way (`session_id($id)`, the `SID` constant,
+`use_trans_sid` on, cookies off) is a stop sign: it refuses and changes nothing. Without the flag, the plan says how
+many calls it found. Details in [the guide](docs/guides/strict-sessions.md).
+
 ### What a hop does
 
 On PHP hops a pre-pass runs first: PHP 4 era `$a = &new Foo();` becomes a plain assignment, because PHP 7 and newer
@@ -729,7 +743,7 @@ three: skipping it skips them, and a person finishes the job, because Rector doe
 
 ### Hops Booster knows
 
-Thirty-eight hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
+Thirty-nine hops: PHP one minor at a time from 5.5 to 8.5, Laravel one major at a time from 5.8 to 13 and PHPUnit one
 major at a time from 9 to 13, each list read from `data/versions.json` and trimmed to the majors whose Rector ruleset
 is installed ([Hop data](#hop-data)). An app whose PHPUnit is below 9 gets `phpunit-to-9-manual`, a manual move to
 `^9.5` placed before the first hop that targets PHP 8.0 (PHPUnit 7 and 8 do not run on PHP 8), and the regular
@@ -780,7 +794,11 @@ Doctrine 2, Smarty 3 or Slim 1 into its root `vendor/`, at the first PHP every C
 Slim, 7.1 without): deletes the hand copies, writes `composer.json` for `doctrine/orm ^2.20`, `smarty/smarty ^4.5` and
 `slim/slim ^4.15`, points the app's `require` lines at `vendor/autoload.php`, and keeps a Slim 1 app's routes running on
 Slim 4 through `slim1-bridge.php`; anything it cannot rewrite exactly is a stop sign that leaves it out, and the
-replay waits for it ([the guide](docs/guides/framework-hops.md)). `booster hops` prints them all.
+replay waits for it ([the guide](docs/guides/framework-hops.md)). `session-strict-mode` (planned with
+`--strict-session` for a raw PHP app that calls `session_start()` without strict session IDs, first, on the PHP the
+app runs today; never for Laravel): adds one guarded `ini_set()` line for `session.use_strict_mode` and
+`session.use_only_cookies` before each call, skips what is already covered, and refuses on a stop sign
+([the guide](docs/guides/strict-sessions.md)). `booster hops` prints them all.
 
 > Every other hop lifts the engine; `wayneui-1-to-2` is the one that repaints the bodywork.
 

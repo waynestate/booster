@@ -11,6 +11,7 @@ use Waynestate\Booster\Policy\Policy;
 use Waynestate\Booster\Policy\PolicyException;
 use Waynestate\Booster\Project\Project;
 use Waynestate\Booster\Refresh\HopDataRefresher;
+use Waynestate\Booster\Run\StrictSession;
 use Waynestate\Booster\Run\VendoredMigration;
 use Waynestate\Booster\Scan\VendoredLibraries;
 use Waynestate\Booster\ToolError;
@@ -35,6 +36,7 @@ final class Planner
         private readonly ?PackageFetcher $packages = null,
         private readonly ?WayneCasReachability $casReachability = null,
         private readonly VendoredMigration $vendoredMigration = new VendoredMigration(),
+        private readonly StrictSession $strictSession = new StrictSession(),
     ) {}
 
     public function plan(Project $project, PlanOptions $options, DateTimeImmutable $today): Plan
@@ -188,6 +190,10 @@ final class Planner
         $phpunit = $fromPhpunit;
         $sesamePlanned = false;
         $n = 0;
+
+        if ($this->strictSessionPlanned($project, $options, $warnings)) {
+            $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::SESSION_STRICT_MODE_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+        }
 
         if ($sesameFirstReason !== null) {
             $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
@@ -393,6 +399,66 @@ final class Planner
         // block, so they travel on the plan without a warning entry of their
         // own.
         return new Plan($project, $today->format('Y-m-d'), $this->policy->origin(), $toPhp, $toLaravel, $toPhpunit, $steps, $warnings, $packageChecks, $stopsEarly, $vendoredLibraries, $fromPhp);
+    }
+
+    /**
+     * Whether the plan carries session-strict-mode, adding the warning that
+     * explains a no. Without --strict-session it only suggests the flag, and
+     * only for an app that still starts sessions without strict IDs. The hop
+     * goes first: it does not depend on the PHP version, so its gate proves
+     * this one change on the PHP the app runs today, and the hardening lands
+     * even if a later hop stalls. A stop sign leaves it out with the reasons.
+     *
+     * @param list<string> $warnings
+     */
+    private function strictSessionPlanned(Project $project, PlanOptions $options, array &$warnings): bool
+    {
+        $id = HopRegistry::SESSION_STRICT_MODE_ID;
+        if (in_array($id, $options->skip, true)) {
+            return false;
+        }
+        if ($project->type->isLaravel()) {
+            if ($options->strictSession) {
+                $warnings[] = 'Asked for strict sessions, but this is a Laravel app: Laravel runs its own session store and issues its own IDs, so PHP\'s session settings do not apply; skipped.';
+            }
+
+            return false;
+        }
+
+        $inspection = $this->strictSession->inspect($project->path);
+        if (!$options->strictSession) {
+            if ($inspection->appWide === null && $inspection->calls !== []) {
+                $warnings[] = sprintf('The app starts PHP sessions without strict session IDs (%s). Add --strict-session to plan the hop that turns them on.', $inspection->summary());
+            }
+
+            return false;
+        }
+        if ($inspection->appWide !== null) {
+            $warnings[] = sprintf('Asked for strict sessions, but %s; skipped.', $inspection->appWide);
+
+            return false;
+        }
+        if ($inspection->refusals !== []) {
+            $warnings[] = sprintf(
+                'The %s hop was left out: strict mode would change how this app hands out session IDs. Check %s, then set the two options by hand where it is safe:',
+                $id,
+                count($inspection->refusals) === 1 ? 'this stop sign' : 'these ' . count($inspection->refusals) . ' stop signs',
+            );
+            foreach ($inspection->refusals as $refusal) {
+                $warnings[] = 'Stop sign: ' . $refusal;
+            }
+
+            return false;
+        }
+        if ($inspection->calls === []) {
+            $warnings[] = $inspection->covered === []
+                ? 'Asked for strict sessions, but found no session_start() call outside vendor/ and node_modules/; skipped.'
+                : 'Asked for strict sessions, but every session_start() call already runs with them; skipped.';
+
+            return false;
+        }
+
+        return true;
     }
 
     /**

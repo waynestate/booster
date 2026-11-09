@@ -62,6 +62,7 @@ final class HopExecutor
         private readonly TrustProxiesRewriter $trustProxies = new TrustProxiesRewriter(),
         private readonly ?ReplayRunner $replayRunner = null,
         private readonly VendoredMigration $vendoredMigration = new VendoredMigration(),
+        private readonly StrictSession $strictSession = new StrictSession(),
     ) {}
 
     /** The replay gate for this run, once its baseline is recorded (--replay). */
@@ -497,6 +498,10 @@ final class HopExecutor
 
             if ($hop->kind === HopKind::Framework) {
                 return $this->runFrameworkHop($step, $path, $options, $baseline);
+            }
+
+            if ($hop->kind === HopKind::Session) {
+                return $this->runSessionHop($step, $path, $options, $baseline);
             }
 
             // PHP hops get the new-by-reference pre-pass first: modern PHP refuses to compile
@@ -1383,6 +1388,44 @@ final class HopExecutor
             $messages = [...$messages, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $baseline->gateKind)];
         } else {
             $messages[] = sprintf('Gate skipped. Run composer install and the tests on PHP %s before the next step.', $php);
+        }
+
+        return new StepResult($step->number, $hop->id, StepResult::APPLIED, $migration->files, [...$messages, ...$migration->manual]);
+    }
+
+    /**
+     * The session-strict-mode hop. StrictSession does the work: a guarded
+     * ini_set() line before each session_start() statement. No Composer file
+     * changes, so the gate is a plain install and the app's tests (or the
+     * syntax check); with --replay, the replay shows the pages still answer
+     * the same. An app with nothing left to cover skips the gate.
+     */
+    private function runSessionHop(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): StepResult
+    {
+        $hop = $step->hop;
+        $migration = $this->strictSession->migrate($path, $options->dryRun);
+        if ($migration->refused()) {
+            return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [
+                'Refused: strict mode would change how this app hands out session IDs, so nothing changed.',
+                ...array_map(static fn(string $reason): string => 'Stop sign: ' . $reason, $migration->refusals),
+            ]);
+        }
+        if ($migration->files === []) {
+            return new StepResult($step->number, $hop->id, StepResult::NOTHING_TO_DO, [], [...$migration->notes, 'The gate was skipped: nothing changed.']);
+        }
+        if ($options->dryRun) {
+            return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, $migration->files, [...$migration->changes, ...$migration->notes, ...$migration->manual]);
+        }
+
+        $messages = [...$migration->changes, ...$migration->notes];
+        if (!$options->skipGate) {
+            $gate = $this->runGate($step, $path, $options, $baseline);
+            if (!$gate->passed) {
+                return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $migration->files, [...$messages, ...$migration->manual, ...$gate->lines]);
+            }
+            $messages = [...$messages, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $baseline->gateKind)];
+        } else {
+            $messages[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
         }
 
         return new StepResult($step->number, $hop->id, StepResult::APPLIED, $migration->files, [...$messages, ...$migration->manual]);

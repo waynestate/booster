@@ -14,4 +14,5 @@ enum HopKind: string
     case Vue = 'vue';
     case Node = 'node';
     case Framework = 'framework';
+    case Session = 'session';
 }

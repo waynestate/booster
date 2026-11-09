@@ -13,6 +13,9 @@ final class SkillRendererTest extends TestCase
 
     private const ADVISOR_OPEN = 'Optional: ADVISOR gives the agent read-only answers about the WSU stack';
 
+    /** The one playbook with no Boost section: its hop never runs on a Laravel app, and Boost is a Laravel package. */
+    private const NO_BOOST = 'booster-session-strict-mode/SKILL.md';
+
     /** @return array<string, string> */
     private function files(): array
     {
@@ -24,16 +27,28 @@ final class SkillRendererTest extends TestCase
         $files = $this->files();
         self::assertArrayHasKey('booster/SKILL.md', $files);
 
-        foreach (array_filter(array_keys($files), static fn(string $path): bool => str_starts_with($path, 'booster-')) as $path) {
+        foreach (array_filter(array_keys($files), static fn(string $path): bool => str_starts_with($path, 'booster-') && $path !== self::NO_BOOST) as $path) {
             self::assertStringContainsString(self::BOOST_OPEN, $files[$path], $path);
             self::assertStringContainsString("Boost is read-only help. Booster's gate stays the authority: never skip a gate because Boost says so.", $files[$path], $path);
         }
     }
 
+    public function test_the_session_playbook_has_no_boost_section_because_it_skips_laravel_apps(): void
+    {
+        $text = $this->files()[self::NO_BOOST];
+
+        self::assertStringNotContainsString(self::BOOST_OPEN, $text);
+        self::assertStringContainsString('Opt in with --strict-session.', $text);
+        self::assertStringContainsString('2. `booster run --path=<app> --strict-session --dry-run` and read every diff.', $text);
+        self::assertStringContainsString("Check these by hand:\n", $text);
+        self::assertStringNotContainsString('Rector', $text);
+        self::assertStringContainsString('When a gate fails', $text);
+    }
+
     public function test_each_boost_section_lists_three_to_five_prompts(): void
     {
         foreach ($this->files() as $path => $text) {
-            if (!str_starts_with($path, 'booster-')) {
+            if (!str_starts_with($path, 'booster-') || $path === self::NO_BOOST) {
                 continue;
             }
             $start = strpos($text, self::BOOST_OPEN);
@@ -102,7 +117,9 @@ final class SkillRendererTest extends TestCase
             // The section sits after the how-to steps and before the optional Boost help.
             $failure = strpos($text, 'When a gate fails');
             self::assertIsInt($failure, $path);
-            self::assertLessThan(strpos($text, self::BOOST_OPEN), $failure, $path);
+            if ($path !== self::NO_BOOST) {
+                self::assertLessThan(strpos($text, self::BOOST_OPEN), $failure, $path);
+            }
             self::assertSame(1, substr_count($text, 'When a gate fails'), $path);
 
             if ($hop->isManual()) {

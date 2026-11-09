@@ -16,6 +16,7 @@ final readonly class PlanOptions
      * @param ?string     $until            hop id to cut the plan after (that step and everything before it stay)
      * @param ?string     $only             hop id to plan and run alone; never set together with $until
      * @param bool        $vendored         plan the move of hand-copied libraries under vendor/ onto Composer
+     * @param bool        $strictSession    plan the hop that turns on strict session IDs before each session_start()
      */
     public function __construct(
         public ?string $fromPhp = null,
@@ -31,5 +32,6 @@ final readonly class PlanOptions
         public ?string $until = null,
         public ?string $only = null,
         public bool $vendored = false,
+        public bool $strictSession = false,
     ) {}
 }

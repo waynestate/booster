@@ -60,6 +60,9 @@ final class HopRegistry
     /** The framework hop that moves hand-copied Doctrine, Smarty and Slim 1 out of vendor/ and onto Composer. */
     public const VENDORED_TO_COMPOSER_ID = 'vendored-to-composer';
 
+    /** The hop that turns on strict session IDs before each session_start() in a raw PHP app. */
+    public const SESSION_STRICT_MODE_ID = 'session-strict-mode';
+
     /** The lowest Laravel major whose upgrade guide ships Vite as the front-end tool. */
     public const VITE_LARAVEL_FLOOR = '9';
 
@@ -168,6 +171,7 @@ final class HopRegistry
         $this->add($this->sesameHop());
         $this->add($this->wayneUi1To2Hop());
         $this->add($this->vendoredToComposerHop());
+        $this->add($this->sessionStrictModeHop());
         $this->add($this->nodePinHop());
         $this->add($this->mixToViteHop());
         $this->add($this->viteMajorHop());
@@ -909,6 +913,36 @@ final class HopRegistry
                 'https://www.smarty.net/docs/en/',
                 'https://www.doctrine-project.org/projects/doctrine-orm/en/2.20/index.html',
                 'https://www.slimframework.com/docs/v4/',
+            ],
+        );
+    }
+
+    /**
+     * Strict session IDs for an existing raw PHP app. Citadel's shared
+     * php.ini leaves session.use_strict_mode at 0, and an app that calls plain
+     * session_start() and uses none of the stack's packages never turns it
+     * on. The engine (StrictSession) puts a guarded ini_set() line before
+     * each call; this is the hop's face in plans and listings.
+     */
+    private function sessionStrictModeHop(): Hop
+    {
+        return new Hop(
+            id: self::SESSION_STRICT_MODE_ID,
+            kind: HopKind::Session,
+            from: 'off',
+            to: 'strict',
+            summary: 'Turn on strict session IDs in a raw PHP app: set session.use_strict_mode and session.use_only_cookies before each session_start() call.',
+            notes: [
+                'Opt in with --strict-session. The planner puts the hop first, on the PHP the app runs today, so its gate proves this change alone. Laravel apps are skipped: Laravel runs its own session store and issues its own IDs, so PHP\'s session settings do not apply.',
+                'Booster puts one guarded line before the statement that holds each session_start() call. It sets both options with ini_set() only while no session is active and no output has gone out, so it never adds a warning; a braceless if or else gets the line before the whole statement.',
+                'Already covered, so left alone: a file that names session.use_strict_mode, a folder whose .htaccess sets it, and an app that calls HELMET\'s helmet_boot() or sets it in Squire\'s php.ini. Running the hop again changes nothing.',
+                'Stop signs: session_id($id) before the session starts, the SID constant, session.use_trans_sid on, or session.use_only_cookies or session.use_cookies off. Strict mode would change how those sessions behave, so the hop refuses and changes nothing.',
+                'A custom session handler (session_set_save_handler) only gets strict mode when it implements validateId(); the hop names each one as a MANUAL line.',
+                'Not a .user.ini: Citadel runs PHP as an Apache module, which never reads one. A php.ini change on Citadel would cover every app at once; that is a separate proposal, not this hop.',
+            ],
+            links: [
+                'https://www.php.net/manual/en/session.configuration.php#ini.session.use-strict-mode',
+                'https://www.php.net/manual/en/features.session.security.management.php',
             ],
         );
     }
