@@ -17,9 +17,11 @@ use Waynestate\Booster\Project\Project;
  * floor above the plan's starting version, or a ceiling below it) gets its own
  * finding instead: no hop is to blame for where the plan starts.
  *
- * Only the newest stable release of each package counts. The dev aliases
+ * Only stable releases the app's own constraint allows count (the newest
+ * stable release when the constraint allows none). The dev aliases
  * Packagist lists first (the v9.99.x entries) say nothing about what a
- * composer install would give a person today.
+ * composer install would give a person today, and neither does a 3.x the
+ * app's ^2.20 never installs.
  */
 final class PackageCompat
 {
@@ -139,12 +141,31 @@ final class PackageCompat
             }
         }
 
-        $require = (array) ($metadata['require'] ?? []);
-        $phpConstraint = $this->stringOrNull($require, 'php');
-        $laravelConstraint = $this->stringOrNull($require, 'laravel/framework');
-        if ($laravelConstraint === null) {
-            $laravelConstraint = $this->loosestIlluminate($require);
+        // Judge what the app's own constraint can install, not the newest
+        // release: a 2012 app asked for doctrine/orm ^2.20, which runs on PHP
+        // 8.0, and the check said 3.7.6 "blocks php-74-to-80". Every stable
+        // release the constraint allows is a candidate (newest first), and a
+        // step is blocked only when none of them can make the trip. With no
+        // usable constraint (dev-main, nothing stable in range) the newest
+        // stable release stands in, as before. The warnings name the newest
+        // candidate; the JSON's "newest" stays the package's newest release.
+        $appConstraint = $this->appConstraint($composer, $name);
+        $candidates = [];
+        foreach ($appConstraint === null ? [] : $versions as $version => $entry) {
+            if (VersionParser::parseStability((string) $version) !== 'stable' || !$this->satisfies((string) $version, (string) $appConstraint)) {
+                continue;
+            }
+            $pair = $this->constraintsOf($entry);
+            $candidates[$pair[0] . '|' . $pair[1]] ??= ['version' => (string) $version, 'php' => $pair[0], 'laravel' => $pair[1]];
         }
+        if ($candidates === []) {
+            $pair = $this->constraintsOf($metadata);
+            $candidates = [['version' => $newest, 'php' => $pair[0], 'laravel' => $pair[1]]];
+        }
+        $candidates = array_values($candidates);
+        $judged = $candidates[0]['version'];
+        $phpConstraint = $candidates[0]['php'] !== '' ? $candidates[0]['php'] : null;
+        $laravelConstraint = $candidates[0]['laravel'] !== '' ? $candidates[0]['laravel'] : null;
 
         $abandoned = $metadata['abandoned'] ?? null;
         $isAbandoned = $abandoned === true || (is_string($abandoned) && $abandoned !== '');
@@ -160,6 +181,14 @@ final class PackageCompat
         $blockingStep = null;
         foreach ($steps as $step) {
             $failed = $this->stepFailures($step, $phpConstraint, $laravelConstraint);
+            foreach (array_slice($candidates, 1) as $candidate) {
+                if ($failed === []) {
+                    break;
+                }
+                if ($this->stepFailures($step, self::nullIfEmpty($candidate['php']), self::nullIfEmpty($candidate['laravel'])) === []) {
+                    $failed = [];
+                }
+            }
             if ($failed !== []) {
                 $blocks = $step->hop->id;
                 $blockingStep = $step;
@@ -167,15 +196,24 @@ final class PackageCompat
             }
         }
 
-        // Dimensions the newest release is out of reach on before any hop
-        // runs: a floor above the starting version, or a ceiling below it. No
-        // hop is to blame for those, because no hop put the app there.
+        // Dimensions no candidate reaches before any hop runs: a floor above
+        // the starting version, or a ceiling below it. No hop is to blame for
+        // those, because no hop put the app there.
         $outOfReach = [];
-        if ($startPhp !== null && $phpConstraint !== null && !$this->intersects($startPhp . '.*', $phpConstraint)) {
+        $reaches = function (string $dimension, ?string $start, string $range) use ($candidates): bool {
+            foreach ($candidates as $candidate) {
+                $constraint = self::nullIfEmpty($candidate[$dimension]);
+                if ($start === null || $constraint === null || $this->intersects($range, $constraint)) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+        if (!$reaches('php', $startPhp, $startPhp . '.*')) {
             $outOfReach[] = 'php';
         }
-        if ($startLaravel !== null && $laravelConstraint !== null
-            && !$this->intersects(sprintf('^%s.0', $startLaravel), $laravelConstraint)) {
+        if (!$reaches('laravel', $startLaravel, sprintf('^%s.0', (string) $startLaravel))) {
             $outOfReach[] = 'laravel';
         }
 
@@ -191,7 +229,7 @@ final class PackageCompat
             $blockWarning = sprintf(
                 '%s %s %s, so it blocks %s. Replace or upgrade it first.',
                 $name,
-                $newest,
+                $judged,
                 $this->supportPhrase($phraseFailed, $phpConstraint, $laravelConstraint, $blockingStep->phpAfter),
                 $blocks,
             );
@@ -199,7 +237,7 @@ final class PackageCompat
             $findings = [];
             foreach (['laravel', 'php'] as $dimension) {
                 if (in_array($dimension, $outOfReach, true)) {
-                    $findings[] = $this->startFinding($dimension, $name, $newest, $phpConstraint, $laravelConstraint, $startPhp, $startLaravel, $steps);
+                    $findings[] = $this->startFinding($dimension, $name, $judged, $phpConstraint, $laravelConstraint, $startPhp, $startLaravel, $steps);
                 }
             }
             $startWarning = $findings === [] ? null : implode(' ', $findings);
@@ -212,6 +250,56 @@ final class PackageCompat
         }
 
         return new PackageCheck($name, $newest, $blocks, $isAbandoned, $replacement, true, null, $blockWarning, $abandonedWarning, $startWarning);
+    }
+
+    /**
+     * The app's own constraint on $name, require before require-dev, or
+     * null when it names none Booster can use (a dev branch, an inline
+     * alias, a catch-all star).
+     *
+     * @param array<string, mixed> $composer
+     */
+    private function appConstraint(array $composer, string $name): ?string
+    {
+        foreach (['require', 'require-dev'] as $section) {
+            $constraint = $composer[$section][$name] ?? null;
+            if (!is_string($constraint)) {
+                continue;
+            }
+            $constraint = trim($constraint);
+            if ($constraint === '' || $constraint === '*' || str_contains($constraint, 'dev-') || str_contains($constraint, ' as ')) {
+                return null;
+            }
+            try {
+                (new VersionParser())->parseConstraints($constraint);
+            } catch (\Throwable) {
+                return null;
+            }
+
+            return $constraint;
+        }
+
+        return null;
+    }
+
+    /**
+     * One release's PHP and Laravel constraints, '' where it states none.
+     *
+     * @param array<string, mixed> $entry
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function constraintsOf(array $entry): array
+    {
+        $require = (array) ($entry['require'] ?? []);
+        $laravel = $this->stringOrNull($require, 'laravel/framework') ?? $this->loosestIlluminate($require);
+
+        return [$this->stringOrNull($require, 'php') ?? '', $laravel ?? ''];
+    }
+
+    private static function nullIfEmpty(string $value): ?string
+    {
+        return $value === '' ? null : $value;
     }
 
     /**

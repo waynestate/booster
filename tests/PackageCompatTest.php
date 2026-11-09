@@ -375,4 +375,62 @@ final class PackageCompatTest extends TestCase
             $plan->warnings,
         );
     }
+
+    /**
+     * The shape of the WSAM run's false alarm: the newest doctrine/orm needs
+     * PHP 8.1, but the app asks for ^2.20, and 2.20 runs on 8.0.
+     *
+     * @param array<string, string> $require
+     */
+    private function planRawPhp(array $require): Plan
+    {
+        $dir = $this->copyExample('raw-php');
+        file_put_contents($dir . '/composer.json', (string) json_encode(['require' => ['php' => '^7.4', ...$require]]));
+        $fetcher = $this->fetcher(['acme/orm' => [
+            'minified' => 'composer/2.0',
+            'packages' => ['acme/orm' => [
+                ['name' => 'acme/orm', 'version' => '3.7.6', 'require' => ['php' => '^8.1']],
+                ['name' => 'acme/orm', 'version' => '3.0.0-beta1', 'require' => ['php' => '^7.4']],
+                ['name' => 'acme/orm', 'version' => '2.20.6', 'require' => ['php' => '^7.1 || ^8.0']],
+                ['name' => 'acme/orm', 'version' => '2.19.0', 'require' => ['php' => '^7.1']],
+            ]],
+        ]]);
+
+        return (new Planner($this->policy(), new HopRegistry(), $fetcher))
+            ->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '7.4', toPhp: '8.1'), $this->today());
+    }
+
+    public function test_the_apps_own_constraint_is_judged_not_the_newest_release(): void
+    {
+        $plan = $this->planRawPhp(['acme/orm' => '^2.20']);
+
+        $check = $plan->packageChecks[0];
+        self::assertSame('3.7.6', $check->newest, 'The JSON still names the newest release.');
+        // 2.20.6 runs on 8.0 but stops below 8.1 only if its constraint says
+        // so; ^7.1 || ^8.0 allows every 8.x, so nothing is blocked.
+        self::assertNull($check->blocks);
+        self::assertSame([], preg_grep('/^acme\/orm /', $plan->warnings));
+    }
+
+    public function test_a_range_with_no_release_that_makes_the_trip_names_its_newest_member(): void
+    {
+        $plan = $this->planRawPhp(['acme/orm' => '~2.19.0']);
+
+        self::assertSame('php-74-to-80', $plan->packageChecks[0]->blocks);
+        self::assertContains(
+            'acme/orm 2.19.0 supports PHP up to 7.4, so it blocks php-74-to-80. Replace or upgrade it first.',
+            $plan->warnings,
+        );
+    }
+
+    public function test_a_constraint_with_nothing_stable_in_range_falls_back_to_the_newest_release(): void
+    {
+        $plan = $this->planRawPhp(['acme/orm' => 'dev-main']);
+
+        self::assertSame('php-74-to-80', $plan->packageChecks[0]->blocks);
+        self::assertContains(
+            'acme/orm 3.7.6 needs PHP 8.1 or newer, so it blocks php-74-to-80. Replace or upgrade it first.',
+            $plan->warnings,
+        );
+    }
 }
