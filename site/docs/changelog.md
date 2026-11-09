@@ -13,6 +13,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 ## \[Unreleased\][#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
 - Changed: Composer 2.11.1 (was 2.10.3, no longer maintained), pinned by its multi-arch list digest, in the `wayneui-copies`, `composer-ci`, `refresh-hop-data` and `phar` CI jobs, the PHAR build scripts, the Docker lines in the README, the install, checks and MAINTAINING pages and the front page, and the gate's target image for PHP 7.2 and up (builds for older PHP keep Composer 2.2). 2.11 fixes GHSA-c968-33g3-wh7p and GHSA-fm2w-xgf2-f9fh. The target image's recipe stamp changes with it, so the next `run` builds a fresh image.
+- Changed: the deploy kit is Squire 0.10.2 (was 0.10.1): the kit's `php.ini` sets `session.cookie_samesite = Lax`, the fallback base names its images in full (`docker.io/library/...`) with Composer as a build argument, and the portable image drops `node_modules/` after the build. `squire init --check` passes on `deploy/`.
 
 ## \[1.13.0\] - 2026-11-09[#](https://booster.apps.wayne.edu/docs/changelog.html#1-13-0-2026-11-09)
 

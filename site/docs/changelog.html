@@ -47,6 +47,7 @@
 <h2 id="unreleased">[Unreleased]<a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></h2>
 <ul>
 <li>Changed: Composer 2.11.1 (was 2.10.3, no longer maintained), pinned by its multi-arch list digest, in the <code>wayneui-copies</code>, <code>composer-ci</code>, <code>refresh-hop-data</code> and <code>phar</code> CI jobs, the PHAR build scripts, the Docker lines in the README, the install, checks and MAINTAINING pages and the front page, and the gate's target image for PHP 7.2 and up (builds for older PHP keep Composer 2.2). 2.11 fixes GHSA-c968-33g3-wh7p and GHSA-fm2w-xgf2-f9fh. The target image's recipe stamp changes with it, so the next <code>run</code> builds a fresh image.</li>
+<li>Changed: the deploy kit is Squire 0.10.2 (was 0.10.1): the kit's <code>php.ini</code> sets <code>session.cookie_samesite = Lax</code>, the fallback base names its images in full (<code>docker.io/library/...</code>) with Composer as a build argument, and the portable image drops <code>node_modules/</code> after the build. <code>squire init --check</code> passes on <code>deploy/</code>.</li>
 </ul>
 <h2 id="1-13-0-2026-11-09">[1.13.0] - 2026-11-09<a class="docs-heading-link" aria-label="Link to this section" href="#1-13-0-2026-11-09">#</a></h2>
 <ul>

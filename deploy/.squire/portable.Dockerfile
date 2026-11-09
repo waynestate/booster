@@ -76,10 +76,15 @@ COPY . /citadel/src/
 # Migrations run once per release from the migrate role (WELD W24); PROCTOR's gate belongs in CI on this path.
 # Composer's and npm's downloads go through a build cache, so a rebuild does not fetch them again (BuildKit and Buildah
 # both read the cache mount without a `# syntax=` line, so the build pulls no frontend image either).
+# node_modules/ is the frontend build's toolbox, not the app: the web, worker, scheduler and migrate roles serve the
+# built assets and never run Node, so it goes in the same RUN and never reaches a layer. An app that truly reads
+# node_modules/ at run time builds with --build-arg SQUIRE_KEEP_NODE_MODULES=1.
+ARG SQUIRE_KEEP_NODE_MODULES=0
 RUN --mount=type=cache,target=/tmp/squire-cache \
     SQUIRE_ALLOW_ROOT=1 COMPOSER_ALLOW_SUPERUSER=1 SQUIRE_REQUIRE_ENV=0 SQUIRE_CACHE_DIR=/tmp/squire-cache \
     SQUIRE_PROCTOR=skip SQUIRE_MIGRATE=0 SQUIRE_ARTISAN_OPTIMIZE=0 SQUIRE_ARTISAN_RESTART=0 SQUIRE_SMOKE=0 \
-    bash "/citadel/src/${SQUIRE_KIT_DIR}/scripts/release.sh"
+    bash "/citadel/src/${SQUIRE_KIT_DIR}/scripts/release.sh" \
+    && if [ "$SQUIRE_KEEP_NODE_MODULES" != "1" ]; then rm -rf /citadel/src/node_modules; fi
 
 # The folders the app writes, for any UID in group 0 (OpenShift's arbitrary UID): storage/ and bootstrap/cache/ for
 # Laravel when this is empty, the way scripts/release.sh picks them; name your own for a raw PHP app that writes.
