@@ -76,8 +76,11 @@ final class VendoredMigrationTest extends TestCase
         self::assertFalse($result->refused());
         self::assertStringStartsWith('Dry run: would replace the hand-copied Doctrine 2.2.2 in vendor/Doctrine/ (2 files) with doctrine/orm 2.20 from Composer.', $result->changes[0]);
         foreach ($result->changes as $change) {
-            self::assertStringStartsWith('Dry run: would', $change);
+            self::assertMatchesRegularExpression('/^(Dry run: would |  [a-z])/', $change);
+            self::assertStringNotContainsString('would wrote', $change);
+            self::assertStringNotContainsString('would  ', $change);
         }
+        self::assertSame(['Dry run: would write composer.json:', '  require php ^7.4'], array_slice($result->changes, 3, 2));
         self::assertDirectoryExists($app . '/vendor/Doctrine');
         self::assertFileDoesNotExist($app . '/composer.json');
         self::assertFileDoesNotExist($app . '/' . VendoredMigration::BRIDGE_FILE);

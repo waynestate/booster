@@ -146,8 +146,16 @@ final class VendoredMigration
         }
 
         [$composerJson, $composerChanges, $packages] = $this->composerJson($appPath, $inspection, $php, $slim);
-        foreach ($composerChanges as $line) {
-            $changes[] = $would . ($dryRun ? lcfirst($line) : $line);
+        foreach ($composerChanges as $index => $line) {
+            // The heading carries the dry-run words; the indented lines under
+            // it are its list. Prefixing every line gave "would wrote
+            // composer.json" and "would   require php ^7.4".
+            $changes[] = match (true) {
+                !$dryRun || $index > 0 => $line,
+                str_starts_with($line, 'Wrote ') => $would . 'write ' . substr($line, strlen('Wrote ')),
+                str_starts_with($line, 'Edited ') => $would . 'edit ' . substr($line, strlen('Edited ')),
+                default => $would . lcfirst($line),
+            };
         }
         $files[] = ['file' => 'composer.json', 'diff' => implode("\n", $composerChanges)];
 
