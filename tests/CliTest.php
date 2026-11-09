@@ -1214,6 +1214,26 @@ final class CliTest extends TestCase
         self::assertSame(0, $planExit);
     }
 
+    public function test_the_step_that_crosses_php_8_2_names_dynamic_properties_in_plan_and_run(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        file_put_contents($dir . '/src/Account.php', "<?php\n\nnamespace Example;\n\nclass Account\n{\n    public function __construct(string \$name)\n    {\n        \$this->name = \$name;\n    }\n}\n");
+        $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(2, (string) json_encode(['file_diffs' => []]), ''));
+
+        [, $plan] = $this->booster(['command' => 'plan', '--path' => $dir, '--today' => self::TODAY, '--goal' => 'php-74-to-84', '--no-scan' => true, '--no-package-check' => true]);
+        [, $json] = $this->booster(['command' => 'plan', '--path' => $dir, '--today' => self::TODAY, '--goal' => 'php-74-to-84', '--no-scan' => true, '--no-package-check' => true, '--format' => 'json']);
+        [, $run] = $this->booster(['command' => 'run', '--path' => $dir, '--today' => self::TODAY, '--goal' => 'php-74-to-84', '--dry-run' => true, '--no-package-check' => true], $fake);
+
+        self::assertSame(1, preg_match('/php-81-to-82.*?(?=\n\d+\.|\n\n)/s', $plan, $step), $plan);
+        self::assertStringContainsString("   Dynamic properties (deprecated in PHP 8.2): 1 found. Booster does not change them; declare each one in its class, or mark the class #[\\AllowDynamicProperties]:\n     src/Account.php:9 Example\\Account::\$name", $step[0]);
+        self::assertSame(1, substr_count($plan, 'Dynamic properties'), 'Only the step that crosses 8.2 asks.');
+        $decoded = json_decode($json, true);
+        self::assertIsArray($decoded);
+        self::assertSame('php-81-to-82', $decoded['dynamic_properties']['hop']);
+        self::assertSame([['file' => 'src/Account.php', 'line' => 9, 'class' => 'Example\\Account', 'property' => 'name']], $decoded['dynamic_properties']['findings']);
+        self::assertStringContainsString('MANUAL: src/Account.php:9 Example\\Account::$name is a dynamic property, deprecated in PHP 8.2', $run);
+    }
+
     public function test_detect_names_the_hand_copied_libraries_and_plans_their_move(): void
     {
         $app = __DIR__ . '/fixtures/vendored-2012';

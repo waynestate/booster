@@ -27,6 +27,7 @@ use Waynestate\Booster\Replay\ReplaySuggestion;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Scan\BehaviourScan;
 use Waynestate\Booster\Scan\ComposerAuditScan;
+use Waynestate\Booster\Scan\DynamicPropertiesScan;
 use Waynestate\Booster\Scan\RemovalsScan;
 use Waynestate\Booster\ToolError;
 
@@ -465,6 +466,9 @@ final class HopExecutor
     {
         // Scan first: the advisory must describe the app as it was before the hop rewrites it.
         $removals = $this->removalsLines($step, $path);
+        $dynamic = $step->hop->kind === HopKind::Php && DynamicPropertiesScan::appliesTo($step->phpBefore, $step->phpAfter)
+            ? (new TextWriter())->dynamicProperties((new DynamicPropertiesScan())->scan($path), true)
+            : [];
         $behaviour = $this->behaviourLines($step, $path, $plan);
         // A dry run changes no file, so there is nothing to fingerprint and
         // nothing to audit afterwards.
@@ -491,6 +495,9 @@ final class HopExecutor
         if ($removals !== '') {
             array_unshift($messages, $removals);
         }
+        // Rector has no safe fix for these, so they ride along as MANUAL
+        // lines, file and line, scanned before the hop touched anything.
+        $messages = [...$messages, ...$dynamic];
         if ($behaviour !== '') {
             $messages[] = $behaviour;
         }

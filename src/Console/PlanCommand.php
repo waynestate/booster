@@ -14,6 +14,7 @@ use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\ProcessRunner;
 use Waynestate\Booster\Scan\BehaviourEntry;
 use Waynestate\Booster\Scan\BehaviourScan;
+use Waynestate\Booster\Scan\DynamicPropertiesScan;
 use Waynestate\Booster\Scan\PhpCompatScan;
 use Waynestate\Booster\Scan\PhpStanScan;
 use Waynestate\Booster\Scan\RemovalsScan;
@@ -66,6 +67,19 @@ final class PlanCommand extends BaseCommand
             $removalsJson[] = ['step' => $step->number, 'hop' => $step->hop->id, ...$result->toArray()];
         }
 
+        // Dynamic properties, on the one PHP step that crosses 8.2: also
+        // cheap (tokens, no processes), so it always runs too.
+        $dynamicByStep = [];
+        $dynamicJson = null;
+        foreach ($plan->steps as $step) {
+            if ($step->hop->kind === HopKind::Php && DynamicPropertiesScan::appliesTo($step->phpBefore, $step->phpAfter)) {
+                $result = (new DynamicPropertiesScan())->scan($plan->project->path);
+                $dynamicByStep[$step->number] = $result;
+                $dynamicJson = ['step' => $step->number, 'hop' => $step->hop->id, ...$result->toArray()];
+                break;
+            }
+        }
+
         // The behaviour scan is cheap (no processes), so it always runs, like
         // the removals scan: curated silent changes per PHP and Laravel hop,
         // plus the package rows on the last step, where the lock lands.
@@ -102,12 +116,15 @@ final class PlanCommand extends BaseCommand
                 $data['phpstan'] = $phpstan->toArray();
             }
             $data['removals'] = $removalsJson;
+            if ($dynamicJson !== null) {
+                $data['dynamic_properties'] = $dynamicJson;
+            }
             // Always present, even when empty, so consumers can rely on the key.
             $data['behaviour_changes'] = $behaviourJson;
             $text = (new JsonWriter())->write($data);
         } else {
             $writer = new TextWriter();
-            $text = $writer->plan($plan, $removalsByStep, $behaviourByStep);
+            $text = $writer->plan($plan, $removalsByStep, $behaviourByStep, $dynamicByStep);
             if ($scan !== null) {
                 $text .= "\n\n" . $writer->phpCompat($scan);
             }

@@ -16,6 +16,8 @@ use Waynestate\Booster\Run\StepResult;
 use Waynestate\Booster\Scan\BehaviourEntry;
 use Waynestate\Booster\Scan\BehaviourResult;
 use Waynestate\Booster\Scan\ComposerAuditResult;
+use Waynestate\Booster\Scan\DynamicPropertiesResult;
+use Waynestate\Booster\Scan\DynamicPropertiesScan;
 use Waynestate\Booster\Scan\RemovalsResult;
 use Waynestate\Booster\Scan\ScanResult;
 
@@ -35,8 +37,9 @@ final class TextWriter
     /**
      * @param array<int, RemovalsResult>  $removalsByStep removals result per PHP step number
      * @param array<int, BehaviourResult> $behaviourByStep behaviour changes per step number
+     * @param array<int, DynamicPropertiesResult> $dynamicByStep dynamic properties on the step that crosses PHP 8.2
      */
-    public function plan(Plan $plan, array $removalsByStep = [], array $behaviourByStep = []): string
+    public function plan(Plan $plan, array $removalsByStep = [], array $behaviourByStep = [], array $dynamicByStep = []): string
     {
         $p = $plan->project;
         $lines = [
@@ -68,6 +71,12 @@ final class TextWriter
             $removals = $removalsByStep[$step->number] ?? null;
             if ($removals instanceof RemovalsResult) {
                 foreach ($this->removals($removals) as $line) {
+                    $lines[] = '   ' . $line;
+                }
+            }
+            $dynamic = $dynamicByStep[$step->number] ?? null;
+            if ($dynamic instanceof DynamicPropertiesResult) {
+                foreach ($this->dynamicProperties($dynamic) as $line) {
                     $lines[] = '   ' . $line;
                 }
             }
@@ -289,6 +298,49 @@ final class TextWriter
         $hidden = $result->total - count($shown);
         if ($hidden > 0) {
             $lines[] = sprintf('(%d more...)', $hidden);
+        }
+
+        return $lines;
+    }
+
+    /**
+     * The dynamic properties block for the step that crosses PHP 8.2, as
+     * plan prints it, or as the run's MANUAL lines ($manual). A run that
+     * found nothing says nothing; a plan says how many classes it read, so
+     * "none found" is a reading, not a guess.
+     *
+     * @return list<string>
+     */
+    public function dynamicProperties(DynamicPropertiesResult $result, bool $manual = false): array
+    {
+        $php = DynamicPropertiesScan::DEPRECATED_IN;
+        $count = count($result->findings);
+        if ($count === 0 && $result->unchecked === []) {
+            return $manual ? [] : [sprintf('Dynamic properties (deprecated in PHP %s): none found in the %d class%s Booster read.', $php, $result->classes, $result->classes === 1 ? '' : 'es')];
+        }
+        $lines = [];
+        if ($count > 0 && !$manual) {
+            $lines[] = sprintf('Dynamic properties (deprecated in PHP %s): %d found. Booster does not change them; declare each one in its class, or mark the class #[\AllowDynamicProperties]:', $php, $count);
+        }
+        foreach (array_slice($result->findings, 0, self::MAX_FINDINGS) as $finding) {
+            $where = sprintf('%s:%d %s::$%s', self::clean($finding->file), $finding->line, self::clean($finding->class), self::clean($finding->property));
+            $lines[] = $manual
+                ? sprintf('MANUAL: %s is a dynamic property, deprecated in PHP %s: declare it in the class, or mark the class #[\AllowDynamicProperties].', $where, $php)
+                : '  ' . $where;
+        }
+        if ($count > self::MAX_FINDINGS) {
+            $lines[] = sprintf($manual ? 'MANUAL: %d more dynamic properties; booster plan --format=json lists them all.' : '  (%d more...)', $count - self::MAX_FINDINGS);
+        }
+        if ($result->unchecked !== []) {
+            $lines[] = sprintf(
+                '%sDynamic properties (deprecated in PHP %s) not checked in %d class%s, because a parent or a trait is outside the app\'s own code: %s. Check %s by hand.',
+                $manual ? 'MANUAL: ' : '',
+                $php,
+                count($result->unchecked),
+                count($result->unchecked) === 1 ? '' : 'es',
+                self::clean(implode('; ', $result->unchecked)),
+                count($result->unchecked) === 1 ? 'it' : 'them',
+            );
         }
 
         return $lines;
