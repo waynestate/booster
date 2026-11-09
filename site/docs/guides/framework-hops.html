@@ -142,6 +142,9 @@ through the app or the response, <code>etag()</code>, <code>lastModified()</code
 pattern with regular-expression characters, which Slim 4's router reads differently.</li>
 <li>A copy whose major the recipe does not cover (Smarty 2, Doctrine 1, Slim 2), an existing <code>slim1-bridge.php</code>, or a
 <code>composer.json</code> that is not valid JSON.</li>
+<li>A copy whose version Booster cannot read. It reads the version the code states (<code>const VERSION</code> in Doctrine's
+<code>Version.php</code>, <code>SMARTY_VERSION</code> in <code>Smarty.class.php</code>), else the <code>@version 1.6.0</code> tag in the main file's docblock,
+which is the only place Slim 1 says it.</li>
 </ul>
 <p>A commented-out call is not a stop sign. Booster reads the line, not the vibe.</p>
 <h2 id="what-stays">What stays<a class="docs-heading-link" aria-label="Link to this section" href="#what-stays">#</a></h2>

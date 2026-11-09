@@ -22,6 +22,16 @@ final class VendoredLibraries
     /** How much of a file version detection reads. */
     private const MAX_BYTES = 65536;
 
+    /** `const VERSION = '2.2.2';`, the version as code. */
+    private const CONST_VERSION = "/const\\s+VERSION\\s*=\\s*'([^']+)'/";
+
+    /**
+     * ` * @version     1.6.0` on a docblock line. Only a dotted number
+     * counts, so a version-control keyword such as `@version $Revision$`
+     * (Doctrine's docblocks) leaves the version unknown.
+     */
+    private const DOCBLOCK_VERSION = '/^[ \t]*\*[ \t]*@version[ \t]+v?(\d+\.\d+(?:\.\d+)*)(?![\w.])/m';
+
     /** @var array<string, array{0: string, 1: string}> lowercased dirname to display name and Composer package */
     private const KNOWN = [
         'doctrine' => ['Doctrine', 'doctrine/orm'],
@@ -291,6 +301,30 @@ final class VendoredLibraries
     }
 
     /**
+     * The version a library states in code ($codePattern) in any of $files,
+     * else the one its docblock states in an `@version x.y.z` tag, trying the
+     * files in order on each pass. The code wins because a docblock is the
+     * first thing a hand edit forgets. Real copies need both: Doctrine 2.2.2
+     * and Smarty 3.1.8 declare a constant, while Slim 1.6.0 says its version
+     * only in the docblock at the top of Slim.php.
+     *
+     * @param list<string> $files
+     */
+    private static function codeOrDocblockVersion(array $files, string $codePattern): ?string
+    {
+        foreach ([$codePattern, self::DOCBLOCK_VERSION] as $pattern) {
+            foreach ($files as $file) {
+                $version = self::firstMatch($file, $pattern);
+                if ($version !== null) {
+                    return $version;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Doctrine prints its version in a Version.php file. Prefer the ORM
      * copy over the DBAL copy over the Common one.
      *
@@ -313,58 +347,42 @@ final class VendoredLibraries
             }
         }
 
-        $pattern = "/const\s+VERSION\s*=\s*'([^']+)'/";
-        foreach ($groups as $group) {
-            foreach ($group as $file) {
-                $version = self::firstMatch($file, $pattern);
-                if ($version !== null) {
-                    return $version;
-                }
-            }
-        }
-
-        return null;
+        return self::codeOrDocblockVersion(array_merge(...$groups), self::CONST_VERSION);
     }
 
     /**
+     * Smarty 3 declares SMARTY_VERSION as a class constant (or a define()),
+     * and its docblock repeats it.
+     *
      * @param list<string> $files
      */
     private static function smartyVersion(array $files): ?string
     {
-        $pattern = "/SMARTY_VERSION['\"]?\\s*[,=]\\s*['\"](?:Smarty[- ])?(\\d[^'\"]*)['\"]/";
-        foreach ($files as $file) {
-            if (basename($file) !== 'Smarty.class.php') {
-                continue;
-            }
-            $version = self::firstMatch($file, $pattern);
-            if ($version !== null) {
-                return $version;
-            }
-        }
+        $mainFiles = array_values(array_filter(
+            $files,
+            static fn(string $file): bool => basename($file) === 'Smarty.class.php',
+        ));
 
-        return null;
+        return self::codeOrDocblockVersion(
+            $mainFiles,
+            "/SMARTY_VERSION['\"]?\\s*[,=]\\s*['\"](?:Smarty[- ])?(\\d[^'\"]*)['\"]/",
+        );
     }
 
     /**
+     * Slim 1 keeps its version in the docblock at the top of Slim.php (no
+     * constant: the 1.6.0 copy a real app shipped has only `@version 1.6.0`).
+     *
      * @param list<string> $files
      */
     private static function slimVersion(array $files): ?string
     {
-        $pattern = "/const\s+VERSION\s*=\s*'([^']+)'/";
-        foreach ($files as $file) {
-            if (basename($file) !== 'Slim.php') {
-                continue;
-            }
-            if (basename(dirname($file)) !== 'Slim') {
-                continue;
-            }
-            $version = self::firstMatch($file, $pattern);
-            if ($version !== null) {
-                return $version;
-            }
-        }
+        $mainFiles = array_values(array_filter(
+            $files,
+            static fn(string $file): bool => basename($file) === 'Slim.php' && basename(dirname($file)) === 'Slim',
+        ));
 
-        return null;
+        return self::codeOrDocblockVersion($mainFiles, self::CONST_VERSION);
     }
 
     /**

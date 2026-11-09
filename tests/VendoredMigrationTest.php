@@ -56,13 +56,13 @@ final class VendoredMigrationTest extends TestCase
         self::assertTrue($inspection->movable(), implode("\n", $inspection->refusals));
         self::assertSame(['Doctrine', 'Slim', 'Smarty'], array_map(static fn(VendoredLibrary $l): string => $l->name, $inspection->moves));
         self::assertSame('7.4', $inspection->floor);
-        self::assertSame('Doctrine 2.2.2, Slim 1.6.7 and Smarty 3.1.8', $inspection->summary());
+        self::assertSame('Doctrine 2.2.2, Slim 1.6.0 and Smarty 3.1.8', $inspection->summary());
         self::assertSame([], $inspection->leftAlone);
     }
 
     public function test_the_floor_comes_from_the_recipes(): void
     {
-        self::assertSame('7.4', VendoredMigration::floorFor(new VendoredLibrary('Slim', 'vendor/Slim', '1.6.7', 'slim/slim')));
+        self::assertSame('7.4', VendoredMigration::floorFor(new VendoredLibrary('Slim', 'vendor/Slim', '1.6.0', 'slim/slim')));
         self::assertSame('7.1', VendoredMigration::floorFor(new VendoredLibrary('Smarty', 'vendor/Smarty', '3.1.8', 'smarty/smarty')));
         self::assertNull(VendoredMigration::floorFor(new VendoredLibrary('PHPMailer', 'vendor/PHPMailer', '5.2.1', 'phpmailer/phpmailer')));
     }
