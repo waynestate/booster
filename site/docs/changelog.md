@@ -16,6 +16,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - Changed: the deploy kit is Squire 0.10.2 (was 0.10.1): the kit's `php.ini` sets `session.cookie_samesite = Lax`, the fallback base names its images in full (`docker.io/library/...`) with Composer as a build argument, and the portable image drops `node_modules/` after the build. `squire init --check` passes on `deploy/`.
 - Changed: the `cas-to-sesame` hop writes `waynestate/sesame:^0.7` (was `^0.6`) and its MANUAL note names the same constraint. SESAME 0.7.0's one new behavior is a cookie flag warning in its raw PHP session, which a Laravel app (every wayne-cas app) does not use; an app hopped by an earlier Booster takes SESAME's 0.7.0 upgrade step.
 - Changed: the `proctor` CI job on `deploy/` blocks the pipeline (it was allowed to fail); PROCTOR 0.11.1 reports a pass there, with warnings and no failures. MAINTAINING says so.
+- Docs: MAINTAINING names the maintainer as a role (the stack maintainer), reached through an issue on git.wayne.edu, and the CI cache comment says why the key is fixed without an internal decision number.
 - Changed: Booster requires CREED ^0.1.8 (locked 0.1.8, was ^0.1 at 0.1.7), PROCTOR ^0.11 (locked 0.11.1, was 0.11.0) and Pinstripe ^0.1.4 (locked 0.1.4, was ^0.1 at 0.1.1). The deploy layer requires HELMET ^1.3 (locked 1.3.0, was ^1.0 at 1.0.1), CREED ^0.1.8 (locked 0.1.8, was 0.1.7) and PROCTOR ^0.11 (locked 0.11.1, was 0.11.0).
 
 ## \[1.13.0\] - 2026-11-09[#](https://booster.apps.wayne.edu/docs/changelog.html#1-13-0-2026-11-09)
