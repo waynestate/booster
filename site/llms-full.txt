@@ -1325,6 +1325,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### \[Unreleased\][#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Added: the Laravel 12 to 13 hop's behavior-changes block gains three rows from the upgrade guide: a lone `array_last()` call (the polyfill row only looked for `array_first()`), and an app that leaves its session cookie name or cache prefix to the framework fallback, whose names change in 13 (everyone is signed out once, the cache starts cold). Set `SESSION_COOKIE` and `CACHE_PREFIX` to today's values to keep them.
+- Added: every hop playbook from `booster init` says what an AI coding tool does when a gate fails: work from the real output and the files it names, fix one cause per try, never loosen a test or add `--skip-gate`, and stop after 3 tries at one failure to hand the hop back to a person. Run `booster init` again to pick it up (`booster init --check` reports the old playbooks as stale).
 - Changed: CI pins the Preflight components to 0.4.0 (the proctor job clones the full history, so the override-approver check can read git blame).
 - Docs: OPEN_QUESTIONS and the GitHub workflow comment name the pins in use (Preflight 0.3.1 on GitLab, 0.1.4's commit on GitHub).
 - Changed: the deploy layer runs Squire's kit 0.7.1 (was 0.6.0): `.squire/php.ini` no longer sets the deprecated `session.sid_*` lines, web requests get a `disable_functions` list and Apache hardening (`.squire/php-web.ini`, `.squire/apache-hardening.conf`), and opcache gets production settings with `SQUIRE_OPCACHE_VALIDATE` as the one switch.
@@ -2821,6 +2823,8 @@ The usual loop:
 4. Run again. Booster reads `composer.json` fresh each time, so it plans from the versions the app is on now and the finished hops are not repeated.
 
 If you would rather throw the failed hop away, `git checkout .`, fix the cause, and run again. To get the hop's edits and keep working in the same tree, pass `--allow-dirty`.
+
+An AI coding tool working from the playbooks `booster init` writes follows the same loop, with a cap: it works from the real output and the files it names, fixes one cause per try, never loosens a test or adds `--skip-gate`, and after 3 tries at one failure it stops and hands the hop back to you with the last output.
 
 Not for: re-running again and again hoping for a different answer. Booster is deterministic; the gate will be just as red.
 

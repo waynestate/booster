@@ -215,4 +215,6 @@ The usual loop:
 
 If you would rather throw the failed hop away, `git checkout .`, fix the cause, and run again. To get the hop's edits and keep working in the same tree, pass `--allow-dirty`.
 
+An AI coding tool working from the playbooks `booster init` writes follows the same loop, with a cap: it works from the real output and the files it names, fixes one cause per try, never loosens a test or adds `--skip-gate`, and after 3 tries at one failure it stops and hands the hop back to you with the last output.
+
 Not for: re-running again and again hoping for a different answer. Booster is deterministic; the gate will be just as red.
