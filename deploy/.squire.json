@@ -1,6 +1,6 @@
 {
     "squire": "Written by Squire. Commit this file: `vendor/bin/squire init --check` reads it to report drift.",
-    "version": "0.10.0",
+    "version": "0.10.1",
     "target": "raw",
     "groups": [
         "release",
@@ -11,7 +11,7 @@
         ".squire/Dockerfile": "2d0f1eafbb78fa10741b3abe400fd254a21ad8b3605ca0860aef1bcac5923d2e",
         ".squire/Dockerfile.dockerignore": "6ccbb5a302475dd6322dc9f46057f98d0a5db59e5cfcc334d956df862d5da6fe",
         ".squire/apache-hardening.conf": "1f4f8dbcb70ad69a9ac91d852780a3e811527098c8bbf90416076ded25c52a40",
-        ".squire/base-fallback.Dockerfile": "dd1b169d0c6c117bab00d0899e1cae43386b609555c7dfd5ecf42fd00719c580",
+        ".squire/base-fallback.Dockerfile": "2f1b158115ecfc5a0fd7af46fc926b1cb0a7337bec42d6cbd638f7480499b658",
         ".squire/fallback/citadel-apache-entrypoint": "5586d39815a2f5f2bb29b07dd326cc8651ec61962160af942e5762783791af70",
         ".squire/fallback/citadel-deploy": "4203eb9458ab6910156622735da2ca026e2ac50420598c64e98cf3ef66603b90",
         ".squire/haproxy.cfg": "bcbc3ea3a8fb19c991900a1275e0d6954b41a6a3c6ccaef1934eeebf9f6ab901",

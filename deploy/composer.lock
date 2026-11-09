@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f9146f57ad27b432233fc090050a16f2",
+    "content-hash": "1768d58eea781a983b4219a2ee492a5c",
     "packages": [
         {
             "name": "composer/semver",
@@ -1929,16 +1929,16 @@
         },
         {
             "name": "waynestate/proctor",
-            "version": "0.8.0",
+            "version": "0.11.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/proctor.git",
-                "reference": "29a9060e9929af73b0d23869a15fe73cbf46bf9b"
+                "reference": "a10f6ab99c8e579bcf0022eb756a6727f6a5323d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/proctor/zipball/29a9060e9929af73b0d23869a15fe73cbf46bf9b",
-                "reference": "29a9060e9929af73b0d23869a15fe73cbf46bf9b",
+                "url": "https://api.github.com/repos/waynestate/proctor/zipball/a10f6ab99c8e579bcf0022eb756a6727f6a5323d",
+                "reference": "a10f6ab99c8e579bcf0022eb756a6727f6a5323d",
                 "shasum": ""
             },
             "require": {
@@ -1989,7 +1989,7 @@
                 "issues": "https://git.wayne.edu/enterprise-apps/proctor/-/issues",
                 "source": "https://github.com/waynestate/proctor"
             },
-            "time": "2026-11-08T08:00:24+00:00"
+            "time": "2026-11-09T08:38:41+00:00"
         }
     ],
     "packages-dev": [],

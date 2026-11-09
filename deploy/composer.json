@@ -6,7 +6,7 @@
         "php": "^8.3",
         "waynestate/creed": "^0.1",
         "waynestate/helmet": "^1.0",
-        "waynestate/proctor": "^0.8"
+        "waynestate/proctor": "^0.11"
     },
     "config": {
         "sort-packages": true,

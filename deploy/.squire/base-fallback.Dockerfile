@@ -93,10 +93,11 @@ RUN set -eux; \
 RUN php -m | grep -qx 'Zend OPcache' || docker-php-ext-enable opcache
 
 # Composer's runtime tooling, plus Composer itself (Citadel downloads it at first boot; locally it is copied from the
-# pinned Composer image so the container does not need the network to start).
+# pinned Composer image so the container does not need the network to start). 2.11.1, because 2.10 is no longer
+# maintained and Composer, like Beethoven, keeps writing after the old score stops getting fixes.
 RUN apt-get update && apt-get install -y --no-install-recommends git openssh-client wget zip unzip curl \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=composer:2.10.3@sha256:2cf275428757e5435a667bfc0d038b14520ca02be2b1b70d44a05c8c19e2de48 /usr/bin/composer /usr/local/bin/composer
+COPY --from=composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0 /usr/bin/composer /usr/local/bin/composer
 
 # Node 22 and corepack, copied from the official Node image instead of piping a setup script into a shell (S4).
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
