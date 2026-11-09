@@ -46,30 +46,14 @@
 <p>All notable changes to Booster are recorded here. The format follows Keep a Changelog.</p>
 <h2 id="unreleased">[Unreleased]<a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></h2>
 <ul>
-<li>
-<p>Fixed: a hand-copied library's version is also read from the <code>@version x.y.z</code> tag in its main file's docblock when the code does not state it (a <code>const VERSION</code> or <code>SMARTY_VERSION</code> still wins). A real app's Slim 1.6.0 copy says its version only there, so <code>vendored-to-composer</code> raised a wrong stop sign (&quot;holds Slim of an unknown version&quot;) and left the hop out. A version-control keyword such as Doctrine's <code>@version $Revision$</code> still leaves the version unknown. The test fixture's Slim now ships as the real copy does, docblock only.</p>
-</li>
-<li>
-<p>Changed: Composer 2.11.1 (was 2.10.3, no longer maintained), pinned by its multi-arch list digest, in the <code>wayneui-copies</code>, <code>composer-ci</code>, <code>refresh-hop-data</code> and <code>phar</code> CI jobs, the PHAR build scripts, the Docker lines in the README, the install, checks and MAINTAINING pages and the front page, and the gate's target image for PHP 7.2 and up (builds for older PHP keep Composer 2.2). 2.11 fixes GHSA-c968-33g3-wh7p and GHSA-fm2w-xgf2-f9fh. The target image's recipe stamp changes with it, so the next <code>run</code> builds a fresh image.</p>
-</li>
-<li>
-<p>Changed: the deploy kit is Squire 0.10.2 (was 0.10.1): the kit's <code>php.ini</code> sets <code>session.cookie_samesite = Lax</code>, the fallback base names its images in full (<code>docker.io/library/...</code>) with Composer as a build argument, and the portable image drops <code>node_modules/</code> after the build. <code>squire init --check</code> passes on <code>deploy/</code>.</p>
-</li>
-<li>
-<p>Changed: the <code>cas-to-sesame</code> hop writes <code>waynestate/sesame:^0.7</code> (was <code>^0.6</code>) and its MANUAL note names the same constraint. SESAME 0.7.0's one new behavior is a cookie flag warning in its raw PHP session, which a Laravel app (every wayne-cas app) does not use; an app hopped by an earlier Booster takes SESAME's 0.7.0 upgrade step.</p>
-</li>
-<li>
-<p>Changed: the <code>proctor</code> CI job on <code>deploy/</code> blocks the pipeline (it was allowed to fail); PROCTOR 0.11.1 reports a pass there, with warnings and no failures. MAINTAINING says so.</p>
-</li>
-<li>
-<p>Docs: MAINTAINING names the maintainer as a role (the stack maintainer), reached through an issue on git.wayne.edu, and the CI cache comment says why the key is fixed without an internal decision number.</p>
-</li>
-<li>
-<p>Docs: <code>.env.example</code> says an unset <code>BOOSTER_POLICY</code> uses the policy.json in the waynestate/creed package (it said a snapshot bundled with Booster, which Booster no longer ships).</p>
-</li>
-<li>
-<p>Changed: Booster requires CREED ^0.1.8 (locked 0.1.8, was ^0.1 at 0.1.7), PROCTOR ^0.11 (locked 0.11.1, was 0.11.0) and Pinstripe ^0.1.4 (locked 0.1.4, was ^0.1 at 0.1.1). The deploy layer requires HELMET ^1.3 (locked 1.3.0, was ^1.0 at 1.0.1), CREED ^0.1.8 (locked 0.1.8, was 0.1.7) and PROCTOR ^0.11 (locked 0.11.1, was 0.11.0).</p>
-</li>
+<li>Fixed: a hand-copied library's version is also read from the <code>@version x.y.z</code> tag in its main file's docblock when the code does not state it (a <code>const VERSION</code> or <code>SMARTY_VERSION</code> still wins). A real app's Slim 1.6.0 copy says its version only there, so <code>vendored-to-composer</code> raised a wrong stop sign (&quot;holds Slim of an unknown version&quot;) and left the hop out. A version-control keyword such as Doctrine's <code>@version $Revision$</code> still leaves the version unknown. The test fixture's Slim now ships as the real copy does, docblock only.</li>
+<li>Changed: Composer 2.11.1 (was 2.10.3, no longer maintained), pinned by its multi-arch list digest, in the <code>wayneui-copies</code>, <code>composer-ci</code>, <code>refresh-hop-data</code> and <code>phar</code> CI jobs, the PHAR build scripts, the Docker lines in the README, the install, checks and MAINTAINING pages and the front page, and the gate's target image for PHP 7.2 and up (builds for older PHP keep Composer 2.2). 2.11 fixes GHSA-c968-33g3-wh7p and GHSA-fm2w-xgf2-f9fh. The target image's recipe stamp changes with it, so the next <code>run</code> builds a fresh image.</li>
+<li>Changed: the deploy kit is Squire 0.10.2 (was 0.10.1): the kit's <code>php.ini</code> sets <code>session.cookie_samesite = Lax</code>, the fallback base names its images in full (<code>docker.io/library/...</code>) with Composer as a build argument, and the portable image drops <code>node_modules/</code> after the build. <code>squire init --check</code> passes on <code>deploy/</code>.</li>
+<li>Changed: the <code>cas-to-sesame</code> hop writes <code>waynestate/sesame:^0.7</code> (was <code>^0.6</code>) and its MANUAL note names the same constraint. SESAME 0.7.0's one new behavior is a cookie flag warning in its raw PHP session, which a Laravel app (every wayne-cas app) does not use; an app hopped by an earlier Booster takes SESAME's 0.7.0 upgrade step.</li>
+<li>Changed: the <code>proctor</code> CI job on <code>deploy/</code> blocks the pipeline (it was allowed to fail); PROCTOR 0.11.1 reports a pass there, with warnings and no failures. MAINTAINING says so.</li>
+<li>Docs: MAINTAINING names the maintainer as a role (the stack maintainer), reached through an issue on git.wayne.edu, and the CI cache comment says why the key is fixed without an internal decision number.</li>
+<li>Docs: <code>.env.example</code> says an unset <code>BOOSTER_POLICY</code> uses the policy.json in the waynestate/creed package (it said a snapshot bundled with Booster, which Booster no longer ships).</li>
+<li>Changed: Booster requires CREED ^0.1.8 (locked 0.1.8, was ^0.1 at 0.1.7), PROCTOR ^0.11 (locked 0.11.1, was 0.11.0) and Pinstripe ^0.1.4 (locked 0.1.4, was ^0.1 at 0.1.1). The deploy layer requires HELMET ^1.3 (locked 1.3.0, was ^1.0 at 1.0.1), CREED ^0.1.8 (locked 0.1.8, was 0.1.7) and PROCTOR ^0.11 (locked 0.11.1, was 0.11.0).</li>
 </ul>
 <h2 id="1-13-0-2026-11-09">[1.13.0] - 2026-11-09<a class="docs-heading-link" aria-label="Link to this section" href="#1-13-0-2026-11-09">#</a></h2>
 <ul>
