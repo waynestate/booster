@@ -71,7 +71,8 @@ When the app carries a `composer.lock`, `detect` also reads the PHP range the lo
 `require.php` floor and the lowest ceiling across `packages` and `packages-dev`, raised by a `platform-overrides.php`
 or `config.platform.php` pin in `composer.json` when one is set. If that floor sits above the floor `composer.json`
 claims, Booster plans from the lock's floor and prints a warning saying so; if the first PHP hop lands at or above
-the lock's ceiling, a second warning notes that hop will need a `composer update` to keep the lock installable.
+the lock's ceiling, a second warning says that hop's gate updates the locked packages that stop it (item 5 of
+[What a hop does](hops.md)).
 Without a lock, `composer.json` stays the sole source.
 
 A plan for the bundled Laravel 10 example app on PHP 8.2 looks like this (the order keeps the app on a PHP and

@@ -217,6 +217,8 @@ The usual loop:
 
 If you would rather throw the failed hop away, `git checkout .`, fix the cause, and run again. To get the hop's edits and keep working in the same tree, pass `--allow-dirty`.
 
+If you keep a stopped PHP hop's edits, the app has already moved: that hop raised `php` in `composer.json`. So run again without `--from-php` (or with the PHP the stopped hop landed on), not with the PHP you started from. Booster then starts where the app is, and the baseline on that PHP checks the stopped hop's work before the next hop. A rerun from the old PHP cannot install, and Booster says so: its baseline names the `php` constraint and the rerun to type. When the baseline's install fails because a locked package refuses that PHP, it names the `composer update -W` to run instead.
+
 An AI coding tool working from the playbooks `booster init` writes follows the same loop, with a cap: it works from the real output and the files it names, fixes one cause per try, never loosens a test or adds `--skip-gate`, and after 3 tries at one failure it stops and hands the hop back to you with the last output.
 
 Not for: re-running again and again hoping for a different answer. Booster is deterministic; the gate will be just as red.

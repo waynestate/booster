@@ -262,7 +262,8 @@ When the app carries a `composer.lock`, `detect` also reads the PHP range the lo
 `require.php` floor and the lowest ceiling across `packages` and `packages-dev`, raised by a `platform-overrides.php`
 or `config.platform.php` pin in `composer.json` when one is set. If that floor sits above the floor `composer.json`
 claims, Booster plans from the lock's floor and prints a warning saying so; if the first PHP hop lands at or above
-the lock's ceiling, a second warning notes that hop will need a `composer update` to keep the lock installable.
+the lock's ceiling, a second warning says that hop's gate updates the locked packages that stop it (item 5 of
+[What a hop does](#what-a-hop-does)).
 Without a lock, `composer.json` stays the sole source.
 
 A plan for the bundled Laravel 10 example app on PHP 8.2 looks like this (the order keeps the app on a PHP and
@@ -553,6 +554,11 @@ with the exit code and the last 20 lines of output).
 - A red baseline stops the run before the first hop, with a non-zero exit. `--allow-failing-baseline` lets it go on;
   each later gate failure is then labeled "the baseline was already failing" in the text and JSON output.
 - `--skip-gate` and `--dry-run` skip the baseline (reported as `skipped`), so a dry run never starts Docker.
+- When the baseline's `composer install` fails on the PHP version, the report says which of two causes it was and
+  what to run, instead of the general advice: `composer.json` already requires a newer `php` than `--from-php` (where
+  a run stands after it stopped at a PHP hop; run again without `--from-php`), or a locked package's own
+  `require.php` leaves that PHP out (the report names the `composer update -W` to run). The JSON baseline carries the
+  same text as `advice`.
 - A Mix app's `public/mix-manifest.json` is a build artifact, not committed source: a fresh clone has no manifest, so
   the suite can be red before any hop. Build the assets before the baseline (the app's usual `npm ci && npm run
   build`), or pass `--allow-failing-baseline` knowing why.
@@ -683,7 +689,12 @@ under `Pre-pass fixes:`.
     `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and
     verifies its extension list; it needs Docker and a few minutes per version, so it is not part of `composer ci`.
 5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package
-   the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. A PHP hop on an app
+   the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. A PHP hop reads the
+   lock first: a locked package whose own `require.php` leaves out the hop's PHP makes a plain `composer install`
+   refuse the whole lock, so the gate runs `composer update -W` for just those packages, inside `composer.json`'s
+   constraints, and the report names each one (`the lock held symfony/service-contracts v1.1.2, which needs php
+   ^7.1.3, not PHP 8.0`). The lock follows the app up one PHP at a time, and each hop's diff moves only what had to
+   move. Otherwise, a PHP hop on an app
    that pins `config.platform.php` (every Sourdough app does) runs `composer update --lock`: no package moves, but
    the lock's `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check
    the raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain
@@ -1269,7 +1280,7 @@ Task:
 
 Constraints:
 - Plan and dry run only, until I say so. Never commit or push.
-- Laravel and PHPUnit hops refresh composer.lock inside the gate (composer update -W for the package the hop moved), and a Composer-phase failure means the tests never ran. PHP hops keep a plain install: if a committed lock goes stale, say which packages need composer update.
+- Laravel and PHPUnit hops refresh composer.lock inside the gate (composer update -W for the package the hop moved), and a Composer-phase failure means the tests never ran. PHP hops keep a plain install unless a locked package refuses the new PHP; then the gate updates just those packages (composer update -W) and the report names them. Say which ones the dry run lists.
 - Ask me before you guess: a red baseline, a capped hop, or a package that blocks a Laravel major.
 
 Output: the plan with the reason for its order, the SESAME notes if any, the dry-run summary, then your questions.
@@ -1396,6 +1407,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 ### \[Unreleased\][#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
 - Fixed: a hand-copied library's version is also read from the `@version x.y.z` tag in its main file's docblock when the code does not state it (a `const VERSION` or `SMARTY_VERSION` still wins). A real app's Slim 1.6.0 copy says its version only there, so `vendored-to-composer` raised a wrong stop sign ("holds Slim of an unknown version") and left the hop out. A version-control keyword such as Doctrine's `@version $Revision$` still leaves the version unknown. The test fixture's Slim now ships as the real copy does, docblock only.
+- Fixed: a PHP hop no longer stops on a lock that cannot install on its PHP. Found on a real 2012 app: `vendored-to-composer` resolved the first `composer.lock` on PHP 7.4, where Slim 4's `psr/container` 2.0 holds `symfony/service-contracts` at v1.1.2 (php ^7.1.3), so the 7.4 to 8.0 hop's plain `composer install` refused the lock every time. A PHP hop now reads the lock first and, when locked packages' own `require.php` leaves out its PHP, the gate runs `composer update -W` for just those packages, inside `composer.json`'s constraints; the report says which (`The gate refreshed composer.lock (composer update -W symfony/service-contracts): the lock held symfony/service-contracts v1.1.2, which needs php ^7.1.3, not PHP 8.0.`), a dry run says `would run:` it, and a hop with no other change still runs its gate for it. On that app's `composer.json` the 8.0 hop moves two packages and nothing refuses 8.1 to 8.5 after it. Booster still never creates `config.platform.php`: Composer picks the newest release each PHP allows, so no pin finds one lock for 7.4 through 8.5 on its own. The plan's lock-ceiling warning says the hop's gate does the update (it said the hop "will need composer update").
+- Fixed: a rerun after a stopped PHP hop says what to run. The stopped hop's `composer.json` edit stays, so `--from-php` with the old PHP could never install, and the report only said to fix `composer.json` and `composer.lock` or pass `--allow-failing-baseline`. Now, when the baseline's install fails because `composer.json` already requires a newer `php` than the run starts from, it says so and to run again without `--from-php` (the baseline on the PHP `composer.json` names then checks the stopped hop's work); when a locked package refuses the baseline's PHP, it names the `composer update -W` to run. The JSON baseline gains `advice` for those two cases only. Recipe 14, "After a stop", says how to rerun.
 - Changed: Composer 2.11.1 (was 2.10.3, no longer maintained), pinned by its multi-arch list digest, in the `wayneui-copies`, `composer-ci`, `refresh-hop-data` and `phar` CI jobs, the PHAR build scripts, the Docker lines in the README, the install, checks and MAINTAINING pages and the front page, and the gate's target image for PHP 7.2 and up (builds for older PHP keep Composer 2.2). 2.11 fixes GHSA-c968-33g3-wh7p and GHSA-fm2w-xgf2-f9fh. The target image's recipe stamp changes with it, so the next `run` builds a fresh image.
 - Changed: the deploy kit is Squire 0.10.2 (was 0.10.1): the kit's `php.ini` sets `session.cookie_samesite = Lax`, the fallback base names its images in full (`docker.io/library/...`) with Composer as a build argument, and the portable image drops `node_modules/` after the build. `squire init --check` passes on `deploy/`.
 - Changed: the `cas-to-sesame` hop writes `waynestate/sesame:^0.7` (was `^0.6`) and its MANUAL note names the same constraint. SESAME 0.7.0's one new behavior is a cookie flag warning in its raw PHP session, which a Laravel app (every wayne-cas app) does not use; an app hopped by an earlier Booster takes SESAME's 0.7.0 upgrade step.
@@ -1881,6 +1894,7 @@ Before the first hop, `run` runs the app's own tests (or the built-in `php -l` s
 
 - A red baseline stops the run before the first hop, with a non-zero exit. `--allow-failing-baseline` lets it go on; each later gate failure is then labeled "the baseline was already failing" in the text and JSON output.
 - `--skip-gate` and `--dry-run` skip the baseline (reported as `skipped`), so a dry run never starts Docker.
+- When the baseline's `composer install` fails on the PHP version, the report says which of two causes it was and what to run, instead of the general advice: `composer.json` already requires a newer `php` than `--from-php` (where a run stands after it stopped at a PHP hop; run again without `--from-php`), or a locked package's own `require.php` leaves that PHP out (the report names the `composer update -W` to run). The JSON baseline carries the same text as `advice`.
 - A Mix app's `public/mix-manifest.json` is a build artifact, not committed source: a fresh clone has no manifest, so the suite can be red before any hop. Build the assets before the baseline (the app's usual `npm ci && npm run build`), or pass `--allow-failing-baseline` knowing why.
 - When the app has no tests of its own, the baseline and every gate run a built-in check instead: every PHP file outside `vendor/` and `node_modules/` must still parse on the target PHP (`php -l`). That proves the code loads on the new PHP, not that it works: click through the app before you ship. Pass `--test-command` to run something else, or add a smoke test ([A smoke test for WSU apps](https://booster.apps.wayne.edu/docs/guides/smoke-test.html)) to get the real gate back. Without `--replay`, the run also says so under the baseline and names `booster replay init`, because [the replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html) records what the pages answer and fails a hop that changes one.
 
@@ -2022,6 +2036,8 @@ The planner puts the hop at the first PHP every recipe's release runs on: right 
 
 The gate then runs `composer install` on the hop's PHP inside the target image, which resolves the packages and writes the app's first `composer.lock`; an app that already had a lock gets `composer update -W` for the new packages only. Then it runs the app's tests, or the syntax check for an app with none, and the replay.
 
+That lock is right for the hop's PHP and no newer. On 7.4, Slim 4's `psr/container` 2.0 holds `symfony/service-contracts` at v1.1.2, which needs PHP below 8.0, so a plain `composer install` on 8.0 refuses the lock. Each later PHP hop therefore reads the lock first and updates just the packages that refuse its PHP (here `composer update -W symfony/service-contracts` on the 8.0 hop, which also lifts `symfony/deprecation-contracts`), inside `composer.json`'s constraints. On a real app's `composer.json` that update moved two packages, and nothing in the lock refused 8.1 through 8.5 after it. One lock for every PHP from 7.4 to the target is not on offer: Composer picks the newest release each PHP allows, so no `config.platform.php` pin finds that lock on its own, and Booster never creates that key.
+
 ### The Slim 1 bridge[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#the-slim-1-bridge)
 
 Slim 4 is not Slim 1: different classes, PSR-7 requests, a different router. Rewriting every route by hand is how a framework move eats a semester. Instead the hop writes `slim1-bridge.php`, about 1,200 lines ported from Slim 1.6.7 (MIT), that keeps Slim 1's classes and behavior and hands the routing and the sending to Slim 4:
@@ -2063,7 +2079,7 @@ A real app's replay found two Doctrine changes no test asked about: `DISTINCT(al
 
 - Commit `composer.json`, `composer.lock` and, for Slim, `slim1-bridge.php`. Citadel never runs `composer install`, so commit `vendor/` on the deploy branch or let Booster's `deployments/` script install it (see [Deploying on Citadel](https://booster.apps.wayne.edu/docs/guides/citadel.html)).
 - ORM 2.20 is the last line that reads docblock annotations, and `doctrine/annotations` 1.x is abandoned. ORM 3 (PHP 8.1 or newer, attributes instead of annotations) is the next move, by hand for now. Smarty 5 likewise, once the templates stop using PHP functions as modifiers.
-- The lock was resolved on the hop's PHP. Later PHP hops keep it, so run `composer update` once the app lands on its target to pick up the newest releases that PHP allows.
+- The lock was resolved on the hop's PHP, and later PHP hops move only the packages that refuse theirs. Run `composer update` once the app lands on its target to pick up the newest releases that PHP allows.
 
 ---
 
@@ -2079,7 +2095,7 @@ On PHP hops a pre-pass runs first: PHP 4 era `$a = &new Foo();` becomes a plain 
 2. Rector runs for real, with only that hop's rules. A rule that would change what the code does is never applied: the PHP 8.0 set's switch-to-match rewrite is skipped, because `match` compares strictly and would stop a `case 1:` from matching the string `"1"` a query string carries. Every run keeps Rector's and PHPStan's caches in its own temp directory, removed at exit, so one run never reads another's.
 3. `composer.json` is edited: the `php` or `laravel/framework` constraint is raised, and `config.platform.php` moves with it when the app already pins it, to the first released patch of the new PHP (8.4.1 for 8.4, because 8.4.0 never shipped; x.y.0 otherwise). Booster never creates that key.
 4. The gate runs the app's tests inside `booster-target:<php>-<stamp>`, a container built from `docker/Dockerfile` on the PHP the hop moves to. The stamp is a short hash of the recipe, so an edited `docker/Dockerfile` rebuilds the image instead of reusing a stale one. The image carries the extension set Citadel's apps run with: intl, ldap, soap, zip, gd, pdo_mysql, mysqli, bcmath, pcntl, exif, redis, imagick and oci8. The first build downloads Oracle Instant Client for oci8, so it takes a few minutes; later hops reuse the image. Pass `--image` to run the gate in your own image instead (below). A red gate stops the run and leaves the changes in place so you can read them (`git checkout .` undoes them). With `--replay`, the gate also replays the requests recorded before the first hop and fails on a changed answer: see [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html). To check the image itself, `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and verifies its extension list; it needs Docker and a few minutes per version, so it is not part of `composer ci`.
-5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. A PHP hop on an app that pins `config.platform.php` (every Sourdough app does) runs `composer update --lock`: no package moves, but the lock's `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check the raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's own output, because the tests never ran.
+5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. A PHP hop reads the lock first: a locked package whose own `require.php` leaves out the hop's PHP makes a plain `composer install` refuse the whole lock, so the gate runs `composer update -W` for just those packages, inside `composer.json`'s constraints, and the report names each one (`the lock held symfony/service-contracts v1.1.2, which needs php ^7.1.3, not PHP 8.0`). The lock follows the app up one PHP at a time, and each hop's diff moves only what had to move. Otherwise, a PHP hop on an app that pins `config.platform.php` (every Sourdough app does) runs `composer update --lock`: no package moves, but the lock's `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check the raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's own output, because the tests never ran.
 
 Composer 2.10 refuses to load tagged releases Packagist has flagged with a security advisory, and hops that move onto Laravel 9 or 10 most often meet that block. The refusal has two faces. The loud one fails the install phase and names the advisories. The quiet one happens when the app allows dev stability: Composer does not fail at all, it locks the branch instead, `9.x-dev` where the hop asks for `^9.0`. Booster reads the refreshed lock back and treats a branch version behind a tagged range like the block. Either way it writes a temporary entry to `config.policy.advisories.ignore` in `composer.json`: scoped to the package and the constraint Composer refused, kept visible to `composer audit`, and carrying a reason PROCTOR can find and report until the app removes it. The gate then retries once. If the retry still fails, the run stops with the unblock and the failure both in the report, and the entry stays in `composer.json`.
 
@@ -2196,7 +2212,7 @@ The one-command form for a forced image upgrade:
 booster run --path=../my-app --goal=php-74-to-84
 ```
 
-When the app carries a `composer.lock`, `detect` also reads the PHP range the locked packages allow: the highest `require.php` floor and the lowest ceiling across `packages` and `packages-dev`, raised by a `platform-overrides.php` or `config.platform.php` pin in `composer.json` when one is set. If that floor sits above the floor `composer.json` claims, Booster plans from the lock's floor and prints a warning saying so; if the first PHP hop lands at or above the lock's ceiling, a second warning notes that hop will need a `composer update` to keep the lock installable. Without a lock, `composer.json` stays the sole source.
+When the app carries a `composer.lock`, `detect` also reads the PHP range the locked packages allow: the highest `require.php` floor and the lowest ceiling across `packages` and `packages-dev`, raised by a `platform-overrides.php` or `config.platform.php` pin in `composer.json` when one is set. If that floor sits above the floor `composer.json` claims, Booster plans from the lock's floor and prints a warning saying so; if the first PHP hop lands at or above the lock's ceiling, a second warning says that hop's gate updates the locked packages that stop it (item 5 of [What a hop does](https://booster.apps.wayne.edu/docs/guides/hops.html)). Without a lock, `composer.json` stays the sole source.
 
 A plan for the bundled Laravel 10 example app on PHP 8.2 looks like this (the order keeps the app on a PHP and Laravel pair Laravel supports at every step):
 
@@ -3032,6 +3048,8 @@ The usual loop:
 4. Run again. Booster reads `composer.json` fresh each time, so it plans from the versions the app is on now and the finished hops are not repeated.
 
 If you would rather throw the failed hop away, `git checkout .`, fix the cause, and run again. To get the hop's edits and keep working in the same tree, pass `--allow-dirty`.
+
+If you keep a stopped PHP hop's edits, the app has already moved: that hop raised `php` in `composer.json`. So run again without `--from-php` (or with the PHP the stopped hop landed on), not with the PHP you started from. Booster then starts where the app is, and the baseline on that PHP checks the stopped hop's work before the next hop. A rerun from the old PHP cannot install, and Booster says so: its baseline names the `php` constraint and the rerun to type. When the baseline's install fails because a locked package refuses that PHP, it names the `composer update -W` to run instead.
 
 An AI coding tool working from the playbooks `booster init` writes follows the same loop, with a cap: it works from the real output and the files it names, fixes one cause per try, never loosens a test or adds `--skip-gate`, and after 3 tries at one failure it stops and hands the hop back to you with the last output.
 

@@ -139,7 +139,7 @@ final class PlannerTest extends TestCase
         // The first hop lands exactly on the exclusive ceiling, where the
         // lock can no longer install without an update.
         self::assertContains(
-            'The lock also needs PHP below 8.1 (acme/ceiling-pkg requires <8.1); the first PHP hop will need composer update for it.',
+            'The lock also needs PHP below 8.1 (acme/ceiling-pkg requires <8.1); the first PHP hop\'s gate updates the locked packages that stop it (composer update -W, inside composer.json\'s constraints).',
             $plan->warnings,
         );
     }
@@ -215,7 +215,7 @@ final class PlannerTest extends TestCase
             self::assertStringStartsNotWith('composer.json allows PHP', $warning);
         }
         self::assertContains(
-            'The lock also needs PHP below 8.1 (acme/ceiling-pkg requires <8.1); the first PHP hop will need composer update for it.',
+            'The lock also needs PHP below 8.1 (acme/ceiling-pkg requires <8.1); the first PHP hop\'s gate updates the locked packages that stop it (composer update -W, inside composer.json\'s constraints).',
             $plan->warnings,
         );
     }

@@ -63,6 +63,14 @@ The gate then runs `composer install` on the hop's PHP inside the target image, 
 writes the app's first `composer.lock`; an app that already had a lock gets `composer update -W` for the new packages
 only. Then it runs the app's tests, or the syntax check for an app with none, and the replay.
 
+That lock is right for the hop's PHP and no newer. On 7.4, Slim 4's `psr/container` 2.0 holds
+`symfony/service-contracts` at v1.1.2, which needs PHP below 8.0, so a plain `composer install` on 8.0 refuses the
+lock. Each later PHP hop therefore reads the lock first and updates just the packages that refuse its PHP (here
+`composer update -W symfony/service-contracts` on the 8.0 hop, which also lifts `symfony/deprecation-contracts`),
+inside `composer.json`'s constraints. On a real app's `composer.json` that update moved two packages, and nothing in
+the lock refused 8.1 through 8.5 after it. One lock for every PHP from 7.4 to the target is not on offer: Composer picks the newest release each
+PHP allows, so no `config.platform.php` pin finds that lock on its own, and Booster never creates that key.
+
 ## The Slim 1 bridge
 
 Slim 4 is not Slim 1: different classes, PSR-7 requests, a different router. Rewriting every route by hand is how a
@@ -129,5 +137,5 @@ lines, so you know where to look when the replay says an answer changed.
 - ORM 2.20 is the last line that reads docblock annotations, and `doctrine/annotations` 1.x is abandoned. ORM 3 (PHP
   8.1 or newer, attributes instead of annotations) is the next move, by hand for now. Smarty 5 likewise, once the
   templates stop using PHP functions as modifiers.
-- The lock was resolved on the hop's PHP. Later PHP hops keep it, so run `composer update` once the app lands on its
-  target to pick up the newest releases that PHP allows.
+- The lock was resolved on the hop's PHP, and later PHP hops move only the packages that refuse theirs. Run
+  `composer update` once the app lands on its target to pick up the newest releases that PHP allows.

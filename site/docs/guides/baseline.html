@@ -52,6 +52,11 @@ with the exit code and the last 20 lines of output).</p>
 <li>A red baseline stops the run before the first hop, with a non-zero exit. <code>--allow-failing-baseline</code> lets it go on;
 each later gate failure is then labeled &quot;the baseline was already failing&quot; in the text and JSON output.</li>
 <li><code>--skip-gate</code> and <code>--dry-run</code> skip the baseline (reported as <code>skipped</code>), so a dry run never starts Docker.</li>
+<li>When the baseline's <code>composer install</code> fails on the PHP version, the report says which of two causes it was and
+what to run, instead of the general advice: <code>composer.json</code> already requires a newer <code>php</code> than <code>--from-php</code> (where
+a run stands after it stopped at a PHP hop; run again without <code>--from-php</code>), or a locked package's own
+<code>require.php</code> leaves that PHP out (the report names the <code>composer update -W</code> to run). The JSON baseline carries the
+same text as <code>advice</code>.</li>
 <li>A Mix app's <code>public/mix-manifest.json</code> is a build artifact, not committed source: a fresh clone has no manifest, so
 the suite can be red before any hop. Build the assets before the baseline (the app's usual <code>npm ci &amp;&amp; npm run build</code>), or pass <code>--allow-failing-baseline</code> knowing why.</li>
 <li>When the app has no tests of its own, the baseline and every gate run a built-in check instead: every PHP file

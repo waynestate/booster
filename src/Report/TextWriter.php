@@ -705,7 +705,7 @@ final class TextWriter
             ],
             BaselineResult::INSTALL_FAILED => [
                 sprintf('Baseline: composer install failed (exit %d) on PHP %s.', $baseline->exitCode ?? -1, $php),
-                "The gate never ran, so its state is unknown; fix the app's composer.json and composer.lock, or pass --allow-failing-baseline.",
+                $baseline->advice ?? "The gate never ran, so its state is unknown; fix the app's composer.json and composer.lock, or pass --allow-failing-baseline.",
             ],
             BaselineResult::SKIPPED => ['Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).'],
             default => [sprintf('Baseline: %s.', $baseline->status)],

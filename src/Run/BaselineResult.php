@@ -34,6 +34,7 @@ final readonly class BaselineResult
      * @param list<string> $output   the last lines of the run's output
      * @param string|null  $warning  an advisory about the suite itself (for example that it holds only Laravel's stock examples)
      * @param string       $gateKind which gate the baseline ran: the app's tests, the built-in syntax check, or a --test-command
+     * @param string|null  $advice   for a failed install whose cause Booster can name, what to run instead of the general advice
      */
     public function __construct(
         public string $status,
@@ -42,6 +43,7 @@ final readonly class BaselineResult
         public array $output = [],
         public ?string $warning = null,
         public string $gateKind = self::GATE_TESTS,
+        public ?string $advice = null,
     ) {}
 
     public function failed(): bool
@@ -54,7 +56,7 @@ final readonly class BaselineResult
      */
     public function toArray(): array
     {
-        return [
+        $data = [
             'status' => $this->status,
             'php' => $this->php,
             'exit_code' => $this->exitCode,
@@ -62,5 +64,12 @@ final readonly class BaselineResult
             'warning' => $this->warning,
             'gate' => $this->gateKind,
         ];
+        // Only a failed install with a named cause carries the key, so every
+        // other report keeps its shape.
+        if ($this->advice !== null) {
+            $data['advice'] = $this->advice;
+        }
+
+        return $data;
     }
 }

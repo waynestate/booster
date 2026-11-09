@@ -261,7 +261,8 @@ When the app carries a `composer.lock`, `detect` also reads the PHP range the lo
 `require.php` floor and the lowest ceiling across `packages` and `packages-dev`, raised by a `platform-overrides.php`
 or `config.platform.php` pin in `composer.json` when one is set. If that floor sits above the floor `composer.json`
 claims, Booster plans from the lock's floor and prints a warning saying so; if the first PHP hop lands at or above
-the lock's ceiling, a second warning notes that hop will need a `composer update` to keep the lock installable.
+the lock's ceiling, a second warning says that hop's gate updates the locked packages that stop it (item 5 of
+[What a hop does](#what-a-hop-does)).
 Without a lock, `composer.json` stays the sole source.
 
 A plan for the bundled Laravel 10 example app on PHP 8.2 looks like this (the order keeps the app on a PHP and
@@ -569,6 +570,11 @@ with the exit code and the last 20 lines of output).
 - A red baseline stops the run before the first hop, with a non-zero exit. `--allow-failing-baseline` lets it go on;
   each later gate failure is then labeled "the baseline was already failing" in the text and JSON output.
 - `--skip-gate` and `--dry-run` skip the baseline (reported as `skipped`), so a dry run never starts Docker.
+- When the baseline's `composer install` fails on the PHP version, the report says which of two causes it was and
+  what to run, instead of the general advice: `composer.json` already requires a newer `php` than `--from-php` (where
+  a run stands after it stopped at a PHP hop; run again without `--from-php`), or a locked package's own
+  `require.php` leaves that PHP out (the report names the `composer update -W` to run). The JSON baseline carries the
+  same text as `advice`.
 - A Mix app's `public/mix-manifest.json` is a build artifact, not committed source: a fresh clone has no manifest, so
   the suite can be red before any hop. Build the assets before the baseline (the app's usual `npm ci && npm run
   build`), or pass `--allow-failing-baseline` knowing why.
@@ -699,7 +705,12 @@ under `Pre-pass fixes:`.
     `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and
     verifies its extension list; it needs Docker and a few minutes per version, so it is not part of `composer ci`.
 5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package
-   the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. A PHP hop on an app
+   the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. A PHP hop reads the
+   lock first: a locked package whose own `require.php` leaves out the hop's PHP makes a plain `composer install`
+   refuse the whole lock, so the gate runs `composer update -W` for just those packages, inside `composer.json`'s
+   constraints, and the report names each one (`the lock held symfony/service-contracts v1.1.2, which needs php
+   ^7.1.3, not PHP 8.0`). The lock follows the app up one PHP at a time, and each hop's diff moves only what had to
+   move. Otherwise, a PHP hop on an app
    that pins `config.platform.php` (every Sourdough app does) runs `composer update --lock`: no package moves, but
    the lock's `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check
    the raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain
