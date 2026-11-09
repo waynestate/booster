@@ -277,7 +277,7 @@ BOOSTER plan for examples/laravel-blade
   PHP: 8.2 -> 8.5
   Laravel: 10 -> 13
   PHPUnit: 10 -> 13
-  policy: waynestate/creed 0.1.7 (today 2026-10-29)
+  policy: waynestate/creed 0.1.8 (today 2026-10-29)
 
 1. phpunit-10-to-11
    Move PHPUnit 10 tests to PHPUnit 11.
@@ -1004,7 +1004,7 @@ Form B-01 · Version immunization record
 
 - **App type**: laravel-blade
 - **Course**: PHP 8.2 → 8.5 · Laravel 10 → 13 · PHPUnit 10 → 13
-- **Policy**: waynestate/creed 0.1.7
+- **Policy**: waynestate/creed 0.1.8
 - **Next booster due**: 17 Mar 2028
 
 1. 01 `phpunit-10-to-11` Move PHPUnit 10 tests to PHPUnit 11. PHP 8.2 · Laravel 10 booster-target:8.2 Gate passed PHP 8.2 28 Oct 2026
@@ -1074,7 +1074,7 @@ $ bin/booster detect --path=examples/vue-spa path examples/vue-spa app_type raw-
 
 **planThe ordered hops, the warnings and the scans. Changes nothing.**
 
-$ bin/booster plan --path=examples/raw-php --today=2026-10-29 BOOSTER plan for examples/raw-php app type: raw-php PHP: 7.4 -> 8.5 policy: waynestate/creed 0.1.7 (today 2026-10-29) 1. php-74-to-80 Move PHP 7.4 code to PHP 8.0. After this step your tests run in Docker. Give this hop the most review time. Removed between PHP 7.4 and PHP 8.0: none found. Behavior changes to check: Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; \< / \<= against negative numbers also flip for such strings check: Audit loose comparisons of request parameters and string DB columns Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output keep old: error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED in php.ini check: Watch error logs and rendered pages for new notices after the hop 2. php-80-to-81 Move PHP 8.0 code to PHP 8.1. After this step your tests run in Docker. Removed between PHP 8.0 and PHP 8.1: none found. 3. php-81-to-82 Move PHP 8.1 code to PHP 8.2. After this step your tests run in Docker. Removed between PHP 8.1 and PHP 8.2: none found. 4. php-82-to-83 Move PHP 8.2 code to PHP 8.3. After this step your tests run in Docker. Removed between PHP 8.2 and PHP 8.3: none found. 5. php-83-to-84 Move PHP 8.3 code to PHP 8.4. After this step your tests run in Docker. Removed between PHP 8.3 and PHP 8.4: none found. 6. php-84-to-85 Move PHP 8.4 code to PHP 8.5. After this step your tests run in Docker. Removed between PHP 8.4 and PHP 8.5: none found. PHPCompatibility check for PHP 8.0: no findings. PHPStan on PHP 8.5: 3 findings (code quality hints, not upgrade blockers). src/Legacy.php:20 \[missingType.parameter\] Method Example\\Legacy::className() has parameter $object with no type specified. src/Legacy.php:22 \[return.type\] Method Example\\Legacy::className() should return string but returns class-string|false. src/Legacy.php:25 \[parameter.implicitlyNullable\] Deprecated in PHP 8.4: Parameter #1 $label (string) is implicitly nullable via default value null. Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice for you to read, not errors. Booster does every numbered step above when you run it. Preview the edits: php bin/booster run --path=examples/raw-php --dry-run (The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/raw-php)
+$ bin/booster plan --path=examples/raw-php --today=2026-10-29 BOOSTER plan for examples/raw-php app type: raw-php PHP: 7.4 -> 8.5 policy: waynestate/creed 0.1.8 (today 2026-10-29) 1. php-74-to-80 Move PHP 7.4 code to PHP 8.0. After this step your tests run in Docker. Give this hop the most review time. Removed between PHP 7.4 and PHP 8.0: none found. Behavior changes to check: Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; \< / \<= against negative numbers also flip for such strings check: Audit loose comparisons of request parameters and string DB columns Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output keep old: error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED in php.ini check: Watch error logs and rendered pages for new notices after the hop 2. php-80-to-81 Move PHP 8.0 code to PHP 8.1. After this step your tests run in Docker. Removed between PHP 8.0 and PHP 8.1: none found. 3. php-81-to-82 Move PHP 8.1 code to PHP 8.2. After this step your tests run in Docker. Removed between PHP 8.1 and PHP 8.2: none found. 4. php-82-to-83 Move PHP 8.2 code to PHP 8.3. After this step your tests run in Docker. Removed between PHP 8.2 and PHP 8.3: none found. 5. php-83-to-84 Move PHP 8.3 code to PHP 8.4. After this step your tests run in Docker. Removed between PHP 8.3 and PHP 8.4: none found. 6. php-84-to-85 Move PHP 8.4 code to PHP 8.5. After this step your tests run in Docker. Removed between PHP 8.4 and PHP 8.5: none found. PHPCompatibility check for PHP 8.0: no findings. PHPStan on PHP 8.5: 3 findings (code quality hints, not upgrade blockers). src/Legacy.php:20 \[missingType.parameter\] Method Example\\Legacy::className() has parameter $object with no type specified. src/Legacy.php:22 \[return.type\] Method Example\\Legacy::className() should return string but returns class-string|false. src/Legacy.php:25 \[parameter.implicitlyNullable\] Deprecated in PHP 8.4: Parameter #1 $label (string) is implicitly nullable via default value null. Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice for you to read, not errors. Booster does every numbered step above when you run it. Preview the edits: php bin/booster run --path=examples/raw-php --dry-run (The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/raw-php)
 
 **runRuns the plan; --dry-run previews every hop**
 
@@ -1412,6 +1412,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### \[Unreleased\][#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+### \[1.13.1\] - 2026-11-09[#](https://booster.apps.wayne.edu/docs/changelog.html#1-13-1-2026-11-09)
+
 - Fixed: a hand-copied library's version is also read from the `@version x.y.z` tag in its main file's docblock when the code does not state it (a `const VERSION` or `SMARTY_VERSION` still wins). A real app's Slim 1.6.0 copy says its version only there, so `vendored-to-composer` raised a wrong stop sign ("holds Slim of an unknown version") and left the hop out. A version-control keyword such as Doctrine's `@version $Revision$` still leaves the version unknown. The test fixture's Slim now ships as the real copy does, docblock only.
 - Fixed: a PHP hop no longer stops on a lock that cannot install on its PHP. Found on a real 2012 app: `vendored-to-composer` resolved the first `composer.lock` on PHP 7.4, where Slim 4's `psr/container` 2.0 holds `symfony/service-contracts` at v1.1.2 (php ^7.1.3), so the 7.4 to 8.0 hop's plain `composer install` refused the lock every time. A PHP hop now reads the lock first and, when locked packages' own `require.php` leaves out its PHP, the gate runs `composer update -W` for just those packages, inside `composer.json`'s constraints; the report says which (`The gate refreshed composer.lock (composer update -W symfony/service-contracts): the lock held symfony/service-contracts v1.1.2, which needs php ^7.1.3, not PHP 8.0.`), a dry run says `would run:` it, and a hop with no other change still runs its gate for it. On that app's `composer.json` the 8.0 hop moves two packages and nothing refuses 8.1 to 8.5 after it. Booster still never creates `config.platform.php`: Composer picks the newest release each PHP allows, so no pin finds one lock for 7.4 through 8.5 on its own. The plan's lock-ceiling warning says the hop's gate does the update (it said the hop "will need composer update").
 - Fixed: a rerun after a stopped PHP hop says what to run. The stopped hop's `composer.json` edit stays, so `--from-php` with the old PHP could never install, and the report only said to fix `composer.json` and `composer.lock` or pass `--allow-failing-baseline`. Now, when the baseline's install fails because `composer.json` already requires a newer `php` than the run starts from, it says so and to run again without `--from-php` (the baseline on the PHP `composer.json` names then checks the stopped hop's work); when a locked package refuses the baseline's PHP, it names the `composer update -W` to run. The JSON baseline gains `advice` for those two cases only. Recipe 14, "After a stop", says how to rerun.
@@ -1422,6 +1424,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - Changed: the `cas-to-sesame` hop writes `waynestate/sesame:^0.7` (was `^0.6`) and its MANUAL note names the same constraint. SESAME 0.7.0's one new behavior is a cookie flag warning in its raw PHP session, which a Laravel app (every wayne-cas app) does not use; an app hopped by an earlier Booster takes SESAME's 0.7.0 upgrade step.
 - Changed: the `proctor` CI job on `deploy/` blocks the pipeline (it was allowed to fail); PROCTOR 0.11.1 reports a pass there, with warnings and no failures. MAINTAINING says so.
 - Docs: MAINTAINING names the maintainer as a role (the stack maintainer), reached through an issue on git.wayne.edu, and the CI cache comment says why the key is fixed without an internal decision number.
+- Docs: the sample plans in the README, the quick start and the front page, the README's record card and the front page's Policy line name CREED 0.1.8, the policy Booster locks (they said 0.1.7).
 - Docs: `.env.example` says an unset `BOOSTER_POLICY` uses the policy.json in the waynestate/creed package (it said a snapshot bundled with Booster, which Booster no longer ships).
 - Changed: Booster requires CREED ^0.1.8 (locked 0.1.8, was ^0.1 at 0.1.7), PROCTOR ^0.11 (locked 0.11.1, was 0.11.0) and Pinstripe ^0.1.4 (locked 0.1.4, was ^0.1 at 0.1.1). The deploy layer requires HELMET ^1.3 (locked 1.3.0, was ^1.0 at 1.0.1), CREED ^0.1.8 (locked 0.1.8, was 0.1.7) and PROCTOR ^0.11 (locked 0.11.1, was 0.11.0).
 
@@ -2234,7 +2237,7 @@ BOOSTER plan for examples/laravel-blade
   PHP: 8.2 -> 8.5
   Laravel: 10 -> 13
   PHPUnit: 10 -> 13
-  policy: waynestate/creed 0.1.7 (today 2026-10-29)
+  policy: waynestate/creed 0.1.8 (today 2026-10-29)
 
 1. phpunit-10-to-11
    Move PHPUnit 10 tests to PHPUnit 11.
@@ -3349,7 +3352,7 @@ Source: https://booster.apps.wayne.edu/proof.html
 
 ## Real output, from Booster's own example apps
 
-Captured on 2026-11-09 with Booster 1.13.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
+Captured on 2026-11-09 with Booster 1.13.1. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
 
 ### laravel-blade
 
@@ -3363,7 +3366,7 @@ BOOSTER plan for examples/laravel-blade
   PHP: 8.2 -> 8.5
   Laravel: 10 -> 13
   PHPUnit: 10 -> 13
-  policy: waynestate/creed 0.1.7 (today 2026-11-09)
+  policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
 1. phpunit-10-to-11
    Move PHPUnit 10 tests to PHPUnit 11.
@@ -3583,7 +3586,7 @@ BOOSTER plan for examples/laravel-blade-vue
   app type: laravel-blade-vue
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.7 (today 2026-11-09)
+  policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
@@ -3673,7 +3676,7 @@ BOOSTER plan for examples/laravel-inertia-vue
   app type: laravel-inertia-vue
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.7 (today 2026-11-09)
+  policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
@@ -3792,7 +3795,7 @@ BOOSTER plan for examples/laravel-wayne-cas
   app type: laravel-blade
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.7 (today 2026-11-09)
+  policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
@@ -3883,7 +3886,7 @@ Nothing was changed.
 BOOSTER plan for examples/raw-php
   app type: raw-php
   PHP: 7.4 -> 8.5
-  policy: waynestate/creed 0.1.7 (today 2026-11-09)
+  policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
 1. php-74-to-80
    Move PHP 7.4 code to PHP 8.0.
@@ -4032,7 +4035,7 @@ Next, if the edits look right: php bin/booster run --path=examples/raw-php
 BOOSTER plan for examples/vue-spa
   app type: raw-php-vue
   PHP: 8.0 -> 8.5
-  policy: waynestate/creed 0.1.7 (today 2026-11-09)
+  policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
 1. php-80-to-81
    Move PHP 8.0 code to PHP 8.1.

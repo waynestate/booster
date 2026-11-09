@@ -8,7 +8,7 @@ generator: Squire agent-ready
 
 # Real output, from Booster's own example apps
 
-Captured on 2026-11-09 with Booster 1.13.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
+Captured on 2026-11-09 with Booster 1.13.1. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
 
 ## laravel-blade
 
@@ -22,7 +22,7 @@ BOOSTER plan for examples/laravel-blade
   PHP: 8.2 -> 8.5
   Laravel: 10 -> 13
   PHPUnit: 10 -> 13
-  policy: waynestate/creed 0.1.7 (today 2026-11-09)
+  policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
 1. phpunit-10-to-11
    Move PHPUnit 10 tests to PHPUnit 11.
@@ -242,7 +242,7 @@ BOOSTER plan for examples/laravel-blade-vue
   app type: laravel-blade-vue
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.7 (today 2026-11-09)
+  policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
@@ -332,7 +332,7 @@ BOOSTER plan for examples/laravel-inertia-vue
   app type: laravel-inertia-vue
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.7 (today 2026-11-09)
+  policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
@@ -451,7 +451,7 @@ BOOSTER plan for examples/laravel-wayne-cas
   app type: laravel-blade
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.7 (today 2026-11-09)
+  policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
@@ -542,7 +542,7 @@ Nothing was changed.
 BOOSTER plan for examples/raw-php
   app type: raw-php
   PHP: 7.4 -> 8.5
-  policy: waynestate/creed 0.1.7 (today 2026-11-09)
+  policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
 1. php-74-to-80
    Move PHP 7.4 code to PHP 8.0.
@@ -691,7 +691,7 @@ Next, if the edits look right: php bin/booster run --path=examples/raw-php
 BOOSTER plan for examples/vue-spa
   app type: raw-php-vue
   PHP: 8.0 -> 8.5
-  policy: waynestate/creed 0.1.7 (today 2026-11-09)
+  policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
 1. php-80-to-81
    Move PHP 8.0 code to PHP 8.1.

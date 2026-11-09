@@ -104,7 +104,7 @@
     <text class="fk" x="900" y="56">COURSE</text>
     <text class="fv" x="900" y="77">PHP 8.2 → 8.5 · Laravel 10 → 13 · PHPUnit 10 → 13</text>
     <text class="fk" x="660" y="106">POLICY</text>
-    <text class="fv" x="660" y="127">waynestate/creed 0.1.7</text>
+    <text class="fv" x="660" y="127">waynestate/creed 0.1.8</text>
     <text class="fk" x="900" y="106">NEXT BOOSTER DUE</text>
     <text class="fv" x="900" y="127">17 Mar 2028</text>
   </g>
