@@ -66,6 +66,36 @@ final class BehaviourDataTest extends TestCase
         }
     }
 
+    public function test_the_laravel_13_hop_flags_array_last_and_the_unset_cookie_and_cache_names(): void
+    {
+        $result = (new BehaviourScan())->scan(__DIR__ . '/fixtures/behaviour/laravel13-fallbacks', 'laravel-12-to-13', []);
+        $byId = [];
+        foreach ($result->entries as $entry) {
+            $byId[$entry->id] = $entry;
+        }
+
+        // A lone array_last() call is flagged on its own; array_first() is not called, so its row stays quiet.
+        self::assertSame(['polyfill-array-last', 'session-cookie-name-fallback', 'cache-prefix-fallback'], array_keys($byId));
+        self::assertSame(['src/Report.php:3'], $byId['polyfill-array-last']->hits);
+        self::assertSame('use Arr::last() instead of the global helper', $byId['polyfill-array-last']->keepOld);
+        // No config file at all is the Laravel 11+ slim skeleton: the framework fallback decides the name.
+        self::assertSame(['config/session.php'], $byId['session-cookie-name-fallback']->hits);
+        self::assertSame('set SESSION_COOKIE in .env to the cookie name the app sends today', $byId['session-cookie-name-fallback']->keepOld);
+        self::assertSame(['config/cache.php'], $byId['cache-prefix-fallback']->hits);
+        self::assertStringContainsString('REDIS_PREFIX', (string) $byId['cache-prefix-fallback']->keepOld);
+        foreach ($byId as $id => $entry) {
+            self::assertStringStartsWith('https://laravel.com/docs/13.x/upgrade#', $entry->source, $id);
+        }
+    }
+
+    public function test_the_laravel_13_hop_stays_quiet_when_the_app_pins_its_cookie_and_cache_names(): void
+    {
+        $result = (new BehaviourScan())->scan(__DIR__ . '/fixtures/behaviour/laravel13-pinned', 'laravel-12-to-13', []);
+
+        self::assertSame(['polyfill-array-first-last'], array_map(static fn($e): string => $e->id, $result->entries));
+        self::assertSame(['src/Report.php:3'], $result->entries[0]->hits);
+    }
+
     public function test_the_sweet_alert_toast_timer_entry_carries_the_parity_row(): void
     {
         $byId = [];

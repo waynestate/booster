@@ -4,6 +4,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Added: the Laravel 12 to 13 hop's behavior-changes block gains three rows from the upgrade guide: a lone `array_last()` call (the polyfill row only looked for `array_first()`), and an app that leaves its session cookie name or cache prefix to the framework fallback, whose names change in 13 (everyone is signed out once, the cache starts cold). Set `SESSION_COOKIE` and `CACHE_PREFIX` to today's values to keep them.
 - Added: every hop playbook from `booster init` says what an AI coding tool does when a gate fails: work from the real output and the files it names, fix one cause per try, never loosen a test or add `--skip-gate`, and stop after 3 tries at one failure to hand the hop back to a person. Run `booster init` again to pick it up (`booster init --check` reports the old playbooks as stale).
 - Changed: CI pins the Preflight components to 0.4.0 (the proctor job clones the full history, so the override-approver check can read git blame).
 - Docs: OPEN_QUESTIONS and the GitHub workflow comment name the pins in use (Preflight 0.3.1 on GitLab, 0.1.4's commit on GitHub).

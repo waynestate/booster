@@ -70,6 +70,11 @@ tag for how Booster holds each rule today.
   counts. It never changes the exit code, a clean audit stays silent, a hop that changed no composer file skips it
   and says so, and an audit that cannot run is reported with the command to run by hand. Tests:
   `tests/ComposerAuditHopTest.php`, `tests/ComposerAuditScanTest.php`.
+- **Watch the framework fallbacks and helper clashes.** `Checked`: the behavior-changes block flags an app that
+  leaves its session cookie name or cache prefix to Laravel's fallback before the 12 to 13 hop (the fallback names
+  change, so users are signed out once and the cache starts cold), and each global `array_first()` or `array_last()`
+  call the PHP 8.5 polyfill would silently redefine (`tests/BehaviourDataTest.php`). Advisory: it never changes the
+  exit code.
 - **PHPCompatibility is advisory only.** `Enforced`: `plan` and `booster scan` run it as an advisory scan; it never changes the exit code and a scan that cannot run is reported, not failed.
 
 ## Safe edits

@@ -254,6 +254,33 @@
       "source": "https://laravel.com/docs/13.x/upgrade#symfony-php-85-polyfill-and-global-function-conflicts"
     },
     {
+      "id": "polyfill-array-last",
+      "hop": "laravel-12-to-13",
+      "detect": { "kind": "function", "match": "array_last" },
+      "label": "On PHP below 8.5 the new symfony/polyfill-php85 dependency defines a global array_last(); where laravel/helpers or a custom helper defined it with callback support, the polyfill version (no callback) silently wins and returns the last element instead of the last match",
+      "keep_old": "use Arr::last() instead of the global helper",
+      "check": "Run code paths that filter with array_last($arr, fn)",
+      "source": "https://laravel.com/docs/13.x/upgrade#symfony-php-85-polyfill-and-global-function-conflicts"
+    },
+    {
+      "id": "session-cookie-name-fallback",
+      "hop": "laravel-12-to-13",
+      "detect": { "kind": "config", "file": "config/session.php", "key": "cookie" },
+      "label": "When the app does not set its session cookie name, Laravel 13 derives the fallback name from APP_NAME differently, so the name can change and every signed-in user is signed out once after the deploy",
+      "keep_old": "set SESSION_COOKIE in .env to the cookie name the app sends today",
+      "check": "Compare the session cookie name in the browser before and after the hop",
+      "source": "https://laravel.com/docs/13.x/upgrade#cache-prefixes-and-session-cookie-names"
+    },
+    {
+      "id": "cache-prefix-fallback",
+      "hop": "laravel-12-to-13",
+      "detect": { "kind": "config", "file": "config/cache.php", "key": "prefix" },
+      "label": "When the app does not set a cache prefix, Laravel 13's fallback changes from app_name_cache_ to app-name-cache- (and the Redis prefix from _database_ to -database-), so every cached value misses once after the deploy and keys shared with other code stop matching",
+      "keep_old": "set CACHE_PREFIX (and REDIS_PREFIX when the app uses Redis) in .env to the values the app uses today",
+      "check": "Compare a cache key in the store before and after the hop",
+      "source": "https://laravel.com/docs/13.x/upgrade#cache-prefixes-and-session-cookie-names"
+    },
+    {
       "id": "number-format-negative-zero",
       "hop": "php-71-to-72",
       "detect": { "kind": "function", "match": "number_format" },
