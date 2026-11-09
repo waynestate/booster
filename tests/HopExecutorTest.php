@@ -237,8 +237,34 @@ final class HopExecutorTest extends TestCase
         self::assertStringContainsString('The gate refreshed composer.lock (composer update --lock).', $messages);
     }
 
+    public function test_every_php_hop_on_a_locked_app_refreshes_the_lock_hash(): void
+    {
+        // No platform pin: the hop still raises require.php, so the lock's
+        // content hash goes stale unless the gate refreshes it.
+        $dir = $this->copyExample('raw-php');
+        file_put_contents($dir . '/composer.lock', json_encode(['content-hash' => 'stale', 'packages' => []]));
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan((new ProjectDetector())->detect($dir), new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $fake = $this->fake();
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        self::assertSame([StepResult::APPLIED, StepResult::APPLIED], $this->statuses($report));
+        $scripts = array_map(static fn(array $run): string => $run['command'][count($run['command']) - 1], $this->dockerRuns($fake));
+        self::assertCount(3, $scripts);
+        self::assertStringContainsString('composer install --no-interaction', $scripts[0]);
+        self::assertStringContainsString('composer update --lock --no-interaction', $scripts[1]);
+        self::assertStringContainsString('composer update --lock --no-interaction', $scripts[2]);
+        foreach ($report->results as $result) {
+            self::assertContains('The gate refreshed composer.lock (composer update --lock).', $result->messages);
+        }
+
+        $dry = (new HopExecutor(new RectorRunner($this->fake(), '/fake/rector'), new ComposerEditor(), new TargetImageRunner($this->fake()), $this->fake()))->execute($plan, new RunOptions(dryRun: true));
+        self::assertContains('would run: composer update --lock', $dry->results[0]->messages);
+    }
+
     public function test_a_php_hop_without_a_platform_pin_keeps_the_plain_install(): void
     {
+        // raw-php has no composer.lock, so there is no hash to refresh.
         $fake = $this->fake();
         $this->execute($fake, new RunOptions());
 

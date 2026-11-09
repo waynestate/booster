@@ -213,8 +213,13 @@ final class LockFollowsHopsTest extends TestCase
         // Baseline on 7.4, the vendored hop's gate, then one gate per PHP hop.
         self::assertCount(8, $scripts);
         self::assertStringContainsString('composer update -W --no-interaction --no-progress symfony/service-contracts', $scripts[2]);
-        foreach ([0, 1, 3, 4, 5, 6, 7] as $plain) {
+        foreach ([0, 1] as $plain) {
             self::assertStringContainsString('composer install --no-interaction', $scripts[$plain], 'gate ' . $plain . ' keeps the plain install');
+        }
+        // Every later PHP hop raised require.php, so its gate rewrites the
+        // lock's content hash: no "lock file is not up to date" left behind.
+        foreach ([3, 4, 5, 6, 7] as $refresh) {
+            self::assertStringContainsString('composer update --lock --no-interaction', $scripts[$refresh], 'gate ' . $refresh . ' refreshes the lock hash');
         }
         $lock = json_decode((string) file_get_contents($dir . '/composer.lock'), true);
         self::assertIsArray($lock);

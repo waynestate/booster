@@ -978,12 +978,15 @@ final class HopExecutor
      * packages, and because the app is mounted at /app the refreshed lock
      * lands in the app itself. A Laravel hop also refreshes each companion
      * package the app actually lists, so the lock moves with composer.json.
-     * PHP hops only move the platform requirement, so they keep the plain
-     * install, except when the app pins config.platform.php: the lock keeps
-     * the old pin in its platform-overrides and `composer install` checks
-     * against that, so it refuses the raised require.php (found on WELD,
-     * 2026-11-06; every Sourdough app pins it). Those get `composer update
-     * --lock`, which moves no package but rewrites the hash and overrides.
+     * PHP hops only move the platform requirement, but that still changes
+     * composer.json, so a locked app gets `composer update --lock`, which
+     * moves no package but rewrites the lock's content hash (and its
+     * platform-overrides). Without it every hop left "The lock file is not
+     * up to date" behind (a real 2012 app, 2026-11-09). An app that pins
+     * config.platform.php needs it outright: the lock keeps the old pin and
+     * `composer install` refuses the raised require.php (found on WELD,
+     * 2026-11-06; every Sourdough app pins it). Mission control re-reads the
+     * flight plan after every burn.
      *
      * Either way, when locked packages' own require.php leaves out the hop's
      * PHP, the lock cannot install there at all, so the gate runs `composer
@@ -1004,7 +1007,7 @@ final class HopExecutor
                 return $refusing;
             }
 
-            return self::pinsPlatformPhp($path) && is_file(rtrim($path, '/\\') . '/composer.lock')
+            return is_file(rtrim($path, '/\\') . '/composer.json') && is_file(rtrim($path, '/\\') . '/composer.lock')
                 ? [TargetImageRunner::LOCK_REFRESH]
                 : [];
         }
@@ -1069,15 +1072,6 @@ final class HopExecutor
         return false;
     }
 
-    /** True when the app's composer.json sets config.platform.php. */
-    private static function pinsPlatformPhp(string $path): bool
-    {
-        $file = rtrim($path, '/\\') . '/composer.json';
-        $raw = is_file($file) ? file_get_contents($file) : false;
-        $data = $raw === false ? null : json_decode($raw, true);
-
-        return is_array($data) && is_string($data['config']['platform']['php'] ?? null);
-    }
 
     /**
      * True when the app's composer.json lists $package in require or
