@@ -4,6 +4,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Changed: Booster locks Pinstripe 0.1.5 (was 0.1.4), whose package metadata names git.wayne.edu, so `composer.lock` no longer carries an internal hostname in Pinstripe's support links. No other package moved.
+
 ## [1.13.1] - 2026-11-09
 
 - Fixed: a hand-copied library's version is also read from the `@version x.y.z` tag in its main file's docblock when the code does not state it (a `const VERSION` or `SMARTY_VERSION` still wins). A real app's Slim 1.6.0 copy says its version only there, so `vendored-to-composer` raised a wrong stop sign ("holds Slim of an unknown version") and left the hop out. A version-control keyword such as Doctrine's `@version $Revision$` still leaves the version unknown. The test fixture's Slim now ships as the real copy does, docblock only.

@@ -45,6 +45,9 @@
 <h1 id="changelog">Changelog<a class="docs-heading-link" aria-label="Link to this section" href="#changelog">#</a></h1>
 <p>All notable changes to Booster are recorded here. The format follows Keep a Changelog.</p>
 <h2 id="unreleased">[Unreleased]<a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></h2>
+<ul>
+<li>Changed: Booster locks Pinstripe 0.1.5 (was 0.1.4), whose package metadata names git.wayne.edu, so <code>composer.lock</code> no longer carries an internal hostname in Pinstripe's support links. No other package moved.</li>
+</ul>
 <h2 id="1-13-1-2026-11-09">[1.13.1] - 2026-11-09<a class="docs-heading-link" aria-label="Link to this section" href="#1-13-1-2026-11-09">#</a></h2>
 <ul>
 <li>Fixed: a hand-copied library's version is also read from the <code>@version x.y.z</code> tag in its main file's docblock when the code does not state it (a <code>const VERSION</code> or <code>SMARTY_VERSION</code> still wins). A real app's Slim 1.6.0 copy says its version only there, so <code>vendored-to-composer</code> raised a wrong stop sign (&quot;holds Slim of an unknown version&quot;) and left the hop out. A version-control keyword such as Doctrine's <code>@version $Revision$</code> still leaves the version unknown. The test fixture's Slim now ships as the real copy does, docblock only.</li>

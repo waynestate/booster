@@ -1978,16 +1978,16 @@
         },
         {
             "name": "waynestate/pinstripe",
-            "version": "0.1.4",
+            "version": "0.1.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/pinstripe.git",
-                "reference": "eb030787b2b9558e31b3e571a341675c34309c7f"
+                "reference": "48bbeb094f6e985f8ef250820a5a32bbe531484d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/pinstripe/zipball/eb030787b2b9558e31b3e571a341675c34309c7f",
-                "reference": "eb030787b2b9558e31b3e571a341675c34309c7f",
+                "url": "https://api.github.com/repos/waynestate/pinstripe/zipball/48bbeb094f6e985f8ef250820a5a32bbe531484d",
+                "reference": "48bbeb094f6e985f8ef250820a5a32bbe531484d",
                 "shasum": ""
             },
             "require": {
@@ -2031,11 +2031,11 @@
             "description": "The coding standard for the Wayne State app stack: shared Pint and PHPStan presets.",
             "homepage": "https://pinstripe.apps.wayne.edu/",
             "support": {
-                "issues": "https://nougat.snu.gs/enterprise-apps/pinstripe/-/issues",
-                "source": "https://nougat.snu.gs/enterprise-apps/pinstripe"
+                "issues": "https://git.wayne.edu/enterprise-apps/pinstripe/-/issues",
+                "source": "https://github.com/waynestate/pinstripe"
             },
-            "time": "2026-11-07T00:59:25+00:00",
-            "published-time": "2026-11-07T01:31:49+00:00"
+            "time": "2026-11-09T21:33:26+00:00",
+            "published-time": "2026-11-09T21:53:38+00:00"
         },
         {
             "name": "waynestate/proctor",
