@@ -13,6 +13,21 @@
 
 **Boosts your versions.** One dose at a time, and every dose gets a stamp.
 
+## Run it today
+
+With PHP 8.3 or newer on the machine, from the folder of the app you want to upgrade:
+
+```
+curl -L -o ../booster.phar https://github.com/waynestate/booster/releases/latest/download/booster.phar
+php ../booster.phar detect
+php ../booster.phar plan
+php ../booster.phar run --dry-run
+```
+
+Those three change nothing. `run` makes the edits (it needs git, a clean working copy and Docker for the test gate)
+and never commits. The file sits one folder up so it stays out of the app's git; on Windows PowerShell, type
+`curl.exe` instead of `curl`. Keeping it on your PATH, a clone, and Docker only (no PHP) are under [Install](#install).
+
 **Not to be confused with:** Booster moves an app to a newer PHP or framework version; Pinstripe's Rector set only modernizes code within the PHP version the app already runs.
 
 Checks: `composer ci` (the same command runs on GitLab and GitHub).
@@ -82,6 +97,19 @@ booster run
 `detect` reads the app and prints its type and versions. `plan` lists the steps. `run --dry-run` previews the edits
 and changes nothing. `run` edits files and makes no commit. A real `run` also needs git, a clean git folder (commit
 or stash first) and a Docker daemon for its test gate.
+
+On Windows PowerShell, the same single file (`curl.exe` ships with Windows 10 and 11):
+
+```
+New-Item -ItemType Directory -Force "$HOMEin" | Out-Null
+curl.exe -L -o "$HOMEinooster.phar" https://github.com/waynestate/booster/releases/latest/download/booster.phar
+function booster { php "$HOMEinooster.phar" @args }   # put this line in $PROFILE to keep it
+cd C:\path	o\your-app
+booster detect
+booster plan
+booster run --dry-run
+booster run
+```
 
 ### Linux, macOS and WSL (Ubuntu): clone it
 
@@ -202,7 +230,7 @@ How many hops? One for every step on the way, never a jump:
 - one hop per Laravel major,
 - one hop per PHPUnit major.
 
-Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel supports at every step: a Laravel step as soon as the current PHP allows it, a PHPUnit step when the PHP allows it, a PHP step otherwise. Two real examples: a Laravel 10 app on PHP 8.1 plans 11 hops, and a PHP 5.5 app with no framework plans 12 hops to PHP 8.5.
+Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel supports at every step: a Laravel step as soon as the current PHP allows it, a PHPUnit step when the PHP allows it, a PHP step otherwise. Two real examples: a Laravel 10 app on PHP 8.1 with PHPUnit 10 plans 10 hops (more with front-end Node hops), and a PHP 5.5 app with no framework plans 12 hops to PHP 8.5.
 
 Some hops come along by default, and some only when you ask:
 

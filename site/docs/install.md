@@ -27,6 +27,19 @@ booster run
 
 `detect` reads the app and prints its type and versions. `plan` lists the steps. `run --dry-run` previews the edits and changes nothing. `run` edits files and makes no commit. A real `run` also needs git, a clean git folder (commit or stash first) and a Docker daemon for its test gate.
 
+On Windows PowerShell, the same single file (`curl.exe` ships with Windows 10 and 11):
+
+```
+New-Item -ItemType Directory -Force "$HOMEin" | Out-Null
+curl.exe -L -o "$HOMEinooster.phar" https://github.com/waynestate/booster/releases/latest/download/booster.phar
+function booster { php "$HOMEinooster.phar" @args }   # put this line in $PROFILE to keep it
+cd C:\path	o\your-app
+booster detect
+booster plan
+booster run --dry-run
+booster run
+```
+
 ## Linux, macOS and WSL (Ubuntu): clone it[#](https://booster.apps.wayne.edu/docs/install.html#linux-macos-and-wsl-ubuntu-clone-it)
 
 ```

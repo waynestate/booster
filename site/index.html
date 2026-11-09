@@ -79,7 +79,7 @@
         </ul>
         <p class="hero__cta">
           <a class="wsu-btn btn-launch" href="#record"><span>Watch a plan launch</span><span class="btn-launch__arrow" aria-hidden="true">↑</span></a>
-          <a class="btn-quiet" href="#install">Install</a>
+          <a class="btn-quiet" href="#install">Run it today</a>
         </p>
         <p class="hero__weld"><strong>Works alongside <a href="https://weld.apps.wayne.edu/">WELD</a>.</strong> WELD and <a href="https://sourdough.apps.wayne.edu/">Sourdough</a> start new apps. Booster is for the apps you already have.</p>
         <!-- The patient's chart, for the agent: where it reads this page. The script adds Copy page
@@ -125,7 +125,7 @@
   <!-- ========================================================= record card -->
   <!-- The magic: pick an app, press Run the plan, and watch the countdown,
        each dose stamped as its gate passes, and the version climb. The data is
-          real Booster 1.10 output for the example apps in examples/. -->
+          real Booster 1.12 output for the example apps in examples/. -->
   <section class="section section--record" id="record" aria-labelledby="record-title">
     <div class="wsu-container">
       <div class="head head--split">
@@ -373,7 +373,7 @@ Warning: PHP 8.1 is past security support since 2025-12-31. Use it only as a sto
       </div>
 
       <!-- A greenbar printout, tractor-feed holes and all. Output is real
-            Booster 1.10 output against the bundled example apps. -->
+            Booster output (main, 2026-11-09) against the bundled example apps. -->
       <div class="printout">
         <span class="printout__feed printout__feed--l" aria-hidden="true"></span>
         <span class="printout__feed printout__feed--r" aria-hidden="true"></span>
@@ -396,11 +396,11 @@ helmet         no
 Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version
 composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan).
 Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.
-Next: bin/booster plan --path=examples/vue-spa</pre>
+Next: php bin/booster plan --path=examples/vue-spa</pre>
 <pre class="out" role="tabpanel" id="out-plan" aria-labelledby="tab-plan" tabindex="0" hidden><span class="out__cmd">$ bin/booster plan --path=examples/raw-php --today=2026-10-29</span>
 BOOSTER plan for examples/raw-php
   app type: raw-php
-  PHP: 7.4 -> 8.5
+  PHP: 7.4 -&gt; 8.5
   policy: waynestate/creed 0.1.7 (today 2026-10-29)
 
 1. php-74-to-80
@@ -445,17 +445,20 @@ PHPStan on PHP 8.5: 3 findings (code quality hints, not upgrade blockers).
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: bin/booster run --path=examples/raw-php --dry-run
-(The real run needs Docker, and your app committed in git: bin/booster run --path=examples/raw-php)</pre>
+Preview the edits: php bin/booster run --path=examples/raw-php --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/raw-php)</pre>
 <pre class="out" role="tabpanel" id="out-run" aria-labelledby="tab-run" tabindex="0" hidden><span class="out__cmd">$ bin/booster run --path=examples/raw-php --to-php=8.2 --dry-run</span>
 BOOSTER dry run (nothing was changed)
 
 Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
+Replay: off, and the gate only proves every PHP file parses, so a hop can change what a page answers and still pass.
+Record the answers first: php bin/booster replay init --path=examples/raw-php drafts booster-replay.json from the routes; fill in its todo items, then run again with --replay.
+Step 1 (php-74-to-80) is the hop most likely to change an answer: loose comparisons of numbers and strings, and warnings that now throw.
 
 1. php-74-to-80: PREVIEWED (1 file)
    Largest risk hop: loose comparison of numbers and strings changed, many warnings became thrown errors, and arithmetic on arrays throws.
-    Write or extend tests before applying this hop; only tests and review find behavior changes here.
-    Behavior changes to check:
+   Write or extend tests before applying this hop, or record what the pages answer with the replay gate (`booster replay init`, then `booster run --replay`); only tests, the replay and review find behavior changes here.
+   Behavior changes to check:
    Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; &lt; / &lt;= against negative numbers also flip for such strings
      check: Audit loose comparisons of request parameters and string DB columns
    Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output
@@ -474,7 +477,7 @@ Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests a
 <span class="out__del">   -    public function __construct(string $name)</span>
 <span class="out__add">   +    public function __construct(private string $name)</span>
         {
-<span class="out__del">   -        $this->name = $name;</span>
+<span class="out__del">   -        $this-&gt;name = $name;</span>
         }
     
         public function mentionsAdmin(string $text): bool
@@ -493,6 +496,7 @@ Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests a
    
 2. php-80-to-81: PREVIEWED (0 files)
    No edits needed for this step (dry run).
+   General notes for this step (nothing found in your app, just good to know):
    mysqli now throws on errors by default; PDO on MySQL returns native int and float types; htmlspecialchars() now escapes single quotes.
    Passing null to a non-nullable built-in parameter is deprecated: check the log after the run.
 3. php-81-to-82: PREVIEWED (0 files)
@@ -504,7 +508,7 @@ RESULT: PASS (previewed, no tests ran)
 
 Dry run: these changes were previewed, none were applied.
 Nothing was changed. RESULT: PASS means the preview worked; no tests ran.
-Next, if the edits look right: bin/booster run --path=examples/raw-php
+Next, if the edits look right: php bin/booster run --path=examples/raw-php
 (It needs Docker and a clean git folder. Commit or stash first.)</pre>
 <pre class="out" role="tabpanel" id="out-hops" aria-labelledby="tab-hops" tabindex="0" hidden><span class="out__cmd">$ bin/booster hops</span>
 php-55-to-56       Move PHP 5.5 code to PHP 5.6.
@@ -535,6 +539,7 @@ phpunit-to-9-manual Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on 
 cas-to-sesame      Swap the wayne-cas package for SESAME using its compatibility classes.
 wayneui-1-to-2     Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest.
 vendored-to-composer Move hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto their maintained Composer releases (doctrine/orm 2.20, smarty/smarty 4.5, slim/slim 4 through a Slim 1 bridge).
+session-strict-mode Turn on strict session IDs in a raw PHP app: set session.use_strict_mode and session.use_only_cookies before each session_start() call.
 node-pin-24        Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
 mix-to-vite        Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only).
 vite-major         Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions.
@@ -544,12 +549,19 @@ vue-26-to-27       Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, 
 vue-27-to-compat   Move a Vue 2.7 front end to Vue 3 through the @vue/compat build.
 vue-compat-codemod Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists.
 vue-2-to-3         Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue). [playbook]
-inertia-2-to-3     Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0.</pre>
-<pre class="out" role="tabpanel" id="out-init" aria-labelledby="tab-init" tabindex="0" hidden><span class="out__cmd">$ bin/booster init --path=../my-app</span>
-Wrote 36 playbooks (one for each step Booster knows, plus a general one), 36 changed.
+inertia-2-to-3     Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0.
 
+These are every step Booster knows; `plan` picks the ones your app needs.
+Use an id with --until=&lt;id&gt;, --only=&lt;id&gt; or --skip=&lt;id&gt;. [playbook] steps are done by hand, not by Booster.</pre>
+<pre class="out" role="tabpanel" id="out-init" aria-labelledby="tab-init" tabindex="0" hidden><span class="out__cmd">$ bin/booster init --path=../my-app</span>
+Wrote 40 playbooks (one for each step Booster knows, plus a general one), 40 changed.
+
+Wrote files into ../my-app/.agents/skills. They are instructions for AI coding tools and are not needed to run Booster yourself.
+Next: commit them (git add ../my-app/.agents/skills &amp;&amp; git commit), so a real run starts from a clean folder.
 <span class="out__cmd">$ bin/booster init --path=../my-app --check</span>
 Playbooks are current.
+
+Nothing was changed.
 <span class="out__note"># exits 1 when a playbook is stale, so CI notices</span></pre>
         </div>
       </div>
@@ -562,9 +574,9 @@ Playbooks are current.
       <div class="head head--split">
         <div>
           <p class="label"><span class="label__dot" aria-hidden="true"></span>Get the shot</p>
-          <h2 id="install-title">Install, then plan.</h2>
+          <h2 id="install-title">Run it today.</h2>
         </div>
-        <p class="head__note">Run Booster from inside the app you want to upgrade: <code>--path</code> defaults to <code>.</code>, so <code>booster plan</code> needs no flags. Booster needs PHP 8.3 or newer on the machine; the app it upgrades does not.</p>
+        <p class="head__note">Install, then plan: <code>detect</code>, <code>plan</code> and <code>run --dry-run</code> change nothing, so they are safe to try on any app today. Run Booster from inside the app you want to upgrade: <code>--path</code> defaults to <code>.</code>, so <code>booster plan</code> needs no flags. Booster needs PHP 8.3 or newer on the machine; the app it upgrades does not.</p>
       </div>
 
       <div class="install" data-install>
@@ -587,7 +599,7 @@ booster run --dry-run
 booster run</pre>
             <button class="copy" type="button" data-copy="#code-phar">Copy</button>
           </div>
-          <p class="os__note">One shot, properly administered: the phar carries everything, so the machine needs PHP 8.3 or newer and nothing else. <code>detect</code> reads the app and prints its type and versions. <code>plan</code> lists the steps. <code>run --dry-run</code> previews the edits and changes nothing. <code>run</code> edits files and makes no commit. A real <code>run</code> also needs git, a clean git folder (commit or stash first) and a Docker daemon for its test gate.</p>
+          <p class="os__note">One shot, properly administered: the phar carries everything, so the machine needs PHP 8.3 or newer and nothing else. <code>detect</code> reads the app and prints its type and versions. <code>plan</code> lists the steps. <code>run --dry-run</code> previews the edits and changes nothing. <code>run</code> edits files and makes no commit. A real <code>run</code> also needs git, a clean git folder (commit or stash first) and a Docker daemon for its test gate. On Windows, the PowerShell tab has the same lines.</p>
         </div>
         <div class="os__panel" role="tabpanel" id="os-unix-panel" aria-labelledby="os-unix" tabindex="0" hidden>
           <div class="code">
@@ -598,24 +610,35 @@ bin/booster --version
 bin/booster plan --path=/path/to/your-app</pre>
             <button class="copy" type="button" data-copy="#code-unix">Copy</button>
           </div>
-          <p class="os__note">Ubuntu splits the XML extension out of <code>php-cli</code>, and Composer's dev dependencies need it: when Composer says 'ext-dom is missing', run that line. On macOS: <code>brew install php composer git</code>. Ubuntu 22.04 ships PHP 8.1, too old for Booster: add the ondrej/php PPA or use the Docker route below. Never clone Booster inside an app, and <code>--path</code> takes a full path, not <code>~</code>.</p>
+          <p class="os__note">Ubuntu splits the XML extension out of <code>php-cli</code>, and Composer's dev dependencies need it: when Composer says 'ext-dom is missing', run that line. On macOS: <code>brew install php composer git</code>. Ubuntu 22.04 ships PHP 8.1, too old for Booster: add the ondrej/php PPA or use the Docker route below. Never clone Booster inside an app. <code>--path</code> takes a path, and a leading <code>~</code> means your home folder.</p>
           <p class="os__note">In WSL, keep Booster and the app in your Linux home folder, not under <code>/mnt/c</code> (a Windows drive is slow from Linux); a Windows folder is <code>/mnt/c/Users/&lt;you&gt;/...</code>, and <code>run</code> needs Docker Desktop's WSL integration switched on.</p>
         </div>
         <div class="os__panel" role="tabpanel" id="os-win-panel" aria-labelledby="os-win" tabindex="0" hidden>
           <div class="code">
-<pre id="code-win"># PowerShell, with PHP and Composer installed
-git clone https://github.com/waynestate/booster.git
+<pre id="code-win-phar"># PowerShell, with PHP 8.3 or newer: the single file
+New-Item -ItemType Directory -Force "$HOME\bin" | Out-Null
+curl.exe -L -o "$HOME\bin\booster.phar" https://github.com/waynestate/booster/releases/latest/download/booster.phar
+function booster { php "$HOME\bin\booster.phar" @args }   # add this line to $PROFILE to keep it
+cd C:\path\to\your-app
+booster detect
+booster plan
+booster run --dry-run</pre>
+            <button class="copy" type="button" data-copy="#code-win-phar">Copy</button>
+          </div>
+          <p class="os__note">No Composer needed for the single file. Or clone it, with PHP and Composer installed:</p>
+          <div class="code">
+<pre id="code-win">git clone https://github.com/waynestate/booster.git
 cd booster; composer install
 php bin\booster --version
 php bin\booster plan --path=..\my-app</pre>
             <button class="copy" type="button" data-copy="#code-win">Copy</button>
           </div>
-          <p class="os__note">This route assumes PHP 8.3 or newer and Composer are already on PATH. For a real <code>run</code>, git and a Docker daemon are needed too.</p>
+          <p class="os__note">Both routes need PHP 8.3 or newer on PATH. For a real <code>run</code>, git and a Docker daemon are needed too. Progress lines print in red in PowerShell: they go to standard error, and they are not errors.</p>
         </div>
         <div class="os__panel" role="tabpanel" id="os-docker-panel" aria-labelledby="os-docker" tabindex="0" hidden>
           <div class="code">
 <pre id="code-docker"># inside the booster clone; the path after the second -v is your app
-docker run --rm -v "${PWD}:/booster" -w /booster composer:2 composer install --no-interaction
+docker run --rm -v "${PWD}:/booster" -w /booster composer:2.10.3 composer install --no-interaction
 docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-cli php bin/booster plan --path=/app</pre>
             <button class="copy" type="button" data-copy="#code-docker">Copy</button>
           </div>

@@ -29,6 +29,20 @@ booster run
 and changes nothing. `run` edits files and makes no commit. A real `run` also needs git, a clean git folder (commit
 or stash first) and a Docker daemon for its test gate.
 
+On Windows PowerShell, the same single file (`curl.exe` ships with Windows 10 and 11):
+
+<!-- docs-test: skip needs network -->
+```
+New-Item -ItemType Directory -Force "$HOMEin" | Out-Null
+curl.exe -L -o "$HOMEinooster.phar" https://github.com/waynestate/booster/releases/latest/download/booster.phar
+function booster { php "$HOMEinooster.phar" @args }   # put this line in $PROFILE to keep it
+cd C:\path	o\your-app
+booster detect
+booster plan
+booster run --dry-run
+booster run
+```
+
 ## Linux, macOS and WSL (Ubuntu): clone it
 
 <!-- docs-test: skip installs software -->

@@ -84,7 +84,7 @@ booster init   --path=../my-app        # optional: writes playbooks for AI codin
 <li>one hop per Laravel major,</li>
 <li>one hop per PHPUnit major.</li>
 </ul>
-<p>Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel supports at every step: a Laravel step as soon as the current PHP allows it, a PHPUnit step when the PHP allows it, a PHP step otherwise. Two real examples: a Laravel 10 app on PHP 8.1 plans 11 hops, and a PHP 5.5 app with no framework plans 12 hops to PHP 8.5.</p>
+<p>Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel supports at every step: a Laravel step as soon as the current PHP allows it, a PHPUnit step when the PHP allows it, a PHP step otherwise. Two real examples: a Laravel 10 app on PHP 8.1 with PHPUnit 10 plans 10 hops (more with front-end Node hops), and a PHP 5.5 app with no framework plans 12 hops to PHP 8.5.</p>
 <p>Some hops come along by default, and some only when you ask:</p>
 <ul>
 <li>The front-end Node hops (Mix to Vite, Vite major, Tailwind, TypeScript, Vue) are in the plan by default. Pass any target (<code>--goal</code>, <code>--to-php</code>, <code>--to-laravel</code>, <code>--to-phpunit</code>, <code>--from-php</code>, <code>--from-laravel</code>) and they drop out with a warning, unless you add <code>--with-node</code>.</li>

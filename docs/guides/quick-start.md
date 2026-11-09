@@ -39,7 +39,7 @@ How many hops? One for every step on the way, never a jump:
 - one hop per Laravel major,
 - one hop per PHPUnit major.
 
-Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel supports at every step: a Laravel step as soon as the current PHP allows it, a PHPUnit step when the PHP allows it, a PHP step otherwise. Two real examples: a Laravel 10 app on PHP 8.1 plans 11 hops, and a PHP 5.5 app with no framework plans 12 hops to PHP 8.5.
+Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel supports at every step: a Laravel step as soon as the current PHP allows it, a PHPUnit step when the PHP allows it, a PHP step otherwise. Two real examples: a Laravel 10 app on PHP 8.1 with PHPUnit 10 plans 10 hops (more with front-end Node hops), and a PHP 5.5 app with no framework plans 12 hops to PHP 8.5.
 
 Some hops come along by default, and some only when you ask:
 

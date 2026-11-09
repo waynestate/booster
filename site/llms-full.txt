@@ -14,6 +14,21 @@ Source: https://github.com/waynestate/booster/blob/HEAD/README.md
 
 **Boosts your versions.** One dose at a time, and every dose gets a stamp.
 
+### Run it today
+
+With PHP 8.3 or newer on the machine, from the folder of the app you want to upgrade:
+
+```
+curl -L -o ../booster.phar https://github.com/waynestate/booster/releases/latest/download/booster.phar
+php ../booster.phar detect
+php ../booster.phar plan
+php ../booster.phar run --dry-run
+```
+
+Those three change nothing. `run` makes the edits (it needs git, a clean working copy and Docker for the test gate)
+and never commits. The file sits one folder up so it stays out of the app's git; on Windows PowerShell, type
+`curl.exe` instead of `curl`. Keeping it on your PATH, a clone, and Docker only (no PHP) are under [Install](#install).
+
 **Not to be confused with:** Booster moves an app to a newer PHP or framework version; Pinstripe's Rector set only modernizes code within the PHP version the app already runs.
 
 Checks: `composer ci` (the same command runs on GitLab and GitHub).
@@ -83,6 +98,19 @@ booster run
 `detect` reads the app and prints its type and versions. `plan` lists the steps. `run --dry-run` previews the edits
 and changes nothing. `run` edits files and makes no commit. A real `run` also needs git, a clean git folder (commit
 or stash first) and a Docker daemon for its test gate.
+
+On Windows PowerShell, the same single file (`curl.exe` ships with Windows 10 and 11):
+
+```
+New-Item -ItemType Directory -Force "$HOMEin" | Out-Null
+curl.exe -L -o "$HOMEinooster.phar" https://github.com/waynestate/booster/releases/latest/download/booster.phar
+function booster { php "$HOMEinooster.phar" @args }   # put this line in $PROFILE to keep it
+cd C:\path	o\your-app
+booster detect
+booster plan
+booster run --dry-run
+booster run
+```
 
 #### Linux, macOS and WSL (Ubuntu): clone it
 
@@ -203,7 +231,7 @@ How many hops? One for every step on the way, never a jump:
 - one hop per Laravel major,
 - one hop per PHPUnit major.
 
-Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel supports at every step: a Laravel step as soon as the current PHP allows it, a PHPUnit step when the PHP allows it, a PHP step otherwise. Two real examples: a Laravel 10 app on PHP 8.1 plans 11 hops, and a PHP 5.5 app with no framework plans 12 hops to PHP 8.5.
+Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel supports at every step: a Laravel step as soon as the current PHP allows it, a PHPUnit step when the PHP allows it, a PHP step otherwise. Two real examples: a Laravel 10 app on PHP 8.1 with PHPUnit 10 plans 10 hops (more with front-end Node hops), and a PHP 5.5 app with no framework plans 12 hops to PHP 8.5.
 
 Some hops come along by default, and some only when you ask:
 
@@ -927,7 +955,7 @@ A booster shot keeps your immunity current. This one keeps your PHP current, and
 - **200 files** review threshold per hop
 - **0** commits made for you
 
-[Watch a plan launch](https://booster.apps.wayne.edu/#record) [Install](https://booster.apps.wayne.edu/#install)
+[Watch a plan launch](https://booster.apps.wayne.edu/#record) [Run it today](https://booster.apps.wayne.edu/#install)
 
 **Works alongside [WELD](https://weld.apps.wayne.edu/).** WELD and [Sourdough](https://sourdough.apps.wayne.edu/) start new apps. Booster is for the apps you already have.
 
@@ -1015,29 +1043,29 @@ Want to see it run? [Real output](https://booster.apps.wayne.edu/proof.html) sho
 
 **detectWhich of the five stack shapes, and which versions**
 
-$ bin/booster detect --path=examples/vue-spa path examples/vue-spa app_type raw-php-vue composer_json yes php 8.0 laravel unknown phpunit unknown vue 2 node unknown mix_file no wayne_cas no wayneui_1 no boost no helmet no Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan). Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package. Next: bin/booster plan --path=examples/vue-spa
+$ bin/booster detect --path=examples/vue-spa path examples/vue-spa app_type raw-php-vue composer_json yes php 8.0 laravel unknown phpunit unknown vue 2 node unknown mix_file no wayne_cas no wayneui_1 no boost no helmet no Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan). Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package. Next: php bin/booster plan --path=examples/vue-spa
 
 **planThe ordered hops, the warnings and the scans. Changes nothing.**
 
-$ bin/booster plan --path=examples/raw-php --today=2026-10-29 BOOSTER plan for examples/raw-php app type: raw-php PHP: 7.4 -> 8.5 policy: waynestate/creed 0.1.7 (today 2026-10-29) 1. php-74-to-80 Move PHP 7.4 code to PHP 8.0. After this step your tests run in Docker. Give this hop the most review time. Removed between PHP 7.4 and PHP 8.0: none found. Behavior changes to check: Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; \< / \<= against negative numbers also flip for such strings check: Audit loose comparisons of request parameters and string DB columns Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output keep old: error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED in php.ini check: Watch error logs and rendered pages for new notices after the hop 2. php-80-to-81 Move PHP 8.0 code to PHP 8.1. After this step your tests run in Docker. Removed between PHP 8.0 and PHP 8.1: none found. 3. php-81-to-82 Move PHP 8.1 code to PHP 8.2. After this step your tests run in Docker. Removed between PHP 8.1 and PHP 8.2: none found. 4. php-82-to-83 Move PHP 8.2 code to PHP 8.3. After this step your tests run in Docker. Removed between PHP 8.2 and PHP 8.3: none found. 5. php-83-to-84 Move PHP 8.3 code to PHP 8.4. After this step your tests run in Docker. Removed between PHP 8.3 and PHP 8.4: none found. 6. php-84-to-85 Move PHP 8.4 code to PHP 8.5. After this step your tests run in Docker. Removed between PHP 8.4 and PHP 8.5: none found. PHPCompatibility check for PHP 8.0: no findings. PHPStan on PHP 8.5: 3 findings (code quality hints, not upgrade blockers). src/Legacy.php:20 \[missingType.parameter\] Method Example\\Legacy::className() has parameter $object with no type specified. src/Legacy.php:22 \[return.type\] Method Example\\Legacy::className() should return string but returns class-string|false. src/Legacy.php:25 \[parameter.implicitlyNullable\] Deprecated in PHP 8.4: Parameter #1 $label (string) is implicitly nullable via default value null. Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice for you to read, not errors. Booster does every numbered step above when you run it. Preview the edits: bin/booster run --path=examples/raw-php --dry-run (The real run needs Docker, and your app committed in git: bin/booster run --path=examples/raw-php)
+$ bin/booster plan --path=examples/raw-php --today=2026-10-29 BOOSTER plan for examples/raw-php app type: raw-php PHP: 7.4 -> 8.5 policy: waynestate/creed 0.1.7 (today 2026-10-29) 1. php-74-to-80 Move PHP 7.4 code to PHP 8.0. After this step your tests run in Docker. Give this hop the most review time. Removed between PHP 7.4 and PHP 8.0: none found. Behavior changes to check: Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; \< / \<= against negative numbers also flip for such strings check: Audit loose comparisons of request parameters and string DB columns Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output keep old: error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED in php.ini check: Watch error logs and rendered pages for new notices after the hop 2. php-80-to-81 Move PHP 8.0 code to PHP 8.1. After this step your tests run in Docker. Removed between PHP 8.0 and PHP 8.1: none found. 3. php-81-to-82 Move PHP 8.1 code to PHP 8.2. After this step your tests run in Docker. Removed between PHP 8.1 and PHP 8.2: none found. 4. php-82-to-83 Move PHP 8.2 code to PHP 8.3. After this step your tests run in Docker. Removed between PHP 8.2 and PHP 8.3: none found. 5. php-83-to-84 Move PHP 8.3 code to PHP 8.4. After this step your tests run in Docker. Removed between PHP 8.3 and PHP 8.4: none found. 6. php-84-to-85 Move PHP 8.4 code to PHP 8.5. After this step your tests run in Docker. Removed between PHP 8.4 and PHP 8.5: none found. PHPCompatibility check for PHP 8.0: no findings. PHPStan on PHP 8.5: 3 findings (code quality hints, not upgrade blockers). src/Legacy.php:20 \[missingType.parameter\] Method Example\\Legacy::className() has parameter $object with no type specified. src/Legacy.php:22 \[return.type\] Method Example\\Legacy::className() should return string but returns class-string|false. src/Legacy.php:25 \[parameter.implicitlyNullable\] Deprecated in PHP 8.4: Parameter #1 $label (string) is implicitly nullable via default value null. Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice for you to read, not errors. Booster does every numbered step above when you run it. Preview the edits: php bin/booster run --path=examples/raw-php --dry-run (The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/raw-php)
 
 **runRuns the plan; --dry-run previews every hop**
 
-$ bin/booster run --path=examples/raw-php --to-php=8.2 --dry-run BOOSTER dry run (nothing was changed) Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate). 1. php-74-to-80: PREVIEWED (1 file) Largest risk hop: loose comparison of numbers and strings changed, many warnings became thrown errors, and arithmetic on arrays throws. Write or extend tests before applying this hop; only tests and review find behavior changes here. Behavior changes to check: Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; \< / \<= against negative numbers also flip for such strings check: Audit loose comparisons of request parameters and string DB columns Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output keep old: error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED in php.ini check: Watch error logs and rendered pages for new notices after the hop --- src/Legacy.php --- Original +++ New @@ -4,22 +4,18 @@ class Legacy { - /\*\* @var string \*/ - private $name; - - public function \_\_construct(string $name) + public function \_\_construct(private string $name) { - $this->name = $name; } public function mentionsAdmin(string $text): bool { - return strpos($text, 'admin') !== false; + return str_contains($text, 'admin'); } public function className($object): string { - return get_class($object); + return $object::class; } public function label(string $label = null): string 2. php-80-to-81: PREVIEWED (0 files) No edits needed for this step (dry run). mysqli now throws on errors by default; PDO on MySQL returns native int and float types; htmlspecialchars() now escapes single quotes. Passing null to a non-nullable built-in parameter is deprecated: check the log after the run. 3. php-81-to-82: PREVIEWED (0 files) No edits needed for this step (dry run). Unique files across hops: 1. Later hops were previewed against the original tree, so the same file can appear in several hops. RESULT: PASS (previewed, no tests ran) Dry run: these changes were previewed, none were applied. Nothing was changed. RESULT: PASS means the preview worked; no tests ran. Next, if the edits look right: bin/booster run --path=examples/raw-php (It needs Docker and a clean git folder. Commit or stash first.)
+$ bin/booster run --path=examples/raw-php --to-php=8.2 --dry-run BOOSTER dry run (nothing was changed) Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate). Replay: off, and the gate only proves every PHP file parses, so a hop can change what a page answers and still pass. Record the answers first: php bin/booster replay init --path=examples/raw-php drafts booster-replay.json from the routes; fill in its todo items, then run again with --replay. Step 1 (php-74-to-80) is the hop most likely to change an answer: loose comparisons of numbers and strings, and warnings that now throw. 1. php-74-to-80: PREVIEWED (1 file) Largest risk hop: loose comparison of numbers and strings changed, many warnings became thrown errors, and arithmetic on arrays throws. Write or extend tests before applying this hop, or record what the pages answer with the replay gate (\`booster replay init\`, then \`booster run --replay\`); only tests, the replay and review find behavior changes here. Behavior changes to check: Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; \< / \<= against negative numbers also flip for such strings check: Audit loose comparisons of request parameters and string DB columns Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output keep old: error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED in php.ini check: Watch error logs and rendered pages for new notices after the hop --- src/Legacy.php --- Original +++ New @@ -4,22 +4,18 @@ class Legacy { - /\*\* @var string \*/ - private $name; - - public function \_\_construct(string $name) + public function \_\_construct(private string $name) { - $this->name = $name; } public function mentionsAdmin(string $text): bool { - return strpos($text, 'admin') !== false; + return str_contains($text, 'admin'); } public function className($object): string { - return get_class($object); + return $object::class; } public function label(string $label = null): string 2. php-80-to-81: PREVIEWED (0 files) No edits needed for this step (dry run). General notes for this step (nothing found in your app, just good to know): mysqli now throws on errors by default; PDO on MySQL returns native int and float types; htmlspecialchars() now escapes single quotes. Passing null to a non-nullable built-in parameter is deprecated: check the log after the run. 3. php-81-to-82: PREVIEWED (0 files) No edits needed for this step (dry run). Unique files across hops: 1. Later hops were previewed against the original tree, so the same file can appear in several hops. RESULT: PASS (previewed, no tests ran) Dry run: these changes were previewed, none were applied. Nothing was changed. RESULT: PASS means the preview worked; no tests ran. Next, if the edits look right: php bin/booster run --path=examples/raw-php (It needs Docker and a clean git folder. Commit or stash first.)
 
 **hopsEvery hop Booster knows**
 
-$ bin/booster hops php-55-to-56 Move PHP 5.5 code to PHP 5.6. php-56-to-70 Move PHP 5.6 code to PHP 7.0. php-70-to-71 Move PHP 7.0 code to PHP 7.1. php-71-to-72 Move PHP 7.1 code to PHP 7.2. php-72-to-73 Move PHP 7.2 code to PHP 7.3. php-73-to-74 Move PHP 7.3 code to PHP 7.4. php-74-to-80 Move PHP 7.4 code to PHP 8.0. php-80-to-81 Move PHP 8.0 code to PHP 8.1. php-81-to-82 Move PHP 8.1 code to PHP 8.2. php-82-to-83 Move PHP 8.2 code to PHP 8.3. php-83-to-84 Move PHP 8.3 code to PHP 8.4. php-84-to-85 Move PHP 8.4 code to PHP 8.5. laravel-5.8-to-6 Move a Laravel 5.8 app to Laravel 6. laravel-6-to-7 Move a Laravel 6 app to Laravel 7. laravel-7-to-8 Move a Laravel 7 app to Laravel 8. laravel-8-to-9 Move a Laravel 8 app to Laravel 9. laravel-9-to-10 Move a Laravel 9 app to Laravel 10. laravel-10-to-11 Move a Laravel 10 app to Laravel 11. laravel-11-to-12 Move a Laravel 11 app to Laravel 12. laravel-12-to-13 Move a Laravel 12 app to Laravel 13. phpunit-9-to-10 Move PHPUnit 9 tests to PHPUnit 10. phpunit-10-to-11 Move PHPUnit 10 tests to PHPUnit 11. phpunit-11-to-12 Move PHPUnit 11 tests to PHPUnit 12. phpunit-12-to-13 Move PHPUnit 12 tests to PHPUnit 13. phpunit-to-9-manual Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves. \[playbook\] cas-to-sesame Swap the wayne-cas package for SESAME using its compatibility classes. wayneui-1-to-2 Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. vendored-to-composer Move hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto their maintained Composer releases (doctrine/orm 2.20, smarty/smarty 4.5, slim/slim 4 through a Slim 1 bridge). node-pin-24 Pin the app to Node 26: set engines.node in package.json and write .nvmrc. mix-to-vite Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). vite-major Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions. tailwind-3-to-4 Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool. typescript-major Move the app to TypeScript 6: pin typescript in package.json, and vue-tsc too when the app has it. vue-26-to-27 Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API. vue-27-to-compat Move a Vue 2.7 front end to Vue 3 through the @vue/compat build. vue-compat-codemod Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists. vue-2-to-3 Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue). \[playbook\] inertia-2-to-3 Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0.
+$ bin/booster hops php-55-to-56 Move PHP 5.5 code to PHP 5.6. php-56-to-70 Move PHP 5.6 code to PHP 7.0. php-70-to-71 Move PHP 7.0 code to PHP 7.1. php-71-to-72 Move PHP 7.1 code to PHP 7.2. php-72-to-73 Move PHP 7.2 code to PHP 7.3. php-73-to-74 Move PHP 7.3 code to PHP 7.4. php-74-to-80 Move PHP 7.4 code to PHP 8.0. php-80-to-81 Move PHP 8.0 code to PHP 8.1. php-81-to-82 Move PHP 8.1 code to PHP 8.2. php-82-to-83 Move PHP 8.2 code to PHP 8.3. php-83-to-84 Move PHP 8.3 code to PHP 8.4. php-84-to-85 Move PHP 8.4 code to PHP 8.5. laravel-5.8-to-6 Move a Laravel 5.8 app to Laravel 6. laravel-6-to-7 Move a Laravel 6 app to Laravel 7. laravel-7-to-8 Move a Laravel 7 app to Laravel 8. laravel-8-to-9 Move a Laravel 8 app to Laravel 9. laravel-9-to-10 Move a Laravel 9 app to Laravel 10. laravel-10-to-11 Move a Laravel 10 app to Laravel 11. laravel-11-to-12 Move a Laravel 11 app to Laravel 12. laravel-12-to-13 Move a Laravel 12 app to Laravel 13. phpunit-9-to-10 Move PHPUnit 9 tests to PHPUnit 10. phpunit-10-to-11 Move PHPUnit 10 tests to PHPUnit 11. phpunit-11-to-12 Move PHPUnit 11 tests to PHPUnit 12. phpunit-12-to-13 Move PHPUnit 12 tests to PHPUnit 13. phpunit-to-9-manual Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves. \[playbook\] cas-to-sesame Swap the wayne-cas package for SESAME using its compatibility classes. wayneui-1-to-2 Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. vendored-to-composer Move hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto their maintained Composer releases (doctrine/orm 2.20, smarty/smarty 4.5, slim/slim 4 through a Slim 1 bridge). session-strict-mode Turn on strict session IDs in a raw PHP app: set session.use_strict_mode and session.use_only_cookies before each session_start() call. node-pin-24 Pin the app to Node 26: set engines.node in package.json and write .nvmrc. mix-to-vite Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). vite-major Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions. tailwind-3-to-4 Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool. typescript-major Move the app to TypeScript 6: pin typescript in package.json, and vue-tsc too when the app has it. vue-26-to-27 Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API. vue-27-to-compat Move a Vue 2.7 front end to Vue 3 through the @vue/compat build. vue-compat-codemod Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists. vue-2-to-3 Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue). \[playbook\] inertia-2-to-3 Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0. These are every step Booster knows; \`plan\` picks the ones your app needs. Use an id with --until=\<id>, --only=\<id> or --skip=\<id>. \[playbook\] steps are done by hand, not by Booster.
 
 **initWrites the coding-tab playbooks to .agents/skills**
 
-$ bin/booster init --path=../my-app Wrote 36 playbooks (one for each step Booster knows, plus a general one), 36 changed. $ bin/booster init --path=../my-app --check Playbooks are current. # exits 1 when a playbook is stale, so CI notices
+$ bin/booster init --path=../my-app Wrote 40 playbooks (one for each step Booster knows, plus a general one), 40 changed. Wrote files into ../my-app/.agents/skills. They are instructions for AI coding tools and are not needed to run Booster yourself. Next: commit them (git add ../my-app/.agents/skills && git commit), so a real run starts from a clean folder. $ bin/booster init --path=../my-app --check Playbooks are current. Nothing was changed. # exits 1 when a playbook is stale, so CI notices
 
 Get the shot
 
-### Install, then plan.
+### Run it today.
 
-Run Booster from inside the app you want to upgrade: `--path` defaults to `.`, so `booster plan` needs no flags. Booster needs PHP 8.3 or newer on the machine; the app it upgrades does not.
+Install, then plan: `detect`, `plan` and `run --dry-run` change nothing, so they are safe to try on any app today. Run Booster from inside the app you want to upgrade: `--path` defaults to `.`, so `booster plan` needs no flags. Booster needs PHP 8.3 or newer on the machine; the app it upgrades does not.
 
 **Single file (PHAR)**
 
@@ -1052,7 +1080,7 @@ booster run --dry-run
 booster run
 ```
 
-One shot, properly administered: the phar carries everything, so the machine needs PHP 8.3 or newer and nothing else. `detect` reads the app and prints its type and versions. `plan` lists the steps. `run --dry-run` previews the edits and changes nothing. `run` edits files and makes no commit. A real `run` also needs git, a clean git folder (commit or stash first) and a Docker daemon for its test gate.
+One shot, properly administered: the phar carries everything, so the machine needs PHP 8.3 or newer and nothing else. `detect` reads the app and prints its type and versions. `plan` lists the steps. `run --dry-run` previews the edits and changes nothing. `run` edits files and makes no commit. A real `run` also needs git, a clean git folder (commit or stash first) and a Docker daemon for its test gate. On Windows, the PowerShell tab has the same lines.
 
 **Linux, macOS and WSL**
 
@@ -1064,27 +1092,39 @@ bin/booster --version
 bin/booster plan --path=/path/to/your-app
 ```
 
-Ubuntu splits the XML extension out of `php-cli`, and Composer's dev dependencies need it: when Composer says 'ext-dom is missing', run that line. On macOS: `brew install php composer git`. Ubuntu 22.04 ships PHP 8.1, too old for Booster: add the ondrej/php PPA or use the Docker route below. Never clone Booster inside an app, and `--path` takes a full path, not `~`.
+Ubuntu splits the XML extension out of `php-cli`, and Composer's dev dependencies need it: when Composer says 'ext-dom is missing', run that line. On macOS: `brew install php composer git`. Ubuntu 22.04 ships PHP 8.1, too old for Booster: add the ondrej/php PPA or use the Docker route below. Never clone Booster inside an app. `--path` takes a path, and a leading `~` means your home folder.
 
 In WSL, keep Booster and the app in your Linux home folder, not under `/mnt/c` (a Windows drive is slow from Linux); a Windows folder is `/mnt/c/Users/<you>/...`, and `run` needs Docker Desktop's WSL integration switched on.
 
 **Windows PowerShell**
 
 ```
-# PowerShell, with PHP and Composer installed
+# PowerShell, with PHP 8.3 or newer: the single file
+New-Item -ItemType Directory -Force "$HOME\bin" | Out-Null
+curl.exe -L -o "$HOME\bin\booster.phar" https://github.com/waynestate/booster/releases/latest/download/booster.phar
+function booster { php "$HOME\bin\booster.phar" @args }   # add this line to $PROFILE to keep it
+cd C:\path\to\your-app
+booster detect
+booster plan
+booster run --dry-run
+```
+
+No Composer needed for the single file. Or clone it, with PHP and Composer installed:
+
+```
 git clone https://github.com/waynestate/booster.git
 cd booster; composer install
 php bin\booster --version
 php bin\booster plan --path=..\my-app
 ```
 
-This route assumes PHP 8.3 or newer and Composer are already on PATH. For a real `run`, git and a Docker daemon are needed too.
+Both routes need PHP 8.3 or newer on PATH. For a real `run`, git and a Docker daemon are needed too. Progress lines print in red in PowerShell: they go to standard error, and they are not errors.
 
 **Docker, no PHP**
 
 ```
 # inside the booster clone; the path after the second -v is your app
-docker run --rm -v "${PWD}:/booster" -w /booster composer:2 composer install --no-interaction
+docker run --rm -v "${PWD}:/booster" -w /booster composer:2.10.3 composer install --no-interaction
 docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-cli php bin/booster plan --path=/app
 ```
 
@@ -1345,6 +1385,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### \[Unreleased\][#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Docs: "Run it today": the README opens with the four lines from nothing to a dry run (the PHAR, one folder above the app so `run` still sees a clean working copy), the PHAR route gains its Windows PowerShell lines in the README, the install page and the front page, and the front page's Install button and heading say "Run it today". The front page printouts (detect, plan, run, hops, init) are re-taken from main, the `--path` note says a leading `~` works (it does), the Docker tab pins `composer:2.10.3` like the README, and the quick start, recipes and README say a Laravel 10 app on PHP 8.1 with PHPUnit 10 plans 10 hops, as `plan` prints today.
 - Added: the `session-strict-mode` hop, planned with the new `--strict-session` option, turns on `session.use_strict_mode` and `session.use_only_cookies` in a raw PHP app that calls plain `session_start()`. PHP ships with strict mode off, so it accepts session IDs the server never issued. Before the statement that holds each call, the hop adds one guarded `ini_set()` line that runs only while no session is active and no output has gone out, so it never adds a warning. It is a line in the code because Citadel's PHP runs as an Apache module and never reads `.user.ini`, and `.htaccess` PHP flags break under PHP-FPM. The planner puts it first, on the PHP the app runs today, with its own gate. It skips Laravel apps, apps that boot HELMET, and files or folders that already set strict mode, so a second run changes nothing. It refuses and changes nothing on a stop sign: `session_id($id)`, the `SID` constant, `use_trans_sid` on, or cookies off. Custom session handlers without `validateId()` are listed as MANUAL lines. Without the flag, the plan says how many calls it found. `booster init --check` reports the playbooks as stale until `booster init` runs again. Guide: `docs/guides/strict-sessions.md`.
 - Added: a run whose gate proves little (the built-in `php -l` check for an app with no tests, or only Laravel's stock example tests) and that does not pass `--replay` says so under the baseline, with the `booster replay init` command that drafts the request file (or just `--replay`, when `booster-replay.json` is already there) and the step most likely to change an answer, the PHP 8.0 hop; the JSON report gains `replay_suggestion`. Advisory: it never changes the exit code. The PHP 8.0 hop's notes and playbook now name the replay gate next to extra tests, so `booster init --check` reports that playbook as stale until `booster init` runs again.
 - Docs: BEST_PRACTICES catches up with the code: characterization tests are `Checked` by the replay gate (`booster run --replay`), and "Pin Rector" names the `rector validate-config` check (in `run` and in CI) and the hop record's rule-package versions. The Next page says what the pilot runs and the `cas-to-sesame` hop already shipped, as OPEN_QUESTIONS does.
@@ -2102,7 +2143,7 @@ How many hops? One for every step on the way, never a jump:
 - one hop per Laravel major,
 - one hop per PHPUnit major.
 
-Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel supports at every step: a Laravel step as soon as the current PHP allows it, a PHPUnit step when the PHP allows it, a PHP step otherwise. Two real examples: a Laravel 10 app on PHP 8.1 plans 11 hops, and a PHP 5.5 app with no framework plans 12 hops to PHP 8.5.
+Booster interleaves them so the app sits on a PHP and Laravel pair that Laravel supports at every step: a Laravel step as soon as the current PHP allows it, a PHPUnit step when the PHP allows it, a PHP step otherwise. Two real examples: a Laravel 10 app on PHP 8.1 with PHPUnit 10 plans 10 hops (more with front-end Node hops), and a PHP 5.5 app with no framework plans 12 hops to PHP 8.5.
 
 Some hops come along by default, and some only when you ask:
 
@@ -2634,6 +2675,19 @@ booster run
 
 `detect` reads the app and prints its type and versions. `plan` lists the steps. `run --dry-run` previews the edits and changes nothing. `run` edits files and makes no commit. A real `run` also needs git, a clean git folder (commit or stash first) and a Docker daemon for its test gate.
 
+On Windows PowerShell, the same single file (`curl.exe` ships with Windows 10 and 11):
+
+```
+New-Item -ItemType Directory -Force "$HOMEin" | Out-Null
+curl.exe -L -o "$HOMEinooster.phar" https://github.com/waynestate/booster/releases/latest/download/booster.phar
+function booster { php "$HOMEinooster.phar" @args }   # put this line in $PROFILE to keep it
+cd C:\path	o\your-app
+booster detect
+booster plan
+booster run --dry-run
+booster run
+```
+
 ### Linux, macOS and WSL (Ubuntu): clone it[#](https://booster.apps.wayne.edu/docs/install.html#linux-macos-and-wsl-ubuntu-clone-it)
 
 ```
@@ -2762,7 +2816,7 @@ You want the newest PHP and Laravel CREED's policy supports, and you are happy t
 booster run --path=../my-app
 ```
 
-With no flags Booster plans one hop per PHP minor, Laravel major and PHPUnit major up to the policy's newest, plus the front-end Node hops. It runs them in order, tests the app after each one, and stops at the first red gate. It never commits. A Laravel 10 app on PHP 8.1 plans 11 hops; a PHP 5.5 app with no framework plans 12 hops to PHP 8.5. The long version is in [What a run does by default](https://booster.apps.wayne.edu/docs/guides/quick-start.html#what-a-run-does-by-default).
+With no flags Booster plans one hop per PHP minor, Laravel major and PHPUnit major up to the policy's newest, plus the front-end Node hops. It runs them in order, tests the app after each one, and stops at the first red gate. It never commits. A Laravel 10 app on PHP 8.1 with PHPUnit 10 plans 10 hops (more with front-end Node hops); a PHP 5.5 app with no framework plans 12 hops to PHP 8.5. The long version is in [What a run does by default](https://booster.apps.wayne.edu/docs/guides/quick-start.html#what-a-run-does-by-default).
 
 Not for: an app with no tests and no one to click through it afterward. The gate then only proves every file still parses, which is a start and not a finish (see recipe 10).
 

@@ -37,7 +37,7 @@ You want the newest PHP and Laravel CREED's policy supports, and you are happy t
 booster run --path=../my-app
 ```
 
-With no flags Booster plans one hop per PHP minor, Laravel major and PHPUnit major up to the policy's newest, plus the front-end Node hops. It runs them in order, tests the app after each one, and stops at the first red gate. It never commits. A Laravel 10 app on PHP 8.1 plans 11 hops; a PHP 5.5 app with no framework plans 12 hops to PHP 8.5. The long version is in [What a run does by default](https://booster.apps.wayne.edu/docs/guides/quick-start.html#what-a-run-does-by-default).
+With no flags Booster plans one hop per PHP minor, Laravel major and PHPUnit major up to the policy's newest, plus the front-end Node hops. It runs them in order, tests the app after each one, and stops at the first red gate. It never commits. A Laravel 10 app on PHP 8.1 with PHPUnit 10 plans 10 hops (more with front-end Node hops); a PHP 5.5 app with no framework plans 12 hops to PHP 8.5. The long version is in [What a run does by default](https://booster.apps.wayne.edu/docs/guides/quick-start.html#what-a-run-does-by-default).
 
 Not for: an app with no tests and no one to click through it afterward. The gate then only proves every file still parses, which is a start and not a finish (see recipe 10).
 

@@ -60,6 +60,17 @@ booster run
 <p><code>detect</code> reads the app and prints its type and versions. <code>plan</code> lists the steps. <code>run --dry-run</code> previews the edits
 and changes nothing. <code>run</code> edits files and makes no commit. A real <code>run</code> also needs git, a clean git folder (commit
 or stash first) and a Docker daemon for its test gate.</p>
+<p>On Windows PowerShell, the same single file (<code>curl.exe</code> ships with Windows 10 and 11):</p>
+<!-- docs-test: skip needs network -->
+<pre tabindex="0"><code>New-Item -ItemType Directory -Force &quot;$HOMEin&quot; | Out-Null
+curl.exe -L -o &quot;$HOMEinooster.phar&quot; https://github.com/waynestate/booster/releases/latest/download/booster.phar
+function booster { php &quot;$HOMEinooster.phar&quot; @args }   # put this line in $PROFILE to keep it
+cd C:\path	o\your-app
+booster detect
+booster plan
+booster run --dry-run
+booster run
+</code></pre>
 <h2 id="linux-macos-and-wsl-ubuntu-clone-it">Linux, macOS and WSL (Ubuntu): clone it<a class="docs-heading-link" aria-label="Link to this section" href="#linux-macos-and-wsl-ubuntu-clone-it">#</a></h2>
 <!-- docs-test: skip installs software -->
 <pre tabindex="0"><code>sudo apt install php-cli php-xml php-mbstring php-zip php-curl unzip git composer

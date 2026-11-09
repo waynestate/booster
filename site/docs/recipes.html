@@ -62,7 +62,7 @@ booster plan   --path=../my-app --format=json
 <!-- docs-test: skip run on your own app -->
 <pre tabindex="0"><code>booster run --path=../my-app
 </code></pre>
-<p>With no flags Booster plans one hop per PHP minor, Laravel major and PHPUnit major up to the policy's newest, plus the front-end Node hops. It runs them in order, tests the app after each one, and stops at the first red gate. It never commits. A Laravel 10 app on PHP 8.1 plans 11 hops; a PHP 5.5 app with no framework plans 12 hops to PHP 8.5. The long version is in <a href="guides/quick-start.html#what-a-run-does-by-default">What a run does by default</a>.</p>
+<p>With no flags Booster plans one hop per PHP minor, Laravel major and PHPUnit major up to the policy's newest, plus the front-end Node hops. It runs them in order, tests the app after each one, and stops at the first red gate. It never commits. A Laravel 10 app on PHP 8.1 with PHPUnit 10 plans 10 hops (more with front-end Node hops); a PHP 5.5 app with no framework plans 12 hops to PHP 8.5. The long version is in <a href="guides/quick-start.html#what-a-run-does-by-default">What a run does by default</a>.</p>
 <p>Not for: an app with no tests and no one to click through it afterward. The gate then only proves every file still parses, which is a start and not a finish (see recipe 10).</p>
 <h2 id="3-only-get-off-an-old-php-or-reach-a-specific-php">3. Only get off an old PHP, or reach a specific PHP<a class="docs-heading-link" aria-label="Link to this section" href="#3-only-get-off-an-old-php-or-reach-a-specific-php">#</a></h2>
 <p>You want PHP 8.4, say, and you would rather not change anything else.</p>
