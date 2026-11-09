@@ -702,7 +702,7 @@ under `Pre-pass fixes:`.
     Oracle Instant Client for oci8, so it takes a few minutes; later hops reuse the image. Pass `--image` to run the
     gate in your own image instead (below). A red gate stops the run and leaves the changes in place so you can read
     them (`git checkout .` undoes them). To check the image itself,
-    `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and
+    `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`, PowerShell 7.3 or later) builds it for each PHP version and
     verifies its extension list, that Composer runs and, on the archived Debian releases, that apt can verify the
     archive; it needs Docker and a few minutes per version, so it is not part of `composer ci` (a unit test reads
     the recipe instead).

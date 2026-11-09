@@ -30,7 +30,7 @@ under `Pre-pass fixes:`.
    gate in your own image instead (below). A red gate stops the run and leaves the changes in place so you can read
    them (`git checkout .` undoes them). With `--replay`, the gate also replays the requests recorded before the
    first hop and fails on a changed answer: see [The replay gate](replay-gate.md). To check the image itself,
-   `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`) builds it for each PHP version and
+   `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`, PowerShell 7.3 or later) builds it for each PHP version and
    verifies its extension list, that Composer runs and, on the archived Debian releases, that apt can verify the
    archive; it needs Docker and a few minutes per version, so it is not part of `composer ci` (a unit test reads
    the recipe instead).

@@ -66,7 +66,7 @@ Oracle Instant Client for oci8, so it takes a few minutes; later hops reuse the 
 gate in your own image instead (below). A red gate stops the run and leaves the changes in place so you can read
 them (<code>git checkout .</code> undoes them). With <code>--replay</code>, the gate also replays the requests recorded before the
 first hop and fails on a changed answer: see <a href="replay-gate.html">The replay gate</a>. To check the image itself,
-<code>scripts/check-target-image.sh</code> (or its Windows twin <code>check-target-image.ps1</code>) builds it for each PHP version and
+<code>scripts/check-target-image.sh</code> (or its Windows twin <code>check-target-image.ps1</code>, PowerShell 7.3 or later) builds it for each PHP version and
 verifies its extension list, that Composer runs and, on the archived Debian releases, that apt can verify the
 archive; it needs Docker and a few minutes per version, so it is not part of <code>composer ci</code> (a unit test reads
 the recipe instead).</li>

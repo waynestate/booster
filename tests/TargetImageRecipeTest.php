@@ -120,4 +120,13 @@ final class TargetImageRecipeTest extends TestCase
         self::assertNotNull($lastApt);
         self::assertStringContainsString('rm -f /etc/apt/apt.conf.d/99jessie-expired-keys', $instructions[$lastApt]);
     }
+
+    public function test_the_jessie_setting_removed_is_the_file_the_jessie_block_writes(): void
+    {
+        // A rename on one side only would leave unsigned apt switched on in the finished image.
+        $all = implode("\n", $this->instructions());
+        self::assertSame(1, preg_match('#AllowInsecureRepositories[^>]*> (/etc/apt/apt\.conf\.d/[A-Za-z0-9._-]+);#', $all, $written), 'The jessie block writes its apt setting to one file under apt.conf.d.');
+        self::assertSame(1, preg_match_all('#rm -f (/etc/apt/apt\.conf\.d/[A-Za-z0-9._-]+)#', $all, $removed), 'One rm removes an apt.conf.d file.');
+        self::assertSame($written[1], $removed[1][0]);
+    }
 }

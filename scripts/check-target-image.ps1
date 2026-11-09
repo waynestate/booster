@@ -1,4 +1,4 @@
-#Requires -Version 7.0
+#Requires -Version 7.3
 <#
 .SYNOPSIS
     Builds the gate image for each PHP version and checks its extensions.
@@ -69,7 +69,9 @@ function Invoke-Docker {
 }
 
 # Runs in the image: archived releases other than jessie must verify their
-# archive. apt prints a GPG error or "not signed" when it cannot.
+# archive. apt prints a GPG error or "not signed" when it cannot. The probe is
+# full of double quotes, which PowerShell before 7.3 passes to docker.exe
+# stripped (the old native argument rules), so the script requires 7.3.
 $AptProbe = @'
 . /etc/os-release
 codename="${VERSION_CODENAME:-$(printf "%s" "${VERSION:-}" | sed -n "s/.*(\([a-z]*\)).*/\1/p")}"
