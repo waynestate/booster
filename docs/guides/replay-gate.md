@@ -184,6 +184,28 @@ Every GET without parameters becomes a request, plus one unknown path (an honest
 parameter, form and setup command gets a `todo`, because Booster cannot know which note id exists or what a valid
 form looks like. Fill those in, delete the `todo` lines, and record.
 
+## Pages behind sign-in
+
+The replay never signs in through a real CAS, Entra or Wayne Auth server, so an app that sends every guest to its
+sign-in page answers every request with the same redirect. That baseline matches on every hop, and proves only that
+the front controller still reaches its sign-in check: a rehearsal on an empty launch pad. Booster says so when it
+records one:
+
+    Warning: all 5 recorded answers are the same redirect (Location: /login). If that is the sign-in page, the replay proves only that the app reaches sign-in, not that the pages behind it still work. Give the replay a test login: https://booster.apps.wayne.edu/docs/guides/replay-gate.html#pages-behind-sign-in
+
+It is a warning, not a stop: the replay still gates every hop. To make it prove more, give the replay a signed-in
+user the way the app's own tests would, with fake data only:
+
+- **An app on SESAME** boots it with the `fake` driver in a replay-only config, picked by an `env` entry in `serve`
+  (SESAME's raw PHP guide has the settings). Every request is then signed in as the fake user.
+- **A raw PHP app with its own session** gets a session file from `setup`: a small script writes a session for a fake
+  user into a folder the server uses (`"ini": {"session.save_path": "/tmp/replay-sessions"}`), and each request sends
+  its ID (`"cookies": {"PHPSESSID": "replay-user"}`), or a `sequences` entry posts the app's own test login form first.
+- **An app on Wayne Auth** cannot sign in at all in the replay: the old service checks its cookie, and nothing fakes
+  that. Move it to SESAME's Wayne Auth bridge first; `booster plan` names it as a stop sign.
+
+Keep the guest's redirect as one request either way: it is the honest answer for a visitor who is not signed in.
+
 ## Limits, honestly
 
 - **No real Oracle, SSO or CAS.** The replay never reaches a real system, by design. An app that cannot render a

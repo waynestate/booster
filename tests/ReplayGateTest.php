@@ -51,6 +51,31 @@ final class ReplayGateTest extends TestCase
         self::assertStringContainsString('   2x PHP Deprecated:  Old thing in /app/src/app.php on line 3', (string) file_get_contents($out . '/baseline-php7.4.php-errors.txt'));
     }
 
+    public function test_a_baseline_of_one_redirect_everywhere_warns_that_it_proves_only_sign_in(): void
+    {
+        $signIn = [[302, '', [['Location', '/login?next=%2F']]], [302, '', [['Location', '/login?next=%2F']]]];
+        $gate = $this->gate([$signIn, $signIn]);
+
+        $recorded = $gate->record('5.6');
+
+        self::assertSame(ReplayOutcome::RECORDED, $recorded->status);
+        self::assertContains(
+            'Warning: all 2 recorded answers are the same redirect (Location: /login?next=%2F). If that is the sign-in page, the replay proves only that the app reaches sign-in, not that the pages behind it still work. Give the replay a test login: ' . ReplayGate::SIGN_IN_GUIDE,
+            $recorded->lines,
+        );
+        // It warns; the replay still gates every hop.
+        self::assertSame(ReplayOutcome::PASSED, $gate->check('7.0', 'step-1')->status);
+    }
+
+    public function test_redirects_to_different_places_or_a_page_among_them_do_not_warn(): void
+    {
+        $mixed = [[302, '', [['Location', '/login']]], [200, '{"code":"abc"}', self::JSON]];
+        $apart = [[302, '', [['Location', '/login']]], [301, '', [['Location', '/compare/']]]];
+
+        self::assertEmpty(preg_grep('/^Warning: /', $this->gate([$mixed])->record('5.6')->lines));
+        self::assertEmpty(preg_grep('/^Warning: /', $this->gate([$apart])->record('5.6')->lines));
+    }
+
     public function test_a_changed_answer_fails_with_the_first_difference_and_where_the_transcripts_are(): void
     {
         $out = $this->tempDir();

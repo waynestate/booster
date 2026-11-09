@@ -20,6 +20,9 @@ use Waynestate\Booster\ToolError;
  */
 final class ReplayGate
 {
+    /** The replay guide's section on pages behind sign-in. */
+    public const SIGN_IN_GUIDE = 'https://booster.apps.wayne.edu/docs/guides/replay-gate.html#pages-behind-sign-in';
+
     private ?ReplayRecording $recording = null;
 
     public function __construct(
@@ -97,6 +100,10 @@ final class ReplayGate
 
         $this->recording = new ReplayRecording($php, $this->file->fingerprint, $run->answers);
         $lines = [sprintf('Replay: recorded %d answer%s on PHP %s from %s.', count($run->answers), count($run->answers) === 1 ? '' : 's', $php, $name)];
+        $redirect = self::sameRedirect($run->answers);
+        if ($redirect !== null) {
+            $lines[] = self::sameRedirectWarning(count($run->answers), $redirect);
+        }
         if ($errors !== null) {
             $lines[] = sprintf('PHP logged %d distinct message%s while serving them (%s).', count($run->phpErrors), count($run->phpErrors) === 1 ? '' : 's', $errors);
         }
@@ -150,6 +157,41 @@ final class ReplayGate
             'A value that changes on every request (a token, a time) is not a real difference: hide it with a normalizer in ' . $name . '.',
             ...$errorLine,
         ], $name, $this->outDir, $transcript, $total, count($differences));
+    }
+
+    /**
+     * The one Location every answer redirects to, or null when any answer
+     * is not a 3xx or two of them point at different places. A real app
+     * answered every request with the redirect to sign-in before it loaded a
+     * single library, so "all 5 answers match" on every hop proved only that
+     * index.php still reaches its auth check: a launch rehearsal on an empty
+     * pad.
+     *
+     * @param list<ReplayAnswer> $answers
+     */
+    public static function sameRedirect(array $answers): ?string
+    {
+        $location = null;
+        foreach ($answers as $answer) {
+            $to = $answer->header('Location');
+            if ($answer->status < 300 || $answer->status > 399 || $to === null || ($location !== null && $to !== $location)) {
+                return null;
+            }
+            $location = $to;
+        }
+
+        return $location;
+    }
+
+    /** What to say when every recorded answer is the same redirect. */
+    public static function sameRedirectWarning(int $count, string $location): string
+    {
+        return sprintf(
+            'Warning: %s the same redirect (Location: %s). If that is the sign-in page, the replay proves only that the app reaches sign-in, not that the pages behind it still work. Give the replay a test login: %s',
+            $count === 1 ? 'the one recorded answer is' : sprintf('all %d recorded answers are', $count),
+            preg_replace('/[\x00-\x1F\x7F]/', '', $location),
+            self::SIGN_IN_GUIDE,
+        );
     }
 
     public static function todoMessage(ReplayFile $file): string
