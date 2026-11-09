@@ -85,7 +85,8 @@ Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayn
 Next: php bin/booster plan --path=.
 ```
 
-Every route, per OS, is on [Install](install.md).
+Every route, per OS, is on [Install](install.md). Moving Booster itself to a new release, and what an app an older
+Booster moved needs then, is on [Upgrading](upgrading.md).
 
 ## Guides
 

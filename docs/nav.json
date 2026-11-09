@@ -93,6 +93,10 @@
       "path": "next"
     },
     {
+      "title": "Upgrading",
+      "path": "upgrading"
+    },
+    {
       "title": "Changelog",
       "path": "changelog"
     }

@@ -4,6 +4,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-11-09
+
+- Docs: a new Upgrading page (`docs/upgrading.md`, in the docs menu and linked from the overview) says what changes when you move Booster to a new release, newest first: nothing to do for 1.14.0, and for 1.13.1 the fresh gate image, the stale `cas-to-sesame` playbook, and the one `composer require waynestate/sesame:^0.7` line an app that an earlier Booster moved to SESAME needs, with what SESAME 0.7.0 changes (nothing, for a Laravel app).
+- Docs: README status, the front page masthead and its Version label say 1.14; the Real output page and the docs pages stamp 1.14.0. No hop changed since 1.13.1, so the captured plans are the same.
 - Changed: Booster locks Pinstripe 0.1.5 (was 0.1.4), whose package metadata names git.wayne.edu, so `composer.lock` no longer carries an internal hostname in Pinstripe's support links. No other package moved.
 - Changed: CI pins the Preflight components to 0.5.0 (was 0.4.0). The composer-audit include drops its `image` input and runs 0.5.0's default, Composer 2.11.1 by its multi-arch list digest (it ran a floating `composer:2` digest), and the proctor job now keeps PROCTOR's JSON report as `proctor.json` in its artifact for ROLLCALL. The vendored a11y checker is byte for byte the same at 0.5.0, so its pin test, the a11y scripts, the README and MAINTAINING name the new tag. The GitHub workflow stays on 0.1.4's commit, since the GitHub mirror has no 0.5.0.
 

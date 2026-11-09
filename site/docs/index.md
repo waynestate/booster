@@ -79,7 +79,7 @@ Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayn
 Next: php bin/booster plan --path=.
 ```
 
-Every route, per OS, is on [Install](https://booster.apps.wayne.edu/docs/install.html).
+Every route, per OS, is on [Install](https://booster.apps.wayne.edu/docs/install.html). Moving Booster itself to a new release, and what an app an older Booster moved needs then, is on [Upgrading](https://booster.apps.wayne.edu/docs/upgrading.html).
 
 ## Guides[#](https://booster.apps.wayne.edu/docs/#guides)
 
