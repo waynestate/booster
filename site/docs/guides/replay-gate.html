@@ -230,6 +230,25 @@ calls in <code>routes/</code>);</li>
 <p>Every GET without parameters becomes a request, plus one unknown path (an honest 404 is an answer too). Every path
 parameter, form and setup command gets a <code>todo</code>, because Booster cannot know which note id exists or what a valid
 form looks like. Fill those in, delete the <code>todo</code> lines, and record.</p>
+<h2 id="pages-behind-sign-in">Pages behind sign-in<a class="docs-heading-link" aria-label="Link to this section" href="#pages-behind-sign-in">#</a></h2>
+<p>The replay never signs in through a real CAS, Entra or Wayne Auth server, so an app that sends every guest to its
+sign-in page answers every request with the same redirect. That baseline matches on every hop, and proves only that
+the front controller still reaches its sign-in check: a rehearsal on an empty launch pad. Booster says so when it
+records one:</p>
+<pre tabindex="0"><code>Warning: all 5 recorded answers are the same redirect (Location: /login). If that is the sign-in page, the replay proves only that the app reaches sign-in, not that the pages behind it still work. Give the replay a test login: https://booster.apps.wayne.edu/docs/guides/replay-gate.html#pages-behind-sign-in
+</code></pre>
+<p>It is a warning, not a stop: the replay still gates every hop. To make it prove more, give the replay a signed-in
+user the way the app's own tests would, with fake data only:</p>
+<ul>
+<li><strong>An app on SESAME</strong> boots it with the <code>fake</code> driver in a replay-only config, picked by an <code>env</code> entry in <code>serve</code>
+(SESAME's raw PHP guide has the settings). Every request is then signed in as the fake user.</li>
+<li><strong>A raw PHP app with its own session</strong> gets a session file from <code>setup</code>: a small script writes a session for a fake
+user into a folder the server uses (<code>&quot;ini&quot;: {&quot;session.save_path&quot;: &quot;/tmp/replay-sessions&quot;}</code>), and each request sends
+its ID (<code>&quot;cookies&quot;: {&quot;PHPSESSID&quot;: &quot;replay-user&quot;}</code>), or a <code>sequences</code> entry posts the app's own test login form first.</li>
+<li><strong>An app on Wayne Auth</strong> cannot sign in at all in the replay: the old service checks its cookie, and nothing fakes
+that. Move it to SESAME's Wayne Auth bridge first; <code>booster plan</code> names it as a stop sign.</li>
+</ul>
+<p>Keep the guest's redirect as one request either way: it is the honest answer for a visitor who is not signed in.</p>
 <h2 id="limits-honestly">Limits, honestly<a class="docs-heading-link" aria-label="Link to this section" href="#limits-honestly">#</a></h2>
 <ul>
 <li><strong>No real Oracle, SSO or CAS.</strong> The replay never reaches a real system, by design. An app that cannot render a
@@ -252,7 +271,7 @@ queue. A follow-up request that reads the saved record back (like <code>read bac
     </main>
     <nav class="docs-pager" aria-label="Pages"><a class="docs-pager__link" href="../../docs/guides/hops.html"><span class="docs-pager__dir">Previous</span><span class="docs-pager__title">What a hop does</span></a><a class="docs-pager__link docs-pager__link--next" href="../../docs/guides/framework-hops.html"><span class="docs-pager__dir">Next</span><span class="docs-pager__title">Hand-copied libraries to Composer</span></a></nav>
   </div>
-  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#in-three-commands">In three commands</a></li><li class="docs-toc__item"><a href="#what-a-run-does-with-it">What a run does with it</a></li><li class="docs-toc__item"><a href="#the-request-file">The request file</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-is-compared">What is compared</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#normalizers">Normalizers</a></li><li class="docs-toc__item"><a href="#design">Design</a></li><li class="docs-toc__item"><a href="#drafting-the-file">Drafting the file</a></li><li class="docs-toc__item"><a href="#limits-honestly">Limits, honestly</a></li></ul></nav>
+  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#in-three-commands">In three commands</a></li><li class="docs-toc__item"><a href="#what-a-run-does-with-it">What a run does with it</a></li><li class="docs-toc__item"><a href="#the-request-file">The request file</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-is-compared">What is compared</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#normalizers">Normalizers</a></li><li class="docs-toc__item"><a href="#design">Design</a></li><li class="docs-toc__item"><a href="#drafting-the-file">Drafting the file</a></li><li class="docs-toc__item"><a href="#pages-behind-sign-in">Pages behind sign-in</a></li><li class="docs-toc__item"><a href="#limits-honestly">Limits, honestly</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
   <span>Documents Booster <span data-docs-version>1.14.0</span></span>

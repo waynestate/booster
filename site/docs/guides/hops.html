@@ -75,11 +75,11 @@ the hop moved, so <code>composer.lock</code> lands on the new major version next
 lock first: a locked package whose own <code>require.php</code> leaves out the hop's PHP makes a plain <code>composer install</code>
 refuse the whole lock, so the gate runs <code>composer update -W</code> for just those packages, inside <code>composer.json</code>'s
 constraints, and the report names each one (<code>the lock held symfony/service-contracts v1.1.2, which needs php ^7.1.3, not PHP 8.0</code>). The lock follows the app up one PHP at a time, and each hop's diff moves only what had to
-move. Otherwise, a PHP hop on an app
-that pins <code>config.platform.php</code> (every Sourdough app does) runs <code>composer update --lock</code>: no package moves, but
-the lock's <code>platform-overrides</code> catch up with the new pin, which a plain <code>composer install</code> would otherwise check
-the raised <code>php</code> constraint against and refuse. Every other hop, and the baseline, run a plain
-<code>composer install</code>. The two phases report separately: a Composer failure names the Composer phase and Composer's
+move. Otherwise, a PHP hop on an app with a <code>composer.lock</code> runs <code>composer update --lock</code>: no package moves,
+but the lock's content hash catches up with the raised <code>php</code> constraint, so no hop leaves &quot;The lock file is not
+up to date&quot; behind, and on an app that pins <code>config.platform.php</code> (every Sourdough app does) the lock's
+<code>platform-overrides</code> catch up with the new pin, which a plain <code>composer install</code> would otherwise check the
+raised <code>php</code> constraint against and refuse. Every other hop, and the baseline, run a plain <code>composer install</code>. The two phases report separately: a Composer failure names the Composer phase and Composer's
 own output, because the tests never ran.</li>
 </ol>
 <p>Composer 2.10 refuses to load tagged releases Packagist has flagged with a security advisory, and hops that move

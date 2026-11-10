@@ -75,13 +75,14 @@ vue            unknown
 node           unknown
 mix_file       no
 wayne_cas      no
+wayne_auth     no
 wayneui_1      no
 boost          no
 helmet         no
 
 Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version
 composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan).
-Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.
+Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayne_auth = the old Wayne Auth sign-in in the app's own code, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.
 Next: php bin/booster plan --path=.
 ```
 

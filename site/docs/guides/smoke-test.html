@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>A smoke test for WSU apps | Booster docs</title>
-<meta name="description" content="One small test that proves the app boots and its front door still sends guests to CAS.">
+<meta name="description" content="One small test that proves the app boots and its front door still sends guests to CAS, and a script that does the same for a raw PHP app.">
 <meta name="docs-version" content="1.14.0">
 <link rel="stylesheet" href="../../assets/wayne-ui/wayne-ui.css">
 <link rel="stylesheet" href="../../assets/docs.css">
@@ -33,7 +33,7 @@
       <a class="masthead__install" href="../../docs/index.html#run-it-today">Run it today</a>
     </nav>
   </div>
-</header><div class="docs-layout">
+</header><div class="docs-layout docs-layout--toc">
   <details class="docs-menu">
     <summary>Menu</summary>
     <nav class="docs-nav" aria-label="Documentation"><ul class="docs-nav__list"><li><a href="../../docs/index.html">Overview</a></li><li><a href="../../docs/install.html">Install</a></li><li class="docs-nav__group"><span class="docs-nav__label">Guides</span><ul><li><a href="../../docs/guides/quick-start.html">Quick start</a></li><li><a href="../../docs/recipes.html">How do I...</a></li><li><a href="../../docs/guides/scans.html">The scans</a></li><li><a href="../../docs/guides/dependency-check.html">The dependency check</a></li><li><a href="../../docs/guides/behaviour-changes.html">Behavior changes</a></li><li><a href="../../docs/guides/baseline.html">The baseline</a></li><li><a href="../../docs/guides/smoke-test.html" aria-current="page">A smoke test for WSU apps</a></li><li><a href="../../docs/guides/hops.html">What a hop does</a></li><li><a href="../../docs/guides/replay-gate.html">The replay gate</a></li><li><a href="../../docs/guides/framework-hops.html">Hand-copied libraries to Composer</a></li><li><a href="../../docs/guides/strict-sessions.html">Strict session IDs</a></li><li><a href="../../docs/guides/laravel-and-vendor.html">Laravel hops and vendor/</a></li><li><a href="../../docs/guides/citadel.html">Deploying on Citadel</a></li></ul></li><li class="docs-nav__group"><span class="docs-nav__label">Reference</span><ul><li><a href="../../docs/reference/commands.html">Commands</a></li><li><a href="../../docs/reference/configuration.html">Configuration</a></li><li><a href="../../docs/reference/hops.html">Hops</a></li></ul></li><li><a href="../../docs/checks.html">Checks</a></li><li><a href="../../docs/next.html">Next</a></li><li><a href="../../docs/upgrading.html">Upgrading</a></li><li><a href="../../docs/changelog.html">Changelog</a></li></ul></nav>
@@ -88,10 +88,51 @@ command line instead; Booster forwards each one to the baseline and every gate c
 names the keys only, never the values:</p>
 <pre tabindex="0"><code>booster run --path=&lt;app&gt; --test-env DB_CONNECTION=sqlite --test-env DB_DATABASE=:memory:
 </code></pre>
+<h2 id="a-raw-php-app">A raw PHP app<a class="docs-heading-link" aria-label="Link to this section" href="#a-raw-php-app">#</a></h2>
+<p>A raw PHP app (no framework, often no tests at all) gets the built-in syntax check, which proves the files parse on
+the new PHP and nothing more. Give it the same kind of smoke test, as a plain script with no PHPUnit to install:
+load what every page loads and touch each library the app leans on, then exit 0. Save it as <code>tests/smoke.php</code>:</p>
+<pre tabindex="0"><code class="language-php">&lt;?php
+// Smoke test for a raw PHP app: the bootstrap and the libraries load on this PHP.
+// Exit 0 is a pass. Booster runs it on the old PHP first, then after every hop.
+
+error_reporting(E_ALL);
+set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
+    if ($severity === E_DEPRECATED || $severity === E_USER_DEPRECATED) {
+        return true; // Deprecations are next year's hop. Delete these lines to fail on them now.
+    }
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+
+try {
+    require __DIR__ . '/../config/bootstrap.php'; // the file every page includes first
+
+    // One line per library the app leans on, for example a template that renders:
+    // $view = new Smarty(); $view-&gt;setCompileDir(sys_get_temp_dir()); $view-&gt;fetch('string:ok');
+
+    echo &quot;Smoke test passed on PHP &quot; . PHP_VERSION . &quot;\n&quot;;
+    exit(0);
+} catch (Throwable $e) {
+    fwrite(STDERR, get_class($e) . ': ' . $e-&gt;getMessage() . ' at ' . $e-&gt;getFile() . ':' . $e-&gt;getLine() . &quot;\n&quot;);
+    exit(1);
+}
+</code></pre>
+<p>Point the gate at it with <code>--test-command</code>; the dry run's Next line keeps the flag, so the real run
+gets it too:</p>
+<pre tabindex="0"><code>booster run --path=&lt;app&gt; --test-command &quot;php tests/smoke.php&quot; --dry-run
+</code></pre>
+<p>Or add <code>&quot;scripts&quot;: {&quot;test&quot;: &quot;php tests/smoke.php&quot;}</code> to the app's <code>composer.json</code>, and Booster runs <code>composer test</code>
+without the flag. If the bootstrap connects to a database as it loads, give the script fake settings with
+<code>--test-env</code>, or keep that call out of what the script loads: the gate container has no database server. A run with
+<code>--vendored</code> runs the syntax check instead of your script on the steps before the move to Composer, because the hand-copied libraries may not load on that PHP yet;
+your script runs from that step on.</p>
+<p>The script proves that the code loads. The pages are the <a href="replay-gate.html">replay gate</a>'s job: it asks the app for
+real URLs on the old PHP and after every hop, and the two together are a fair gate for an app with no tests.</p>
 </article>
     </main>
     <nav class="docs-pager" aria-label="Pages"><a class="docs-pager__link" href="../../docs/guides/baseline.html"><span class="docs-pager__dir">Previous</span><span class="docs-pager__title">The baseline</span></a><a class="docs-pager__link docs-pager__link--next" href="../../docs/guides/hops.html"><span class="docs-pager__dir">Next</span><span class="docs-pager__title">What a hop does</span></a></nav>
   </div>
+  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#a-raw-php-app">A raw PHP app</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
   <span>Documents Booster <span data-docs-version>1.14.0</span></span>

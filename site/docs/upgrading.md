@@ -12,6 +12,23 @@ This page says what changes when you move Booster itself to a new release, newes
 
 To take a new Booster, download the PHAR again (the same `curl` line as on [Install](https://booster.apps.wayne.edu/docs/install.html); its `releases/latest` link always names the newest release), or run `git pull` and `composer install` in your clone. `booster --version` prints the version you have.
 
+## 1.15.0[#](https://booster.apps.wayne.edu/docs/upgrading.html#1-15-0)
+
+Released 2026-11-09. Lessons from a real 2012 raw PHP app taken from PHP 5.6 to 8.5. No hop was added or removed, no option or exit code changed, and the gate's target images and the `booster init` playbooks are the same, so `booster init --check` stays green.
+
+### What you see[#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see)
+
+- **New lines in `detect` and `plan`.** `detect` prints a `wayne_auth` line and lists hand-copied libraries; `plan` lists dynamic properties on the step that crosses PHP 8.2. The JSON reports gain `wayne_auth` and `hand_copied_libraries` (detect) and `dynamic_properties` (plan). A script that reads them by key keeps working.
+- **A Wayne Auth stop sign.** An app that still signs people in through Wayne Auth now sees `detect` and `plan` open with a stop sign. Move the app onto SESAME's Wayne Auth bridge before the first hop off PHP 5.6; the [recipes](https://booster.apps.wayne.edu/docs/recipes.html) link SESAME's guide.
+- **Next lines you can paste.** The plan footer and a dry run's Next line carry the flags you typed, so the line runs the plan you just read.
+- **`composer.lock` changes on every PHP hop.** Each PHP hop on an app with a lock now runs `composer update --lock` in its gate, so the lock's content hash follows the `require.php` the hop raised. Commit `composer.lock` with each hop.
+- **Fewer dependency warnings.** The dependency check judges the releases the app's constraint allows, so a warning about a major line `composer update` would never pick is gone.
+- **Tests wait for the vendored move.** With `--vendored` and a test command, the steps before `vendored-to-composer` run the syntax check and say "Tests deferred"; the baseline and every step from the move on run your tests.
+
+### An app that `vendored-to-composer` already moved[#](https://booster.apps.wayne.edu/docs/upgrading.html#an-app-that-vendored-to-composer-already-moved)
+
+Rector on Booster 1.14.0 or earlier rewrote `slim1-bridge.php` on the PHP hops after the move. That file still works. It no longer matches the file Booster ships, so Booster treats it as the app's own code from now on, and Rector may visit it again. Nothing to do.
+
 ## 1.14.0[#](https://booster.apps.wayne.edu/docs/upgrading.html#1-14-0)
 
 Released 2026-11-09. Nothing to do: no hop, command, option, exit code or gate image changed. Booster's own CI moves to the Preflight 0.5.0 components, Booster locks Pinstripe 0.1.5, and this page is new.
@@ -20,7 +37,7 @@ Released 2026-11-09. Nothing to do: no hop, command, option, exit code or gate i
 
 Released 2026-11-09. The stack sweep: the `cas-to-sesame` hop writes `waynestate/sesame:^0.7`, and the gate's target image runs Composer 2.11.1. No command, option or exit code changed.
 
-### What you see[#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see)
+### What you see[#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-1)
 
 - **A fresh image on the first gate.** For an app on PHP 7.2 or newer, the gate's target image now installs Composer 2.11.1 (it was 2.10.3, which is no longer maintained). The images for PHP 5.6 and 7.0 build again with Debian's current archive keys. The recipe stamp changes with both, so the first `booster run` after the upgrade builds the image again, and that first gate takes a little longer. Images for older PHP keep Composer 2.2. Nothing to do.
 - **A stale playbook.** The `cas-to-sesame` hop's notes name `waynestate/sesame:^0.7`, and the hop playbooks that `booster init` writes carry those notes. In an app where you ran `booster init` with an earlier Booster, `booster init --check` reports that playbook as stale until you run `booster init` again.

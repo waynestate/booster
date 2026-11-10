@@ -161,6 +161,7 @@ booster run --path=../my-app --skip-gate
 - **Custom test command:** `--test-command` replaces the default (`composer test`, else `vendor/bin/phpunit`, else the syntax check).
 - **Environment for the tests:** `--test-env KEY=VALUE`, repeatable. The report names the keys only, never the values.
 - **Your own image:** `--image` takes one image name, a `{php}` template, or a map such as `8.1=foo:1,8.2=bar:2`; the image needs `php` and `composer` on `PATH`, and must cover every PHP in the plan.
+- **Hand-copied libraries and real tests:** with `--vendored`, the PHP hops before `vendored-to-composer` run the syntax check instead of your tests, because the 2012 copies may not run on the new PHP; your tests run on the baseline and on every step from the move on. See [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#why-the-replay-and-the-tests-wait).
 - **Few tests, but pages that must not change:** `--replay` records how the app answers a list of requests before the first hop and fails any hop that changes an answer. `booster replay init --path=../my-app` drafts the request file. See [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html).
 - **Skip the gate:** `--skip-gate` skips the baseline, the per-hop tests and the PROCTOR check.
 
@@ -192,6 +193,8 @@ Without the flag, `plan` only warns that your app uses `wayne-cas` or WayneUI 1.
 An app that hand-copied Doctrine 2, Smarty 3 or Slim 1 into `vendor/` has a third opt-in move, `--vendored`, which puts those libraries on Composer; see [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html).
 
 A raw PHP app that calls `session_start()` itself has a fourth, `--strict-session`, which turns on strict session IDs before each call (Laravel apps are skipped); see [Strict session IDs for raw PHP apps](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html).
+
+An app that still signs people in through the old Wayne Auth service in its own code (a `WayneAuth` class, the `validUser` cookie, an `sso_host` setting) gets a stop sign from `detect` (the `wayne_auth` key) and at the top of `plan`. PHP 5.6 never checked that service's TLS certificate; PHP 7 and later do, and it has expired, so sign-in breaks on the first PHP hop off 5.6. Ship the move to SESAME's Wayne Auth bridge (it needs PHP 8.3) in the same release as the PHP hops, and deploy no hop off 5.6 before it: [Moving off Wayne Auth](https://sesame.apps.wayne.edu/docs/guides/moving-off-wayne-auth.html).
 
 ## 13. Plan for a future date, or a different policy[#](https://booster.apps.wayne.edu/docs/recipes.html#13-plan-for-a-future-date-or-a-different-policy)
 

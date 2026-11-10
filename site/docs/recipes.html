@@ -146,6 +146,7 @@ booster run --path=../my-app --skip-gate
 <li><strong>Custom test command:</strong> <code>--test-command</code> replaces the default (<code>composer test</code>, else <code>vendor/bin/phpunit</code>, else the syntax check).</li>
 <li><strong>Environment for the tests:</strong> <code>--test-env KEY=VALUE</code>, repeatable. The report names the keys only, never the values.</li>
 <li><strong>Your own image:</strong> <code>--image</code> takes one image name, a <code>{php}</code> template, or a map such as <code>8.1=foo:1,8.2=bar:2</code>; the image needs <code>php</code> and <code>composer</code> on <code>PATH</code>, and must cover every PHP in the plan.</li>
+<li><strong>Hand-copied libraries and real tests:</strong> with <code>--vendored</code>, the PHP hops before <code>vendored-to-composer</code> run the syntax check instead of your tests, because the 2012 copies may not run on the new PHP; your tests run on the baseline and on every step from the move on. See <a href="guides/framework-hops.html#why-the-replay-and-the-tests-wait">Hand-copied libraries to Composer</a>.</li>
 <li><strong>Few tests, but pages that must not change:</strong> <code>--replay</code> records how the app answers a list of requests before the first hop and fails any hop that changes an answer. <code>booster replay init --path=../my-app</code> drafts the request file. See <a href="guides/replay-gate.html">The replay gate</a>.</li>
 <li><strong>Skip the gate:</strong> <code>--skip-gate</code> skips the baseline, the per-hop tests and the PROCTOR check.</li>
 </ul>
@@ -168,6 +169,12 @@ booster run  --path=../my-app --sesame --wayneui
 <p>An app that hand-copied Doctrine 2, Smarty 3 or Slim 1 into <code>vendor/</code> has a third opt-in move, <code>--vendored</code>, which puts those libraries on Composer; see <a href="guides/framework-hops.html">Hand-copied libraries to Composer</a>.</p>
 <p>A raw PHP app that calls <code>session_start()</code> itself has a fourth, <code>--strict-session</code>, which turns on strict session IDs
 before each call (Laravel apps are skipped); see <a href="guides/strict-sessions.html">Strict session IDs for raw PHP apps</a>.</p>
+<p>An app that still signs people in through the old Wayne Auth service in its own code (a <code>WayneAuth</code> class, the
+<code>validUser</code> cookie, an <code>sso_host</code> setting) gets a stop sign from <code>detect</code> (the <code>wayne_auth</code> key) and at the top of
+<code>plan</code>. PHP 5.6 never checked that service's TLS certificate; PHP 7 and later do, and it has expired, so sign-in breaks
+on the first PHP hop off 5.6. Ship the move to SESAME's Wayne Auth bridge (it needs PHP 8.3) in the same release as the
+PHP hops, and deploy no hop off 5.6 before it:
+<a rel="noopener" href="https://sesame.apps.wayne.edu/docs/guides/moving-off-wayne-auth.html">Moving off Wayne Auth</a>.</p>
 <h2 id="13-plan-for-a-future-date-or-a-different-policy">13. Plan for a future date, or a different policy<a class="docs-heading-link" aria-label="Link to this section" href="#13-plan-for-a-future-date-or-a-different-policy">#</a></h2>
 <!-- docs-test: skip run on your own app -->
 <pre tabindex="0"><code>booster plan --path=../my-app --today=2027-06-01

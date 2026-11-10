@@ -1,6 +1,6 @@
 ---
 title: A smoke test for WSU apps
-description: One small test that proves the app boots and its front door still sends guests to CAS.
+description: One small test that proves the app boots and its front door still sends guests to CAS, and a script that does the same for a raw PHP app.
 ---
 
 # A smoke test for WSU apps
@@ -63,3 +63,50 @@ command line instead; Booster forwards each one to the baseline and every gate c
 names the keys only, never the values:
 
     booster run --path=<app> --test-env DB_CONNECTION=sqlite --test-env DB_DATABASE=:memory:
+
+## A raw PHP app
+
+A raw PHP app (no framework, often no tests at all) gets the built-in syntax check, which proves the files parse on
+the new PHP and nothing more. Give it the same kind of smoke test, as a plain script with no PHPUnit to install:
+load what every page loads and touch each library the app leans on, then exit 0. Save it as `tests/smoke.php`:
+
+```php
+<?php
+// Smoke test for a raw PHP app: the bootstrap and the libraries load on this PHP.
+// Exit 0 is a pass. Booster runs it on the old PHP first, then after every hop.
+
+error_reporting(E_ALL);
+set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
+    if ($severity === E_DEPRECATED || $severity === E_USER_DEPRECATED) {
+        return true; // Deprecations are next year's hop. Delete these lines to fail on them now.
+    }
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+
+try {
+    require __DIR__ . '/../config/bootstrap.php'; // the file every page includes first
+
+    // One line per library the app leans on, for example a template that renders:
+    // $view = new Smarty(); $view->setCompileDir(sys_get_temp_dir()); $view->fetch('string:ok');
+
+    echo "Smoke test passed on PHP " . PHP_VERSION . "\n";
+    exit(0);
+} catch (Throwable $e) {
+    fwrite(STDERR, get_class($e) . ': ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine() . "\n");
+    exit(1);
+}
+```
+
+Point the gate at it with `--test-command`; the dry run's Next line keeps the flag, so the real run
+gets it too:
+
+    booster run --path=<app> --test-command "php tests/smoke.php" --dry-run
+
+Or add `"scripts": {"test": "php tests/smoke.php"}` to the app's `composer.json`, and Booster runs `composer test`
+without the flag. If the bootstrap connects to a database as it loads, give the script fake settings with
+`--test-env`, or keep that call out of what the script loads: the gate container has no database server. A run with
+`--vendored` runs the syntax check instead of your script on the steps before the move to Composer, because the hand-copied libraries may not load on that PHP yet;
+your script runs from that step on.
+
+The script proves that the code loads. The pages are the [replay gate](replay-gate.md)'s job: it asks the app for
+real URLs on the old PHP and after every hop, and the two together are a fair gate for an app with no tests.

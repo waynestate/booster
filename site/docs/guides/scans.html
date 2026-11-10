@@ -42,7 +42,7 @@
   <div class="docs-content">
     <main id="main">
       <article class="docs-article"><h1 id="the-scans">The scans<a class="docs-heading-link" aria-label="Link to this section" href="#the-scans">#</a></h1>
-<p>This page covers both advisory scans Booster runs with <code>plan</code>, and how to run either one alone. Next: <a href="dependency-check.html">The dependency check</a>.</p>
+<p>This page covers both advisory scans Booster runs with <code>plan</code>, how to run either one alone, the audit <code>run</code> adds, and the dynamic-properties list on the PHP 8.2 step. Next: <a href="dependency-check.html">The dependency check</a>.</p>
 <h2 id="the-phpcompatibility-scan">The PHPCompatibility scan<a class="docs-heading-link" aria-label="Link to this section" href="#the-phpcompatibility-scan">#</a></h2>
 <p><code>plan</code> ends with an advisory scan: PHP_CodeSniffer runs the PHPCompatibility standard over the app and asks what will
 break on the PHP version the first PHP hop lands on. The findings are hints for the person doing the upgrade, never a
@@ -73,11 +73,15 @@ Booster's folder) or download the PHAR again.</p>
 even when it finds a wall of missing types.</p>
 <h2 id="the-composer-audit-during-the-run">The composer audit during the run<a class="docs-heading-link" aria-label="Link to this section" href="#the-composer-audit-during-the-run">#</a></h2>
 <p><code>run</code> carries a third advisory check, per hop: after a hop changes <code>composer.json</code> or <code>composer.lock</code>, Booster runs <code>composer audit --format=json --no-interaction</code> in the app and lists advisories and abandoned packages in the step's report with counts. It never changes the exit code, a clean audit stays silent, and a hop that changed no composer file skips it and says so. A dry run previews the hops and runs no audit.</p>
+<p>Composer's audit exits 1 for advisories, 2 for abandoned packages and 3 for both. Booster reads the JSON report on every one of those exits, so an app with abandoned packages gets the list, not a &quot;could not run&quot;. Only an exit with no JSON report behind it (Composer missing, a crash) is reported as &quot;could not run&quot;.</p>
+<h2 id="dynamic-properties">Dynamic properties<a class="docs-heading-link" aria-label="Link to this section" href="#dynamic-properties">#</a></h2>
+<p>PHP 8.2 deprecates dynamic properties: assigning <code>$this-&gt;name</code> in a class that never declares <code>$name</code>. The plan step that crosses PHP 8.2 reads the app's own classes (it skips <code>vendor/</code>, <code>node_modules/</code> and <code>storage/</code>) and lists every such assignment as <code>file:line Class::$prop</code>, or says how many classes it read and found none. <code>run</code> repeats them on that step as MANUAL lines. Booster never changes them: declare each property in its class, or mark the class <code>#[\AllowDynamicProperties]</code>.</p>
+<p>A class that declares the property in a parent or a trait, has a <code>__set()</code>, or already carries <code>#[\AllowDynamicProperties]</code> is not listed. A class whose parent or trait lives outside the app's own code (a library in <code>vendor/</code>) cannot be checked from the app alone, so it is named on a &quot;not checked&quot; line for you to check by hand. <code>plan --format=json</code> carries the same list under <code>dynamic_properties</code>.</p>
 </article>
     </main>
     <nav class="docs-pager" aria-label="Pages"><a class="docs-pager__link" href="../../docs/recipes.html"><span class="docs-pager__dir">Previous</span><span class="docs-pager__title">How do I...</span></a><a class="docs-pager__link docs-pager__link--next" href="../../docs/guides/dependency-check.html"><span class="docs-pager__dir">Next</span><span class="docs-pager__title">The dependency check</span></a></nav>
   </div>
-  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#the-phpcompatibility-scan">The PHPCompatibility scan</a></li><li class="docs-toc__item"><a href="#the-phpstan-scan">The PHPStan scan</a></li><li class="docs-toc__item"><a href="#the-composer-audit-during-the-run">The composer audit during the run</a></li></ul></nav>
+  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#the-phpcompatibility-scan">The PHPCompatibility scan</a></li><li class="docs-toc__item"><a href="#the-phpstan-scan">The PHPStan scan</a></li><li class="docs-toc__item"><a href="#the-composer-audit-during-the-run">The composer audit during the run</a></li><li class="docs-toc__item"><a href="#dynamic-properties">Dynamic properties</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
   <span>Documents Booster <span data-docs-version>1.14.0</span></span>

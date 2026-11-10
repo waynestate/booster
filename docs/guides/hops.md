@@ -40,11 +40,11 @@ under `Pre-pass fixes:`.
    refuse the whole lock, so the gate runs `composer update -W` for just those packages, inside `composer.json`'s
    constraints, and the report names each one (`the lock held symfony/service-contracts v1.1.2, which needs php
    ^7.1.3, not PHP 8.0`). The lock follows the app up one PHP at a time, and each hop's diff moves only what had to
-   move. Otherwise, a PHP hop on an app
-   that pins `config.platform.php` (every Sourdough app does) runs `composer update --lock`: no package moves, but
-   the lock's `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check
-   the raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain
-   `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's
+   move. Otherwise, a PHP hop on an app with a `composer.lock` runs `composer update --lock`: no package moves,
+   but the lock's content hash catches up with the raised `php` constraint, so no hop leaves "The lock file is not
+   up to date" behind, and on an app that pins `config.platform.php` (every Sourdough app does) the lock's
+   `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check the
+   raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's
    own output, because the tests never ran.
 
 Composer 2.10 refuses to load tagged releases Packagist has flagged with a security advisory, and hops that move

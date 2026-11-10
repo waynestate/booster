@@ -335,8 +335,8 @@ https://github.com/sebastianbergmann/phpunit/issues/6052
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: booster run --path=examples/laravel-blade --dry-run
-(The real run needs Docker, and your app committed in git: booster run --path=examples/laravel-blade)
+Preview the edits: booster run --path=examples/laravel-blade --today=2026-10-29 --dry-run
+(The real run needs Docker, and your app committed in git: booster run --path=examples/laravel-blade --today=2026-10-29)
 ```
 
 ### Commands
@@ -472,11 +472,23 @@ It ignores `vendor/`, `node_modules/` and `storage/`, reads the app only and cha
 --path=../my-app --php=8.5 --phpstan` runs the same scan on its own, for any PHP version Booster knows, and exits 0
 even when it finds a wall of missing types.
 
+#### Dynamic properties
+
+PHP 8.2 deprecates dynamic properties: assigning `$this->name` in a class that never declares `$name`. The plan step
+that crosses PHP 8.2 reads the app's own classes and lists every such assignment as `file:line Class::$prop`, or says
+how many classes it read and found none; `run` repeats them on that step as MANUAL lines. Booster never changes them:
+declare each property in its class, or mark the class `#[\AllowDynamicProperties]`. A class whose parent or trait
+lives outside the app's own code is named on a "not checked" line for you to check by hand. `plan --format=json`
+carries the list under `dynamic_properties`. More in [the scans guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/scans.md#dynamic-properties).
+
 #### The dependency check
 
 Before the hops print, `plan` (and `run`) asks Packagist about each direct third-party dependency in the app's
-`composer.json`: what is its newest stable release, and can that release still be installed at each hop's
-destination? Only plain `require` and `require-dev` entries count; PHP, extensions (`ext-*`, `lib-*`), Laravel
+`composer.json`: which stable releases does the app's own constraint allow, and can one of them still be installed
+at each hop's destination? A newer major the constraint never installs does not count: an app on `doctrine/orm ^2.20`
+is judged by 2.20, which runs on PHP 8.0, not by 3.x, which needs 8.1. With no usable constraint (a `dev-` branch,
+nothing stable in range) the newest stable release stands in. The warning names the newest release in range; the
+JSON's `newest` field stays the package's newest stable release. Only plain `require` and `require-dev` entries count; PHP, extensions (`ext-*`, `lib-*`), Laravel
 itself (`laravel/framework`, its `illuminate/*` components), PHPUnit and Booster's own scan tools are Booster's
 own business, so they are skipped.
 
@@ -628,6 +640,53 @@ names the keys only, never the values:
 
     booster run --path= --test-env DB_CONNECTION=sqlite --test-env DB_DATABASE=:memory:
 
+##### A raw PHP app
+
+A raw PHP app (no framework, often no tests at all) gets the built-in syntax check, which proves the files parse on
+the new PHP and nothing more. Give it the same kind of smoke test, as a plain script with no PHPUnit to install:
+load what every page loads and touch each library the app leans on, then exit 0. Save it as `tests/smoke.php`:
+
+```php
+<?php
+// Smoke test for a raw PHP app: the bootstrap and the libraries load on this PHP.
+// Exit 0 is a pass. Booster runs it on the old PHP first, then after every hop.
+
+error_reporting(E_ALL);
+set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
+    if ($severity === E_DEPRECATED || $severity === E_USER_DEPRECATED) {
+        return true; // Deprecations are next year's hop. Delete these lines to fail on them now.
+    }
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+
+try {
+    require __DIR__ . '/../config/bootstrap.php'; // the file every page includes first
+
+    // One line per library the app leans on, for example a template that renders:
+    // $view = new Smarty(); $view->setCompileDir(sys_get_temp_dir()); $view->fetch('string:ok');
+
+    echo "Smoke test passed on PHP " . PHP_VERSION . "\n";
+    exit(0);
+} catch (Throwable $e) {
+    fwrite(STDERR, get_class($e) . ': ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine() . "\n");
+    exit(1);
+}
+```
+
+Point the gate at it with `--test-command`; the dry run's Next line keeps the flag, so the real run
+gets it too:
+
+    booster run --path= --test-command "php tests/smoke.php" --dry-run
+
+Or add `"scripts": {"test": "php tests/smoke.php"}` to the app's `composer.json`, and Booster runs `composer test`
+without the flag. If the bootstrap connects to a database as it loads, give the script fake settings with
+`--test-env`, or keep that call out of what the script loads: the gate container has no database server. A run with
+`--vendored` runs the syntax check instead of your script on the steps before the move to Composer, because the hand-copied libraries may not load on that PHP yet;
+your script runs from that step on.
+
+The script proves that the code loads. The pages are the [replay gate](https://github.com/waynestate/booster/blob/HEAD/docs/guides/replay-gate.md)'s job: it asks the app for
+real URLs on the old PHP and after every hop, and the two together are a fair gate for an app with no tests.
+
 #### The replay gate
 
 Tests only prove what they ask. `booster run --replay` also records how the app answers a list of requests on its
@@ -645,9 +704,10 @@ climb past PHP 7 on the PHP hops alone, and Booster never edits a library's file
 `vendored-to-composer`, which moves the app instead: the copies leave, `composer.json` asks for the maintained release
 that keeps the same API (`doctrine/orm ^2.20`, `smarty/smarty ^4.5`, `slim/slim ^4.15` through a Slim 1 bridge the
 hop writes), and the `require` lines load Composer's autoloader. Hooks, cookies through Slim, Doctrine's
-`ClassLoader` and other shapes it cannot rewrite exactly are stop signs: it refuses and changes nothing. Run it with
-`--replay`; the replay waits for this hop, then compares every step. The recipes, the stop signs and the bridge are in
-[the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/framework-hops.md).
+`ClassLoader` and other shapes it cannot rewrite exactly are stop signs: it refuses and changes nothing. `detect` lists
+the copies and puts `--vendored` on its Next line. Run it with `--replay`; the replay and the test gate wait for this
+hop (the PHP hops before it run the syntax check), then check every step. The recipes, the stop signs and the bridge
+are in [the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/framework-hops.md).
 
 #### Strict session IDs for raw PHP apps
 
@@ -696,11 +756,11 @@ under `Pre-pass fixes:`.
    refuse the whole lock, so the gate runs `composer update -W` for just those packages, inside `composer.json`'s
    constraints, and the report names each one (`the lock held symfony/service-contracts v1.1.2, which needs php
    ^7.1.3, not PHP 8.0`). The lock follows the app up one PHP at a time, and each hop's diff moves only what had to
-   move. Otherwise, a PHP hop on an app
-   that pins `config.platform.php` (every Sourdough app does) runs `composer update --lock`: no package moves, but
-   the lock's `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check
-   the raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain
-   `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's
+   move. Otherwise, a PHP hop on an app with a `composer.lock` runs `composer update --lock`: no package moves,
+   but the lock's content hash catches up with the raised `php` constraint, so no hop leaves "The lock file is not
+   up to date" behind, and on an app that pins `config.platform.php` (every Sourdough app does) the lock's
+   `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check the
+   raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's
    own output, because the tests never ran.
 
 Composer 2.10 refuses to load tagged releases Packagist has flagged with a security advisory, and hops that move
@@ -1070,15 +1130,15 @@ Want to see it run? [Real output](https://booster.apps.wayne.edu/proof.html) sho
 
 **detectWhich of the five stack shapes, and which versions**
 
-$ bin/booster detect --path=examples/vue-spa path examples/vue-spa app_type raw-php-vue composer_json yes php 8.0 laravel unknown phpunit unknown vue 2 node unknown mix_file no wayne_cas no wayneui_1 no boost no helmet no Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan). Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package. Next: php bin/booster plan --path=examples/vue-spa
+$ bin/booster detect --path=examples/vue-spa path examples/vue-spa app_type raw-php-vue composer_json yes php 8.0 laravel unknown phpunit unknown vue 2 node unknown mix_file no wayne_cas no wayne_auth no wayneui_1 no boost no helmet no Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan). Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayne_auth = the old Wayne Auth sign-in in the app's own code, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package. Next: php bin/booster plan --path=examples/vue-spa
 
 **planThe ordered hops, the warnings and the scans. Changes nothing.**
 
-$ bin/booster plan --path=examples/raw-php --today=2026-10-29 BOOSTER plan for examples/raw-php app type: raw-php PHP: 7.4 -> 8.5 policy: waynestate/creed 0.1.8 (today 2026-10-29) 1. php-74-to-80 Move PHP 7.4 code to PHP 8.0. After this step your tests run in Docker. Give this hop the most review time. Removed between PHP 7.4 and PHP 8.0: none found. Behavior changes to check: Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; \< / \<= against negative numbers also flip for such strings check: Audit loose comparisons of request parameters and string DB columns Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output keep old: error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED in php.ini check: Watch error logs and rendered pages for new notices after the hop 2. php-80-to-81 Move PHP 8.0 code to PHP 8.1. After this step your tests run in Docker. Removed between PHP 8.0 and PHP 8.1: none found. 3. php-81-to-82 Move PHP 8.1 code to PHP 8.2. After this step your tests run in Docker. Removed between PHP 8.1 and PHP 8.2: none found. 4. php-82-to-83 Move PHP 8.2 code to PHP 8.3. After this step your tests run in Docker. Removed between PHP 8.2 and PHP 8.3: none found. 5. php-83-to-84 Move PHP 8.3 code to PHP 8.4. After this step your tests run in Docker. Removed between PHP 8.3 and PHP 8.4: none found. 6. php-84-to-85 Move PHP 8.4 code to PHP 8.5. After this step your tests run in Docker. Removed between PHP 8.4 and PHP 8.5: none found. PHPCompatibility check for PHP 8.0: no findings. PHPStan on PHP 8.5: 3 findings (code quality hints, not upgrade blockers). src/Legacy.php:20 \[missingType.parameter\] Method Example\\Legacy::className() has parameter $object with no type specified. src/Legacy.php:22 \[return.type\] Method Example\\Legacy::className() should return string but returns class-string|false. src/Legacy.php:25 \[parameter.implicitlyNullable\] Deprecated in PHP 8.4: Parameter #1 $label (string) is implicitly nullable via default value null. Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice for you to read, not errors. Booster does every numbered step above when you run it. Preview the edits: php bin/booster run --path=examples/raw-php --dry-run (The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/raw-php)
+$ bin/booster plan --path=examples/raw-php --today=2026-10-29 BOOSTER plan for examples/raw-php app type: raw-php PHP: 7.4 -> 8.5 policy: waynestate/creed 0.1.8 (today 2026-10-29) 1. php-74-to-80 Move PHP 7.4 code to PHP 8.0. After this step your tests run in Docker. Give this hop the most review time. Removed between PHP 7.4 and PHP 8.0: none found. Behavior changes to check: Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; \< / \<= against negative numbers also flip for such strings check: Audit loose comparisons of request parameters and string DB columns Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output keep old: error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED in php.ini check: Watch error logs and rendered pages for new notices after the hop 2. php-80-to-81 Move PHP 8.0 code to PHP 8.1. After this step your tests run in Docker. Removed between PHP 8.0 and PHP 8.1: none found. 3. php-81-to-82 Move PHP 8.1 code to PHP 8.2. After this step your tests run in Docker. Removed between PHP 8.1 and PHP 8.2: none found. Dynamic properties (deprecated in PHP 8.2): none found in the 1 class Booster read. 4. php-82-to-83 Move PHP 8.2 code to PHP 8.3. After this step your tests run in Docker. Removed between PHP 8.2 and PHP 8.3: none found. 5. php-83-to-84 Move PHP 8.3 code to PHP 8.4. After this step your tests run in Docker. Removed between PHP 8.3 and PHP 8.4: none found. 6. php-84-to-85 Move PHP 8.4 code to PHP 8.5. After this step your tests run in Docker. Removed between PHP 8.4 and PHP 8.5: none found. PHPCompatibility check for PHP 8.0: no findings. PHPStan on PHP 8.5: 3 findings (code quality hints, not upgrade blockers). src/Legacy.php:20 \[missingType.parameter\] Method Example\\Legacy::className() has parameter $object with no type specified. src/Legacy.php:22 \[return.type\] Method Example\\Legacy::className() should return string but returns class-string|false. src/Legacy.php:25 \[parameter.implicitlyNullable\] Deprecated in PHP 8.4: Parameter #1 $label (string) is implicitly nullable via default value null. Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice for you to read, not errors. Booster does every numbered step above when you run it. Preview the edits: php bin/booster run --path=examples/raw-php --today=2026-10-29 --dry-run (The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/raw-php --today=2026-10-29)
 
 **runRuns the plan; --dry-run previews every hop**
 
-$ bin/booster run --path=examples/raw-php --to-php=8.2 --dry-run BOOSTER dry run (nothing was changed) Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate). Replay: off, and the gate only proves every PHP file parses, so a hop can change what a page answers and still pass. Record the answers first: php bin/booster replay init --path=examples/raw-php drafts booster-replay.json from the routes; fill in its todo items, then run again with --replay. Step 1 (php-74-to-80) is the hop most likely to change an answer: loose comparisons of numbers and strings, and warnings that now throw. 1. php-74-to-80: PREVIEWED (1 file) Largest risk hop: loose comparison of numbers and strings changed, many warnings became thrown errors, and arithmetic on arrays throws. Write or extend tests before applying this hop, or record what the pages answer with the replay gate (\`booster replay init\`, then \`booster run --replay\`); only tests, the replay and review find behavior changes here. Behavior changes to check: Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; \< / \<= against negative numbers also flip for such strings check: Audit loose comparisons of request parameters and string DB columns Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output keep old: error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED in php.ini check: Watch error logs and rendered pages for new notices after the hop --- src/Legacy.php --- Original +++ New @@ -4,22 +4,18 @@ class Legacy { - /\*\* @var string \*/ - private $name; - - public function \_\_construct(string $name) + public function \_\_construct(private string $name) { - $this->name = $name; } public function mentionsAdmin(string $text): bool { - return strpos($text, 'admin') !== false; + return str_contains($text, 'admin'); } public function className($object): string { - return get_class($object); + return $object::class; } public function label(string $label = null): string 2. php-80-to-81: PREVIEWED (0 files) No edits needed for this step (dry run). General notes for this step (nothing found in your app, just good to know): mysqli now throws on errors by default; PDO on MySQL returns native int and float types; htmlspecialchars() now escapes single quotes. Passing null to a non-nullable built-in parameter is deprecated: check the log after the run. 3. php-81-to-82: PREVIEWED (0 files) No edits needed for this step (dry run). Unique files across hops: 1. Later hops were previewed against the original tree, so the same file can appear in several hops. RESULT: PASS (previewed, no tests ran) Dry run: these changes were previewed, none were applied. Nothing was changed. RESULT: PASS means the preview worked; no tests ran. Next, if the edits look right: php bin/booster run --path=examples/raw-php (It needs Docker and a clean git folder. Commit or stash first.)
+$ bin/booster run --path=examples/raw-php --to-php=8.2 --dry-run BOOSTER dry run (nothing was changed) Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate). Replay: off, and the gate only proves every PHP file parses, so a hop can change what a page answers and still pass. Record the answers first: php bin/booster replay init --path=examples/raw-php drafts booster-replay.json from the routes; fill in its todo items, then run again with --replay. Step 1 (php-74-to-80) is the hop most likely to change an answer: loose comparisons of numbers and strings, and warnings that now throw. 1. php-74-to-80: PREVIEWED (1 file) Largest risk hop: loose comparison of numbers and strings changed, many warnings became thrown errors, and arithmetic on arrays throws. Write or extend tests before applying this hop, or record what the pages answer with the replay gate (\`booster replay init\`, then \`booster run --replay\`); only tests, the replay and review find behavior changes here. Behavior changes to check: Loose comparison of a number with a non-numeric string is now false: 0 == "foo", 0 == "" and 42 == "42foo" flip from true to false; \< / \<= against negative numbers also flip for such strings check: Audit loose comparisons of request parameters and string DB columns Default error_reporting is now E_ALL (previously excluded E_NOTICE and E_DEPRECATED); notices and deprecations now surface in logs and, with display_errors on, in output keep old: error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED in php.ini check: Watch error logs and rendered pages for new notices after the hop --- src/Legacy.php --- Original +++ New @@ -4,22 +4,18 @@ class Legacy { - /\*\* @var string \*/ - private $name; - - public function \_\_construct(string $name) + public function \_\_construct(private string $name) { - $this->name = $name; } public function mentionsAdmin(string $text): bool { - return strpos($text, 'admin') !== false; + return str_contains($text, 'admin'); } public function className($object): string { - return get_class($object); + return $object::class; } public function label(string $label = null): string 2. php-80-to-81: PREVIEWED (0 files) No edits needed for this step (dry run). General notes for this step (nothing found in your app, just good to know): mysqli now throws on errors by default; PDO on MySQL returns native int and float types; htmlspecialchars() now escapes single quotes. Passing null to a non-nullable built-in parameter is deprecated: check the log after the run. 3. php-81-to-82: PREVIEWED (0 files) No edits needed for this step (dry run). Unique files across hops: 1. Later hops were previewed against the original tree, so the same file can appear in several hops. RESULT: PASS (previewed, no tests ran) Dry run: these changes were previewed, none were applied. Nothing was changed. RESULT: PASS means the preview worked; no tests ran. Next, if the edits look right: php bin/booster run --path=examples/raw-php --to-php=8.2 (It needs Docker and a clean git folder. Commit or stash first.)
 
 **hopsEvery hop Booster knows**
 
@@ -1411,6 +1471,22 @@ Source: https://booster.apps.wayne.edu/docs/changelog.html
 All notable changes to Booster are recorded here. The format follows Keep a Changelog.
 
 ### \[Unreleased\][#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
+
+Lessons from a real 2012 raw PHP app that Booster took from PHP 5.6 to 8.5, with its hand-copied Doctrine, Smarty and Slim moved onto Composer.
+
+- Added: a Wayne Auth stop sign. An app that still signs people in through the old Wayne Auth service (the `WayneAuth` class copied into the app, the `validUser` cookie, the `sso_host` setting) loses its sign-in on the first hop off PHP 5.6, because PHP 7 and later verify the service's TLS certificate. `detect` gains a `wayne_auth` line and JSON key, and both `detect` and `plan` open with a stop sign that names up to three of the lines and points at SESAME's Wayne Auth bridge guide. An app already on the bridge gets none.
+- Added: `detect` lists hand-copied libraries (Doctrine 2, Smarty 3 and Slim 1 committed into a vendor folder with no Composer behind them) with their versions and folders, says Booster can move them, and its Next line adds `--vendored`. The JSON report gains `hand_copied_libraries`.
+- Added: dynamic properties. The plan step that crosses PHP 8.2 lists every `$this->x` the app's own classes assign without declaring (`file:line Class::$prop`), or says how many classes it read and found none, and `run` repeats them on that step as MANUAL lines. A class whose parent or trait is outside the app is named on a "not checked" line. Booster never changes them. `plan --format=json` gains `dynamic_properties`. Guide: "Dynamic properties" in the scans guide.
+- Added: a replay baseline whose answers are all the same redirect (every request sent to sign-in) says the replay proves only that the app reaches its sign-in check, and points at the replay guide's new "Pages behind sign-in" section.
+- Fixed: Composer's audit exits 2 for abandoned packages and 3 for those plus advisories. Booster read any exit above 1 as "could not run", so an app whose libraries had just moved to Composer got that line on every hop with the report right there. A JSON report now wins for exits up to 3, and abandoned packages print as findings.
+- Fixed: the plan footer and a dry run's Next line keep the flags the run needs (`--from-php`, `--vendored`, `--today` and the rest of the plan's; the dry run adds the gate's, such as `--replay` and `--test-command`). They dropped every flag, so a 2012 app was told to type a run that planned something else or nothing. `--test-env` stays out, because its values may be credentials. `detect` on an app with no PHP version to read prints a `plan` line with `--from-php=5.6` and says to change the value (it printed a line that exited 2).
+- Fixed: a dry run of `vendored-to-composer` says "Dry run: would write composer.json:" (it said "would wrote"), and the lines under it no longer repeat "would".
+- Fixed: the dependency check judges the releases the app's own constraint allows, not only the newest release on Packagist. An app whose constraint allows only an ORM's 2.x line was told that the newest 3.x release blocks the PHP 8.0 hop, a release `composer update` would never pick. A step is blocked only when no allowed release fits it, and a constraint the check cannot read (`*`, a dev branch) still judges the newest stable release.
+- Fixed: compiled Smarty templates in a hand copy's cache folder are a cache, not code: `vendored-to-composer` skips them and adds one MANUAL line per folder saying to delete them and keep the folder out of git, and the SMARTY_DIR stop sign says when the folder it found is a cache.
+- Fixed: Rector leaves `slim1-bridge.php` alone while it is the file Booster wrote, so every PHP hop after `vendored-to-composer` no longer rewrites (and churns) Booster's own bridge.
+- Changed: every PHP hop on an app with `composer.lock` refreshes the lock's content hash in its gate (`composer update --lock`), because each hop raises `require.php` and Composer warns on a stale hash. It used to happen only when `config.platform.php` was pinned. A hop whose locked packages refuse the new PHP still runs `composer update -W` for those packages instead.
+- Changed: with `--vendored`, the steps before the move to Composer run the syntax check instead of your test command, as the replay already waited, because the hand-copied libraries may not load on that PHP yet. The report says "Tests deferred to step N (vendored-to-composer)". Your tests run on the baseline and from the move on.
+- Docs: "A smoke test for WSU apps" gains a raw PHP app section: one plain script, run with `--test-command`, that proves the bootstrap and the libraries load. The framework hops guide says why the replay and the tests wait for the vendored move, recipes name the Wayne Auth stop sign and SESAME's bridge, and the README, quick start and front page printouts match `detect` and `plan` as they print today.
 
 ### \[1.14.0\] - 2026-11-09[#](https://booster.apps.wayne.edu/docs/changelog.html#1-14-0-2026-11-09)
 
@@ -1994,7 +2070,7 @@ Source: https://booster.apps.wayne.edu/docs/guides/dependency-check.html
 
 This page explains the Packagist check Booster runs before the hops print. Next: [Behavior changes](https://booster.apps.wayne.edu/docs/guides/behaviour-changes.html).
 
-Before the hops print, `plan` (and `run`) asks Packagist about each direct third-party dependency in the app's `composer.json`: what is its newest stable release, and can that release still be installed at each hop's destination? Only plain `require` and `require-dev` entries count; PHP, extensions (`ext-*`, `lib-*`), Laravel itself (`laravel/framework`, its `illuminate/*` components) and PHPUnit are Booster's own business, so they are skipped.
+Before the hops print, `plan` (and `run`) asks Packagist about each direct third-party dependency in the app's `composer.json`: which stable releases does the app's own constraint allow, and can one of them still be installed at each hop's destination? A newer major the constraint never installs does not count: an app on `doctrine/orm ^2.20` is judged by 2.20, which runs on PHP 8.0, not by 3.x, which needs 8.1. With no usable constraint (a `dev-` branch, nothing stable in range) the newest stable release stands in. The warning names the newest release in range; the JSON's `newest` field stays the package's newest stable release. Only plain `require` and `require-dev` entries count; PHP, extensions (`ext-*`, `lib-*`), Laravel itself (`laravel/framework`, its `illuminate/*` components) and PHPUnit are Booster's own business, so they are skipped.
 
 The answer is advisory, like the scans: a package that cannot follow the plan does not drop the hop. It adds a warning that names the package, the hop it blocks, and what to do about it:
 
@@ -2023,6 +2099,16 @@ Some apps never met Composer. In 2012 a real WSU app copied Doctrine 2.2, Smarty
 ```sh
 booster plan --path=<app> --from-php=5.6 --vendored          # where the move fits, or the stop signs that block it
 booster run --path=<app> --from-php=5.6 --vendored --replay  # move it, with the replay as proof
+```
+
+`booster detect` lists the copies it finds, and when Booster can move them its Next line already carries `--vendored` (and, for an app with no `composer.json`, `--from-php=5.6`, to change if the server runs another PHP):
+
+```
+Hand-copied libraries (committed into a vendor folder, no Composer behind them):
+  - Doctrine 2.2.2 (vendor/Doctrine)
+  - Slim 1.6.0 (vendor/Slim)
+  - Smarty 3.1.8 (vendor/Smarty)
+Booster can move Doctrine, Slim and Smarty onto Composer, so the line below adds --vendored.
 ```
 
 Without `--vendored` the plan still finds the copies and says so:
@@ -2078,26 +2164,34 @@ The hop rewrites a few exact line shapes and nothing else. Anything that touches
 
 A commented-out call is not a stop sign. Booster reads the line, not the vibe.
 
+Smarty's compiled templates (the files a hand copy writes into `templates_c/` or `tmp/template_compile/`, each starting with a `Smarty version ... compiled from` comment) are a cache, not code: the hop leaves them out of the rewrite and lists each folder as a MANUAL line. Delete the compiled files (Smarty rebuilds them on the next request) and keep the folder out of git. A `SMARTY_DIR` stop sign on a file in a cache or compile folder without that header says so too, because deleting the cache is the likely fix.
+
 ### What stays[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#what-stays)
 
 - Libraries without a recipe (PHPMailer, Swift Mailer, Twig, Monolog, anything Booster does not recognize) stay where they are, still loaded the way they always were, and the hop lists each one as a MANUAL line.
 - Copies in a nested `vendor/` (say `admin/vendor/Smarty`) stay too: `composer.json` goes at the app root, so only the root's `vendor/` can be pointed at Composer.
 
-### Why the replay waits[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#why-the-replay-waits)
+### Why the replay and the tests wait[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#why-the-replay-and-the-tests-wait)
 
-With `--replay`, the baseline is recorded on the app's current PHP as always. The PHP hops before `vendored-to-composer` still run their test gate, but their replay is deferred, because the app still loads its 2012 copies and those may not run on the new PHP; that is the problem the hop exists to fix. From the hop on, every step is compared against the baseline:
+With `--replay`, the baseline is recorded on the app's current PHP as always. The PHP hops before `vendored-to-composer` defer the replay, because the app still loads its 2012 copies and those may not run on the new PHP; that is the problem the hop exists to fix. From the hop on, every step is compared against the baseline:
 
 ```
 Replay deferred to step 6 (vendored-to-composer): the app still loads its hand-copied libraries, which may not run on PHP 7.4. The answers are compared once Composer's releases are in.
+```
+
+The test gate waits the same way. The baseline runs the app's tests (or your `--test-command`) on the PHP it starts from; the PHP hops before the move run the syntax check instead, and the tests take over from the move on:
+
+```
+Tests deferred to step 6 (vendored-to-composer): the app still loads its hand-copied libraries, which may not run on PHP 7.4. This step ran the syntax check; the tests run from that step on.
 ```
 
 A real app's replay found two Doctrine changes no test asked about: `DISTINCT(alias.field)` in DQL reads as an expression in ORM 2.20, and an entity whose id holds a date needs a custom column type. The hop lists both as MANUAL lines, so you know where to look when the replay says an answer changed.
 
 ### After the hop[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#after-the-hop)
 
-- Commit `composer.json`, `composer.lock` and, for Slim, `slim1-bridge.php`. Citadel never runs `composer install`, so commit `vendor/` on the deploy branch or let Booster's `deployments/` script install it (see [Deploying on Citadel](https://booster.apps.wayne.edu/docs/guides/citadel.html)).
+- Commit `composer.json`, `composer.lock` and, for Slim, `slim1-bridge.php`. Later hops leave the bridge alone while it is still the file Booster wrote, so it does not churn in every hop's diff; once you edit it, it is the app's code and gets the hops like the rest. Citadel never runs `composer install`, so commit `vendor/` on the deploy branch or let Booster's `deployments/` script install it (see [Deploying on Citadel](https://booster.apps.wayne.edu/docs/guides/citadel.html)).
 - ORM 2.20 is the last line that reads docblock annotations, and `doctrine/annotations` 1.x is abandoned. ORM 3 (PHP 8.1 or newer, attributes instead of annotations) is the next move, by hand for now. Smarty 5 likewise, once the templates stop using PHP functions as modifiers.
-- The lock was resolved on the hop's PHP, and later PHP hops move only the packages that refuse theirs. Run `composer update` once the app lands on its target to pick up the newest releases that PHP allows.
+- The lock was resolved on the hop's PHP, and later PHP hops move only the packages that refuse theirs (and refresh the lock's content hash, so Composer never calls it out of date). Run `composer update` once the app lands on its target to pick up the newest releases that PHP allows.
 
 ---
 
@@ -2113,7 +2207,7 @@ On PHP hops a pre-pass runs first: PHP 4 era `$a = &new Foo();` becomes a plain 
 2. Rector runs for real, with only that hop's rules. A rule that would change what the code does is never applied: the PHP 8.0 set's switch-to-match rewrite is skipped, because `match` compares strictly and would stop a `case 1:` from matching the string `"1"` a query string carries. Every run keeps Rector's and PHPStan's caches in its own temp directory, removed at exit, so one run never reads another's.
 3. `composer.json` is edited: the `php` or `laravel/framework` constraint is raised, and `config.platform.php` moves with it when the app already pins it, to the first released patch of the new PHP (8.4.1 for 8.4, because 8.4.0 never shipped; x.y.0 otherwise). Booster never creates that key.
 4. The gate runs the app's tests inside `booster-target:<php>-<stamp>`, a container built from `docker/Dockerfile` on the PHP the hop moves to. The stamp is a short hash of the recipe, so an edited `docker/Dockerfile` rebuilds the image instead of reusing a stale one. The image carries the extension set Citadel's apps run with: intl, ldap, soap, zip, gd, pdo_mysql, mysqli, bcmath, pcntl, exif, redis, imagick and oci8. The first build downloads Oracle Instant Client for oci8, so it takes a few minutes; later hops reuse the image. Pass `--image` to run the gate in your own image instead (below). A red gate stops the run and leaves the changes in place so you can read them (`git checkout .` undoes them). With `--replay`, the gate also replays the requests recorded before the first hop and fails on a changed answer: see [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html). To check the image itself, `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`, PowerShell 7.3 or later) builds it for each PHP version and verifies its extension list, that Composer runs and, on the archived Debian releases, that apt can verify the archive; it needs Docker and a few minutes per version, so it is not part of `composer ci` (a unit test reads the recipe instead).
-5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. A PHP hop reads the lock first: a locked package whose own `require.php` leaves out the hop's PHP makes a plain `composer install` refuse the whole lock, so the gate runs `composer update -W` for just those packages, inside `composer.json`'s constraints, and the report names each one (`the lock held symfony/service-contracts v1.1.2, which needs php ^7.1.3, not PHP 8.0`). The lock follows the app up one PHP at a time, and each hop's diff moves only what had to move. Otherwise, a PHP hop on an app that pins `config.platform.php` (every Sourdough app does) runs `composer update --lock`: no package moves, but the lock's `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check the raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's own output, because the tests never ran.
+5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. A PHP hop reads the lock first: a locked package whose own `require.php` leaves out the hop's PHP makes a plain `composer install` refuse the whole lock, so the gate runs `composer update -W` for just those packages, inside `composer.json`'s constraints, and the report names each one (`the lock held symfony/service-contracts v1.1.2, which needs php ^7.1.3, not PHP 8.0`). The lock follows the app up one PHP at a time, and each hop's diff moves only what had to move. Otherwise, a PHP hop on an app with a `composer.lock` runs `composer update --lock`: no package moves, but the lock's content hash catches up with the raised `php` constraint, so no hop leaves "The lock file is not up to date" behind, and on an app that pins `config.platform.php` (every Sourdough app does) the lock's `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check the raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's own output, because the tests never ran.
 
 Composer 2.10 refuses to load tagged releases Packagist has flagged with a security advisory, and hops that move onto Laravel 9 or 10 most often meet that block. The refusal has two faces. The loud one fails the install phase and names the advisories. The quiet one happens when the app allows dev stability: Composer does not fail at all, it locks the branch instead, `9.x-dev` where the hop asks for `^9.0`. Booster reads the refreshed lock back and treats a branch version behind a tagged range like the block. Either way it writes a temporary entry to `config.policy.advisories.ignore` in `composer.json`: scoped to the package and the constraint Composer refused, kept visible to `composer audit`, and carrying a reason PROCTOR can find and report until the app removes it. The gate then retries once. If the retry still fails, the run stops with the unblock and the failure both in the report, and the entry stays in `composer.json`.
 
@@ -2302,8 +2396,8 @@ https://github.com/sebastianbergmann/phpunit/issues/6052
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/laravel-blade --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade)
+Preview the edits: php bin/booster run --path=examples/laravel-blade --today=2026-10-29 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade --today=2026-10-29)
 ```
 
 ![Booster's immunization record for the Laravel 10 example app: after a short countdown, a Gate passed stamp lands on each Laravel and PHP hop in turn, laravel-10-to-11, laravel-11-to-12, php-82-to-83, laravel-12-to-13, php-83-to-84 and php-84-to-85, ending in RESULT: PASS.](https://booster.apps.wayne.edu/docs/readme/record.svg)
@@ -2445,6 +2539,22 @@ Anything else is an object: `{"name": "request id", "pattern": "req-[0-9a-f]{12}
 
 Every GET without parameters becomes a request, plus one unknown path (an honest 404 is an answer too). Every path parameter, form and setup command gets a `todo`, because Booster cannot know which note id exists or what a valid form looks like. Fill those in, delete the `todo` lines, and record.
 
+### Pages behind sign-in[#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#pages-behind-sign-in)
+
+The replay never signs in through a real CAS, Entra or Wayne Auth server, so an app that sends every guest to its sign-in page answers every request with the same redirect. That baseline matches on every hop, and proves only that the front controller still reaches its sign-in check: a rehearsal on an empty launch pad. Booster says so when it records one:
+
+```
+Warning: all 5 recorded answers are the same redirect (Location: /login). If that is the sign-in page, the replay proves only that the app reaches sign-in, not that the pages behind it still work. Give the replay a test login: https://booster.apps.wayne.edu/docs/guides/replay-gate.html#pages-behind-sign-in
+```
+
+It is a warning, not a stop: the replay still gates every hop. To make it prove more, give the replay a signed-in user the way the app's own tests would, with fake data only:
+
+- **An app on SESAME** boots it with the `fake` driver in a replay-only config, picked by an `env` entry in `serve` (SESAME's raw PHP guide has the settings). Every request is then signed in as the fake user.
+- **A raw PHP app with its own session** gets a session file from `setup`: a small script writes a session for a fake user into a folder the server uses (`"ini": {"session.save_path": "/tmp/replay-sessions"}`), and each request sends its ID (`"cookies": {"PHPSESSID": "replay-user"}`), or a `sequences` entry posts the app's own test login form first.
+- **An app on Wayne Auth** cannot sign in at all in the replay: the old service checks its cookie, and nothing fakes that. Move it to SESAME's Wayne Auth bridge first; `booster plan` names it as a stop sign.
+
+Keep the guest's redirect as one request either way: it is the honest answer for a visitor who is not signed in.
+
 ### Limits, honestly[#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#limits-honestly)
 
 - **No real Oracle, SSO or CAS.** The replay never reaches a real system, by design. An app that cannot render a page without Oracle needs a fake for that page (an environment switch to SQLite, a stub repository), or that page stays out of the file. Pages behind CAS or Entra need the app's own test login (a fake user in the session, the way its tests sign in); without one, the honest request is the guest's: the redirect to sign-in.
@@ -2460,7 +2570,7 @@ Source: https://booster.apps.wayne.edu/docs/guides/scans.html
 
 ## The scans[#](https://booster.apps.wayne.edu/docs/guides/scans.html#the-scans)
 
-This page covers both advisory scans Booster runs with `plan`, and how to run either one alone. Next: [The dependency check](https://booster.apps.wayne.edu/docs/guides/dependency-check.html).
+This page covers both advisory scans Booster runs with `plan`, how to run either one alone, the audit `run` adds, and the dynamic-properties list on the PHP 8.2 step. Next: [The dependency check](https://booster.apps.wayne.edu/docs/guides/dependency-check.html).
 
 ### The PHPCompatibility scan[#](https://booster.apps.wayne.edu/docs/guides/scans.html#the-phpcompatibility-scan)
 
@@ -2481,6 +2591,14 @@ It ignores `vendor/`, `node_modules/` and `storage/`, reads the app only and cha
 ### The composer audit during the run[#](https://booster.apps.wayne.edu/docs/guides/scans.html#the-composer-audit-during-the-run)
 
 `run` carries a third advisory check, per hop: after a hop changes `composer.json` or `composer.lock`, Booster runs `composer audit --format=json --no-interaction` in the app and lists advisories and abandoned packages in the step's report with counts. It never changes the exit code, a clean audit stays silent, and a hop that changed no composer file skips it and says so. A dry run previews the hops and runs no audit.
+
+Composer's audit exits 1 for advisories, 2 for abandoned packages and 3 for both. Booster reads the JSON report on every one of those exits, so an app with abandoned packages gets the list, not a "could not run". Only an exit with no JSON report behind it (Composer missing, a crash) is reported as "could not run".
+
+### Dynamic properties[#](https://booster.apps.wayne.edu/docs/guides/scans.html#dynamic-properties)
+
+PHP 8.2 deprecates dynamic properties: assigning `$this->name` in a class that never declares `$name`. The plan step that crosses PHP 8.2 reads the app's own classes (it skips `vendor/`, `node_modules/` and `storage/`) and lists every such assignment as `file:line Class::$prop`, or says how many classes it read and found none. `run` repeats them on that step as MANUAL lines. Booster never changes them: declare each property in its class, or mark the class `#[\AllowDynamicProperties]`.
+
+A class that declares the property in a parent or a trait, has a `__set()`, or already carries `#[\AllowDynamicProperties]` is not listed. A class whose parent or trait lives outside the app's own code (a library in `vendor/`) cannot be checked from the app alone, so it is named on a "not checked" line for you to check by hand. `plan --format=json` carries the same list under `dynamic_properties`.
 
 ---
 
@@ -2541,6 +2659,47 @@ Those values live in `phpunit.xml`, committed with the app. When you would rathe
 ```
 booster run --path=<app> --test-env DB_CONNECTION=sqlite --test-env DB_DATABASE=:memory:
 ```
+
+### A raw PHP app[#](https://booster.apps.wayne.edu/docs/guides/smoke-test.html#a-raw-php-app)
+
+A raw PHP app (no framework, often no tests at all) gets the built-in syntax check, which proves the files parse on the new PHP and nothing more. Give it the same kind of smoke test, as a plain script with no PHPUnit to install: load what every page loads and touch each library the app leans on, then exit 0. Save it as `tests/smoke.php`:
+
+```php
+<?php
+// Smoke test for a raw PHP app: the bootstrap and the libraries load on this PHP.
+// Exit 0 is a pass. Booster runs it on the old PHP first, then after every hop.
+
+error_reporting(E_ALL);
+set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
+    if ($severity === E_DEPRECATED || $severity === E_USER_DEPRECATED) {
+        return true; // Deprecations are next year's hop. Delete these lines to fail on them now.
+    }
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+
+try {
+    require __DIR__ . '/../config/bootstrap.php'; // the file every page includes first
+
+    // One line per library the app leans on, for example a template that renders:
+    // $view = new Smarty(); $view->setCompileDir(sys_get_temp_dir()); $view->fetch('string:ok');
+
+    echo "Smoke test passed on PHP " . PHP_VERSION . "\n";
+    exit(0);
+} catch (Throwable $e) {
+    fwrite(STDERR, get_class($e) . ': ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine() . "\n");
+    exit(1);
+}
+```
+
+Point the gate at it with `--test-command`; the dry run's Next line keeps the flag, so the real run gets it too:
+
+```
+booster run --path=<app> --test-command "php tests/smoke.php" --dry-run
+```
+
+Or add `"scripts": {"test": "php tests/smoke.php"}` to the app's `composer.json`, and Booster runs `composer test` without the flag. If the bootstrap connects to a database as it loads, give the script fake settings with `--test-env`, or keep that call out of what the script loads: the gate container has no database server. A run with `--vendored` runs the syntax check instead of your script on the steps before the move to Composer, because the hand-copied libraries may not load on that PHP yet; your script runs from that step on.
+
+The script proves that the code loads. The pages are the [replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html)'s job: it asks the app for real URLs on the old PHP and after every hop, and the two together are a fair gate for an app with no tests.
 
 ---
 
@@ -2692,13 +2851,14 @@ vue            unknown
 node           unknown
 mix_file       no
 wayne_cas      no
+wayne_auth     no
 wayneui_1      no
 boost          no
 helmet         no
 
 Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version
 composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan).
-Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.
+Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayne_auth = the old Wayne Auth sign-in in the app's own code, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.
 Next: php bin/booster plan --path=.
 ```
 
@@ -3011,6 +3171,7 @@ booster run --path=../my-app --skip-gate
 - **Custom test command:** `--test-command` replaces the default (`composer test`, else `vendor/bin/phpunit`, else the syntax check).
 - **Environment for the tests:** `--test-env KEY=VALUE`, repeatable. The report names the keys only, never the values.
 - **Your own image:** `--image` takes one image name, a `{php}` template, or a map such as `8.1=foo:1,8.2=bar:2`; the image needs `php` and `composer` on `PATH`, and must cover every PHP in the plan.
+- **Hand-copied libraries and real tests:** with `--vendored`, the PHP hops before `vendored-to-composer` run the syntax check instead of your tests, because the 2012 copies may not run on the new PHP; your tests run on the baseline and on every step from the move on. See [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#why-the-replay-and-the-tests-wait).
 - **Few tests, but pages that must not change:** `--replay` records how the app answers a list of requests before the first hop and fails any hop that changes an answer. `booster replay init --path=../my-app` drafts the request file. See [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html).
 - **Skip the gate:** `--skip-gate` skips the baseline, the per-hop tests and the PROCTOR check.
 
@@ -3042,6 +3203,8 @@ Without the flag, `plan` only warns that your app uses `wayne-cas` or WayneUI 1.
 An app that hand-copied Doctrine 2, Smarty 3 or Slim 1 into `vendor/` has a third opt-in move, `--vendored`, which puts those libraries on Composer; see [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html).
 
 A raw PHP app that calls `session_start()` itself has a fourth, `--strict-session`, which turns on strict session IDs before each call (Laravel apps are skipped); see [Strict session IDs for raw PHP apps](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html).
+
+An app that still signs people in through the old Wayne Auth service in its own code (a `WayneAuth` class, the `validUser` cookie, an `sso_host` setting) gets a stop sign from `detect` (the `wayne_auth` key) and at the top of `plan`. PHP 5.6 never checked that service's TLS certificate; PHP 7 and later do, and it has expired, so sign-in breaks on the first PHP hop off 5.6. Ship the move to SESAME's Wayne Auth bridge (it needs PHP 8.3) in the same release as the PHP hops, and deploy no hop off 5.6 before it: [Moving off Wayne Auth](https://sesame.apps.wayne.edu/docs/guides/moving-off-wayne-auth.html).
 
 ### 13. Plan for a future date, or a different policy[#](https://booster.apps.wayne.edu/docs/recipes.html#13-plan-for-a-future-date-or-a-different-policy)
 
@@ -3363,6 +3526,23 @@ This page says what changes when you move Booster itself to a new release, newes
 
 To take a new Booster, download the PHAR again (the same `curl` line as on [Install](https://booster.apps.wayne.edu/docs/install.html); its `releases/latest` link always names the newest release), or run `git pull` and `composer install` in your clone. `booster --version` prints the version you have.
 
+### 1.15.0[#](https://booster.apps.wayne.edu/docs/upgrading.html#1-15-0)
+
+Released 2026-11-09. Lessons from a real 2012 raw PHP app taken from PHP 5.6 to 8.5. No hop was added or removed, no option or exit code changed, and the gate's target images and the `booster init` playbooks are the same, so `booster init --check` stays green.
+
+#### What you see[#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see)
+
+- **New lines in `detect` and `plan`.** `detect` prints a `wayne_auth` line and lists hand-copied libraries; `plan` lists dynamic properties on the step that crosses PHP 8.2. The JSON reports gain `wayne_auth` and `hand_copied_libraries` (detect) and `dynamic_properties` (plan). A script that reads them by key keeps working.
+- **A Wayne Auth stop sign.** An app that still signs people in through Wayne Auth now sees `detect` and `plan` open with a stop sign. Move the app onto SESAME's Wayne Auth bridge before the first hop off PHP 5.6; the [recipes](https://booster.apps.wayne.edu/docs/recipes.html) link SESAME's guide.
+- **Next lines you can paste.** The plan footer and a dry run's Next line carry the flags you typed, so the line runs the plan you just read.
+- **`composer.lock` changes on every PHP hop.** Each PHP hop on an app with a lock now runs `composer update --lock` in its gate, so the lock's content hash follows the `require.php` the hop raised. Commit `composer.lock` with each hop.
+- **Fewer dependency warnings.** The dependency check judges the releases the app's constraint allows, so a warning about a major line `composer update` would never pick is gone.
+- **Tests wait for the vendored move.** With `--vendored` and a test command, the steps before `vendored-to-composer` run the syntax check and say "Tests deferred"; the baseline and every step from the move on run your tests.
+
+#### An app that `vendored-to-composer` already moved[#](https://booster.apps.wayne.edu/docs/upgrading.html#an-app-that-vendored-to-composer-already-moved)
+
+Rector on Booster 1.14.0 or earlier rewrote `slim1-bridge.php` on the PHP hops after the move. That file still works. It no longer matches the file Booster ships, so Booster treats it as the app's own code from now on, and Rector may visit it again. Nothing to do.
+
 ### 1.14.0[#](https://booster.apps.wayne.edu/docs/upgrading.html#1-14-0)
 
 Released 2026-11-09. Nothing to do: no hop, command, option, exit code or gate image changed. Booster's own CI moves to the Preflight 0.5.0 components, Booster locks Pinstripe 0.1.5, and this page is new.
@@ -3371,7 +3551,7 @@ Released 2026-11-09. Nothing to do: no hop, command, option, exit code or gate i
 
 Released 2026-11-09. The stack sweep: the `cas-to-sesame` hop writes `waynestate/sesame:^0.7`, and the gate's target image runs Composer 2.11.1. No command, option or exit code changed.
 
-#### What you see[#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see)
+#### What you see[#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-1)
 
 - **A fresh image on the first gate.** For an app on PHP 7.2 or newer, the gate's target image now installs Composer 2.11.1 (it was 2.10.3, which is no longer maintained). The images for PHP 5.6 and 7.0 build again with Debian's current archive keys. The recipe stamp changes with both, so the first `booster run` after the upgrade builds the image again, and that first gate takes a little longer. Images for older PHP keep Composer 2.2. Nothing to do.
 - **A stale playbook.** The `cas-to-sesame` hop's notes name `waynestate/sesame:^0.7`, and the hop playbooks that `booster init` writes carry those notes. In an app where you ran `booster init` with an earlier Booster, `booster init --check` reports that playbook as stale until you run `booster init` again.

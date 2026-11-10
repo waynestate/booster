@@ -8,7 +8,7 @@ generator: Squire agent-ready
 
 # The scans[#](https://booster.apps.wayne.edu/docs/guides/scans.html#the-scans)
 
-This page covers both advisory scans Booster runs with `plan`, and how to run either one alone. Next: [The dependency check](https://booster.apps.wayne.edu/docs/guides/dependency-check.html).
+This page covers both advisory scans Booster runs with `plan`, how to run either one alone, the audit `run` adds, and the dynamic-properties list on the PHP 8.2 step. Next: [The dependency check](https://booster.apps.wayne.edu/docs/guides/dependency-check.html).
 
 ## The PHPCompatibility scan[#](https://booster.apps.wayne.edu/docs/guides/scans.html#the-phpcompatibility-scan)
 
@@ -29,3 +29,11 @@ It ignores `vendor/`, `node_modules/` and `storage/`, reads the app only and cha
 ## The composer audit during the run[#](https://booster.apps.wayne.edu/docs/guides/scans.html#the-composer-audit-during-the-run)
 
 `run` carries a third advisory check, per hop: after a hop changes `composer.json` or `composer.lock`, Booster runs `composer audit --format=json --no-interaction` in the app and lists advisories and abandoned packages in the step's report with counts. It never changes the exit code, a clean audit stays silent, and a hop that changed no composer file skips it and says so. A dry run previews the hops and runs no audit.
+
+Composer's audit exits 1 for advisories, 2 for abandoned packages and 3 for both. Booster reads the JSON report on every one of those exits, so an app with abandoned packages gets the list, not a "could not run". Only an exit with no JSON report behind it (Composer missing, a crash) is reported as "could not run".
+
+## Dynamic properties[#](https://booster.apps.wayne.edu/docs/guides/scans.html#dynamic-properties)
+
+PHP 8.2 deprecates dynamic properties: assigning `$this->name` in a class that never declares `$name`. The plan step that crosses PHP 8.2 reads the app's own classes (it skips `vendor/`, `node_modules/` and `storage/`) and lists every such assignment as `file:line Class::$prop`, or says how many classes it read and found none. `run` repeats them on that step as MANUAL lines. Booster never changes them: declare each property in its class, or mark the class `#[\AllowDynamicProperties]`.
+
+A class that declares the property in a parent or a trait, has a `__set()`, or already carries `#[\AllowDynamicProperties]` is not listed. A class whose parent or trait lives outside the app's own code (a library in `vendor/`) cannot be checked from the app alone, so it is named on a "not checked" line for you to check by hand. `plan --format=json` carries the same list under `dynamic_properties`.

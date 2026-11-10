@@ -48,13 +48,39 @@ already in orbit. An app that an older Booster already moved keeps what that Boo
 when that needs a step of yours.</p>
 <p>To take a new Booster, download the PHAR again (the same <code>curl</code> line as on <a href="install.html">Install</a>; its
 <code>releases/latest</code> link always names the newest release), or run <code>git pull</code> and <code>composer install</code> in your clone. <code>booster --version</code> prints the version you have.</p>
+<h2 id="1-15-0">1.15.0<a class="docs-heading-link" aria-label="Link to this section" href="#1-15-0">#</a></h2>
+<p>Released 2026-11-09. Lessons from a real 2012 raw PHP app taken from PHP 5.6 to 8.5. No hop was added or removed,
+no option or exit code changed, and the gate's target images and the <code>booster init</code> playbooks are the same, so
+<code>booster init --check</code> stays green.</p>
+<h3 id="what-you-see">What you see<a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see">#</a></h3>
+<ul>
+<li><strong>New lines in <code>detect</code> and <code>plan</code>.</strong> <code>detect</code> prints a <code>wayne_auth</code> line and lists hand-copied libraries; <code>plan</code>
+lists dynamic properties on the step that crosses PHP 8.2. The JSON reports gain <code>wayne_auth</code> and
+<code>hand_copied_libraries</code> (detect) and <code>dynamic_properties</code> (plan). A script that reads them by key keeps working.</li>
+<li><strong>A Wayne Auth stop sign.</strong> An app that still signs people in through Wayne Auth now sees <code>detect</code> and <code>plan</code> open
+with a stop sign. Move the app onto SESAME's Wayne Auth bridge before the first hop off PHP 5.6; the
+<a href="recipes.html">recipes</a> link SESAME's guide.</li>
+<li><strong>Next lines you can paste.</strong> The plan footer and a dry run's Next line carry the flags you typed, so the line runs
+the plan you just read.</li>
+<li><strong><code>composer.lock</code> changes on every PHP hop.</strong> Each PHP hop on an app with a lock now runs <code>composer update --lock</code>
+in its gate, so the lock's content hash follows the <code>require.php</code> the hop raised. Commit <code>composer.lock</code> with each
+hop.</li>
+<li><strong>Fewer dependency warnings.</strong> The dependency check judges the releases the app's constraint allows, so a warning
+about a major line <code>composer update</code> would never pick is gone.</li>
+<li><strong>Tests wait for the vendored move.</strong> With <code>--vendored</code> and a test command, the steps before <code>vendored-to-composer</code>
+run the syntax check and say &quot;Tests deferred&quot;; the baseline and every step from the move on run your tests.</li>
+</ul>
+<h3 id="an-app-that-vendored-to-composer-already-moved">An app that <code>vendored-to-composer</code> already moved<a class="docs-heading-link" aria-label="Link to this section" href="#an-app-that-vendored-to-composer-already-moved">#</a></h3>
+<p>Rector on Booster 1.14.0 or earlier rewrote <code>slim1-bridge.php</code> on the PHP hops after the move. That file still works.
+It no longer matches the file Booster ships, so Booster treats it as the app's own code from now on, and Rector may
+visit it again. Nothing to do.</p>
 <h2 id="1-14-0">1.14.0<a class="docs-heading-link" aria-label="Link to this section" href="#1-14-0">#</a></h2>
 <p>Released 2026-11-09. Nothing to do: no hop, command, option, exit code or gate image changed. Booster's own CI moves
 to the Preflight 0.5.0 components, Booster locks Pinstripe 0.1.5, and this page is new.</p>
 <h2 id="1-13-1">1.13.1<a class="docs-heading-link" aria-label="Link to this section" href="#1-13-1">#</a></h2>
 <p>Released 2026-11-09. The stack sweep: the <code>cas-to-sesame</code> hop writes <code>waynestate/sesame:^0.7</code>, and the gate's target
 image runs Composer 2.11.1. No command, option or exit code changed.</p>
-<h3 id="what-you-see">What you see<a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see">#</a></h3>
+<h3 id="what-you-see-1">What you see<a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-1">#</a></h3>
 <ul>
 <li><strong>A fresh image on the first gate.</strong> For an app on PHP 7.2 or newer, the gate's target image now installs Composer
 2.11.1 (it was 2.10.3, which is no longer maintained). The images for PHP 5.6 and 7.0 build again with Debian's
@@ -90,7 +116,7 @@ JSON sessions. SESAME's
     </main>
     <nav class="docs-pager" aria-label="Pages"><a class="docs-pager__link" href="../docs/next.html"><span class="docs-pager__dir">Previous</span><span class="docs-pager__title">Next</span></a><a class="docs-pager__link docs-pager__link--next" href="../docs/changelog.html"><span class="docs-pager__dir">Next</span><span class="docs-pager__title">Changelog</span></a></nav>
   </div>
-  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#1-14-0">1.14.0</a></li><li class="docs-toc__item"><a href="#1-13-1">1.13.1</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-cas-to-sesame-already-moved">An app that cas-to-sesame already moved</a></li></ul></nav>
+  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#1-15-0">1.15.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-vendored-to-composer-already-moved">An app that vendored-to-composer already moved</a></li><li class="docs-toc__item"><a href="#1-14-0">1.14.0</a></li><li class="docs-toc__item"><a href="#1-13-1">1.13.1</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-1">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-cas-to-sesame-already-moved">An app that cas-to-sesame already moved</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
   <span>Documents Booster <span data-docs-version>1.14.0</span></span>

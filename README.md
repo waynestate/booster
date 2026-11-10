@@ -334,8 +334,8 @@ https://github.com/sebastianbergmann/phpunit/issues/6052
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: booster run --path=examples/laravel-blade --dry-run
-(The real run needs Docker, and your app committed in git: booster run --path=examples/laravel-blade)
+Preview the edits: booster run --path=examples/laravel-blade --today=2026-10-29 --dry-run
+(The real run needs Docker, and your app committed in git: booster run --path=examples/laravel-blade --today=2026-10-29)
 ```
 
 <div align="center">
@@ -488,11 +488,23 @@ It ignores `vendor/`, `node_modules/` and `storage/`, reads the app only and cha
 --path=../my-app --php=8.5 --phpstan` runs the same scan on its own, for any PHP version Booster knows, and exits 0
 even when it finds a wall of missing types.
 
+### Dynamic properties
+
+PHP 8.2 deprecates dynamic properties: assigning `$this->name` in a class that never declares `$name`. The plan step
+that crosses PHP 8.2 reads the app's own classes and lists every such assignment as `file:line Class::$prop`, or says
+how many classes it read and found none; `run` repeats them on that step as MANUAL lines. Booster never changes them:
+declare each property in its class, or mark the class `#[\AllowDynamicProperties]`. A class whose parent or trait
+lives outside the app's own code is named on a "not checked" line for you to check by hand. `plan --format=json`
+carries the list under `dynamic_properties`. More in [the scans guide](docs/guides/scans.md#dynamic-properties).
+
 ### The dependency check
 
 Before the hops print, `plan` (and `run`) asks Packagist about each direct third-party dependency in the app's
-`composer.json`: what is its newest stable release, and can that release still be installed at each hop's
-destination? Only plain `require` and `require-dev` entries count; PHP, extensions (`ext-*`, `lib-*`), Laravel
+`composer.json`: which stable releases does the app's own constraint allow, and can one of them still be installed
+at each hop's destination? A newer major the constraint never installs does not count: an app on `doctrine/orm ^2.20`
+is judged by 2.20, which runs on PHP 8.0, not by 3.x, which needs 8.1. With no usable constraint (a `dev-` branch,
+nothing stable in range) the newest stable release stands in. The warning names the newest release in range; the
+JSON's `newest` field stays the package's newest stable release. Only plain `require` and `require-dev` entries count; PHP, extensions (`ext-*`, `lib-*`), Laravel
 itself (`laravel/framework`, its `illuminate/*` components), PHPUnit and Booster's own scan tools are Booster's
 own business, so they are skipped.
 
@@ -644,6 +656,53 @@ names the keys only, never the values:
 
     booster run --path=<app> --test-env DB_CONNECTION=sqlite --test-env DB_DATABASE=:memory:
 
+#### A raw PHP app
+
+A raw PHP app (no framework, often no tests at all) gets the built-in syntax check, which proves the files parse on
+the new PHP and nothing more. Give it the same kind of smoke test, as a plain script with no PHPUnit to install:
+load what every page loads and touch each library the app leans on, then exit 0. Save it as `tests/smoke.php`:
+
+```php
+<?php
+// Smoke test for a raw PHP app: the bootstrap and the libraries load on this PHP.
+// Exit 0 is a pass. Booster runs it on the old PHP first, then after every hop.
+
+error_reporting(E_ALL);
+set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
+    if ($severity === E_DEPRECATED || $severity === E_USER_DEPRECATED) {
+        return true; // Deprecations are next year's hop. Delete these lines to fail on them now.
+    }
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+
+try {
+    require __DIR__ . '/../config/bootstrap.php'; // the file every page includes first
+
+    // One line per library the app leans on, for example a template that renders:
+    // $view = new Smarty(); $view->setCompileDir(sys_get_temp_dir()); $view->fetch('string:ok');
+
+    echo "Smoke test passed on PHP " . PHP_VERSION . "\n";
+    exit(0);
+} catch (Throwable $e) {
+    fwrite(STDERR, get_class($e) . ': ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine() . "\n");
+    exit(1);
+}
+```
+
+Point the gate at it with `--test-command`; the dry run's Next line keeps the flag, so the real run
+gets it too:
+
+    booster run --path=<app> --test-command "php tests/smoke.php" --dry-run
+
+Or add `"scripts": {"test": "php tests/smoke.php"}` to the app's `composer.json`, and Booster runs `composer test`
+without the flag. If the bootstrap connects to a database as it loads, give the script fake settings with
+`--test-env`, or keep that call out of what the script loads: the gate container has no database server. A run with
+`--vendored` runs the syntax check instead of your script on the steps before the move to Composer, because the hand-copied libraries may not load on that PHP yet;
+your script runs from that step on.
+
+The script proves that the code loads. The pages are the [replay gate](docs/guides/replay-gate.md)'s job: it asks the app for
+real URLs on the old PHP and after every hop, and the two together are a fair gate for an app with no tests.
+
 ### The replay gate
 
 Tests only prove what they ask. `booster run --replay` also records how the app answers a list of requests on its
@@ -661,9 +720,10 @@ climb past PHP 7 on the PHP hops alone, and Booster never edits a library's file
 `vendored-to-composer`, which moves the app instead: the copies leave, `composer.json` asks for the maintained release
 that keeps the same API (`doctrine/orm ^2.20`, `smarty/smarty ^4.5`, `slim/slim ^4.15` through a Slim 1 bridge the
 hop writes), and the `require` lines load Composer's autoloader. Hooks, cookies through Slim, Doctrine's
-`ClassLoader` and other shapes it cannot rewrite exactly are stop signs: it refuses and changes nothing. Run it with
-`--replay`; the replay waits for this hop, then compares every step. The recipes, the stop signs and the bridge are in
-[the guide](docs/guides/framework-hops.md).
+`ClassLoader` and other shapes it cannot rewrite exactly are stop signs: it refuses and changes nothing. `detect` lists
+the copies and puts `--vendored` on its Next line. Run it with `--replay`; the replay and the test gate wait for this
+hop (the PHP hops before it run the syntax check), then check every step. The recipes, the stop signs and the bridge
+are in [the guide](docs/guides/framework-hops.md).
 
 ### Strict session IDs for raw PHP apps
 
@@ -712,11 +772,11 @@ under `Pre-pass fixes:`.
    refuse the whole lock, so the gate runs `composer update -W` for just those packages, inside `composer.json`'s
    constraints, and the report names each one (`the lock held symfony/service-contracts v1.1.2, which needs php
    ^7.1.3, not PHP 8.0`). The lock follows the app up one PHP at a time, and each hop's diff moves only what had to
-   move. Otherwise, a PHP hop on an app
-   that pins `config.platform.php` (every Sourdough app does) runs `composer update --lock`: no package moves, but
-   the lock's `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check
-   the raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain
-   `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's
+   move. Otherwise, a PHP hop on an app with a `composer.lock` runs `composer update --lock`: no package moves,
+   but the lock's content hash catches up with the raised `php` constraint, so no hop leaves "The lock file is not
+   up to date" behind, and on an app that pins `config.platform.php` (every Sourdough app does) the lock's
+   `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check the
+   raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's
    own output, because the tests never ran.
 
 Composer 2.10 refuses to load tagged releases Packagist has flagged with a security advisory, and hops that move

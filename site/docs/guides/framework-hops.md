@@ -19,6 +19,16 @@ booster plan --path=<app> --from-php=5.6 --vendored          # where the move fi
 booster run --path=<app> --from-php=5.6 --vendored --replay  # move it, with the replay as proof
 ```
 
+`booster detect` lists the copies it finds, and when Booster can move them its Next line already carries `--vendored` (and, for an app with no `composer.json`, `--from-php=5.6`, to change if the server runs another PHP):
+
+```
+Hand-copied libraries (committed into a vendor folder, no Composer behind them):
+  - Doctrine 2.2.2 (vendor/Doctrine)
+  - Slim 1.6.0 (vendor/Slim)
+  - Smarty 3.1.8 (vendor/Smarty)
+Booster can move Doctrine, Slim and Smarty onto Composer, so the line below adds --vendored.
+```
+
 Without `--vendored` the plan still finds the copies and says so:
 
 ```
@@ -72,23 +82,31 @@ The hop rewrites a few exact line shapes and nothing else. Anything that touches
 
 A commented-out call is not a stop sign. Booster reads the line, not the vibe.
 
+Smarty's compiled templates (the files a hand copy writes into `templates_c/` or `tmp/template_compile/`, each starting with a `Smarty version ... compiled from` comment) are a cache, not code: the hop leaves them out of the rewrite and lists each folder as a MANUAL line. Delete the compiled files (Smarty rebuilds them on the next request) and keep the folder out of git. A `SMARTY_DIR` stop sign on a file in a cache or compile folder without that header says so too, because deleting the cache is the likely fix.
+
 ## What stays[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#what-stays)
 
 - Libraries without a recipe (PHPMailer, Swift Mailer, Twig, Monolog, anything Booster does not recognize) stay where they are, still loaded the way they always were, and the hop lists each one as a MANUAL line.
 - Copies in a nested `vendor/` (say `admin/vendor/Smarty`) stay too: `composer.json` goes at the app root, so only the root's `vendor/` can be pointed at Composer.
 
-## Why the replay waits[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#why-the-replay-waits)
+## Why the replay and the tests wait[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#why-the-replay-and-the-tests-wait)
 
-With `--replay`, the baseline is recorded on the app's current PHP as always. The PHP hops before `vendored-to-composer` still run their test gate, but their replay is deferred, because the app still loads its 2012 copies and those may not run on the new PHP; that is the problem the hop exists to fix. From the hop on, every step is compared against the baseline:
+With `--replay`, the baseline is recorded on the app's current PHP as always. The PHP hops before `vendored-to-composer` defer the replay, because the app still loads its 2012 copies and those may not run on the new PHP; that is the problem the hop exists to fix. From the hop on, every step is compared against the baseline:
 
 ```
 Replay deferred to step 6 (vendored-to-composer): the app still loads its hand-copied libraries, which may not run on PHP 7.4. The answers are compared once Composer's releases are in.
+```
+
+The test gate waits the same way. The baseline runs the app's tests (or your `--test-command`) on the PHP it starts from; the PHP hops before the move run the syntax check instead, and the tests take over from the move on:
+
+```
+Tests deferred to step 6 (vendored-to-composer): the app still loads its hand-copied libraries, which may not run on PHP 7.4. This step ran the syntax check; the tests run from that step on.
 ```
 
 A real app's replay found two Doctrine changes no test asked about: `DISTINCT(alias.field)` in DQL reads as an expression in ORM 2.20, and an entity whose id holds a date needs a custom column type. The hop lists both as MANUAL lines, so you know where to look when the replay says an answer changed.
 
 ## After the hop[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#after-the-hop)
 
-- Commit `composer.json`, `composer.lock` and, for Slim, `slim1-bridge.php`. Citadel never runs `composer install`, so commit `vendor/` on the deploy branch or let Booster's `deployments/` script install it (see [Deploying on Citadel](https://booster.apps.wayne.edu/docs/guides/citadel.html)).
+- Commit `composer.json`, `composer.lock` and, for Slim, `slim1-bridge.php`. Later hops leave the bridge alone while it is still the file Booster wrote, so it does not churn in every hop's diff; once you edit it, it is the app's code and gets the hops like the rest. Citadel never runs `composer install`, so commit `vendor/` on the deploy branch or let Booster's `deployments/` script install it (see [Deploying on Citadel](https://booster.apps.wayne.edu/docs/guides/citadel.html)).
 - ORM 2.20 is the last line that reads docblock annotations, and `doctrine/annotations` 1.x is abandoned. ORM 3 (PHP 8.1 or newer, attributes instead of annotations) is the next move, by hand for now. Smarty 5 likewise, once the templates stop using PHP functions as modifiers.
-- The lock was resolved on the hop's PHP, and later PHP hops move only the packages that refuse theirs. Run `composer update` once the app lands on its target to pick up the newest releases that PHP allows.
+- The lock was resolved on the hop's PHP, and later PHP hops move only the packages that refuse theirs (and refresh the lock's content hash, so Composer never calls it out of date). Run `composer update` once the app lands on its target to pick up the newest releases that PHP allows.

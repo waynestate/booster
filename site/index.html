@@ -391,13 +391,14 @@ vue            2
 node           unknown
 mix_file       no
 wayne_cas      no
+wayne_auth     no
 wayneui_1      no
 boost          no
 helmet         no
 
 Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version
 composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan).
-Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.
+Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayne_auth = the old Wayne Auth sign-in in the app's own code, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.
 Next: php bin/booster plan --path=examples/vue-spa</pre>
 <pre class="out" role="tabpanel" id="out-plan" aria-labelledby="tab-plan" tabindex="0" hidden><span class="out__cmd">$ bin/booster plan --path=examples/raw-php --today=2026-10-29</span>
 BOOSTER plan for examples/raw-php
@@ -424,6 +425,7 @@ BOOSTER plan for examples/raw-php
    Move PHP 8.1 code to PHP 8.2.
    After this step your tests run in Docker.
    Removed between PHP 8.1 and PHP 8.2: none found.
+   Dynamic properties (deprecated in PHP 8.2): none found in the 1 class Booster read.
 4. php-82-to-83
    Move PHP 8.2 code to PHP 8.3.
    After this step your tests run in Docker.
@@ -447,8 +449,8 @@ PHPStan on PHP 8.5: 3 findings (code quality hints, not upgrade blockers).
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/raw-php --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/raw-php)</pre>
+Preview the edits: php bin/booster run --path=examples/raw-php --today=2026-10-29 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/raw-php --today=2026-10-29)</pre>
 <pre class="out" role="tabpanel" id="out-run" aria-labelledby="tab-run" tabindex="0" hidden><span class="out__cmd">$ bin/booster run --path=examples/raw-php --to-php=8.2 --dry-run</span>
 BOOSTER dry run (nothing was changed)
 
@@ -510,7 +512,7 @@ RESULT: PASS (previewed, no tests ran)
 
 Dry run: these changes were previewed, none were applied.
 Nothing was changed. RESULT: PASS means the preview worked; no tests ran.
-Next, if the edits look right: php bin/booster run --path=examples/raw-php
+Next, if the edits look right: php bin/booster run --path=examples/raw-php --to-php=8.2
 (It needs Docker and a clean git folder. Commit or stash first.)</pre>
 <pre class="out" role="tabpanel" id="out-hops" aria-labelledby="tab-hops" tabindex="0" hidden><span class="out__cmd">$ bin/booster hops</span>
 php-55-to-56       Move PHP 5.5 code to PHP 5.6.

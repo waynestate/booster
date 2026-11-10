@@ -13,6 +13,36 @@ when that needs a step of yours.
 To take a new Booster, download the PHAR again (the same `curl` line as on [Install](install.md); its
 `releases/latest` link always names the newest release), or run `git pull` and `composer install` in your clone. `booster --version` prints the version you have.
 
+## 1.15.0
+
+Released 2026-11-09. Lessons from a real 2012 raw PHP app taken from PHP 5.6 to 8.5. No hop was added or removed,
+no option or exit code changed, and the gate's target images and the `booster init` playbooks are the same, so
+`booster init --check` stays green.
+
+### What you see
+
+- **New lines in `detect` and `plan`.** `detect` prints a `wayne_auth` line and lists hand-copied libraries; `plan`
+  lists dynamic properties on the step that crosses PHP 8.2. The JSON reports gain `wayne_auth` and
+  `hand_copied_libraries` (detect) and `dynamic_properties` (plan). A script that reads them by key keeps working.
+- **A Wayne Auth stop sign.** An app that still signs people in through Wayne Auth now sees `detect` and `plan` open
+  with a stop sign. Move the app onto SESAME's Wayne Auth bridge before the first hop off PHP 5.6; the
+  [recipes](recipes.md) link SESAME's guide.
+- **Next lines you can paste.** The plan footer and a dry run's Next line carry the flags you typed, so the line runs
+  the plan you just read.
+- **`composer.lock` changes on every PHP hop.** Each PHP hop on an app with a lock now runs `composer update --lock`
+  in its gate, so the lock's content hash follows the `require.php` the hop raised. Commit `composer.lock` with each
+  hop.
+- **Fewer dependency warnings.** The dependency check judges the releases the app's constraint allows, so a warning
+  about a major line `composer update` would never pick is gone.
+- **Tests wait for the vendored move.** With `--vendored` and a test command, the steps before `vendored-to-composer`
+  run the syntax check and say "Tests deferred"; the baseline and every step from the move on run your tests.
+
+### An app that `vendored-to-composer` already moved
+
+Rector on Booster 1.14.0 or earlier rewrote `slim1-bridge.php` on the PHP hops after the move. That file still works.
+It no longer matches the file Booster ships, so Booster treats it as the app's own code from now on, and Rector may
+visit it again. Nothing to do.
+
 ## 1.14.0
 
 Released 2026-11-09. Nothing to do: no hop, command, option, exit code or gate image changed. Booster's own CI moves

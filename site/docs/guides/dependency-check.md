@@ -10,7 +10,7 @@ generator: Squire agent-ready
 
 This page explains the Packagist check Booster runs before the hops print. Next: [Behavior changes](https://booster.apps.wayne.edu/docs/guides/behaviour-changes.html).
 
-Before the hops print, `plan` (and `run`) asks Packagist about each direct third-party dependency in the app's `composer.json`: what is its newest stable release, and can that release still be installed at each hop's destination? Only plain `require` and `require-dev` entries count; PHP, extensions (`ext-*`, `lib-*`), Laravel itself (`laravel/framework`, its `illuminate/*` components) and PHPUnit are Booster's own business, so they are skipped.
+Before the hops print, `plan` (and `run`) asks Packagist about each direct third-party dependency in the app's `composer.json`: which stable releases does the app's own constraint allow, and can one of them still be installed at each hop's destination? A newer major the constraint never installs does not count: an app on `doctrine/orm ^2.20` is judged by 2.20, which runs on PHP 8.0, not by 3.x, which needs 8.1. With no usable constraint (a `dev-` branch, nothing stable in range) the newest stable release stands in. The warning names the newest release in range; the JSON's `newest` field stays the package's newest stable release. Only plain `require` and `require-dev` entries count; PHP, extensions (`ext-*`, `lib-*`), Laravel itself (`laravel/framework`, its `illuminate/*` components) and PHPUnit are Booster's own business, so they are skipped.
 
 The answer is advisory, like the scans: a package that cannot follow the plan does not drop the hop. It adds a warning that names the package, the hop it blocks, and what to do about it:
 
