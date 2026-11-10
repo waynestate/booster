@@ -499,7 +499,7 @@
     {
       "id": "pdo-pgsql-dsn-credentials-priority",
       "hop": "php-83-to-84",
-      "detect": { "kind": "class", "match": "PDO" },
+      "detect": { "kind": "new", "match": "PDO" },
       "label": "For PDO_PGSQL, credentials in the DSN now take priority over PDO constructor arguments; connections that passed both now authenticate as the DSN user",
       "keep_old": "remove credentials from the DSN (or stop passing constructor arguments)",
       "check": "Audit pgsql connections that pass credentials in both places",

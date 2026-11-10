@@ -282,6 +282,53 @@ final class BehaviourScanTest extends TestCase
         $this->expectLoadError('not json at all', 'schema_version 1');
     }
 
+    /**
+     * The PDO_PGSQL row fired on every Laravel app: its stock config/database.php
+     * names PDO::MYSQL_ATTR_SSL_CA, a MySQL constant, and the row matched any
+     * mention of PDO. A "new" row matches only a connection being made.
+     */
+    public function test_a_new_row_matches_instantiations_not_constant_uses(): void
+    {
+        $dir = $this->tempDir();
+        $data = $dir . '/behaviour-changes.json';
+        file_put_contents($data, (string) json_encode(['schema_version' => 1, 'changes' => [$this->entry('pdo-new', 'php-83-to-84', ['kind' => 'new', 'match' => 'PDO'])]]));
+        mkdir($dir . '/app/config', 0775, true);
+        file_put_contents($dir . '/app/config/database.php', <<<'PHP'
+            <?php
+
+            return [
+                'options' => [PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA')],
+                'mode' => \PDO::ERRMODE_EXCEPTION,
+            ];
+
+            PHP);
+        file_put_contents($dir . '/app/db.php', <<<'PHP'
+            <?php
+
+            namespace App;
+
+            $a = new \PDO('pgsql:host=db', 'u', 'p');
+            $b = new PDO('mysql:host=db');
+            $c = \PDO::connect('pgsql:host=db');
+            $d = new PDOStatementish();
+
+            PHP);
+
+        $result = (new BehaviourScan($data))->scan($dir . '/app', 'php-83-to-84', []);
+
+        self::assertCount(1, $result->entries);
+        self::assertSame(['db.php:5', 'db.php:6', 'db.php:7'], $result->entries[0]->hits);
+    }
+
+    public function test_the_pdo_pgsql_row_is_a_new_row(): void
+    {
+        $raw = (string) file_get_contents(PharFiles::path('data/behaviour-changes.json'));
+        $rows = json_decode($raw, true)['changes'];
+        $byId = array_column($rows, null, 'id');
+
+        self::assertSame(['kind' => 'new', 'match' => 'PDO'], $byId['pdo-pgsql-dsn-credentials-priority']['detect']);
+    }
+
     public function test_a_duplicate_id_is_rejected(): void
     {
         $this->expectLoadError([

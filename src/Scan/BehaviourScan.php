@@ -94,7 +94,7 @@ final class BehaviourScan
 
         $scanned = 0;
         $skipped = 0;
-        $phpEntries = array_values(array_filter($entries, static fn(array $e): bool => in_array($e['kind'], ['function', 'method', 'class', 'property', 'token'], true)));
+        $phpEntries = array_values(array_filter($entries, static fn(array $e): bool => in_array($e['kind'], ['function', 'method', 'class', 'new', 'property', 'token'], true)));
         if ($phpEntries !== []) {
             foreach ($this->files($appPath, ['.php', '.inc', '.phtml']) as $relative => $absolute) {
                 // Blade templates get their own pass below; do not lex them here.
@@ -212,6 +212,7 @@ final class BehaviourScan
         $lines = [];
         $tokens = token_get_all($source);
         $count = count($tokens);
+        $newRows = in_array('new', array_column($entries, 'kind'), true);
 
         for ($i = 0; $i < $count; $i++) {
             $token = $tokens[$i];
@@ -219,6 +220,20 @@ final class BehaviourScan
                 continue;
             }
             $line = $token[2];
+            if ($newRows && in_array($token[0], [T_STRING, T_NAME_FULLY_QUALIFIED, T_NAME_QUALIFIED], true)) {
+                // An instantiation: new X(...), new \X(...) or the X::connect(...)
+                // factory. Constant and method uses (X::ATTR_*) do not count.
+                $short = strtolower(ltrim(strrchr('\\' . (string) $token[1], '\\') ?: '', '\\'));
+                $prev = $this->prevSignificant($tokens, $i - 1);
+                $next = $this->nextSignificant($tokens, $i + 1);
+                $after = $next !== null && $next[0] === T_DOUBLE_COLON ? $this->nextSignificant($tokens, $next[1] + 1) : null;
+                $factory = $after !== null && $after[0] === T_STRING && strtolower((string) $tokens[$after[1]][1]) === 'connect';
+                foreach ($entries as $entry) {
+                    if ($entry['kind'] === 'new' && $short === strtolower((string) $entry['match']) && ($prev === T_NEW || $factory)) {
+                        $lines[$entry['id']][] = $line;
+                    }
+                }
+            }
             if ($token[0] === T_STRING) {
                 $name = strtolower((string) $token[1]);
                 $prev = $this->prevSignificant($tokens, $i - 1);
@@ -512,7 +527,7 @@ final class BehaviourScan
                 throw new ToolError(sprintf('Behavior change %d in "%s" needs a detect object.', $index, $path));
             }
             $detect = $entry['detect'];
-            if (!isset($detect['kind']) || !is_string($detect['kind']) || !in_array($detect['kind'], ['function', 'method', 'class', 'property', 'token', 'config', 'blade', 'package', 'always'], true)) {
+            if (!isset($detect['kind']) || !is_string($detect['kind']) || !in_array($detect['kind'], ['function', 'method', 'class', 'new', 'property', 'token', 'config', 'blade', 'package', 'always'], true)) {
                 throw new ToolError(sprintf('Behavior change %d in "%s" has an unknown or missing detect kind.', $index, $path));
             }
             $kind = $detect['kind'];
