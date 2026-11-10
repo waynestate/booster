@@ -32,6 +32,9 @@ use Waynestate\Booster\Run\ProcessRunner;
  * leans on the app's phpstan/extension-installer to register Larastan, which
  * only happens while the app's own PHPStan runs; when that will not happen,
  * Booster includes Larastan's extension.neon in the generated config itself.
+ * The same treatment covers spaze/phpstan-disallowed-calls, whose parameters
+ * Pinstripe 0.3's base.neon sets: when the app's own PHPStan will not
+ * register it, Booster includes its extension.neon too.
  */
 final class PhpStanScan
 {
@@ -148,7 +151,8 @@ final class PhpStanScan
         }
 
         $larastanExtension = $this->larastanNeon($absolute, $launch['app']);
-        $neon = $this->writeConfiguration($absolute, $preset, $rules, $larastanExtension, ((int) $m[1]) * 10000 + ((int) $m[2]) * 100);
+        $disallowedExtension = $this->disallowedCallsNeon($absolute, $preset, $launch['app']);
+        $neon = $this->writeConfiguration($absolute, $preset, $rules, $larastanExtension, $disallowedExtension, ((int) $m[1]) * 10000 + ((int) $m[2]) * 100);
         register_shutdown_function(static function () use ($neon): void {
             if (is_file($neon)) {
                 unlink($neon);
@@ -387,20 +391,54 @@ final class PhpStanScan
     }
 
     /**
-     * Write the temporary configuration the scan runs with: the rule neons
-     * and the app's Larastan neon, then the preset, then the parameters the
-     * preset does not carry. The scanned app goes on the command line, not
-     * here, so the CLI stays the shape users expect.
+     * The spaze/phpstan-disallowed-calls extension neon, when the scan must
+     * load it itself. Pinstripe 0.3's base.neon sets spaze's parameters and
+     * leans on the app's phpstan/extension-installer to register the
+     * extension, which only happens while the app's own PHPStan runs. When
+     * Booster's PHPStan runs, or the app has no installer listing spaze, the
+     * neon is included here so the parameters resolve. When the app's own
+     * PHPStan runs and its installer already lists spaze, including the neon
+     * again would make PHPStan refuse to start, so it is left to the app. An
+     * older Pinstripe preset that predates spaze has no extension to include,
+     * and the scan behaves as before.
+     *
+     * @param array{path: string, name: string, fromBooster: bool} $preset
+     *
+     * @return string|null
+     */
+    private function disallowedCallsNeon(string $appPath, array $preset, bool $appPhpstan): ?string
+    {
+        $installer = $appPath . '/vendor/phpstan/extension-installer/src/GeneratedConfig.php';
+        $installed = is_file($installer) ? (string) file_get_contents($installer) : '';
+        if ($appPhpstan && $installed !== '' && str_contains($installed, 'spaze/phpstan-disallowed-calls')) {
+            return null;
+        }
+
+        $presetVendor = dirname(dirname(dirname(dirname($preset['path']))));
+        $extension = $presetVendor . '/spaze/phpstan-disallowed-calls/extension.neon';
+
+        return is_file($extension) ? $extension : null;
+    }
+
+    /**
+     * Write the temporary configuration the scan runs with: the rule neons,
+     * the app's Larastan neon and the spaze disallowed-calls neon, then the
+     * preset, then the parameters the preset does not carry. The scanned app
+     * goes on the command line, not here, so the CLI stays the shape users
+     * expect.
      *
      * @param array{path: string, name: string, fromBooster: bool} $preset
      * @param list<string> $rules
      */
-    private function writeConfiguration(string $appPath, array $preset, array $rules, ?string $larastan, int $phpVersionId): string
+    private function writeConfiguration(string $appPath, array $preset, array $rules, ?string $larastan, ?string $disallowed, int $phpVersionId): string
     {
         $lines = ['includes:'];
         $includes = $rules;
         if ($larastan !== null) {
             $includes[] = $larastan;
+        }
+        if ($disallowed !== null) {
+            $includes[] = $disallowed;
         }
         $includes[] = $preset['path'];
         foreach ($includes as $included) {
