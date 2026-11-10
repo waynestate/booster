@@ -780,6 +780,15 @@ under `Pre-pass fixes:`.
    raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's
    own output, because the tests never ran.
 
+When the run raised the app's PHP floor, its report ends with a list of the other places that still name an older
+PHP, each with its file and line: PHP versions in the CI matrix (Preflight's `php_versions`, a GitHub workflow's
+`php:` matrix, a `PHP_VERSIONS` list) and PHP images (`php:8.3-cli` in a CI job, `citadel/php-apache:8.4r5` in the
+Squire kit's `.env.squire.example` or `docker-compose.squire.yml`). Booster never edits CI or deploy files, so it
+lists them instead: a matrix entry below the floor fails on the first push, because Composer refuses to install
+below it, and an image below it can no longer run the app. A Citadel tag also carries a build revision (`8.5r3`)
+that Booster cannot know. A dry run lists them too, from the floor its last PHP step would set. The JSON report
+carries them as `floor_follow_ups`.
+
 Composer 2.10 refuses to load tagged releases Packagist has flagged with a security advisory, and hops that move
 onto Laravel 9 or 10 most often meet that block. The refusal has two faces. The loud one fails the install phase
 and names the advisories. The quiet one happens when the app allows dev stability: Composer does not fail at all,

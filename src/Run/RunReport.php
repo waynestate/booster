@@ -27,6 +27,8 @@ final readonly class RunReport
         public ?string $deployScript = null,
         /** @var list<string> what the next deploy needs after this run (CitadelDeployScript): empty when the production packages did not move */
         public array $deployNotes = [],
+        /** @var list<string> "Next:" lines for CI and deploy files that still name a PHP below the floor this run raised (FloorFollowUps) */
+        public array $floorNotes = [],
         /** The replay baseline (--replay): recorded, failed or skipped; null when the run did not replay. */
         public ?ReplayOutcome $replay = null,
         /** The rector/rector version that ran the hops, or null when no Rector hop ran. */
@@ -70,6 +72,7 @@ final readonly class RunReport
             'proctor_advisory' => $this->proctorAdvisory,
             'deploy_script' => $this->deployScript,
             'deploy_notes' => $this->deployNotes,
+            'floor_follow_ups' => $this->floorNotes,
             'rector_version' => $this->rectorVersion,
         ];
         // Only runs with --replay carry the key, so every other report keeps its shape.

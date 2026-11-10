@@ -288,7 +288,43 @@ final class HopExecutor
             ? new DeployScriptResult(null, [])
             : (new CitadelDeployScript())->decide($path, $lockBefore, (new \DateTimeImmutable('now'))->format('YmdHi'));
 
-        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys, deployScript: $deploy->script, deployNotes: $deploy->lines, replay: $replay, rectorVersion: $this->ranRector ? $this->rector->installedVersion() : null, replaySuggestion: $replaySuggestion);
+        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys, deployScript: $deploy->script, deployNotes: $deploy->lines, floorNotes: $this->floorFollowUps($plan, $path, $options, $results), replay: $replay, rectorVersion: $this->ranRector ? $this->rector->installedVersion() : null, replaySuggestion: $replaySuggestion);
+    }
+
+    /**
+     * The Next lines for the places that still name a PHP below the floor
+     * this run raised: the CI matrix and the deploy kit's images. A real run
+     * reads the floor composer.json states now (a stopped hop's edit stays,
+     * so it counts too); a dry run takes the last PHP step it previewed.
+     * Nothing when the floor did not rise.
+     *
+     * @param list<StepResult> $results
+     *
+     * @return list<string>
+     */
+    private function floorFollowUps(Plan $plan, string $path, RunOptions $options, array $results): array
+    {
+        $floor = null;
+        if ($options->dryRun) {
+            $steps = [];
+            foreach ($plan->steps as $step) {
+                $steps[$step->number] = $step;
+            }
+            foreach ($results as $result) {
+                $step = $steps[$result->step] ?? null;
+                if ($step !== null && $step->hop->kind === HopKind::Php && $result->status === StepResult::PREVIEWED && $step->phpAfter !== null) {
+                    $floor = $step->phpAfter;
+                }
+            }
+        } else {
+            $floor = FloorFollowUps::composerFloor($path);
+        }
+        $start = $plan->project->manifestPhp;
+        if ($floor === null || ($start !== null && version_compare($floor, $start, '<='))) {
+            return [];
+        }
+
+        return FloorFollowUps::find($path, $floor);
     }
 
     /**

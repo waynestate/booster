@@ -552,6 +552,14 @@ final class TextWriter
         foreach ($report->deployNotes as $line) {
             $lines[] = self::clean($line);
         }
+        if ($report->floorNotes !== []) {
+            // Booster never edits CI or deploy files, so the floor rise ends
+            // with the list of what would fail on the first push.
+            $lines[] = 'The PHP floor rose, and these still name an older PHP. Booster leaves CI and deploy files to you:';
+            foreach ($report->floorNotes as $line) {
+                $lines[] = '  ' . self::clean($line);
+            }
+        }
         $vendored = $this->vendoredLibraries($report->plan);
         if ($vendored !== []) {
             $lines[] = '';

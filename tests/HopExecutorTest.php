@@ -2171,6 +2171,26 @@ final class HopExecutorTest extends TestCase
         self::assertSame(['.', '..'], scandir($dir . '/deployments'));
     }
 
+    public function test_a_floor_rise_lists_the_ci_matrix_entries_below_it_in_real_and_dry_runs(): void
+    {
+        foreach ([new RunOptions(), new RunOptions(dryRun: true)] as $options) {
+            $dir = $this->copyExample('raw-php');
+            file_put_contents($dir . '/.gitlab-ci.yml', "php-test:\n  php_versions: [\"8.1\", \"8.2\", \"8.3\"]\n");
+            $project = (new ProjectDetector())->detect($dir);
+            $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+            $executor = new HopExecutor(new RectorRunner($this->fake(), '/fake/rector'), new ComposerEditor(), new TargetImageRunner($this->fake()), $this->fake());
+
+            $report = $executor->execute($plan, $options);
+
+            $expected = 'Next: .gitlab-ci.yml:2 tests PHP 8.1 and 8.2, below the new floor 8.3: those jobs fail on the first push (Composer refuses to install below the floor). Drop them from the list.';
+            self::assertSame([$expected], $report->floorNotes, $options->dryRun ? 'dry run' : 'real run');
+            self::assertSame([$expected], $report->toArray()['floor_follow_ups']);
+            $text = (new TextWriter())->run($report);
+            self::assertStringContainsString("The PHP floor rose, and these still name an older PHP. Booster leaves CI and deploy files to you:\n  " . $expected, $text);
+            self::assertSame("php-test:\n  php_versions: [\"8.1\", \"8.2\", \"8.3\"]\n", file_get_contents($dir . '/.gitlab-ci.yml'), 'Booster never edits the CI file');
+        }
+    }
+
     public function test_the_report_array_carries_the_proctor_section(): void
     {
         $array = $this->executeWithProctor($this->fake(proctorExit: 1), new RunOptions())->toArray();
