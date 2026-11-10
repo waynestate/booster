@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * oracle-check.php: the plain-language Oracle connection check for the release log (D-046).
+ * oracle-check.php: the plain-language Oracle connection check for the release log.
  *
  * Framework-free, no Composer dependency, and it never fails the release: scripts/release.sh runs it with
  * `|| true`, so a finding prints in the deployment log and the release goes on. When the app does not use

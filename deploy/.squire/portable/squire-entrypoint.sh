@@ -32,7 +32,7 @@ die() {
 }
 
 # squire-secrets: begin
-# Secrets arrive as files at run time, never in an image layer (SQUIRE-18). Each regular file in SQUIRE_SECRETS_DIR
+# Secrets arrive as files at run time, never in an image layer. Each regular file in SQUIRE_SECRETS_DIR
 # (default /run/secrets, where Docker, Compose and Kubernetes mount them) whose name is an environment variable name
 # becomes that variable, with one trailing line ending trimmed. A variable the environment already sets wins. Only names
 # are ever printed, never values. This block is the same in scripts/release.sh and the fallback entrypoint.

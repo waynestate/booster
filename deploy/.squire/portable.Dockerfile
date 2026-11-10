@@ -37,12 +37,12 @@ ENV CITADEL_PUBLIC_DIR=/citadel/$CITADEL_PUBLIC_DIR \
     SQUIRE_APP_DIR=/citadel/src \
     SQUIRE_KIT_DIR=$SQUIRE_KIT_DIR
 
-# The same php.ini as .squire/Dockerfile. opcache never checks files here (SQUIRE-10): the image bakes its code in and
+# The same php.ini as .squire/Dockerfile. opcache never checks files here: the image bakes its code in and
 # is replaced, never edited. A run-time -e SQUIRE_OPCACHE_VALIDATE=1 still wins.
 COPY ${SQUIRE_KIT_DIR}/.squire/php.ini /usr/local/etc/php/php.ini
 ARG SQUIRE_OPCACHE_VALIDATE=0
 ENV SQUIRE_OPCACHE_VALIDATE=$SQUIRE_OPCACHE_VALIDATE
-# The web's own ini (SQUIRE-29), built the same way as in .squire/Dockerfile.
+# The web's own ini, built the same way as in .squire/Dockerfile.
 COPY ${SQUIRE_KIT_DIR}/.squire/php-web.ini /usr/local/etc/php/php-web.ini
 RUN { cat /usr/local/etc/php/php.ini; echo; cat /usr/local/etc/php/php-web.ini; } > /usr/local/etc/php/php-apache2handler.ini
 

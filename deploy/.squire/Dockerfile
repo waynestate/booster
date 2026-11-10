@@ -26,13 +26,13 @@ COPY .squire/vhost.conf "$APACHE_CONFDIR/sites-available/"
 RUN a2dissite 000-default && a2ensite vhost
 
 COPY .squire/php.ini /usr/local/etc/php/php.ini
-# opcache's one switch (SQUIRE-10). 1, the default: the code is pulled into the running container (Citadel, a bind
+# opcache's one switch. 1, the default: the code is pulled into the running container (Citadel, a bind
 # mount), so opcache checks files every 2 seconds. An image that bakes its code in and never changes builds with
 # --build-arg SQUIRE_OPCACHE_VALIDATE=0. A run-time -e SQUIRE_OPCACHE_VALIDATE wins over either. Never empty: PHP's
 # ${NAME:-default} falls back only when NAME is unset, and an empty value would turn the checks off.
 ARG SQUIRE_OPCACHE_VALIDATE=1
 ENV SQUIRE_OPCACHE_VALIDATE=$SQUIRE_OPCACHE_VALIDATE
-# The web's own ini (SQUIRE-29): mod_php reads php-apache2handler.ini instead of php.ini, so php.ini plus the web-only
+# The web's own ini: mod_php reads php-apache2handler.ini instead of php.ini, so php.ini plus the web-only
 # settings in php-web.ini (a later key wins). The CLI still reads php.ini alone.
 COPY .squire/php-web.ini /usr/local/etc/php/php-web.ini
 RUN { cat /usr/local/etc/php/php.ini; echo; cat /usr/local/etc/php/php-web.ini; } > /usr/local/etc/php/php-apache2handler.ini

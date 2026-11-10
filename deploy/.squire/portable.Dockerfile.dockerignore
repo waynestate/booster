@@ -3,7 +3,7 @@
 # and local state (logs, caches, compiled views, a local SQLite file). Docker reads this file because it sits next to
 # portable.Dockerfile with the same name. Patterns start at the context root.
 
-# Never in a layer: config and secrets arrive at run time (SQUIRE-18, WELD W9).
+# Never in a layer: config and secrets arrive at run time (WELD W9).
 **/.env
 **/.env.*
 **/auth.json

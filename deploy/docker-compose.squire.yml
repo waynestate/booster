@@ -118,9 +118,9 @@ services:
       # The two switches pass by name only: set in .env.squire, the value reaches the container; unset, the variable
       # stays unset there and the image's default holds. Never an empty value: PHP's ${NAME:-default} falls back only
       # when NAME is unset, so an empty one would turn opcache's checks off or disable no function.
-      # opcache (SQUIRE-10): the image's 1 suits a bind mount; SQUIRE_OPCACHE_VALIDATE=0 tries a baked image.
+      # opcache: the image's 1 suits a bind mount; SQUIRE_OPCACHE_VALIDATE=0 tries a baked image.
       SQUIRE_OPCACHE_VALIDATE:
-      # The web's disable_functions list (SQUIRE-29): php-web.ini's list; SQUIRE_PHP_DISABLE_FUNCTIONS=none disables nothing.
+      # The web's disable_functions list: php-web.ini's list; SQUIRE_PHP_DISABLE_FUNCTIONS=none disables nothing.
       SQUIRE_PHP_DISABLE_FUNCTIONS:
     # Same timing as Citadel's check (5 minutes, 15 seconds). The start_* settings are local-only: they make the
     # first result arrive in seconds instead of after 5 minutes.

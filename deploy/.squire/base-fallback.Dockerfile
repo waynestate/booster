@@ -7,7 +7,7 @@
 # scripts/parity.sh and parity.ps1 build it for you with `--fallback`:
 #   docker build -f .squire/base-fallback.Dockerfile -t squire/php-parity-base:8.4 .squire
 
-# Pinned by the digest of each multi-arch list (SQUIRE-30), so the same bytes build on an arm64 laptop or CI runner
+# Pinned by the digest of each multi-arch list, so the same bytes build on an arm64 laptop or CI runner
 # and an amd64 server. To bump one, see Image hardening in the docs: read the new list's digest with
 # `docker buildx imagetools inspect`, check it lists linux/amd64 and linux/arm64, and replace the whole reference.
 # Every name is written in full, registry and all, because Buildah and Podman refuse a short name (`composer:2`)
@@ -68,7 +68,7 @@ RUN { \
     } | tee "$APACHE_CONFDIR/conf-available/docker-php.conf" \
     && a2enconf docker-php
 
-# Apache says less about itself: ServerTokens Prod, ServerSignature Off, TraceEnable Off (SQUIRE-9). The zz- name loads
+# Apache says less about itself: ServerTokens Prod, ServerSignature Off, TraceEnable Off. The zz- name loads
 # it after Debian's security.conf, so its values win.
 COPY apache-hardening.conf "$APACHE_CONFDIR/conf-available/zz-squire-hardening.conf"
 RUN a2enconf zz-squire-hardening
@@ -94,7 +94,7 @@ RUN set -eux; \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
     rm -rf /var/lib/apt/lists/*
 
-# opcache (SQUIRE-10): newer official images load it already and PHP 8.5 builds it in; enable it only when missing.
+# opcache: newer official images load it already and PHP 8.5 builds it in; enable it only when missing.
 # The settings are in .squire/php.ini, which the app image copies in.
 RUN php -m | grep -qx 'Zend OPcache' || docker-php-ext-enable opcache
 

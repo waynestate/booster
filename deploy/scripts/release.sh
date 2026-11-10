@@ -28,7 +28,7 @@
 #   SQUIRE_COMPOSER_AUDIT=report     report | fail | skip
 #   SQUIRE_NPM=auto                  auto | skip
 #   SQUIRE_NPM_IGNORE_SCRIPTS=1      1 runs the installer with --ignore-scripts (S57)
-#   SQUIRE_NPM_REBUILD=              packages (space-separated) whose install scripts run after the install (SQUIRE-26)
+#   SQUIRE_NPM_REBUILD=              packages (space-separated) whose install scripts run after the install
 #   SQUIRE_NPM_BUILD_SCRIPT=build    the package.json script to run after install
 #   SQUIRE_CACHE_DIR=.cache/squire   where Composer and npm keep their download caches between releases (off: their defaults)
 #   SQUIRE_MIGRATE=1                 Laravel: run `migrate --force`
@@ -43,7 +43,7 @@
 #   SQUIRE_SMOKE_URL=                full URL (default: http://127.0.0.1:80/up for Laravel, /up.php for raw PHP)
 #   SQUIRE_SMOKE_RETRIES=5           attempts
 #   SQUIRE_SMOKE_DELAY=2             seconds between attempts
-#   SQUIRE_SECRETS_DIR=/run/secrets  a folder of secret files; each file named like a variable becomes one (SQUIRE-18)
+#   SQUIRE_SECRETS_DIR=/run/secrets  a folder of secret files; each file named like a variable becomes one
 #
 # A release script that is not idempotent is just a rehearsal that happens to ship.
 set -euo pipefail
@@ -79,7 +79,7 @@ on_error() {
 trap 'on_error $? $LINENO' ERR
 
 # squire-secrets: begin
-# Secrets arrive as files at run time, never in an image layer (SQUIRE-18). Each regular file in SQUIRE_SECRETS_DIR
+# Secrets arrive as files at run time, never in an image layer. Each regular file in SQUIRE_SECRETS_DIR
 # (default /run/secrets, where Docker, Compose and Kubernetes mount them) whose name is an environment variable name
 # becomes that variable, with one trailing line ending trimmed. A variable the environment already sets wins. Only names
 # are ever printed, never values. This block is the same in scripts/release.sh and the fallback entrypoint.
@@ -156,7 +156,7 @@ if [ -z "$SQUIRE_APP_DIR" ]; then
 fi
 cd "$SQUIRE_APP_DIR"
 squire_load_settings ./.env.squire
-# su -l resets the environment the entrypoint built, so the release reads the mounted secrets itself (SQUIRE-18).
+# su -l resets the environment the entrypoint built, so the release reads the mounted secrets itself.
 squire_load_secrets
 
 : "${SQUIRE_FRAMEWORK:=auto}"
@@ -487,7 +487,7 @@ else
     if [ "$SQUIRE_NPM_IGNORE_SCRIPTS" = "1" ]; then
         ignore_flag="--ignore-scripts"
     fi
-    # The escape hatch for a package that needs its install script (SQUIRE-26): name it, and only it runs its scripts.
+    # The escape hatch for a package that needs its install script: name it, and only it runs its scripts.
     # read -a splits on spaces without expanding globs, and each word must look like an npm package name.
     rebuild=()
     read -r -a rebuild_words <<<"$SQUIRE_NPM_REBUILD" || true
