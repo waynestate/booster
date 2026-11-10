@@ -7,6 +7,7 @@ namespace Waynestate\Booster\Scan;
 use Throwable;
 use Waynestate\Booster\Packaging\PharFiles;
 use Waynestate\Booster\Packaging\RunScratch;
+use Waynestate\Booster\Project\ProjectDetector;
 use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\Run\ProcessRunner;
 
@@ -125,7 +126,7 @@ final class PhpStanScan
         $laravel = $this->isLaravelApp($absolute);
         $larastan = $laravel && is_file($absolute . '/vendor/larastan/larastan/composer.json');
         $hints = [];
-        if (is_file($absolute . '/composer.json') && !is_file($absolute . '/vendor/autoload.php')) {
+        if (ProjectDetector::vendorMissingAt($absolute)) {
             // Without vendor/ nothing the app requires resolves, Larastan
             // included, so the missing install is the hint, not Larastan.
             $hints[] = self::HINT_NO_VENDOR;

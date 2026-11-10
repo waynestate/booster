@@ -101,6 +101,18 @@ final class PhpStanScanTest extends TestCase
         self::assertSame(['vendor/ is not installed, so the classes your packages provide cannot resolve and most of these findings are noise. Run composer install in the app, then scan again.'], $scan->hints);
     }
 
+    public function test_an_app_that_requires_no_packages_gets_no_install_hint(): void
+    {
+        // composer.json asks only for PHP: there is no vendor/ to install.
+        $app = $this->tempDir();
+        file_put_contents($app . '/composer.json', '{"require": {"php": "^7.4", "ext-json": "*"}}');
+        [$fake] = $this->capturingFake(fn(): ProcessResult => new ProcessResult(0, (string) json_encode($this->phpstanJson([])), ''));
+
+        $scan = (new PhpStanScan($fake))->scan($app, '8.4');
+
+        self::assertSame([], $scan->hints);
+    }
+
     public function test_a_finding_is_parsed_relative_to_the_app(): void
     {
         $app = $this->tempDir();

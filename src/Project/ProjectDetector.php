@@ -110,6 +110,23 @@ final class ProjectDetector
     }
 
     /**
+     * Whether the app at $path requires packages (composer.json) that are not
+     * installed (no vendor/autoload.php). An app that requires only PHP and
+     * its extensions needs no vendor/ at all.
+     */
+    public static function vendorMissingAt(string $path): bool
+    {
+        $raw = is_file($path . '/composer.json') ? file_get_contents($path . '/composer.json') : false;
+        $data = $raw === false ? null : json_decode($raw, true);
+        if (!is_array($data)) {
+            return false;
+        }
+        $all = (is_array($data['require'] ?? null) ? $data['require'] : []) + (is_array($data['require-dev'] ?? null) ? $data['require-dev'] : []);
+
+        return self::requiresPackages($all) && !is_file($path . '/vendor/autoload.php');
+    }
+
+    /**
      * Whether composer.json asks for any package, not just the PHP version
      * and its extensions, so composer install would build a vendor/.
      *
