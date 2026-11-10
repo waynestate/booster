@@ -46,6 +46,7 @@
 <p>All notable changes to Booster are recorded here. The format follows Keep a Changelog.</p>
 <h2 id="unreleased"><span class="docs-heading-tail"><span>[Unreleased]</span><a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></span></h2>
 <ul>
+<li>Changed: requires PROCTOR ^0.12 (locked 0.12.0, was ^0.11), and so does the deploy layer.</li>
 <li>Changed: the deploy kit is Squire 0.10.7 (was 0.10.6): it ships a <code>.gitattributes</code> that pins line endings, so the deploy layer clears PROCTOR's line-ending warnings.</li>
 <li>Changed: the GitHub workflow calls Preflight 0.5.0 by its commit (was 0.1.4's), now that GitHub's copy of Preflight has the tag; MAINTAINING.md quotes the CREED constraint as it is (^0.1.8).</li>
 <li>Changed: the docs, agent-ready and deploy kits are Squire 0.10.6 (was 0.10.5): the docs builder and agent-ready generator see every file on Docker Desktop mounts.</li>
