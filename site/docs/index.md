@@ -29,12 +29,18 @@ WELD is the Wayne State application stack. Booster is its upgrade layer.
 | WayneUI (project 0) | The interface layer every other part builds on |
 | CREED | The version policy (`policy.json`) Booster reads |
 | PROCTOR | Measures an app against that policy; the gate runs it before the first hop and after the last |
-| Preflight | The CI templates |
 | SESAME | Auth; Booster can swap `wayne-cas` for it |
 | HELMET | The baseline runtime |
-| Pinstripe | The coding standard |
 | Sourdough | The starters |
+| Squire | The Citadel deploy kit; the layer that serves this repo's front page is one |
+| Parity | Citadel on your computer: its PHP image, its proxy and MySQL 5.6, so an app that works here works on Citadel (0.1.0 coming) |
+| Preflight | The CI templates |
+| Pinstripe | The coding standard |
 | Booster | This project: moves apps forward |
+| Rollcall | The fleet census: which apps run what, and how close each is to end of life |
+| Drawbridge | The one OpenID Connect front door for the Citadel |
+| ADVISOR | The read-only MCP server that answers a coding agent's stack questions |
+| WELD | The Laravel starter app with the rest of the stack already set up |
 
 It works for all five permutations of the stack: raw PHP, raw PHP with a Vue SPA, Laravel with Blade, Laravel with Blade and Vue islands, and Laravel with Inertia and Vue.
 
