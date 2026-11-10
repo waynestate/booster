@@ -31,13 +31,15 @@
  * test it stays on the production href, since there is no pre-production
  * WayneUI app and HELMET's default CSP names the production host. This
  * deliberately departs from ADR-0017 ("WayneUI's link stays on production in
- * every environment") for dev only, and the bytes remain identical on all 14
- * pages.
+ * every environment") for dev only, and the bytes remain identical on all 15
+ * stack pages and on WayneUI's own copies. Parity is the newest name on the
+ * list: the tool that checks your laptop matches Citadel was, for a while, the
+ * one link that did not match its environment.
  */
 (function () {
   "use strict";
-  var PROJECTS = ["advisor", "booster", "creed", "drawbridge", "helmet", "pinstripe", "preflight",
-    "proctor", "rollcall", "sesame", "sourdough", "squire", "wayneui", "weld"];
+  var PROJECTS = ["advisor", "booster", "creed", "drawbridge", "helmet", "parity", "pinstripe",
+    "preflight", "proctor", "rollcall", "sesame", "sourdough", "squire", "wayneui", "weld"];
   var DEFAULT_DEV_BASE = "http://127.0.0.1:18432";
   var WAYNEUI_DEV_BASE = "http://127.0.0.1:4180";
   var ALIASES = { dev: "dev", development: "dev", prod: "production", production: "production",

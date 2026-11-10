@@ -46,6 +46,7 @@
 <p>All notable changes to Booster are recorded here. The format follows Keep a Changelog.</p>
 <h2 id="unreleased">[Unreleased]<a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></h2>
 <ul>
+<li>Site: <code>assets/stack-env.js</code> knows Parity, so a pre-production page links Parity's pre-production site and a dev page links its local <code>site/</code> folder. Until now Parity, of all parts, was the one link that ignored its environment.</li>
 <li>Changed: housekeeping to keep pace with the stack. The <code>waynestate/pinstripe</code> requirement moves from <code>^0.1.4</code> to <code>^0.3</code> (the lock resolves to 0.3.1), the bundled SESAME config that <code>cas-to-sesame</code> falls back on when an app has no vendor copy is now SESAME 0.7.3's (it was 0.5.0's; the hop still writes <code>^0.7</code>, which reaches it), the deploy kit in <code>deploy/</code> is Squire 0.10.5's, and the Where it fits tables in the README and the docs overview now show the full WELD cast.</li>
 </ul>
 <h2 id="1-17-0-2026-11-09">[1.17.0] - 2026-11-09<a class="docs-heading-link" aria-label="Link to this section" href="#1-17-0-2026-11-09">#</a></h2>
