@@ -673,6 +673,8 @@ final class AgentReady
 
     private string $source;
 
+    private readonly string $package;
+
     /** @var list<string> */
     private array $exclude;
 
@@ -686,6 +688,9 @@ final class AgentReady
         }
         $config = $this->json($root.'/agent-ready.json', false);
         $composer = $this->json($root.'/composer.json', false);
+        $name = is_string($composer['name'] ?? null) ? $composer['name'] : '';
+        $slash = strrpos($name, '/');
+        $this->package = $slash === false ? $name : substr($name, $slash + 1);
         $site = is_string($config['site'] ?? null) ? $config['site'] : 'site';
         $this->site = rtrim($root.'/'.$site, '/');
         if (! is_dir($this->site)) {
@@ -765,7 +770,7 @@ final class AgentReady
     public function leftovers(array $files): array
     {
         $out = [];
-        foreach ($this->walk($this->site, 'md') as $relative) {
+        foreach (self::walk($this->site, 'md') as $relative) {
             if (isset($files[$relative])) {
                 continue;
             }
@@ -799,7 +804,7 @@ final class AgentReady
     private function pages(): array
     {
         $pages = [];
-        foreach ($this->walk($this->site, 'html') as $relative) {
+        foreach (self::walk($this->site, 'html') as $relative) {
             if (in_array($relative, $this->exclude, true)) {
                 continue;
             }
@@ -830,32 +835,41 @@ final class AgentReady
         return $pages;
     }
 
-    /** @return list<string> paths relative to $dir, with forward slashes, sorted */
-    private function walk(string $dir, string $extension): array
+    /**
+     * Walked by hand with scandir: PHP's recursive directory iterator lists only some files on Docker Desktop
+     * mounts, so it must not drive what the tool sees.
+     *
+     * @return list<string> paths relative to $dir, with forward slashes, sorted
+     */
+    private static function walk(string $dir, string $extension): array
     {
         $skip = ['assets', 'brand', 'screenshots', 'vendor', 'node_modules'];
         $out = [];
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveCallbackFilterIterator(
-                new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
-                static function (SplFileInfo $file, string $key, RecursiveDirectoryIterator $iterator) use ($skip, $dir): bool {
-                    $relative = str_replace('\\', '/', substr($file->getPathname(), strlen($dir) + 1));
-                    if (str_starts_with($file->getFilename(), '.')) {
-                        return false;
-                    }
-                    if ($iterator->hasChildren()) {
-                        return ! in_array($relative, $skip, true);
-                    }
-
-                    return true;
-                },
-            ),
-        );
-        foreach ($iterator as $file) {
-            if ($file instanceof SplFileInfo && strtolower($file->getExtension()) === $extension) {
-                $out[] = str_replace('\\', '/', substr($file->getPathname(), strlen($dir) + 1));
+        $scan = static function (string $path, string $prefix) use (&$scan, $skip, $extension, &$out): void {
+            $entries = scandir($path);
+            if ($entries === false) {
+                throw new AgentReadyError("Cannot read the folder {$path}.");
             }
-        }
+            foreach ($entries as $entry) {
+                if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
+                    continue;
+                }
+                $relative = $prefix === '' ? $entry : $prefix.'/'.$entry;
+                $full = $path.'/'.$entry;
+                if (is_dir($full) && ! is_link($full)) {
+                    if (in_array($relative, $skip, true)) {
+                        continue;
+                    }
+                    $scan($full, $relative);
+
+                    continue;
+                }
+                if (is_file($full) && strtolower(pathinfo($entry, PATHINFO_EXTENSION)) === $extension) {
+                    $out[] = $relative;
+                }
+            }
+        };
+        $scan($dir, '');
         sort($out);
 
         return $out;
@@ -1113,13 +1127,48 @@ final class AgentReady
     {
         $raw = $this->normalise((string) file_get_contents($this->readme));
         $clean = $this->cleanReadme($raw);
-        $name = preg_match('/^# (.+)$/m', $clean, $m) ? trim($m[1]) : basename($this->root);
+        $name = $this->projectName($raw, $clean);
         $intro = '';
         if (preg_match('/^# [^\n]+\n(.*?)(?=^## |\z)/ms', $clean, $m)) {
             $intro = trim($m[1]);
         }
 
         return ['name' => $name, 'intro' => $intro, 'body' => trim($clean)];
+    }
+
+    /** The project name for the agent files: a cleaned H1, a raw <h1>, a raw H1 before any fence, the Composer package, then the folder. */
+    private function projectName(string $raw, string $clean): string
+    {
+        $candidates = [];
+        if (preg_match('/^# (.+)$/m', $clean, $m)) {
+            $candidates[] = trim($m[1]);
+        }
+        if (preg_match('/<h1\b[^>]*>(.*?)<\/h1>/is', $raw, $m)) {
+            $title = html_entity_decode((string) preg_replace('/<[^>]+>/', '', $m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $candidates[] = trim((string) preg_replace('/\s+/', ' ', $title));
+        }
+        foreach (explode("\n", $raw) as $line) {
+            if (preg_match('/^\s*(```|~~~)/', $line)) {
+                break;
+            }
+            if (preg_match('/^# (.+)$/', $line, $m)) {
+                $candidates[] = trim($m[1]);
+
+                break;
+            }
+        }
+        $candidates[] = $this->package;
+        $folder = basename((string) realpath($this->root));
+        if ($folder !== '' && $folder !== '.') {
+            $candidates[] = $folder;
+        }
+        foreach ($candidates as $candidate) {
+            if ($candidate !== '') {
+                return $candidate;
+            }
+        }
+
+        return 'Project';
     }
 
     /** The README without its pictures and HTML: badges, galleries and the cast are for people. */

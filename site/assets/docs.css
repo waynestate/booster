@@ -175,6 +175,9 @@
 .docs-article h3 {
   line-height: 1.25;
   scroll-margin-top: var(--dk-gap);
+  /* A backstop for a long word on a phone: hyphenate it rather than push the page sideways. */
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 .docs-article h1 {
@@ -216,6 +219,51 @@
 .docs-article h3:hover .docs-heading-link,
 .docs-heading-link:focus-visible {
   opacity: 1;
+}
+
+/* The builder wraps the heading's last word and its "#" in .docs-heading-tail, the word (or code span, or
+ * emphasis) in an element of its own. Only the seam between the word and the "#" holds, so a narrow heading
+ * wraps before the word and never leaves the "#" alone on a line, while a word too long for any line still
+ * breaks or hyphenates instead of pushing the page sideways. */
+.docs-heading-tail {
+  white-space: nowrap;
+}
+
+.docs-heading-tail > * {
+  white-space: normal;
+}
+
+/* The page title's "#" is the page's own address, and a theme's big title can fill a line with one word, which
+ * would leave no room for it. So at every width it steps out of the line as a 1px clipped box: it takes no room
+ * and cannot widen the page. Keyboard focus still lands on it and shows it right after the last word. */
+.docs-article h1 .docs-heading-link:not(:focus-visible) {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.docs-article h1 .docs-heading-link:focus-visible {
+  position: absolute;
+}
+
+/* Phones, narrow windows and touch screens: every heading's "#" does the same, so none adds a line and none is
+ * an invisible trap under a thumb. */
+@media (max-width: 40rem), (hover: none) {
+  .docs-heading-link:not(:focus-visible) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .docs-heading-link:focus-visible {
+    position: absolute;
+  }
 }
 
 .docs-article code {
@@ -518,6 +566,7 @@
 /* A page built before sub-items carried the base class still styles them: --sub alone matches too. */
 .docs-toc__item a,
 .docs-toc__item--sub a {
+  position: relative;
   display: block;
   padding: 0.25rem 0.75rem;
   color: var(--dk-muted);
@@ -531,6 +580,53 @@
 
 .docs-toc__item--sub a {
   padding-left: 1.5rem;
+}
+
+/* The section in view. docs.js marks its link with aria-current="true" and .is-current as the reader scrolls;
+ * without the script nothing is marked and the list reads as before. The marker is a short accent bar laid over
+ * the list's rule, so it shows on any theme that keeps the rule, light or dark. */
+.docs-toc__item a::before,
+.docs-toc__item--sub a::before {
+  content: "";
+  position: absolute;
+  inset-block: 0.3rem;
+  inset-inline-start: -2px;
+  inline-size: 3px;
+  border-radius: 3px;
+  background: var(--dk-accent);
+  opacity: 0;
+  transform: scaleY(0.3);
+}
+
+.docs-toc__item a:is(.is-current, [aria-current="true"]),
+.docs-toc__item--sub a:is(.is-current, [aria-current="true"]) {
+  color: var(--dk-ink);
+}
+
+.docs-toc__item a:is(.is-current, [aria-current="true"])::before,
+.docs-toc__item--sub a:is(.is-current, [aria-current="true"])::before {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .docs-toc__item a,
+  .docs-toc__item--sub a {
+    transition: color 160ms ease;
+  }
+
+  .docs-toc__item a::before,
+  .docs-toc__item--sub a::before {
+    transition: opacity 160ms ease, transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+}
+
+/* High contrast drops the bar's color, so the current link says it with an underline instead. */
+@media (forced-colors: active) {
+  .docs-toc__item a:is(.is-current, [aria-current="true"]),
+  .docs-toc__item--sub a:is(.is-current, [aria-current="true"]) {
+    text-decoration: underline;
+  }
 }
 
 .docs-pager {

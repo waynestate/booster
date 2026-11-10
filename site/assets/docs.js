@@ -1,9 +1,10 @@
 /* docs.js: progressive enhancement for the shared docs site, owned by Squire (kit/docs/).
  *
- * The pages are complete without this file. It adds three conveniences: a copy button on every code block,
- * an accessible tablist on every code tab set (with the choice remembered per set key), and a mobile menu
- * that closes when you pick a page. No dependencies, no globals, nothing that breaks the reading of a single
- * page if it fails to load. Escape closes the open mobile menu.
+ * The pages are complete without this file. It adds four conveniences: a copy button on every code block,
+ * an accessible tablist on every code tab set (with the choice remembered per set key), a mobile menu
+ * that closes when you pick a page, and an "On this page" list that marks the section you are reading.
+ * No dependencies, no globals, nothing that breaks the reading of a single page if it fails to load.
+ * Escape closes the open mobile menu.
  */
 (function () {
   'use strict';
@@ -321,9 +322,156 @@
     });
   }
 
+  // "On this page" follows the reader: the link for the section in view gets aria-current="true" and is-current.
+  // A section is in view once its heading rises above a line 30% down the window; the last one past the line wins.
+  // The last sections of a page can be too short to ever reach that line, so at the very bottom the line drops to
+  // the window's foot. A section the reader picked (a TOC click or a #hash) is marked at once, holds while a smooth
+  // jump is on its way, and then wins while its heading is still in that band. It only marks links: it never
+  // scrolls, so smooth scrolling stays the theme's and the reader's call.
+  // Without IntersectionObserver (or JavaScript) nothing is marked, and the list reads exactly as before.
+  var TOC_LINE = 30; // percent of the window height
+
+  function markTocSection() {
+    var toc = document.querySelector('nav.docs-toc');
+    if (!toc || typeof window.IntersectionObserver !== 'function') {
+      return;
+    }
+    var links = [];
+    var headings = [];
+    Array.prototype.forEach.call(toc.querySelectorAll('a[href^="#"]'), function (link) {
+      var id = '';
+      try {
+        id = decodeURIComponent(link.getAttribute('href').slice(1));
+      } catch (err) {
+        return; // a malformed escape names no heading
+      }
+      var heading = id === '' ? null : document.getElementById(id);
+      if (heading) {
+        links.push(link);
+        headings.push(heading);
+      }
+    });
+    if (headings.length === 0) {
+      return;
+    }
+
+    var current = -1;
+    var picked = -1;
+    var holding = false;
+    var holdTimer = null;
+
+    function mark(index) {
+      if (index === current) {
+        return;
+      }
+      if (current !== -1) {
+        links[current].removeAttribute('aria-current');
+        links[current].classList.remove('is-current');
+      }
+      current = index;
+      if (index !== -1) {
+        links[index].setAttribute('aria-current', 'true');
+        links[index].classList.add('is-current');
+      }
+    }
+
+    function atBottom() {
+      var root = document.documentElement;
+      var y = window.pageYOffset || root.scrollTop || 0;
+      return y > 0 && y + window.innerHeight >= root.scrollHeight - 8;
+    }
+
+    function update() {
+      var height = window.innerHeight || document.documentElement.clientHeight;
+      var limit = atBottom() ? height : height * TOC_LINE / 100;
+      var top = picked === -1 ? -1 : headings[picked].getBoundingClientRect().top;
+      var landed = top >= 0 && top <= limit;
+      if (holding) {
+        if (!landed) {
+          return; // a picked jump is still on its way (smooth scrolling): the sections it passes do not flash by
+        }
+        release(true);
+      }
+      var found = -1;
+      for (var i = 0; i < headings.length; i++) {
+        if (headings[i].getBoundingClientRect().top <= limit) {
+          found = i;
+        }
+      }
+      // The reader's pick holds while its heading sits between the window's top and the limit: a click on an h2
+      // that has an h3 right under it marks the h2, not the h3 that also landed above the line.
+      if (landed) {
+        found = picked;
+      }
+      mark(found);
+    }
+
+    function pick(hash) {
+      var index = -1;
+      for (var i = 0; i < links.length; i++) {
+        if (links[i].getAttribute('href') === hash) {
+          index = i;
+          break;
+        }
+      }
+      if (index !== -1) {
+        picked = index;
+        mark(index);
+        // Under smooth scrolling the jump takes a moment, and the sections it passes would flash by in the list.
+        // Hold the pick until its heading lands or the scroll ends; the timer is the backstop for a jump the
+        // reader interrupts in a browser with no scrollend event.
+        holding = true;
+        window.clearTimeout(holdTimer);
+        holdTimer = window.setTimeout(release, 3000);
+      }
+    }
+
+    function release(quiet) {
+      window.clearTimeout(holdTimer);
+      holding = false;
+      if (quiet !== true) {
+        update();
+      }
+    }
+
+    // The observers only say "something crossed"; update() measures for itself, so one rule decides.
+    var crossing = new window.IntersectionObserver(update, { rootMargin: '0px 0px -' + (100 - TOC_LINE) + '% 0px' });
+    headings.forEach(function (heading) {
+      crossing.observe(heading);
+    });
+    var footer = document.querySelector('.docs-footer');
+    if (footer) {
+      new window.IntersectionObserver(update, { threshold: [0, 1] }).observe(footer);
+    }
+    // A long jump (Home, End, a scrollbar drag) can carry a heading clean across the line between two frames,
+    // which no observer reports; scrollend settles it where the browser has it, and lands a held pick.
+    window.addEventListener('scrollend', function () {
+      release();
+    }, { passive: true });
+    window.addEventListener('hashchange', function () {
+      pick(window.location.hash);
+    });
+    toc.addEventListener('click', function (event) {
+      var target = event.target;
+      while (target && target !== toc) {
+        if (target.tagName === 'A') {
+          pick(target.getAttribute('href'));
+          break;
+        }
+        target = target.parentNode;
+      }
+    });
+
+    if (window.location.hash) {
+      pick(window.location.hash);
+    }
+    update();
+  }
+
   ready(function () {
     addCopyButtons();
     wireTabs();
     closeMenuOnNavigate();
+    markTocSection();
   });
 })();
