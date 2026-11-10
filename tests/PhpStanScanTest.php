@@ -73,6 +73,8 @@ final class PhpStanScanTest extends TestCase
             file_put_contents($app . '/vendor/larastan/larastan/composer.json', '{"name": "larastan/larastan"}');
         }
         mkdir($app . '/vendor/waynestate/pinstripe/phpstan', 0775, true);
+        // An installed app: composer install always writes the autoloader.
+        file_put_contents($app . '/vendor/autoload.php', "<?php\n");
         file_put_contents($app . '/vendor/waynestate/pinstripe/phpstan/base.neon', "parameters:\n    level: 8\n");
         if ($shape['laravelNeon']) {
             file_put_contents($app . '/vendor/waynestate/pinstripe/phpstan/laravel.neon', "includes:\n    - base.neon\n");
@@ -83,6 +85,20 @@ final class PhpStanScanTest extends TestCase
         }
 
         return [$app, $this->tempDir()];
+    }
+
+    public function test_an_app_without_vendor_gets_the_install_hint_instead_of_larastan(): void
+    {
+        // A fresh clone: Larastan is in composer.json, but nothing is installed,
+        // so "require Larastan" would point the wrong way.
+        [$app, $boosterVendor] = $this->appWithPresets(['laravel' => true, 'larastan' => false, 'laravelNeon' => true]);
+        unlink($app . '/vendor/autoload.php');
+        $json = $this->phpstanJson([]);
+        [$fake] = $this->capturingFake(static fn(): ProcessResult => new ProcessResult(0, (string) json_encode($json), ''));
+
+        $scan = (new PhpStanScan($fake, null, null, $boosterVendor))->scan($app, '8.4');
+
+        self::assertSame(['vendor/ is not installed, so the classes your packages provide cannot resolve and most of these findings are noise. Run composer install in the app, then scan again.'], $scan->hints);
     }
 
     public function test_a_finding_is_parsed_relative_to_the_app(): void

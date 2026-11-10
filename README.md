@@ -24,8 +24,9 @@ php ../booster.phar plan
 php ../booster.phar run --dry-run
 ```
 
-Those three change nothing. `run` makes the edits (it needs git, a clean working copy and Docker for the test gate)
-and never commits. The file sits one folder up so it stays out of the app's git; on Windows PowerShell, type
+Those three change nothing. Run `composer install` in the app first: without `vendor/`, Rector and PHPStan cannot
+see the classes your packages provide, so `plan` and the dry run preview less and open with a warning saying so.
+`run` makes the edits (it needs git, a clean working copy and Docker for the test gate) and never commits. The file sits one folder up so it stays out of the app's git; on Windows PowerShell, type
 `curl.exe` instead of `curl`. Keeping it on your PATH, a clone, and Docker only (no PHP) are under [Install](#install).
 
 **Not to be confused with:** Booster moves an app to a newer PHP or framework version; Pinstripe's Rector set only modernizes code within the PHP version the app already runs.

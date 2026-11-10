@@ -105,7 +105,25 @@ final class ProjectDetector
             lockCeilingConstraint: $lock['ceilingConstraint'],
             usesWayneUi1: array_key_exists(self::WAYNE_UI_PACKAGE, $all),
             wayneAuthHits: WayneAuthScan::find($path),
+            vendorMissing: self::requiresPackages($all) && !is_file($path . '/vendor/autoload.php'),
         );
+    }
+
+    /**
+     * Whether composer.json asks for any package, not just the PHP version
+     * and its extensions, so composer install would build a vendor/.
+     *
+     * @param array<string, mixed> $require
+     */
+    private static function requiresPackages(array $require): bool
+    {
+        foreach (array_keys($require) as $name) {
+            if (str_contains((string) $name, '/')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

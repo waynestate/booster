@@ -46,7 +46,19 @@ final readonly class Project
         public bool $usesWayneUi1 = false,
         /** @var list<string> the old Wayne Auth sign-in lines, "file:line what" (WayneAuthScan) */
         public array $wayneAuthHits = [],
+        /** composer.json requires packages but vendor/autoload.php is not there, so Rector and PHPStan see less */
+        public bool $vendorMissing = false,
     ) {}
+
+    /**
+     * The warning a preview opens with when vendor/ is not installed. Rector
+     * and PHPStan read the framework's classes through the app's autoloader:
+     * without it a rule such as PHP 8.5's #[\Override] cannot tell which
+     * properties a class inherits, so the preview misses edits and the
+     * PHPStan count fills with noise. A real run's baseline installs vendor/
+     * before the first hop, so only previews and --skip-gate runs need this.
+     */
+    public const VENDOR_MISSING_WARNING = 'vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.';
 
     /**
      * @return array<string, mixed>
@@ -69,6 +81,10 @@ final readonly class Project
             'boost' => $this->hasBoost,
             'helmet' => $this->hasHelmet,
         ];
+        // Only an app missing its vendor/ carries the key, so every other report keeps its shape.
+        if ($this->vendorMissing) {
+            $array['vendor_missing'] = true;
+        }
         if ($this->lockPhpFloor !== null || $this->lockPhpCeiling !== null) {
             $array['php_lock_range'] = ['floor' => $this->lockPhpFloor, 'ceiling' => $this->lockPhpCeiling];
         }

@@ -46,6 +46,9 @@ final class PhpStanScan
     /** Hint shown when a Laravel app has no Larastan, so model and facade calls read as errors. */
     private const HINT_NO_LARASTAN = 'Laravel app without Larastan: Eloquent and facade calls show as errors. composer require --dev larastan/larastan for a cleaner scan.';
 
+    /** Hint shown when the app has composer.json but no vendor/: most findings are classes that cannot resolve. */
+    private const HINT_NO_VENDOR = "vendor/ is not installed, so the classes your packages provide cannot resolve and most of these findings are noise. Run composer install in the app, then scan again.";
+
     /** Hint shown when a Laravel app has Larastan but Pinstripe's laravel.neon is in neither vendor tree. */
     private const HINT_MISSING_LARAVEL_PRESET = "Laravel app: Pinstripe's laravel.neon preset is missing, so the scan fell back to base.neon. Update Pinstripe with: composer update waynestate/pinstripe";
 
@@ -122,7 +125,11 @@ final class PhpStanScan
         $laravel = $this->isLaravelApp($absolute);
         $larastan = $laravel && is_file($absolute . '/vendor/larastan/larastan/composer.json');
         $hints = [];
-        if ($laravel && !$larastan) {
+        if (is_file($absolute . '/composer.json') && !is_file($absolute . '/vendor/autoload.php')) {
+            // Without vendor/ nothing the app requires resolves, Larastan
+            // included, so the missing install is the hint, not Larastan.
+            $hints[] = self::HINT_NO_VENDOR;
+        } elseif ($laravel && !$larastan) {
             $hints[] = self::HINT_NO_LARASTAN;
         }
 

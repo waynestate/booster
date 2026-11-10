@@ -19,6 +19,11 @@ booster init   --path=../my-app        # optional: writes playbooks for AI codin
 
 Replace `<target>` with the PHP version you are heading for, for example the one `plan` shows on its last step.
 
+Install the app's packages first (`composer install` in the app). Without `vendor/`, Rector and PHPStan cannot see
+the classes your packages provide: on one Laravel app the dry run previewed 10 files instead of 21, and PHPStan
+counted 3387 findings instead of 707. `detect` says when `vendor/` is missing, and `plan` and the dry run open with a
+warning. A real run is not affected, because its baseline installs `vendor/` before the first hop.
+
 A real run needs git and Docker on the machine that runs Booster. If you used the Docker-only route, the first four commands above work as they are, but the last one does not: its `php:8.4-cli` image has no git. Use the single-file or clone route for `booster run` (see Install).
 
 Booster prints its progress lines on standard error. In Windows PowerShell they print in red, as if they were errors. They are not errors; the exit code tells you whether the run worked.

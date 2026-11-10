@@ -740,6 +740,20 @@ final class CliTest extends TestCase
         self::assertTrue(json_decode($out, true)['boost']);
     }
 
+    public function test_detect_says_when_vendor_is_not_installed_and_json_carries_the_key(): void
+    {
+        $app = $this->example('laravel-inertia-vue');
+
+        [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $app]);
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('vendor/ is not installed. Run composer install in the app before plan and run --dry-run: without it their previews miss edits.', $out);
+        self::assertDoesNotMatchRegularExpression('/^vendor_missing/m', $out);
+
+        [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $app, '--format' => 'json']);
+        self::assertSame(0, $exit);
+        self::assertTrue(json_decode($out, true)['vendor_missing']);
+    }
+
     public function test_detect_explains_the_yes_no_keys_before_the_next_step(): void
     {
         $app = $this->example('laravel-inertia-vue');

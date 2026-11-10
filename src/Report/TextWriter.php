@@ -9,6 +9,7 @@ use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanStep;
 use Waynestate\Booster\Plan\Planner;
+use Waynestate\Booster\Project\Project;
 use Waynestate\Booster\Run\BaselineResult;
 use Waynestate\Booster\Run\ProctorResult;
 use Waynestate\Booster\Run\RunReport;
@@ -58,6 +59,10 @@ final class TextWriter
             $lines[] = '  Laravel Boost found: the playbooks include Boost prompts.';
         }
         $lines[] = '';
+        if ($p->vendorMissing) {
+            $lines[] = 'Warning: ' . Project::VENDOR_MISSING_WARNING;
+            $lines[] = '';
+        }
 
         foreach ($plan->steps as $step) {
             $lines[] = $this->stepLine($step);
@@ -479,6 +484,12 @@ final class TextWriter
         $path ??= $report->plan->project->path;
         $program ??= Invocation::program();
         $lines = [$report->dryRun ? 'BOOSTER dry run (nothing was changed)' : 'BOOSTER run', ''];
+        // A preview (a dry run, or a real run with no baseline to install
+        // vendor/) on an app without vendor/ sees less. Say so before anything else.
+        if ($report->plan->project->vendorMissing && $report->baseline->status === BaselineResult::SKIPPED) {
+            $lines[] = 'Warning: ' . Project::VENDOR_MISSING_WARNING;
+            $lines[] = '';
+        }
         if ($report->testEnvKeys !== []) {
             // Keys only: the values may hold credentials and never reach a report.
             $lines[] = sprintf('Test environment: %s (values are not shown).', implode(', ', $report->testEnvKeys));

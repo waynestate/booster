@@ -59,12 +59,20 @@ final class DetectCommand extends BaseCommand
         }
 
         foreach ($project->toArray() as $key => $value) {
+            if ($key === 'vendor_missing') {
+                // Said in words below the keys instead: it is advice, not a reading.
+                continue;
+            }
             $shown = is_array($value)
                 ? self::lockRangeText($value)
                 : (is_bool($value) ? ($value ? 'yes' : 'no') : (string) ($value ?? 'unknown'));
             $output->writeln(sprintf('%-14s %s', $key, TextWriter::clean($shown)), OutputInterface::OUTPUT_RAW);
         }
         $output->writeln('', OutputInterface::OUTPUT_RAW);
+        if ($project->vendorMissing) {
+            $output->writeln('vendor/ is not installed. Run composer install in the app before plan and run --dry-run: without it their previews miss edits.', OutputInterface::OUTPUT_RAW);
+            $output->writeln('', OutputInterface::OUTPUT_RAW);
+        }
         foreach (self::librariesLines($libraries) as $line) {
             $output->writeln(TextWriter::clean($line), OutputInterface::OUTPUT_RAW);
         }
