@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "410505d4f9977d435257a2eeae100fe8",
+    "content-hash": "0df1096b51ff9677e74919d1070328a9",
     "packages": [
         {
             "name": "composer/semver",
@@ -316,7 +316,8 @@
                 "issues": "https://github.com/laravel/pint/issues",
                 "source": "https://github.com/laravel/pint"
             },
-            "time": "2026-09-10T10:47:55+00:00"
+            "time": "2026-09-10T10:47:55+00:00",
+            "published-time": "2026-09-10T10:48:31+00:00"
         },
         {
             "name": "nette/neon",
@@ -740,7 +741,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-11-03T12:14:22+00:00"
+            "time": "2026-11-03T12:14:22+00:00",
+            "published-time": "2026-11-03T12:14:36+00:00"
         },
         {
             "name": "phpstan/phpstan-deprecation-rules",
@@ -956,6 +958,74 @@
                 }
             ],
             "time": "2026-11-03T18:48:08+00:00"
+        },
+        {
+            "name": "spaze/phpstan-disallowed-calls",
+            "version": "v4.15.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/spaze/phpstan-disallowed-calls.git",
+                "reference": "388075908225e22c46b9622177d1629203d41c1f"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/spaze/phpstan-disallowed-calls/zipball/388075908225e22c46b9622177d1629203d41c1f",
+                "reference": "388075908225e22c46b9622177d1629203d41c1f",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.4 || ^8.0",
+                "phpstan/phpstan": "^1.12.6 || ^2.0"
+            },
+            "require-dev": {
+                "nette/neon": "^3.3.1",
+                "php-parallel-lint/php-console-highlighter": "^1.0",
+                "php-parallel-lint/php-parallel-lint": "^1.2",
+                "phpstan/phpstan-deprecation-rules": "^1.2 || ^2.0",
+                "phpunit/phpunit": "^9.6 || ^10.1 || ^11.0 || ^12.0 || ^13.0",
+                "shipmonk/dead-code-detector": "^1.1",
+                "spaze/coding-standard": "^1.8"
+            },
+            "type": "phpstan-extension",
+            "extra": {
+                "phpstan": {
+                    "includes": [
+                        "extension.neon"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Spaze\\PHPStan\\Rules\\Disallowed\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Michal Špaček",
+                    "email": "mail@michalspacek.cz",
+                    "homepage": "https://www.michalspacek.cz"
+                }
+            ],
+            "description": "PHPStan rules to detect disallowed method & function calls, constant, namespace, attribute, property & superglobal usages, with powerful rules to re-allow a call or a usage in places where it should be allowed.",
+            "keywords": [
+                "static analysis"
+            ],
+            "support": {
+                "issues": "https://github.com/spaze/phpstan-disallowed-calls/issues",
+                "source": "https://github.com/spaze/phpstan-disallowed-calls/tree/v4.15.0"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/spaze",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-10-13T00:31:30+00:00",
+            "published-time": "2026-10-13T00:56:49+00:00"
         },
         {
             "name": "squizlabs/php_codesniffer",
@@ -1978,16 +2048,16 @@
         },
         {
             "name": "waynestate/pinstripe",
-            "version": "0.1.5",
+            "version": "0.3.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/pinstripe.git",
-                "reference": "48bbeb094f6e985f8ef250820a5a32bbe531484d"
+                "reference": "7f2d774b11c12c050ca8d2b22ee03cf081fdcd22"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/pinstripe/zipball/48bbeb094f6e985f8ef250820a5a32bbe531484d",
-                "reference": "48bbeb094f6e985f8ef250820a5a32bbe531484d",
+                "url": "https://api.github.com/repos/waynestate/pinstripe/zipball/7f2d774b11c12c050ca8d2b22ee03cf081fdcd22",
+                "reference": "7f2d774b11c12c050ca8d2b22ee03cf081fdcd22",
                 "shasum": ""
             },
             "require": {
@@ -1997,7 +2067,8 @@
                 "phpstan/extension-installer": "^1.4",
                 "phpstan/phpstan": "^2.3",
                 "phpstan/phpstan-deprecation-rules": "^2.0",
-                "phpstan/phpstan-strict-rules": "^2.0"
+                "phpstan/phpstan-strict-rules": "^2.0",
+                "spaze/phpstan-disallowed-calls": "^4.15"
             },
             "require-dev": {
                 "larastan/larastan": "^3.13",
@@ -2028,14 +2099,14 @@
             "license": [
                 "MIT"
             ],
-            "description": "The coding standard for the Wayne State app stack: shared Pint and PHPStan presets.",
+            "description": "The coding standard for the Wayne State app stack: shared Pint, PHPStan and Rector presets, and banned calls.",
             "homepage": "https://pinstripe.apps.wayne.edu/",
             "support": {
                 "issues": "https://git.wayne.edu/enterprise-apps/pinstripe/-/issues",
                 "source": "https://github.com/waynestate/pinstripe"
             },
-            "time": "2026-11-09T21:33:26+00:00",
-            "published-time": "2026-11-09T21:53:38+00:00"
+            "time": "2026-11-10T02:31:59+00:00",
+            "published-time": "2026-11-10T02:52:13+00:00"
         },
         {
             "name": "waynestate/proctor",
