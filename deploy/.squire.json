@@ -1,6 +1,6 @@
 {
     "squire": "Written by Squire. Commit this file: `vendor/bin/squire init --check` reads it to report drift.",
-    "version": "0.10.6",
+    "version": "0.10.7",
     "target": "raw",
     "groups": [
         "release",
@@ -8,6 +8,7 @@
     ],
     "files": {
         ".env.squire.example": "9fee40c218f1418a9a3965e33a84ea6cf77d5efa99700ec995ebab0cdf61810c",
+        ".gitattributes": "07f729566e34bd85d04516625a5aa8edeaa603908a81ed530c4b1b29ea1e558b",
         ".squire/Dockerfile": "89eacb3e9fffa83dcf5204f9ae7372d23dacfe4f868ea86977b7ce415c7f6406",
         ".squire/Dockerfile.dockerignore": "6ccbb5a302475dd6322dc9f46057f98d0a5db59e5cfcc334d956df862d5da6fe",
         ".squire/apache-hardening.conf": "90b34b9e687cc2868af785629a4d790e90424e375a2a56ab84cfa7def7773939",

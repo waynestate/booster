@@ -1,0 +1,11 @@
+# Line endings for this deploy layer. Citadel runs these files on Linux, so they
+# stay LF on every checkout, Windows included; PowerShell and batch files stay CRLF.
+# Squire writes this file only when the folder has none, and never over your own.
+* text=auto eol=lf
+*.sh text eol=lf
+*.conf text eol=lf
+Dockerfile text eol=lf
+*.Dockerfile text eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
