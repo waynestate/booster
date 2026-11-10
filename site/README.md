@@ -25,6 +25,10 @@ Screenshots are in `screenshots/`.
 Links to the other parts are committed as production URLs (`https://<project>.apps.wayne.edu/`), so crawlers and
 visitors without JavaScript always get production. `assets/stack-env.js` (the same file on every stack site) rewrites
 them to `http://127.0.0.1:18432/<project>/site/` in development, for a static server whose root is the
-folder that holds all the projects side by side. Dev is picked automatically on `localhost` or `127.0.0.1`; `?env=dev` or `?env=production` forces
-one (remembered until `?env=auto`), `<meta name="stack-env">` sets the page default, and `?devBase=http://127.0.0.1:<port>`
-points at a server on another port. WayneUI links stay on production.
+folder that holds all the projects side by side. Dev is picked automatically on `localhost` or `127.0.0.1`;
+`?env=dev` or `?env=production` forces one (remembered until `?env=auto`), `<meta name="stack-env">` sets the
+page default, and `?devBase=http://127.0.0.1:<port>` points at a server on another port. On a host ending in
+`.appstest.wayne.edu` the links point at `https://<project>.appstest.wayne.edu/` instead, the pre-production home
+of every part (`?env=test` forces it). WayneUI is the exception: in development its links go to
+`http://127.0.0.1:4180/`, since it does not run from a subfolder, and in test they stay on production, since
+there is no pre-production WayneUI.
