@@ -136,5 +136,5 @@ RESULT: PASS (previewed, no tests ran)
 
 Dry run: these changes were previewed, none were applied.
 Nothing was changed. RESULT: PASS means the preview worked; no tests ran.
-Next, if the edits look right: php bin/booster run --path=examples/laravel-blade
+Next, if the edits look right: php bin/booster run --path=examples/laravel-blade --today=2026-11-09
 (It needs Docker and a clean git folder. Commit or stash first.)

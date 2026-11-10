@@ -48,7 +48,7 @@
     <a class="masthead__brand" href="#main">
       <img src="brand/booster-avatar-256.png" width="36" height="36" alt="">
       <span class="masthead__name">BOOSTER</span>
-      <span class="masthead__ver">1.14</span>
+      <span class="masthead__ver">1.15</span>
     </a>
     <nav class="masthead__nav" aria-label="Main">
       <a href="index.html#record">Record</a>
@@ -66,7 +66,7 @@
 <main id="main">
 <section class="wsu-container proof" aria-labelledby="proof-title">
 <h1 id="proof-title">Real output, from Booster's own example apps</h1>
-<p>Captured on 2026-11-09 with Booster 1.14.0. Each app below is one of the example apps in the <code>examples/</code> folder. A dry run changes nothing. This page is regenerated each release.</p>
+<p>Captured on 2026-11-09 with Booster 1.15.0. Each app below is one of the example apps in the <code>examples/</code> folder. A dry run changes nothing. This page is regenerated each release.</p>
 <nav aria-label="Example apps">
 <ul>
 <li><a href="#app-laravel-blade">laravel-blade</a></li>
@@ -144,8 +144,8 @@ https://github.com/sebastianbergmann/phpunit/issues/6052
 Nothing was changed. The numbered list above is the order Booster would do things; &quot;PHPCompatibility check&quot; and &quot;PHPStan&quot; are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/laravel-blade --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade)
+Preview the edits: php bin/booster run --path=examples/laravel-blade --today=2026-11-09 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade --today=2026-11-09)
 </pre>
 <h3>Dry run</h3>
 <p><code>booster run --path=examples/laravel-blade --dry-run</code></p>
@@ -287,7 +287,7 @@ RESULT: PASS (previewed, no tests ran)
 
 Dry run: these changes were previewed, none were applied.
 Nothing was changed. RESULT: PASS means the preview worked; no tests ran.
-Next, if the edits look right: php bin/booster run --path=examples/laravel-blade
+Next, if the edits look right: php bin/booster run --path=examples/laravel-blade --today=2026-11-09
 (It needs Docker and a clean git folder. Commit or stash first.)
 </pre>
 </section>
@@ -332,8 +332,8 @@ PHPStan scan: could not run
 Nothing was changed. The numbered list above is the order Booster would do things; &quot;PHPCompatibility check&quot; and &quot;PHPStan&quot; are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/laravel-blade-vue --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade-vue)
+Preview the edits: php bin/booster run --path=examples/laravel-blade-vue --today=2026-11-09 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade-vue --today=2026-11-09)
 </pre>
 <h3>Dry run</h3>
 <p><code>booster run --path=examples/laravel-blade-vue --dry-run</code></p>
@@ -418,8 +418,8 @@ PHPStan scan: could not run
 Nothing was changed. The numbered list above is the order Booster would do things; &quot;PHPCompatibility check&quot; and &quot;PHPStan&quot; are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/laravel-inertia-vue --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-inertia-vue)
+Preview the edits: php bin/booster run --path=examples/laravel-inertia-vue --today=2026-11-09 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-inertia-vue --today=2026-11-09)
 </pre>
 <h3>Dry run</h3>
 <p><code>booster run --path=examples/laravel-inertia-vue --dry-run</code></p>
@@ -482,7 +482,7 @@ RESULT: PASS (previewed, no tests ran)
 
 Dry run: these changes were previewed, none were applied.
 Nothing was changed. RESULT: PASS means the preview worked; no tests ran.
-Next, if the edits look right: php bin/booster run --path=examples/laravel-inertia-vue
+Next, if the edits look right: php bin/booster run --path=examples/laravel-inertia-vue --today=2026-11-09
 (It needs Docker and a clean git folder. Commit or stash first.)
 </pre>
 </section>
@@ -533,8 +533,8 @@ PHPStan on PHP 8.5: 16 findings (code quality hints, not upgrade blockers).
 Nothing was changed. The numbered list above is the order Booster would do things; &quot;PHPCompatibility check&quot; and &quot;PHPStan&quot; are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/laravel-wayne-cas --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-wayne-cas)
+Preview the edits: php bin/booster run --path=examples/laravel-wayne-cas --today=2026-11-09 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-wayne-cas --today=2026-11-09)
 </pre>
 <h3>Dry run</h3>
 <p><code>booster run --path=examples/laravel-wayne-cas --dry-run</code></p>
@@ -599,6 +599,7 @@ Nothing was changed.
    Move PHP 8.1 code to PHP 8.2.
    After this step your tests run in Docker.
    Removed between PHP 8.1 and PHP 8.2: none found.
+   Dynamic properties (deprecated in PHP 8.2): none found in the 1 class Booster read.
 4. php-82-to-83
    Move PHP 8.2 code to PHP 8.3.
    After this step your tests run in Docker.
@@ -622,8 +623,8 @@ PHPStan on PHP 8.5: 3 findings (code quality hints, not upgrade blockers).
 Nothing was changed. The numbered list above is the order Booster would do things; &quot;PHPCompatibility check&quot; and &quot;PHPStan&quot; are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/raw-php --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/raw-php)
+Preview the edits: php bin/booster run --path=examples/raw-php --today=2026-11-09 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/raw-php --today=2026-11-09)
 </pre>
 <h3>Dry run</h3>
 <p><code>booster run --path=examples/raw-php --dry-run</code></p>
@@ -709,7 +710,7 @@ RESULT: PASS (previewed, no tests ran)
 
 Dry run: these changes were previewed, none were applied.
 Nothing was changed. RESULT: PASS means the preview worked; no tests ran.
-Next, if the edits look right: php bin/booster run --path=examples/raw-php
+Next, if the edits look right: php bin/booster run --path=examples/raw-php --today=2026-11-09
 (It needs Docker and a clean git folder. Commit or stash first.)
 </pre>
 </section>
@@ -730,6 +731,7 @@ Next, if the edits look right: php bin/booster run --path=examples/raw-php
    Move PHP 8.1 code to PHP 8.2.
    After this step your tests run in Docker.
    Removed between PHP 8.1 and PHP 8.2: none found.
+   Dynamic properties (deprecated in PHP 8.2): none found in the 0 classes Booster read.
 3. php-82-to-83
    Move PHP 8.2 code to PHP 8.3.
    After this step your tests run in Docker.
@@ -759,8 +761,8 @@ PHPStan on PHP 8.5: no findings.
 Nothing was changed. The numbered list above is the order Booster would do things; &quot;PHPCompatibility check&quot; and &quot;PHPStan&quot; are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/vue-spa --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/vue-spa)
+Preview the edits: php bin/booster run --path=examples/vue-spa --today=2026-11-09 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/vue-spa --today=2026-11-09)
 </pre>
 <h3>Dry run</h3>
 <p><code>booster run --path=examples/vue-spa --dry-run</code></p>

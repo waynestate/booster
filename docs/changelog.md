@@ -11,6 +11,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-11-09
+
 Lessons from a real 2012 raw PHP app that Booster took from PHP 5.6 to 8.5, with its hand-copied Doctrine, Smarty and Slim moved onto Composer.
 
 - Added: a Wayne Auth stop sign. An app that still signs people in through the old Wayne Auth service (the `WayneAuth` class copied into the app, the `validUser` cookie, the `sso_host` setting) loses its sign-in on the first hop off PHP 5.6, because PHP 7 and later verify the service's TLS certificate. `detect` gains a `wayne_auth` line and JSON key, and both `detect` and `plan` open with a stop sign that names up to three of the lines and points at SESAME's Wayne Auth bridge guide. An app already on the bridge gets none.

@@ -41,5 +41,5 @@ PHPStan on PHP 8.5: 16 findings (code quality hints, not upgrade blockers).
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/laravel-wayne-cas --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-wayne-cas)
+Preview the edits: php bin/booster run --path=examples/laravel-wayne-cas --today=2026-11-09 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-wayne-cas --today=2026-11-09)

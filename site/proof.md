@@ -8,7 +8,7 @@ generator: Squire agent-ready
 
 # Real output, from Booster's own example apps
 
-Captured on 2026-11-09 with Booster 1.14.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
+Captured on 2026-11-09 with Booster 1.15.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
 
 ## laravel-blade
 
@@ -80,8 +80,8 @@ https://github.com/sebastianbergmann/phpunit/issues/6052
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/laravel-blade --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade)
+Preview the edits: php bin/booster run --path=examples/laravel-blade --today=2026-11-09 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade --today=2026-11-09)
 ```
 
 ### Dry run
@@ -227,7 +227,7 @@ RESULT: PASS (previewed, no tests ran)
 
 Dry run: these changes were previewed, none were applied.
 Nothing was changed. RESULT: PASS means the preview worked; no tests ran.
-Next, if the edits look right: php bin/booster run --path=examples/laravel-blade
+Next, if the edits look right: php bin/booster run --path=examples/laravel-blade --today=2026-11-09
 (It needs Docker and a clean git folder. Commit or stash first.)
 ```
 
@@ -275,8 +275,8 @@ PHPStan scan: could not run
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/laravel-blade-vue --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade-vue)
+Preview the edits: php bin/booster run --path=examples/laravel-blade-vue --today=2026-11-09 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade-vue --today=2026-11-09)
 ```
 
 ### Dry run
@@ -368,8 +368,8 @@ PHPStan scan: could not run
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/laravel-inertia-vue --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-inertia-vue)
+Preview the edits: php bin/booster run --path=examples/laravel-inertia-vue --today=2026-11-09 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-inertia-vue --today=2026-11-09)
 ```
 
 ### Dry run
@@ -436,7 +436,7 @@ RESULT: PASS (previewed, no tests ran)
 
 Dry run: these changes were previewed, none were applied.
 Nothing was changed. RESULT: PASS means the preview worked; no tests ran.
-Next, if the edits look right: php bin/booster run --path=examples/laravel-inertia-vue
+Next, if the edits look right: php bin/booster run --path=examples/laravel-inertia-vue --today=2026-11-09
 (It needs Docker and a clean git folder. Commit or stash first.)
 ```
 
@@ -490,8 +490,8 @@ PHPStan on PHP 8.5: 16 findings (code quality hints, not upgrade blockers).
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/laravel-wayne-cas --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-wayne-cas)
+Preview the edits: php bin/booster run --path=examples/laravel-wayne-cas --today=2026-11-09 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-wayne-cas --today=2026-11-09)
 ```
 
 ### Dry run
@@ -563,6 +563,7 @@ BOOSTER plan for examples/raw-php
    Move PHP 8.1 code to PHP 8.2.
    After this step your tests run in Docker.
    Removed between PHP 8.1 and PHP 8.2: none found.
+   Dynamic properties (deprecated in PHP 8.2): none found in the 1 class Booster read.
 4. php-82-to-83
    Move PHP 8.2 code to PHP 8.3.
    After this step your tests run in Docker.
@@ -586,8 +587,8 @@ PHPStan on PHP 8.5: 3 findings (code quality hints, not upgrade blockers).
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/raw-php --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/raw-php)
+Preview the edits: php bin/booster run --path=examples/raw-php --today=2026-11-09 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/raw-php --today=2026-11-09)
 ```
 
 ### Dry run
@@ -677,7 +678,7 @@ RESULT: PASS (previewed, no tests ran)
 
 Dry run: these changes were previewed, none were applied.
 Nothing was changed. RESULT: PASS means the preview worked; no tests ran.
-Next, if the edits look right: php bin/booster run --path=examples/raw-php
+Next, if the edits look right: php bin/booster run --path=examples/raw-php --today=2026-11-09
 (It needs Docker and a clean git folder. Commit or stash first.)
 ```
 
@@ -701,6 +702,7 @@ BOOSTER plan for examples/vue-spa
    Move PHP 8.1 code to PHP 8.2.
    After this step your tests run in Docker.
    Removed between PHP 8.1 and PHP 8.2: none found.
+   Dynamic properties (deprecated in PHP 8.2): none found in the 0 classes Booster read.
 3. php-82-to-83
    Move PHP 8.2 code to PHP 8.3.
    After this step your tests run in Docker.
@@ -730,8 +732,8 @@ PHPStan on PHP 8.5: no findings.
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/vue-spa --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/vue-spa)
+Preview the edits: php bin/booster run --path=examples/vue-spa --today=2026-11-09 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/vue-spa --today=2026-11-09)
 ```
 
 ### Dry run
