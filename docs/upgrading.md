@@ -13,6 +13,30 @@ when that needs a step of yours.
 To take a new Booster, download the PHAR again (the same `curl` line as on [Install](install.md); its
 `releases/latest` link always names the newest release), or run `git pull` and `composer install` in your clone. `booster --version` prints the version you have.
 
+## 1.17.0
+
+Released 2026-11-09. Follow-ups to 1.16.0. No hop was added or removed, no option changed and no exit code changed.
+Two environment variables are new, and both are off unless you set them.
+
+### What you see
+
+- **A Node pin that builds.** On an app whose `package.json` has a `build` script and a `package-lock.json`,
+  `node-pin-24` now runs `npm ci` and `npm run build` in the `node:<major>` container before the tests, so a real run
+  takes longer and needs Docker for that step too. A red build stops the run at that hop. With no build script the hop
+  prints `No build script in package.json, so the front-end build was not checked.` and carries on as before.
+- **A rerun that re-gates.** After a run that stopped at a red gate, the next run reads `booster-hop.json` and runs
+  that hop's gate again: a `Re-gate: PASS` or `FAIL` line after the baseline when the hop left the plan, or a gate
+  on the hop's own step when it is back with nothing to edit. Keep `booster-hop.json` between the two runs. The JSON
+  report and `booster-hop.json` gain `regate` on such a run; a script that reads them by key keeps working.
+- **Faster gates, if you ask.** `BOOSTER_COMPOSER_CACHE` and `BOOSTER_NPM_CACHE` name a Docker volume or a folder
+  that every gate container shares (see [Configuration](reference/configuration.md)). The WSU stack's volumes are
+  `stack-composer-cache` and `stack-npm-cache`.
+
+### An app that an older Booster already moved
+
+Nothing to do. An app that an older Booster already pinned keeps its pin, and its front end was never built on that
+Node by Booster: run `npm ci` and `npm run build` on that Node once to be sure.
+
 ## 1.16.0
 
 Released 2026-11-09. Lessons from a real Laravel app taken from PHP 8.3 to 8.5. No hop was added or removed and no

@@ -8,7 +8,7 @@ generator: Squire agent-ready
 
 # Real output, from Booster's own example apps
 
-Captured on 2026-11-09 with Booster 1.16.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
+Captured on 2026-11-09 with Booster 1.17.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
 
 ## laravel-blade
 
@@ -321,6 +321,7 @@ Record the answers first: php bin/booster replay init --path=examples/laravel-bl
    Rector moves PDO driver constants such as PDO::MYSQL_ATTR_SSL_CA to Pdo\Mysql::ATTR_SSL_CA, inside PHP_VERSION_ID guards too. A guard such as (PHP_VERSION_ID >= 80500 ? Pdo\Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA), which a stock Laravel config/database.php carries, then names one constant twice. It still works on the new floor; Booster leaves the guard in place, so shorten it to the first branch by hand if you like.
 4. node-pin-24 (pins Node 26): PREVIEWED (0 files)
    Dry run: would set engines.node to >=26 in package.json and write .nvmrc with 26.
+   No build script in package.json, so the front-end build was not checked.
    The pin is a floor, not a ceiling: engines.node ">=26" still allows newer Node majors.
    Later front-end hops run in the same node:26 container, so this hop comes before them.
 
@@ -418,6 +419,7 @@ Record the answers first: php bin/booster replay init --path=examples/laravel-in
    Rector moves PDO driver constants such as PDO::MYSQL_ATTR_SSL_CA to Pdo\Mysql::ATTR_SSL_CA, inside PHP_VERSION_ID guards too. A guard such as (PHP_VERSION_ID >= 80500 ? Pdo\Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA), which a stock Laravel config/database.php carries, then names one constant twice. It still works on the new floor; Booster leaves the guard in place, so shorten it to the first branch by hand if you like.
 4. node-pin-24 (pins Node 26): PREVIEWED (0 files)
    Dry run: would set engines.node to >=26 in package.json and write .nvmrc with 26.
+   No build script in package.json, so the front-end build was not checked.
    The pin is a floor, not a ceiling: engines.node ">=26" still allows newer Node majors.
    Later front-end hops run in the same node:26 container, so this hop comes before them.
 5. inertia-2-to-3: PREVIEWED (2 files)
@@ -783,6 +785,7 @@ Record the answers first: php bin/booster replay init --path=examples/vue-spa dr
    Rector moves PDO driver constants such as PDO::MYSQL_ATTR_SSL_CA to Pdo\Mysql::ATTR_SSL_CA, inside PHP_VERSION_ID guards too. A guard such as (PHP_VERSION_ID >= 80500 ? Pdo\Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA), which a stock Laravel config/database.php carries, then names one constant twice. It still works on the new floor; Booster leaves the guard in place, so shorten it to the first branch by hand if you like.
 6. node-pin-24 (pins Node 26): PREVIEWED (0 files)
    Dry run: would set engines.node to >=26 in package.json and write .nvmrc with 26.
+   No build script in package.json, so the front-end build was not checked.
    The pin is a floor, not a ceiling: engines.node ">=26" still allows newer Node majors.
    Later front-end hops run in the same node:26 container, so this hop comes before them.
 7. vue-27-to-compat: PREVIEWED (0 files)
