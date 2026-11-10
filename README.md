@@ -162,7 +162,7 @@ Run these from inside the booster folder.
 This route can run `detect`, `plan`, `scan` and `run --dry-run`. A real `run` starts Docker and uses git from inside
 Booster, which the `php:8.4-cli` image lacks, so for a real run use the single-file or clone route (in WSL on Windows). When
 Booster itself runs in a container, pass `--skip-gate` to `run` and run the tests yourself. Node hops run `npm` in a
-`node:26` container, so they need the same daemon but no Node installed on the machine.
+`node:<major>` container (26 unless the plan pins another Node), so they need the same daemon but no Node installed on the machine.
 
 Booster prints its progress lines on standard error. In Windows PowerShell they print in red, as if they were errors. They are not errors; the exit code tells you whether the run worked.
 
@@ -386,6 +386,7 @@ Options shared by `plan` and `run`:
 | `--until` | Cut the plan after this hop id: that step and everything before it stay, and the plan's targets move to where it lands |
 | `--only` | Plan and run just this one hop id. The app must sit on the hop's starting versions, and `--until` and `--only` are never combined |
 | `--with-node` | include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version. Without it, any of `--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php` or `--from-laravel` leaves those hops out, and the plan prints: "Node front-end hops were left out because you passed a target version: <hop ids>. Add --with-node to include them." |
+| `--node` | the Node major `node-pin-24` floors the app at (22, 24 or 26 today; the policy must still support it). Without it, Booster takes the Node the app's Citadel image ships, read from `NODE_IMAGE` in the Squire kit's `.squire/base-fallback.Dockerfile`, and otherwise the newest Node the policy supports. The plan says which one and why. Implies `--with-node` |
 
 Example: an app moving from Laravel 8 to 13 takes the climb in parts. `booster plan --path=../my-app --until=laravel-8-to-9` keeps every hop up to and including the move to Laravel 9, and `booster run` with the same flag applies exactly those hops.
 
@@ -839,9 +840,18 @@ A run prints one line per hop to standard error while it works: the hop's positi
 the number of files it changed and the seconds it took, and a final line totals the hops run, the stops and the whole
 run. They go to standard error so the report on standard output is untouched and `--format json` stays valid JSON.
 
+`node-pin-24` floors Node at the Node the app deploys on, not just the newest one. A floor above the server's Node
+makes every `npm ci` there warn (`EBADENGINE`), and the hop's gate never builds on the server's Node either. So the
+major comes from, in order: `--node=<major>` (22, 24 or 26 today; the policy must still support it); the Node the
+app's Citadel image ships, which the Squire kit mirrors as `NODE_IMAGE` in `.squire/base-fallback.Dockerfile`; and
+otherwise the hop data's target, the newest Node the policy supports (26 today). The plan's step line says
+`node-pin-24 (pins Node 22)`, and its summary says where the 22 came from. `--node` also puts the Node hops back in a
+plan that passed a target version, as `--with-node` does. The later front-end hops run in the same `node:<major>`
+container. A Node floor is like a shelf: put it higher than the server can reach and nothing lands on it.
+
 Four hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`,
 then the app's usual gate applies. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (below) and asks for a
-build gate, which runs `npm ci` and `npm run build` in the `node:26` container before the app's tests.
+build gate, which runs `npm ci` and `npm run build` in the `node:<major>` container (the plan's Node pin, 26 by default) before the app's tests.
 `vite-major` moves a Vite front end onto the Vite major in the hop data: it pins `vite` wherever it sits in
 `package.json`, pins `laravel-vite-plugin` and `@vitejs/plugin-vue` to the hop data's versions when they are already
 listed, runs `npm install` in the Node container and asks for a build gate. `tailwind-3-to-4` runs the official
@@ -889,8 +899,9 @@ blocks and CSS, the `Breadcrumbs` calls and the `config/wayne-ui.php` keys) and 
 leaves forked views under `resources/views/vendor/wayne-ui` and `public/vendor/wayne-ui` in place for a person to
 delete, and it cannot rotate a deploy token a repository URL may carry); `node-pin-24` (planned for any app with a
 `package.json` that does
-not already floor Node at the hop data's target, 26 today: sets `engines.node` to `>=26` and writes `.nvmrc`, ahead
-of the front-end hops); `mix-to-vite` (planned when the app has a `webpack.mix.js` and the plan lands on Laravel 9 or
+not already floor Node at the plan's Node: sets `engines.node` to `>=<major>` and writes `.nvmrc`, ahead of the
+front-end hops. The major is `--node`, else the Node the app's Citadel image ships (`NODE_IMAGE` in the Squire kit's
+`.squire/base-fallback.Dockerfile`), else the hop data's target, 26 today); `mix-to-vite` (planned when the app has a `webpack.mix.js` and the plan lands on Laravel 9 or
 newer, after `node-pin-24`: writes `vite.config.js`, swaps `laravel-mix` for `vite` and `laravel-vite-plugin` in
 `package.json`, renames `MIX_` keys to `VITE_` in `.env.example`, rewrites Blade `mix()` script and link tags into one
 `@vite([...])` line per layout when every referenced asset maps to a Mix entry, and deletes `webpack.mix.js`; the

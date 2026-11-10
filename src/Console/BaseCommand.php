@@ -10,6 +10,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Waynestate\Booster\Hop\HopRegistry;
+use Waynestate\Booster\Node\NodeTarget;
 use Waynestate\Booster\Plan\HttpPackageFetcher;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanOptions;
@@ -44,6 +45,7 @@ abstract class BaseCommand extends Command
         'to-laravel' => 'value',
         'to-phpunit' => 'value',
         'with-node' => 'flag',
+        'node' => 'value',
         'sesame' => 'flag',
         'wayneui' => 'flag',
         'vendored' => 'flag',
@@ -59,6 +61,12 @@ abstract class BaseCommand extends Command
      * shares it, so tests see every subprocess in one place. Commands that
      * run processes pass their own; the rest fall back to the real runner.
      */
+    /**
+     * The hop registry buildPlan() planned with. Its Node pin follows --node
+     * or the app's Citadel image, so a run must use this one, not a fresh one.
+     */
+    protected ?HopRegistry $planRegistry = null;
+
     public function __construct(protected readonly ProcessRunner $processes = new SymfonyProcessRunner())
     {
         parent::__construct();
@@ -94,6 +102,7 @@ abstract class BaseCommand extends Command
             ->addOption('to-laravel', null, InputOption::VALUE_REQUIRED, 'Target Laravel major (default: the newest the policy supports).')
             ->addOption('to-phpunit', null, InputOption::VALUE_REQUIRED, 'Target PHPUnit major (default: the newest that runs on the target PHP).')
             ->addOption('with-node', null, InputOption::VALUE_NONE, 'Include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version')
+            ->addOption('node', null, InputOption::VALUE_REQUIRED, "The Node major to pin (22, 24 or 26 today). Default: the Node the app's Citadel image ships, else the newest the policy supports. Implies --with-node")
             ->addOption('sesame', null, InputOption::VALUE_NONE, 'Include the wayne-cas to SESAME swap.')
             ->addOption('wayneui', null, InputOption::VALUE_NONE, 'Include the WayneUI 1.x to 2.x move.')
             ->addOption('vendored', null, InputOption::VALUE_NONE, 'Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto Composer.')
@@ -146,6 +155,10 @@ abstract class BaseCommand extends Command
         }
 
         $skip = $input->getOption('skip');
+        $today = $this->today($input);
+        $node = $this->stringOption($input, 'node');
+        $target = NodeTarget::resolve($node, $project->path, $policy, $today, (new HopRegistry())->nodePinTarget());
+        $this->planRegistry = new HopRegistry(null, $target->major, $target->reason);
         $options = new PlanOptions(
             fromPhp: $fromPhp,
             fromLaravel: $this->stringOption($input, 'from-laravel'),
@@ -154,7 +167,7 @@ abstract class BaseCommand extends Command
             toPhpunit: $this->stringOption($input, 'to-phpunit'),
             sesame: (bool) $input->getOption('sesame'),
             wayneui: (bool) $input->getOption('wayneui'),
-            withNode: (bool) $input->getOption('with-node'),
+            withNode: (bool) $input->getOption('with-node') || $node !== null,
             skip: is_array($skip) ? array_values(array_map('strval', $skip)) : [],
             noPackageCheck: (bool) $input->getOption('no-package-check'),
             until: $this->stringOption($input, 'until'),
@@ -165,7 +178,7 @@ abstract class BaseCommand extends Command
 
         $casReachability = new WayneCasReachability($this->processes);
 
-        return (new Planner($policy, new HopRegistry(), new HttpPackageFetcher(), $casReachability))->plan($project, $options, $this->today($input));
+        return (new Planner($policy, $this->planRegistry, new HttpPackageFetcher(), $casReachability))->plan($project, $options, $today);
     }
 
     /**

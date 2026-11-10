@@ -619,10 +619,30 @@ final class CliTest extends TestCase
             ['--today' => 'yesterday'],
             ['--goal' => 'nonsense'],
             ['--to-php' => '9.9'],
+            ['--node' => 'lts'],
+            ['--node' => '18'],
         ] as $bad) {
             [$exit] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, ...$bad]);
             self::assertSame(2, $exit, json_encode($bad));
         }
+    }
+
+    public function test_node_picks_the_pin_and_the_plan_says_why(): void
+    {
+        $app = $this->example('vue-spa');
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $app, '--today' => self::TODAY, '--no-scan' => true, '--no-package-check' => true]);
+
+        self::assertSame(0, $exit, $out);
+        self::assertStringContainsString('node-pin-24 (pins Node 26)', $out);
+        self::assertStringContainsString("Node 26, the newest the policy supports. Booster cannot see which Node the app's deploy image ships", $out);
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $app, '--today' => self::TODAY, '--no-scan' => true, '--no-package-check' => true, '--to-php' => '8.4', '--node' => '22']);
+
+        self::assertSame(0, $exit, $out);
+        self::assertStringContainsString('node-pin-24 (pins Node 22)', $out);
+        self::assertStringContainsString('Pin the app to Node 22: set engines.node in package.json and write .nvmrc. Node 22, as --node asked.', $out);
+        // --node implies --with-node, and the Next lines keep it.
+        self::assertStringContainsString('--to-php=8.4 --node=22 --no-package-check --dry-run', $out);
     }
 
     public function test_an_unknown_command_is_exit_2(): void

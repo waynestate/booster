@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Report;
 
 use Waynestate\Booster\Console\Invocation;
+use Waynestate\Booster\Hop\Hop;
 use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanStep;
@@ -157,10 +158,20 @@ final class TextWriter
             $gates = ['manual: you do this one by hand', ...$gates];
         }
         if ($gates === []) {
-            return sprintf('%d. %s', $step->number, $step->hop->id);
+            return sprintf('%d. %s', $step->number, self::hopLabel($step->hop));
         }
 
-        return sprintf('%d. %s  [%s]', $step->number, $step->hop->id, implode(', ', $gates));
+        return sprintf('%d. %s  [%s]', $step->number, self::hopLabel($step->hop), implode(', ', $gates));
+    }
+
+    /**
+     * A hop's id as a step line shows it. The Node pin's id keeps the major it
+     * was born with (node-pin-24), so the line adds the major it pins today:
+     * "node-pin-24 (pins Node 22)" reads as one story, not two.
+     */
+    private static function hopLabel(Hop $hop): string
+    {
+        return $hop->pinNode ? sprintf('%s (pins Node %s)', $hop->id, $hop->to) : $hop->id;
     }
 
     /**
@@ -508,9 +519,14 @@ final class TextWriter
         }
         $lines[] = '';
         $previewedFiles = [];
+        $hops = [];
+        foreach ($report->plan->steps as $step) {
+            $hops[$step->number] = $step->hop;
+        }
         foreach ($report->results as $r) {
             $count = $r->incomplete ? '(incomplete)' : sprintf('(%d file%s)', count($r->files), count($r->files) === 1 ? '' : 's');
-            $lines[] = sprintf('%d. %s: %s %s', $r->step, $r->hopId, strtoupper($r->status), $count);
+            $label = isset($hops[$r->step]) && $hops[$r->step]->id === $r->hopId ? self::hopLabel($hops[$r->step]) : $r->hopId;
+            $lines[] = sprintf('%d. %s: %s %s', $r->step, $label, strtoupper($r->status), $count);
             foreach ($r->messages as $message) {
                 foreach (explode("\n", self::clean($message)) as $line) {
                     $lines[] = '   ' . $line;

@@ -77,6 +77,9 @@ final class HopRegistry
 
     private readonly string $nodePinTarget;
 
+    /** Why the Node pin lands where it does, when an app's plan chose it (NodeTarget); null for the hop data's default. */
+    private readonly ?string $nodePinReason;
+
     private readonly string $viteVersion;
 
     private readonly string $laravelVitePluginVersion;
@@ -130,13 +133,18 @@ final class HopRegistry
     /** @var array<string, Hop> */
     private array $hops = [];
 
-    public function __construct(?string $dataPath = null)
+    /**
+     * $nodeTarget and $nodeReason override the hop data's Node pin for one
+     * app's plan (NodeTarget: --node, or the Node its Citadel image ships).
+     */
+    public function __construct(?string $dataPath = null, ?string $nodeTarget = null, ?string $nodeReason = null)
     {
         $data = self::load($dataPath ?? PharFiles::path('data/versions.json'));
         $this->phpChain = self::chain($data, 'php');
         $this->laravelChain = self::chain($data, 'laravel');
         $this->phpunitChain = self::chain($data, 'phpunit');
-        $this->nodePinTarget = self::scalar($data, 'node_pin_target');
+        $this->nodePinTarget = $nodeTarget ?? self::scalar($data, 'node_pin_target');
+        $this->nodePinReason = $nodeReason;
         $this->viteVersion = self::scalar($data, 'vite_version');
         $this->laravelVitePluginVersion = self::scalar($data, 'laravel_vite_plugin_version');
         $this->vuePluginVersion = self::scalar($data, 'vue_plugin_version');
@@ -237,6 +245,12 @@ final class HopRegistry
     public function nodePinTarget(): string
     {
         return $this->nodePinTarget;
+    }
+
+    /** Why this plan pins the Node it does, or null for the hop data's default. */
+    public function nodePinReason(): ?string
+    {
+        return $this->nodePinReason;
     }
 
     public function viteVersion(): string
@@ -956,7 +970,8 @@ final class HopRegistry
             kind: HopKind::Node,
             from: 'any',
             to: $target,
-            summary: sprintf('Pin the app to Node %s: set engines.node in package.json and write .nvmrc.', $target),
+            // The plan prints the summary, so the reason for the major rides on it.
+            summary: sprintf('Pin the app to Node %s: set engines.node in package.json and write .nvmrc.', $target) . ($this->nodePinReason !== null ? ' ' . $this->nodePinReason : ''),
             npmSet: ['engines.node' => '>=' . $target],
             pinNode: true,
             notes: [

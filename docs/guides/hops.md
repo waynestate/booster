@@ -106,9 +106,18 @@ A run prints one line per hop to standard error while it works: the hop's positi
 the number of files it changed and the seconds it took, and a final line totals the hops run, the stops and the whole
 run. They go to standard error so the report on standard output is untouched and `--format json` stays valid JSON.
 
+`node-pin-24` floors Node at the Node the app deploys on, not just the newest one. A floor above the server's Node
+makes every `npm ci` there warn (`EBADENGINE`), and the hop's gate never builds on the server's Node either. So the
+major comes from, in order: `--node=<major>` (22, 24 or 26 today; the policy must still support it); the Node the
+app's Citadel image ships, which the Squire kit mirrors as `NODE_IMAGE` in `.squire/base-fallback.Dockerfile`; and
+otherwise the hop data's target, the newest Node the policy supports (26 today). The plan's step line says
+`node-pin-24 (pins Node 22)`, and its summary says where the 22 came from. `--node` also puts the Node hops back in a
+plan that passed a target version, as `--with-node` does. The later front-end hops run in the same `node:<major>`
+container. A Node floor is like a shelf: put it higher than the server can reach and nothing lands on it.
+
 Four hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`,
 then the app's usual gate applies. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (see [the hop list](../reference/hops.md)) and asks for a
-build gate, which runs `npm ci` and `npm run build` in the `node:26` container before the app's tests.
+build gate, which runs `npm ci` and `npm run build` in the `node:<major>` container (the plan's Node pin, 26 by default) before the app's tests.
 `vite-major` moves a Vite front end onto the Vite major in the hop data: it pins `vite` wherever it sits in
 `package.json`, pins `laravel-vite-plugin` and `@vitejs/plugin-vue` to the hop data's versions when they are already
 listed, runs `npm install` in the Node container and asks for a build gate. `tailwind-3-to-4` runs the official

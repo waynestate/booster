@@ -124,6 +124,17 @@ booster run --path=../my-app --to-php=8.5 --with-node
 
 The ids are `node-pin-24`, `mix-to-vite`, `vite-major`, `tailwind-3-to-4`, `typescript-major`, the Vue steps and `inertia-2-to-3`; `booster hops` lists every id. Skipping `vue-2-to-3` skips all the Vue steps.
 
+To pin the Node your server runs rather than the newest one, name the major with `--node`. It implies `--with-node`:
+
+<!-- docs-test: skip run on your own app -->
+```
+booster run --path=../my-app --to-php=8.5 --node=22
+```
+
+Without `--node`, an app with the Squire kit gets the Node its Citadel image ships (`NODE_IMAGE` in
+`.squire/base-fallback.Dockerfile`), and any other app gets the newest Node the policy supports. The plan's step line
+says which: `node-pin-24 (pins Node 22)`.
+
 Not for: skipping the Node hops and then keeping a Mix build around forever. That is a choice, not a plan.
 
 ## 8. Skip a hop you will do by hand

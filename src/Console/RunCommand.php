@@ -99,7 +99,8 @@ final class RunCommand extends BaseCommand
         if ($gateImage !== null) {
             $this->assertImageCoversPlan($gateImage, $plan);
         }
-        $registry = new HopRegistry();
+        // The registry the plan was built with, so the Node pin and its container match the plan.
+        $registry = $this->planRegistry ?? new HopRegistry();
         $executor = new HopExecutor(
             new RectorRunner($this->processes),
             new ComposerEditor(),

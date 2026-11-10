@@ -51,7 +51,8 @@ This page lists every hop Booster knows; the list is generated from the hop data
 | `inertia-2-to-3` | node | 2 | 3 | Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0. |
 <!-- /generated -->
 
-The hop id `node-pin-24` is a stable id and now pins Node 26.
+The hop id `node-pin-24` is a stable id. The table shows the hop data's target (26); an app's plan pins the Node its
+Citadel image ships, or the major `--node` names, and the plan's step line says which (`node-pin-24 (pins Node 22)`).
 
 > Every other hop lifts the engine; `wayneui-1-to-2` is the one that repaints the bodywork.
 
