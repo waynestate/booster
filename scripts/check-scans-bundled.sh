@@ -1,4 +1,5 @@
 #!/bin/sh
+# proctor-ignore script-pair: runs only inside the composer:2 container (see the docker run line below)
 #
 # Proves the advisory scans bundle their tools, so a scan needs no change to
 # the app, from the PHAR or from a clone:
