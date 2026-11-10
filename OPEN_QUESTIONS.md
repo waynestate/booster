@@ -1,6 +1,6 @@
 # Booster: open questions
 
-Booster 1.0 is built and `composer ci` passes. Fourteen of the fifteen questions below are closed; question 8 stays
+Booster 1.17.0 is built and `composer ci` passes. Fourteen of the fifteen questions below are closed; question 8 stays
 open until the Citadel platform owner answers.
 
 ## Questions
