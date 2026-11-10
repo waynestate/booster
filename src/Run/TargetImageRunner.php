@@ -37,11 +37,82 @@ final class TargetImageRunner
      */
     private array $customImagesReady = [];
 
+    /** Where the opt-in Composer cache (BOOSTER_COMPOSER_CACHE) is mounted in the gate container. */
+    public const COMPOSER_CACHE_MOUNT = '/tmp/composer-cache';
+
+    /**
+     * The per-user folders already made inside a cache volume this run, so
+     * the one-off root container runs once per volume and user, not per gate.
+     *
+     * @var array<string, true>
+     */
+    private array $cacheDirsReady = [];
+
     public function __construct(
         private readonly ProcessRunner $processes,
         private readonly ?string $dockerDir = null,
         private readonly string $docker = 'docker',
+        private readonly ?CacheMount $composerCache = null,
     ) {}
+
+    /**
+     * COMPOSER_CACHE_DIR inside the container. A host folder belongs to the
+     * person running Booster, and so does the container user, so the mount
+     * root works as it is. A Docker volume belongs to root, and on Linux and
+     * macOS the gate runs as the person's own uid, which may not write there
+     * (Composer then carries on without a cache and says nothing). So a
+     * non-root user gets a folder of its own inside the volume; whatever
+     * else the volume holds (a shared stack cache) is left as it is.
+     */
+    public function composerCacheDir(?int $uid): string
+    {
+        if ($this->composerCache !== null && $this->composerCache->volume && $uid !== null && $uid !== 0) {
+            return self::COMPOSER_CACHE_MOUNT . '/booster-uid-' . $uid;
+        }
+
+        return self::COMPOSER_CACHE_MOUNT;
+    }
+
+    /**
+     * The one-off root container that makes the user's folder inside a cache
+     * volume and hands it to that user, or null when none is needed (no
+     * cache, a host folder, or a root or unknown user). Exposed so tests can
+     * assert on it.
+     *
+     * @return list<string>|null
+     */
+    public function cacheDirCommand(string $image, ?int $uid, ?int $gid): ?array
+    {
+        $dir = $this->composerCacheDir($uid);
+        if ($this->composerCache === null || $dir === self::COMPOSER_CACHE_MOUNT || $gid === null) {
+            return null;
+        }
+
+        return [
+            $this->docker, 'run', '--rm', '--user', '0:0',
+            ...$this->composerCache->mountArgs(self::COMPOSER_CACHE_MOUNT),
+            $image, 'sh', '-c', sprintf('mkdir -p %1$s && chown %2$d:%3$d %1$s', $dir, (int) $uid, $gid),
+        ];
+    }
+
+    /**
+     * Makes the user's folder in the cache volume, once per run. A failure is
+     * not fatal: Composer then runs without the cache, as it did before the
+     * cache existed, and the gate's own result still stands.
+     */
+    public function ensureCacheDir(string $image, ?int $uid, ?int $gid): void
+    {
+        $command = $this->cacheDirCommand($image, $uid, $gid);
+        if ($command === null) {
+            return;
+        }
+        $key = $image . "\n" . $this->composerCacheDir($uid);
+        if (isset($this->cacheDirsReady[$key])) {
+            return;
+        }
+        $this->processes->run($command, null, [], 120);
+        $this->cacheDirsReady[$key] = true;
+    }
 
     /**
      * The image tag for a PHP version, stamped with the first 12 hex chars of
@@ -174,6 +245,12 @@ final class TargetImageRunner
         foreach ($env as $pair) {
             array_push($command, '-e', $pair);
         }
+        if ($this->composerCache !== null) {
+            // Opt-in (BOOSTER_COMPOSER_CACHE): the baseline fills the cache and
+            // every later gate reads from it instead of downloading again.
+            array_push($command, ...$this->composerCache->mountArgs(self::COMPOSER_CACHE_MOUNT));
+            array_push($command, '-e', 'COMPOSER_CACHE_DIR=' . $this->composerCacheDir($uid !== null && $gid !== null ? $uid : null));
+        }
         if ($uid !== null && $gid !== null) {
             // Keep files the container writes owned by the person running Booster.
             array_push($command, '--user', $uid . ':' . $gid);
@@ -217,6 +294,7 @@ final class TargetImageRunner
 
         $uid = function_exists('posix_getuid') ? posix_getuid() : null;
         $gid = function_exists('posix_getgid') ? posix_getgid() : null;
+        $this->ensureCacheDir($prepared, $uid, $gid);
 
         return $this->processes->run(
             $this->runCommand($appPath, $php, self::containerScript($testCommand, $extraCommand, $updatePackages), $uid, $gid, $resolved, $env),

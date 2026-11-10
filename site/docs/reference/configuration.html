@@ -33,7 +33,7 @@
       <a class="masthead__install" href="../../docs/index.html#run-it-today">Run it today</a>
     </nav>
   </div>
-</header><div class="docs-layout">
+</header><div class="docs-layout docs-layout--toc">
   <details class="docs-menu">
     <summary>Menu</summary>
     <nav class="docs-nav" aria-label="Documentation"><ul class="docs-nav__list"><li><a href="../../docs/index.html">Overview</a></li><li><a href="../../docs/install.html">Install</a></li><li class="docs-nav__group"><span class="docs-nav__label">Guides</span><ul><li><a href="../../docs/guides/quick-start.html">Quick start</a></li><li><a href="../../docs/recipes.html">How do I...</a></li><li><a href="../../docs/guides/scans.html">The scans</a></li><li><a href="../../docs/guides/dependency-check.html">The dependency check</a></li><li><a href="../../docs/guides/behaviour-changes.html">Behavior changes</a></li><li><a href="../../docs/guides/baseline.html">The baseline</a></li><li><a href="../../docs/guides/smoke-test.html">A smoke test for WSU apps</a></li><li><a href="../../docs/guides/hops.html">What a hop does</a></li><li><a href="../../docs/guides/replay-gate.html">The replay gate</a></li><li><a href="../../docs/guides/framework-hops.html">Hand-copied libraries to Composer</a></li><li><a href="../../docs/guides/strict-sessions.html">Strict session IDs</a></li><li><a href="../../docs/guides/laravel-and-vendor.html">Laravel hops and vendor/</a></li><li><a href="../../docs/guides/citadel.html">Deploying on Citadel</a></li></ul></li><li class="docs-nav__group"><span class="docs-nav__label">Reference</span><ul><li><a href="../../docs/reference/commands.html">Commands</a></li><li><a href="../../docs/reference/configuration.html" aria-current="page">Configuration</a></li><li><a href="../../docs/reference/hops.html">Hops</a></li></ul></li><li><a href="../../docs/checks.html">Checks</a></li><li><a href="../../docs/next.html">Next</a></li><li><a href="../../docs/upgrading.html">Upgrading</a></li><li><a href="../../docs/changelog.html">Changelog</a></li></ul></nav>
@@ -61,6 +61,12 @@
 <td>src/Refresh/HopDataBot.php</td>
 </tr>
 <tr>
+<td>BOOSTER_COMPOSER_CACHE</td>
+<td>Opt-in Composer download cache for the baseline and every gate: a Docker volume name or a host folder, mounted as COMPOSER_CACHE_DIR</td>
+<td>none (each gate container downloads every package)</td>
+<td>src/Run/CacheMount.php</td>
+</tr>
+<tr>
 <td>BOOSTER_POLICY</td>
 <td>Path to CREED's policy.json</td>
 <td>none (uses the policy.json in the waynestate/creed package)</td>
@@ -72,7 +78,26 @@
 <p>Booster reads the policy straight from the <code>waynestate/creed</code> package in its own <code>vendor/</code>, so there is no copy to
 drift: <code>composer update waynestate/creed</code> is the whole refresh. <code>--policy</code> and <code>BOOSTER_POLICY</code> still override it for
 one run.</p>
-<p><code>.env.example</code> holds the placeholder. Booster reads no secrets and talks to no Citadel host. Its own network calls
+<h2 id="download-caches">Download caches<a class="docs-heading-link" aria-label="Link to this section" href="#download-caches">#</a></h2>
+<p>The gate containers start with an empty Composer cache, so a run with five gates downloads every package five times.
+Set <code>BOOSTER_COMPOSER_CACHE</code> and the baseline fills a cache that every later gate reads from. It is off by default:
+unset, nothing is mounted and the gate behaves exactly as before.</p>
+<!-- docs-test: skip sets your shell's environment -->
+<pre tabindex="0"><code>export BOOSTER_COMPOSER_CACHE=stack-composer-cache        # a Docker volume, the one the WSU stack already uses
+export BOOSTER_COMPOSER_CACHE=~/.cache/booster-composer   # or a folder on your machine
+</code></pre>
+<p>In PowerShell: <code>$env:BOOSTER_COMPOSER_CACHE = &quot;stack-composer-cache&quot;</code>.</p>
+<ul>
+<li>A plain name (letters, digits, <code>.</code>, <code>_</code>, <code>-</code>) is a Docker volume, created on first use. Anything with a slash, a
+backslash, a leading <code>.</code> or a leading <code>~</code> is a folder, created when it is missing; a folder that cannot be created
+or written stops the run before the baseline, with the variable named.</li>
+<li>Booster mounts it at <code>/tmp/composer-cache</code> in the baseline and in every gate, and sets <code>COMPOSER_CACHE_DIR</code> there.</li>
+<li>On Linux and macOS the gate runs as your own user, so the files it writes in the app stay yours. A Docker volume
+belongs to root, so Booster makes a folder of its own inside the volume, <code>booster-uid-&lt;your uid&gt;</code>, with one short
+root container per run, and leaves the rest of the volume alone. A folder on your machine is already yours and is
+used as it is.</li>
+</ul>
+<p><code>.env.example</code> holds the placeholders. Booster reads no secrets and talks to no Citadel host. Its own network calls
 only read: the dependency check asks Packagist (and any composer-type repository the app declares) about the app's
 direct dependencies, which <code>--no-package-check</code> turns off, and a plan for an app on <code>wayne-cas</code> with no <code>vendor/</code>
 checks the VCS repository <code>composer.json</code> names for that package with <code>git ls-remote</code>. Everything it prints from an app (file names, diffs) has control characters stripped.</p>
@@ -82,6 +107,7 @@ They are internal; do not set them.</p>
     </main>
     <nav class="docs-pager" aria-label="Pages"><a class="docs-pager__link" href="../../docs/reference/commands.html"><span class="docs-pager__dir">Previous</span><span class="docs-pager__title">Commands</span></a><a class="docs-pager__link docs-pager__link--next" href="../../docs/reference/hops.html"><span class="docs-pager__dir">Next</span><span class="docs-pager__title">Hops</span></a></nav>
   </div>
+  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#download-caches">Download caches</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
   <span>Documents Booster <span data-docs-version>1.16.0</span></span>

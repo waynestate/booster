@@ -45,6 +45,9 @@
 <h1 id="changelog">Changelog<a class="docs-heading-link" aria-label="Link to this section" href="#changelog">#</a></h1>
 <p>All notable changes to Booster are recorded here. The format follows Keep a Changelog.</p>
 <h2 id="unreleased">[Unreleased]<a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></h2>
+<ul>
+<li>Added: an opt-in Composer download cache for the gate. Every gate container started with an empty cache, so a real Laravel app's run downloaded every package once for the baseline and again for each of its four hops. Set <code>BOOSTER_COMPOSER_CACHE</code> to a Docker volume name (the WSU stack's is <code>stack-composer-cache</code>) or a host folder, and Booster mounts it at <code>/tmp/composer-cache</code> as <code>COMPOSER_CACHE_DIR</code> in the baseline and every gate. On Linux and macOS, where the gate runs as your own user, a volume gets a folder of its own (<code>booster-uid-&lt;uid&gt;</code>, made once per run by a short root container) so Composer can write to it; the rest of the volume is left alone. A folder that cannot be created or written stops the run with the variable named. Unset, nothing changes. Guide: &quot;Configuration&quot;, <code>.env.example</code>.</li>
+</ul>
 <h2 id="1-16-0-2026-11-09">[1.16.0] - 2026-11-09<a class="docs-heading-link" aria-label="Link to this section" href="#1-16-0-2026-11-09">#</a></h2>
 <p>Lessons from a real Laravel app that Booster took from PHP 8.3 to 8.5: the code edits were right, and the gaps were in what Booster wrote or left alone around the code.</p>
 <ul>

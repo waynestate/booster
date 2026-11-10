@@ -945,10 +945,25 @@ refused by name.
 | Variable | Meaning | Default |
 |---|---|---|
 | `BOOSTER_POLICY` | Path to CREED's `policy.json` | the copy in the `waynestate/creed` package |
+| `BOOSTER_COMPOSER_CACHE` | Opt-in Composer download cache for the baseline and every gate: a Docker volume name or a host folder | none: each gate container downloads every package |
 
 Booster reads the policy straight from the `waynestate/creed` package in its own `vendor/`, so there is no copy to
 drift: `composer update waynestate/creed` is the whole refresh. `--policy` and `BOOSTER_POLICY` still override it for
 one run.
+
+The gate containers start with an empty Composer cache, so a run with five gates downloads every package five times.
+Set `BOOSTER_COMPOSER_CACHE` and the baseline fills a cache that every later gate reads from:
+
+```
+export BOOSTER_COMPOSER_CACHE=stack-composer-cache   # a Docker volume, the one the WSU stack already uses
+export BOOSTER_COMPOSER_CACHE=~/.cache/booster-composer   # or a folder on your machine
+```
+
+A plain name is a Docker volume (created on first use); anything with a slash, a leading `.` or a leading `~` is a
+folder, created when it is missing. Booster mounts it at `/tmp/composer-cache` and sets `COMPOSER_CACHE_DIR`. The gate
+runs as your own user on Linux and macOS, and a volume belongs to root, so there Booster makes a folder of its own
+inside the volume (`booster-uid-<your uid>`) once per run and leaves the rest of the volume alone. Unset, nothing is
+mounted and the gate behaves exactly as before.
 
 `.env.example` holds the placeholder. Booster reads no secrets and talks to no Citadel host. Its own network calls
 only read: the dependency check asks Packagist (and any composer-type repository the app declares) about the app's

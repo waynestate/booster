@@ -18,6 +18,7 @@ use Waynestate\Booster\Replay\ReplayGate;
 use Waynestate\Booster\Report\HopRecord;
 use Waynestate\Booster\Report\JsonWriter;
 use Waynestate\Booster\Report\TextWriter;
+use Waynestate\Booster\Run\CacheMount;
 use Waynestate\Booster\Run\ComposerEditor;
 use Waynestate\Booster\Run\GateImage;
 use Waynestate\Booster\Run\HopExecutor;
@@ -101,10 +102,11 @@ final class RunCommand extends BaseCommand
         }
         // The registry the plan was built with, so the Node pin and its container match the plan.
         $registry = $this->planRegistry ?? new HopRegistry();
+        // The download caches are opt-in: unset, every gate starts empty, as before.
         $executor = new HopExecutor(
             new RectorRunner($this->processes),
             new ComposerEditor(),
-            new TargetImageRunner($this->processes),
+            new TargetImageRunner($this->processes, composerCache: CacheMount::fromEnvironment(CacheMount::COMPOSER)),
             $this->processes,
             new NodeRunner($this->processes, (int) $registry->nodePinTarget()),
             $registry,

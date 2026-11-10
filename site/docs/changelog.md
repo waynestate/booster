@@ -12,6 +12,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## \[Unreleased\][#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Added: an opt-in Composer download cache for the gate. Every gate container started with an empty cache, so a real Laravel app's run downloaded every package once for the baseline and again for each of its four hops. Set `BOOSTER_COMPOSER_CACHE` to a Docker volume name (the WSU stack's is `stack-composer-cache`) or a host folder, and Booster mounts it at `/tmp/composer-cache` as `COMPOSER_CACHE_DIR` in the baseline and every gate. On Linux and macOS, where the gate runs as your own user, a volume gets a folder of its own (`booster-uid-<uid>`, made once per run by a short root container) so Composer can write to it; the rest of the volume is left alone. A folder that cannot be created or written stops the run with the variable named. Unset, nothing changes. Guide: "Configuration", `.env.example`.
+
 ## \[1.16.0\] - 2026-11-09[#](https://booster.apps.wayne.edu/docs/changelog.html#1-16-0-2026-11-09)
 
 Lessons from a real Laravel app that Booster took from PHP 8.3 to 8.5: the code edits were right, and the gaps were in what Booster wrote or left alone around the code.

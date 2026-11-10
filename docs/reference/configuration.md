@@ -11,6 +11,7 @@ This page lists the environment variables Booster reads; the table is generated 
 | Variable | Meaning | Default | Read in |
 | --- | --- | --- | --- |
 | BOOSTER_BOT_TOKEN | Push token for the hop data robot (bin/hop-data-bot.php). Never in git, never logged, never printed | none | src/Refresh/HopDataBot.php |
+| BOOSTER_COMPOSER_CACHE | Opt-in Composer download cache for the baseline and every gate: a Docker volume name or a host folder, mounted as COMPOSER_CACHE_DIR | none (each gate container downloads every package) | src/Run/CacheMount.php |
 | BOOSTER_POLICY | Path to CREED's policy.json | none (uses the policy.json in the waynestate/creed package) | bin/refresh-hop-data.php |
 <!-- /generated -->
 
@@ -18,7 +19,30 @@ Booster reads the policy straight from the `waynestate/creed` package in its own
 drift: `composer update waynestate/creed` is the whole refresh. `--policy` and `BOOSTER_POLICY` still override it for
 one run.
 
-`.env.example` holds the placeholder. Booster reads no secrets and talks to no Citadel host. Its own network calls
+## Download caches
+
+The gate containers start with an empty Composer cache, so a run with five gates downloads every package five times.
+Set `BOOSTER_COMPOSER_CACHE` and the baseline fills a cache that every later gate reads from. It is off by default:
+unset, nothing is mounted and the gate behaves exactly as before.
+
+<!-- docs-test: skip sets your shell's environment -->
+```
+export BOOSTER_COMPOSER_CACHE=stack-composer-cache        # a Docker volume, the one the WSU stack already uses
+export BOOSTER_COMPOSER_CACHE=~/.cache/booster-composer   # or a folder on your machine
+```
+
+In PowerShell: `$env:BOOSTER_COMPOSER_CACHE = "stack-composer-cache"`.
+
+- A plain name (letters, digits, `.`, `_`, `-`) is a Docker volume, created on first use. Anything with a slash, a
+  backslash, a leading `.` or a leading `~` is a folder, created when it is missing; a folder that cannot be created
+  or written stops the run before the baseline, with the variable named.
+- Booster mounts it at `/tmp/composer-cache` in the baseline and in every gate, and sets `COMPOSER_CACHE_DIR` there.
+- On Linux and macOS the gate runs as your own user, so the files it writes in the app stay yours. A Docker volume
+  belongs to root, so Booster makes a folder of its own inside the volume, `booster-uid-<your uid>`, with one short
+  root container per run, and leaves the rest of the volume alone. A folder on your machine is already yours and is
+  used as it is.
+
+`.env.example` holds the placeholders. Booster reads no secrets and talks to no Citadel host. Its own network calls
 only read: the dependency check asks Packagist (and any composer-type repository the app declares) about the app's
 direct dependencies, which `--no-package-check` turns off, and a plan for an app on `wayne-cas` with no `vendor/`
 checks the VCS repository `composer.json` names for that package with `git ls-remote`. Everything it prints from an app (file names, diffs) has control characters stripped.
