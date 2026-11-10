@@ -659,6 +659,7 @@
 <li><code>php_from</code>, <code>php_to</code>, <code>laravel_from</code>, <code>laravel_to</code>: the plan's starting and target versions, null when unknown.</li>
 <li><code>rule_packages</code>: the installed versions of <code>rector/rector</code> and <code>driftingly/rector-laravel</code>.</li>
 <li><code>hops</code>: one entry per step, each with <code>step</code>, <code>hop</code>, <code>status</code> and <code>rules</code> (rule name to changed-file count, <code>{}</code> when none).</li>
+<li><code>regate</code>: only on a rerun after a hop stopped at its gate and then left the plan: <code>hop</code> and <code>status</code> (<code>passed</code> or <code>gate-failed</code>). The next run reads it, and a <code>gate-failed</code> hop in <code>hops</code>, to know which hop to re-gate (&quot;After a stop&quot; in the recipes).</li>
 </ul>
 <p>Booster never commits <code>booster-hop.json</code>; the developer commits it with the hop. ROLLCALL reads it from the app repo.</p>
 <p>Example: an app moving from Laravel 8 to 13 takes the climb in parts. <code>booster plan --path=../my-app --until=laravel-8-to-9</code> keeps every hop up to and including the move to Laravel 9, and <code>booster run</code> with the same flag applies exactly those hops.</p>

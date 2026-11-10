@@ -223,8 +223,15 @@ The usual loop:
 
 1. Read the report for the failing hop.
 2. Fix the cause: the code Rector could not fix, a package that blocks the hop, a test that depends on old behavior. `plan` shows which direct dependencies block which hops.
-3. Commit the fix on its own, so it is reviewable.
-4. Run again. Booster reads `composer.json` fresh each time, so it plans from the versions the app is on now and the finished hops are not repeated.
+3. Commit the fix on its own, so it is reviewable. Keep the `booster-hop.json` the stopped run wrote (commit it with the fix): it is how the next run knows which hop stopped.
+4. Run again. Booster reads `composer.json` and `package.json` fresh each time, so it plans from the versions the app is on now and the finished hops are not repeated.
+
+The stopped hop is neither redone nor skipped: its gate runs again, and the run carries on from there. Its edits are in your tree, so the new plan either leaves it out (its target is reached) or finds nothing left for it to edit. Booster reads the stopped hop from `booster-hop.json` and then:
+
+- when the hop left the plan, the baseline on the PHP the app is on now runs its tests again, and a hop whose gate builds the front end (Vite, Tailwind, TypeScript, Vue, Inertia, Mix to Vite) runs `npm ci` and `npm run build` again before step 1. The report shows it as `Re-gate: PASS` under the baseline; a red build stops the run there, before the first step, with `Re-gate: FAIL`.
+- when the hop is back in the plan with nothing to edit, its step runs the gate (the build first when it has one, then the tests on its PHP, against the lock you committed) instead of "nothing to do, so the gate was skipped". Green stays `NOTHING-TO-DO` with a `Re-gate:` line; red fails the step.
+
+A dry run and `--skip-gate` never re-gate. The record of a rerun whose re-gate went red keeps the hop's name (`regate` in `booster-hop.json`), so the run after it re-gates again.
 
 If you would rather throw the failed hop away, `git checkout .`, fix the cause, and run again. To get the hop's edits and keep working in the same tree, pass `--allow-dirty`.
 

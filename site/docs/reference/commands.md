@@ -190,6 +190,7 @@ A real `booster run` (not `--dry-run`) also writes a slim machine-readable hop r
 - `php_from`, `php_to`, `laravel_from`, `laravel_to`: the plan's starting and target versions, null when unknown.
 - `rule_packages`: the installed versions of `rector/rector` and `driftingly/rector-laravel`.
 - `hops`: one entry per step, each with `step`, `hop`, `status` and `rules` (rule name to changed-file count, `{}` when none).
+- `regate`: only on a rerun after a hop stopped at its gate and then left the plan: `hop` and `status` (`passed` or `gate-failed`). The next run reads it, and a `gate-failed` hop in `hops`, to know which hop to re-gate ("After a stop" in the recipes).
 
 Booster never commits `booster-hop.json`; the developer commits it with the hop. ROLLCALL reads it from the app repo.
 

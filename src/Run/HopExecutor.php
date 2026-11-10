@@ -78,6 +78,13 @@ final class HopExecutor
      */
     private ?int $replayFrom = null;
 
+    /**
+     * The hop that stopped the last run at its gate, when this plan has it
+     * again: its step re-gates instead of skipping when it has nothing to
+     * edit (see StoppedHop).
+     */
+    private ?string $stoppedHop = null;
+
     private ?RemovalsScan $removals = null;
 
     private ?BehaviourScan $behaviour = null;
@@ -193,6 +200,37 @@ final class HopExecutor
             return new RunReport($plan, $options->dryRun, $baseline, $results, testEnvKeys: $testEnvKeys);
         }
 
+        // A rerun after a hop stopped at its gate: that hop's edits are in
+        // place (the person fixed the cause and committed), so the plan either
+        // left it out or will find nothing to edit. Either way its gate was
+        // never green, so it runs again here, or in its own step, and the run
+        // carries on from there. Neither redone nor skipped.
+        $this->stoppedHop = null;
+        $regate = null;
+        $stopped = $options->dryRun || $options->skipGate ? null : StoppedHop::read($path);
+        if ($stopped !== null) {
+            if (self::planHasHop($plan, $stopped->hopId)) {
+                $this->stoppedHop = $stopped->hopId;
+            } else {
+                $regateStarted = microtime(true);
+                $regate = $this->regateBeforeFirstStep($stopped, $path, $baseline);
+                if ($options->progress !== null) {
+                    ($options->progress)(sprintf('re-gate %s: %s, %d s', $stopped->hopId, $regate->passed ? 'passed' : 'failed', (int) floor(microtime(true) - $regateStarted)));
+                }
+                if (!$regate->passed) {
+                    $results = [];
+                    foreach ($plan->steps as $step) {
+                        $results[] = new StepResult($step->number, $step->hop->id, StepResult::NOT_RUN, [], [sprintf(
+                            'Not run because %s, the hop that stopped the last run, still fails its gate (see Re-gate above).',
+                            $stopped->hopId,
+                        )]);
+                    }
+
+                    return new RunReport($plan, $options->dryRun, $baseline, $results, testEnvKeys: $testEnvKeys, regate: $regate);
+                }
+            }
+        }
+
         // With --replay, record how the app answers now, before the first hop
         // changes anything. A baseline that cannot be recorded stops the run
         // the way a red test baseline does: nothing could be proven later.
@@ -212,7 +250,7 @@ final class HopExecutor
                 ]);
             }
 
-            return new RunReport($plan, $options->dryRun, $baseline, $results, testEnvKeys: $testEnvKeys, replay: $replay);
+            return new RunReport($plan, $options->dryRun, $baseline, $results, testEnvKeys: $testEnvKeys, replay: $replay, regate: $regate);
         }
         // A gate that only parses the code (or only runs Laravel's stock
         // examples) proves little, so a run without --replay names the
@@ -230,6 +268,11 @@ final class HopExecutor
         foreach ($plan->steps as $step) {
             $hopStarted = microtime(true);
             $result = $this->runStep($step, $path, $plan, $options, $baseline);
+            if ($this->stoppedHop === $step->hop->id && $result->status === StepResult::NOTHING_TO_DO) {
+                // The stopped hop is back with nothing left to edit: its own
+                // edits are what it would make. Its gate runs instead of the skip.
+                $result = $this->regateStep($step, $path, $options, $baseline, $result);
+            }
             $results[] = $result;
             if ($progress !== null) {
                 $files = count($result->files);
@@ -290,7 +333,99 @@ final class HopExecutor
             ? new DeployScriptResult(null, [])
             : (new CitadelDeployScript())->decide($path, $lockBefore, (new \DateTimeImmutable('now'))->format('YmdHi'));
 
-        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys, deployScript: $deploy->script, deployNotes: $deploy->lines, floorNotes: $this->floorFollowUps($plan, $path, $options, $results), replay: $replay, rectorVersion: $this->ranRector ? $this->rector->installedVersion() : null, replaySuggestion: $replaySuggestion);
+        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys, deployScript: $deploy->script, deployNotes: $deploy->lines, floorNotes: $this->floorFollowUps($plan, $path, $options, $results), replay: $replay, rectorVersion: $this->ranRector ? $this->rector->installedVersion() : null, replaySuggestion: $replaySuggestion, regate: $regate);
+    }
+
+    /** Whether the plan has a step for $hopId. */
+    private static function planHasHop(Plan $plan, string $hopId): bool
+    {
+        foreach ($plan->steps as $step) {
+            if ($step->hop->id === $hopId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether a hop's gate builds the front end (npm ci, npm run build), so
+     * re-gating it builds too.
+     */
+    private function hopBuildsFrontEnd(Hop $hop, string $path): bool
+    {
+        return $hop->buildGate;
+    }
+
+    /**
+     * The re-gate for a stopped hop that left the plan. The baseline already
+     * ran the tests on the PHP the app is on now, which is where the stopped
+     * hop landed, so that part is done; a hop whose gate builds the front end
+     * builds it again here, because the baseline never builds.
+     */
+    private function regateBeforeFirstStep(StoppedHop $stopped, string $path, BaselineResult $baseline): RegateResult
+    {
+        $hop = $this->registry()->has($stopped->hopId) ? $this->registry()->get($stopped->hopId) : null;
+        $lines = [sprintf(
+            '%s stopped at its gate in the last run (booster-hop.json), and its edits are in place, so it is not in this plan. Its gate ran again before step 1.',
+            $stopped->hopId,
+        )];
+        if ($hop !== null && $this->hopBuildsFrontEnd($hop, $path)) {
+            $failure = $this->runBuildGate($path);
+            if ($failure !== null) {
+                return new RegateResult($stopped->hopId, false, [...$lines, ...self::withoutUndo($failure), 'Fix the build, commit, then run again.']);
+            }
+            $lines[] = 'Build gate passed: npm ci and npm run build are green in the Node container.';
+        }
+        if ($baseline->status === BaselineResult::PASSED) {
+            $lines[] = sprintf('The baseline on PHP %s ran the tests again for it.', $baseline->php ?? '?');
+        }
+
+        return new RegateResult($stopped->hopId, true, $lines);
+    }
+
+    /**
+     * The re-gate for a stopped hop that is back in the plan with nothing to
+     * edit: its build gate when it has one, then its test gate on the hop's
+     * PHP, against the lock as the person committed it (no composer update).
+     * Green keeps "nothing to do" (the hop edited nothing this time); red
+     * fails the step like any red gate.
+     */
+    private function regateStep(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, StepResult $skipped): StepResult
+    {
+        $lines = ['Re-gate: this hop stopped at its gate in the last run (booster-hop.json), and its edits are already in place, so its gate ran again instead of being skipped.'];
+        $kept = array_values(array_filter($skipped->messages, static fn(string $m): bool => !str_starts_with($m, 'Nothing to do')));
+        if ($this->hopBuildsFrontEnd($step->hop, $path)) {
+            $failure = $this->runBuildGate($path);
+            if ($failure !== null) {
+                return new StepResult($step->number, $step->hop->id, StepResult::GATE_FAILED, [], [...$lines, ...self::withoutUndo($failure), ...$kept]);
+            }
+            $lines[] = 'Build gate passed: npm ci and npm run build are green in the Node container.';
+        }
+        $gate = $this->runGate($step, $path, $options, $baseline, []);
+        if (!$gate->passed) {
+            return new StepResult($step->number, $step->hop->id, StepResult::GATE_FAILED, [], [...$lines, ...self::withoutUndo($gate->lines), ...$kept]);
+        }
+
+        return new StepResult($step->number, $step->hop->id, StepResult::NOTHING_TO_DO, [], [
+            ...$lines,
+            ...$gate->lines,
+            $this->gatePassedLine($step->phpAfter, $this->stepGateKind($step, $baseline->gateKind)),
+            ...$kept,
+        ], composerAudit: $skipped->composerAudit);
+    }
+
+    /**
+     * Gate lines without the "Undo with:" hint: a re-gate changed nothing,
+     * so there is nothing of this run's to undo.
+     *
+     * @param list<string> $lines
+     *
+     * @return list<string>
+     */
+    private static function withoutUndo(array $lines): array
+    {
+        return array_values(array_filter($lines, static fn(string $line): bool => !str_starts_with($line, 'Undo with:')));
     }
 
     /**

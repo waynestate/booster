@@ -21,6 +21,9 @@ with the exit code and the last 20 lines of output).
   a run stands after it stopped at a PHP hop; run again without `--from-php`), or a locked package's own
   `require.php` leaves that PHP out (the report names the `composer update -W` to run). The JSON baseline carries the
   same text as `advice`.
+- On a rerun after a hop stopped at its gate, the baseline runs on the PHP that hop landed on, so it is that hop's
+  test gate again. When the hop's gate also built the front end, the build runs again right after the baseline
+  (`Re-gate:` in the report), because the baseline never builds ([After a stop](../recipes.md#14-after-a-stop)).
 - A Mix app's `public/mix-manifest.json` is a build artifact, not committed source: a fresh clone has no manifest, so
   the suite can be red before any hop. Build the assets before the baseline (the app's usual `npm ci && npm run
   build`), or pass `--allow-failing-baseline` knowing why.

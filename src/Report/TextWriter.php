@@ -509,6 +509,15 @@ final class TextWriter
         foreach ($this->baselineLines($report->baseline) as $line) {
             $lines[] = $line;
         }
+        // A rerun after a stopped hop that left the plan: that hop's gate, again.
+        if ($report->regate !== null) {
+            $lines[] = sprintf('Re-gate: %s (%s, the hop that stopped the last run).', $report->regate->passed ? 'PASS' : 'FAIL', self::clean($report->regate->hopId));
+            foreach ($report->regate->lines as $message) {
+                foreach (explode("\n", self::clean($message)) as $line) {
+                    $lines[] = '   ' . $line;
+                }
+            }
+        }
         // --replay only: how the replay baseline went, right under the test baseline.
         foreach ($report->replay->lines ?? [] as $line) {
             $lines[] = self::clean($line);
@@ -648,6 +657,9 @@ final class TextWriter
                     'Booster made no commit.',
                 ]);
             }
+        }
+        if ($report->regate !== null && !$report->regate->passed && $this->nothingRan($report)) {
+            return sprintf('The upgrade did not start: %s, the hop that stopped the last run, still fails its gate. Fix that first, commit, then run again. Nothing was changed.', self::clean($report->regate->hopId));
         }
         if ($report->baseline->failed() && $this->nothingRan($report)) {
             return 'The upgrade did not start: the app failed its check before any change. Fix that first, then run again. Nothing was changed.';

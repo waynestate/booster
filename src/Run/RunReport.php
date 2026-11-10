@@ -35,11 +35,13 @@ final readonly class RunReport
         public ?string $rectorVersion = null,
         /** The nudge toward --replay when the gate proves little and the run does not replay; null otherwise. Advisory. */
         public ?ReplaySuggestion $replaySuggestion = null,
+        /** The gate of the hop that stopped the last run, run again before step 1 because the hop left the plan; null when no hop stopped. */
+        public ?RegateResult $regate = null,
     ) {}
 
     public function failed(): bool
     {
-        if ($this->baseline->failed() || ($this->replay?->failed() ?? false)) {
+        if ($this->baseline->failed() || ($this->replay?->failed() ?? false) || ($this->regate !== null && !$this->regate->passed)) {
             return true;
         }
         foreach ($this->results as $result) {
@@ -78,6 +80,10 @@ final readonly class RunReport
         // Only runs with --replay carry the key, so every other report keeps its shape.
         if ($this->replay !== null) {
             $data['replay'] = $this->replay->toArray();
+        }
+        // Only a rerun after a stopped hop carries the re-gate.
+        if ($this->regate !== null) {
+            $data['regate'] = $this->regate->toArray();
         }
         // Likewise only a run that was nudged toward --replay carries this key.
         if ($this->replaySuggestion !== null) {

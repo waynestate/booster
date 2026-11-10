@@ -6,6 +6,7 @@ namespace Waynestate\Booster\Report;
 
 use Waynestate\Booster\Console\BoosterApplication;
 use Waynestate\Booster\Run\RunReport;
+use Waynestate\Booster\Run\StepResult;
 use Waynestate\Booster\ToolError;
 
 /**
@@ -43,7 +44,7 @@ final class HopRecord
             ];
         }
 
-        return [
+        $record = [
             'tool' => 'booster',
             'version' => BoosterApplication::VERSION,
             'dry_run' => $report->dryRun,
@@ -57,6 +58,16 @@ final class HopRecord
             'rule_packages' => (object) $rulePackages,
             'hops' => $hops,
         ];
+        // A rerun after a stopped hop says how that hop's gate went this
+        // time, so a run after a red re-gate knows to re-gate it again.
+        if ($report->regate !== null) {
+            $record['regate'] = [
+                'hop' => $report->regate->hopId,
+                'status' => $report->regate->passed ? 'passed' : StepResult::GATE_FAILED,
+            ];
+        }
+
+        return $record;
     }
 
     /**
