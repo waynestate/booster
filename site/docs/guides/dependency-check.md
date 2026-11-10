@@ -6,7 +6,7 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# The dependency check[#](https://booster.apps.wayne.edu/docs/guides/dependency-check.html#the-dependency-check)
+# The dependency check [#](https://booster.apps.wayne.edu/docs/guides/dependency-check.html#the-dependency-check)
 
 This page explains the Packagist check Booster runs before the hops print. Next: [Behavior changes](https://booster.apps.wayne.edu/docs/guides/behaviour-changes.html).
 

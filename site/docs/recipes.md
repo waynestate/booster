@@ -6,7 +6,7 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# How do I...[#](https://booster.apps.wayne.edu/docs/recipes.html#how-do-i)
+# How do I... [#](https://booster.apps.wayne.edu/docs/recipes.html#how-do-i)
 
 This page answers "how do I use Booster for X?" one situation at a time. Each recipe has the command, what Booster will do, and when to reach for something else. For the default behavior (no flags at all), read [What a run does by default](https://booster.apps.wayne.edu/docs/guides/quick-start.html#what-a-run-does-by-default) first. For every option, see [Commands](https://booster.apps.wayne.edu/docs/reference/commands.html). Replace `../my-app` with your app's path.
 
@@ -15,7 +15,7 @@ Two things hold for every recipe:
 - `plan` and `run` take the same options, so you can try any flag on `plan` first. `plan` changes nothing.
 - A real `run` needs the app under git with a clean working copy, plus Docker for the test gate. A dry run needs neither.
 
-## 1. Just look first[#](https://booster.apps.wayne.edu/docs/recipes.html#1-just-look-first)
+## 1. Just look first [#](https://booster.apps.wayne.edu/docs/recipes.html#1-just-look-first)
 
 You want to know what the app is on and what moving it would take, before anything changes.
 
@@ -29,7 +29,7 @@ booster plan   --path=../my-app --format=json
 
 Not for: finding what will break on a given PHP. That is `booster scan --php=<target>`, also advisory.
 
-## 2. Go all the way to current[#](https://booster.apps.wayne.edu/docs/recipes.html#2-go-all-the-way-to-current)
+## 2. Go all the way to current [#](https://booster.apps.wayne.edu/docs/recipes.html#2-go-all-the-way-to-current)
 
 You want the newest PHP and Laravel CREED's policy supports, and you are happy to take it a hop at a time.
 
@@ -41,7 +41,7 @@ With no flags Booster plans one hop per PHP minor, Laravel major and PHPUnit maj
 
 Not for: an app with no tests and no one to click through it afterward. The gate then only proves every file still parses, which is a start and not a finish (see recipe 10).
 
-## 3. Only get off an old PHP, or reach a specific PHP[#](https://booster.apps.wayne.edu/docs/recipes.html#3-only-get-off-an-old-php-or-reach-a-specific-php)
+## 3. Only get off an old PHP, or reach a specific PHP [#](https://booster.apps.wayne.edu/docs/recipes.html#3-only-get-off-an-old-php-or-reach-a-specific-php)
 
 You want PHP 8.4, say, and you would rather not change anything else.
 
@@ -65,7 +65,7 @@ Booster checks the pair against what Laravel supports and refuses one it does no
 
 Not for: getting a Laravel app current. Laravel and PHP limit each other, so the interleaved default plan is the safe path.
 
-## 4. Reach a specific Laravel major[#](https://booster.apps.wayne.edu/docs/recipes.html#4-reach-a-specific-laravel-major)
+## 4. Reach a specific Laravel major [#](https://booster.apps.wayne.edu/docs/recipes.html#4-reach-a-specific-laravel-major)
 
 ```
 booster plan --path=../my-app --to-laravel=12
@@ -76,7 +76,7 @@ Booster plans the Laravel hops up to that major and adds the PHP hops that Larav
 
 Not for: stopping at a Laravel major that is past security support as a destination. Booster warns and treats it as a stop on the way up.
 
-## 5. One hop at a time, for small reviewable merge requests[#](https://booster.apps.wayne.edu/docs/recipes.html#5-one-hop-at-a-time-for-small-reviewable-merge-requests)
+## 5. One hop at a time, for small reviewable merge requests [#](https://booster.apps.wayne.edu/docs/recipes.html#5-one-hop-at-a-time-for-small-reviewable-merge-requests)
 
 You want each hop as its own commit, so a reviewer reads one diff at a time.
 
@@ -91,7 +91,7 @@ Then go round again: `plan` now starts from the new versions, so its first hop i
 
 Not for: hops that depend on each other more than you expect. Hops are ordered for a reason; a bigger batch with `--until` is fine when the hops in it are boring.
 
-## 6. Preview without changing anything[#](https://booster.apps.wayne.edu/docs/recipes.html#6-preview-without-changing-anything)
+## 6. Preview without changing anything [#](https://booster.apps.wayne.edu/docs/recipes.html#6-preview-without-changing-anything)
 
 ```
 booster run --path=../my-app --dry-run
@@ -101,7 +101,7 @@ Rector shows the diffs it would make, hop by hop, and nothing is written. No git
 
 Not for: proving the app still works. A preview never runs your tests.
 
-## 7. Backend only, or front end too[#](https://booster.apps.wayne.edu/docs/recipes.html#7-backend-only-or-front-end-too)
+## 7. Backend only, or front end too [#](https://booster.apps.wayne.edu/docs/recipes.html#7-backend-only-or-front-end-too)
 
 Node front-end hops (the Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, the Vue steps and Inertia 3) are in the plan only when you pass no target at all. Two ways to leave them out:
 
@@ -128,7 +128,7 @@ Without `--node`, an app with the Squire kit gets the Node its Citadel image shi
 
 Not for: skipping the Node hops and then keeping a Mix build around forever. That is a choice, not a plan.
 
-## 8. Skip a hop you will do by hand[#](https://booster.apps.wayne.edu/docs/recipes.html#8-skip-a-hop-you-will-do-by-hand)
+## 8. Skip a hop you will do by hand [#](https://booster.apps.wayne.edu/docs/recipes.html#8-skip-a-hop-you-will-do-by-hand)
 
 ```
 booster run --path=../my-app --skip=<hop id>
@@ -138,7 +138,7 @@ booster run --path=../my-app --skip=<hop id>
 
 Not for: skipping to dodge a red gate. Fix the cause, or use recipe 14.
 
-## 9. A big app[#](https://booster.apps.wayne.edu/docs/recipes.html#9-a-big-app)
+## 9. A big app [#](https://booster.apps.wayne.edu/docs/recipes.html#9-a-big-app)
 
 A hop that would change more than 200 files stops to ask you first. In a terminal you see the per-rule summary and a prompt; with `--no-interaction`, in CI, or with `--format=json`, the run stops at that hop instead of asking nobody.
 
@@ -152,7 +152,7 @@ booster run --path=../my-app --memory-limit=4G   # more memory for Rector (defau
 
 Not for: lifting the limit everywhere to make the prompt go away. The prompt is the review.
 
-## 10. Tests and the gate[#](https://booster.apps.wayne.edu/docs/recipes.html#10-tests-and-the-gate)
+## 10. Tests and the gate [#](https://booster.apps.wayne.edu/docs/recipes.html#10-tests-and-the-gate)
 
 The gate is your app's tests, run in the target PHP's Docker image after every hop. Options for every kind of app:
 
@@ -175,7 +175,7 @@ booster run --path=../my-app --skip-gate
 
 Not for: `--skip-gate` on a real upgrade. The gate is how you learn which hop broke the app. Use it only when Docker truly cannot run, and then run the tests yourself after each hop.
 
-## 11. Offline, or a dirty working copy[#](https://booster.apps.wayne.edu/docs/recipes.html#11-offline-or-a-dirty-working-copy)
+## 11. Offline, or a dirty working copy [#](https://booster.apps.wayne.edu/docs/recipes.html#11-offline-or-a-dirty-working-copy)
 
 ```
 booster plan --path=../my-app --no-package-check
@@ -186,7 +186,7 @@ booster run  --path=../my-app --allow-dirty
 
 Not for: running on an app that is not in git at all. Booster wants the change to be reversible; put the app under git first.
 
-## 12. Move off wayne-cas to SESAME, or WayneUI 1 to 2[#](https://booster.apps.wayne.edu/docs/recipes.html#12-move-off-wayne-cas-to-sesame-or-wayneui-1-to-2)
+## 12. Move off wayne-cas to SESAME, or WayneUI 1 to 2 [#](https://booster.apps.wayne.edu/docs/recipes.html#12-move-off-wayne-cas-to-sesame-or-wayneui-1-to-2)
 
 Both moves are opt-in:
 
@@ -204,7 +204,7 @@ A raw PHP app that calls `session_start()` itself has a fourth, `--strict-sessio
 
 An app that still signs people in through the old Wayne Auth service in its own code (a `WayneAuth` class, the `validUser` cookie, an `sso_host` setting) gets a stop sign from `detect` (the `wayne_auth` key) and at the top of `plan`. PHP 5.6 never checked that service's TLS certificate; PHP 7 and later do, and it has expired, so sign-in breaks on the first PHP hop off 5.6. Ship the move to SESAME's Wayne Auth bridge (it needs PHP 8.3) in the same release as the PHP hops, and deploy no hop off 5.6 before it: [Moving off Wayne Auth](https://sesame.apps.wayne.edu/docs/guides/moving-off-wayne-auth.html).
 
-## 13. Plan for a future date, or a different policy[#](https://booster.apps.wayne.edu/docs/recipes.html#13-plan-for-a-future-date-or-a-different-policy)
+## 13. Plan for a future date, or a different policy [#](https://booster.apps.wayne.edu/docs/recipes.html#13-plan-for-a-future-date-or-a-different-policy)
 
 ```
 booster plan --path=../my-app --today=2027-06-01
@@ -215,7 +215,7 @@ The default target is "the newest the policy supports on the plan's date". `--to
 
 Not for: a real run on a faked date. Dates are for planning; run on the real one.
 
-## 14. After a stop[#](https://booster.apps.wayne.edu/docs/recipes.html#14-after-a-stop)
+## 14. After a stop [#](https://booster.apps.wayne.edu/docs/recipes.html#14-after-a-stop)
 
 A run stops at the first hop that fails (a red gate, a hop over the file cap, a Composer error) and reports the rest as "not run". The report names the hop, the phase (Composer or tests), and the last lines of output. The failed hop's changes stay in place so you can read them; `git checkout .` undoes them.
 

@@ -6,7 +6,7 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# Quick start[#](https://booster.apps.wayne.edu/docs/guides/quick-start.html#quick-start)
+# Quick start [#](https://booster.apps.wayne.edu/docs/guides/quick-start.html#quick-start)
 
 This page runs Booster on an app for the first time. Next: [What a hop does](https://booster.apps.wayne.edu/docs/guides/hops.html) for what each step does.
 
@@ -27,7 +27,7 @@ A real run needs git and Docker on the machine that runs Booster. If you used th
 
 Booster prints its progress lines on standard error. In Windows PowerShell they print in red, as if they were errors. They are not errors; the exit code tells you whether the run worked.
 
-## What a run does by default[#](https://booster.apps.wayne.edu/docs/guides/quick-start.html#what-a-run-does-by-default)
+## What a run does by default [#](https://booster.apps.wayne.edu/docs/guides/quick-start.html#what-a-run-does-by-default)
 
 You can run `detect`, `plan` and `run` on an app with nothing after `--path`. Booster then goes as far as it safely can on its own: it climbs to the newest PHP and Laravel that CREED's policy supports today, which is PHP 8.5 and Laravel 13 as of this writing (the policy file is the source of truth, not this page).
 

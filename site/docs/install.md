@@ -6,13 +6,13 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# Install[#](https://booster.apps.wayne.edu/docs/install.html#install)
+# Install [#](https://booster.apps.wayne.edu/docs/install.html#install)
 
 This page covers every install route. Next: [Quick start](https://booster.apps.wayne.edu/docs/guides/quick-start.html).
 
 Run Booster from inside the app you want to upgrade: `--path` defaults to `.`, so `booster plan` needs no flags. Booster needs PHP 8.3 or newer on the machine; the app it upgrades does not, because Rector runs from Booster's own `vendor/`.
 
-## Single file (PHAR)[#](https://booster.apps.wayne.edu/docs/install.html#single-file-phar)
+## Single file (PHAR) [#](https://booster.apps.wayne.edu/docs/install.html#single-file-phar)
 
 ```
 mkdir -p ~/bin
@@ -40,7 +40,7 @@ booster run --dry-run
 booster run
 ```
 
-## Linux, macOS and WSL (Ubuntu): clone it[#](https://booster.apps.wayne.edu/docs/install.html#linux-macos-and-wsl-ubuntu-clone-it)
+## Linux, macOS and WSL (Ubuntu): clone it [#](https://booster.apps.wayne.edu/docs/install.html#linux-macos-and-wsl-ubuntu-clone-it)
 
 ```
 sudo apt install php-cli php-xml php-mbstring php-zip php-curl unzip git composer
@@ -62,7 +62,7 @@ bin/booster plan --path=/path/to/your-app
 
 `--path` takes a path, and a leading `~` means your home folder (from `HOME`, or `USERPROFILE` on Windows). In WSL, keep Booster and the app in your Linux home folder, not under `/mnt/c` (a Windows drive is slow from Linux); a Windows folder is `/mnt/c/Users/<you>/...`, and `run` needs Docker Desktop's WSL integration switched on.
 
-## Windows PowerShell, with PHP and Composer installed[#](https://booster.apps.wayne.edu/docs/install.html#windows-powershell-with-php-and-composer-installed)
+## Windows PowerShell, with PHP and Composer installed [#](https://booster.apps.wayne.edu/docs/install.html#windows-powershell-with-php-and-composer-installed)
 
 ```
 git clone https://github.com/waynestate/booster.git
@@ -71,7 +71,7 @@ php bin\booster --version
 php bin\booster plan --path=..\my-app
 ```
 
-## Docker only, no PHP (Windows or any OS)[#](https://booster.apps.wayne.edu/docs/install.html#docker-only-no-php-windows-or-any-os)
+## Docker only, no PHP (Windows or any OS) [#](https://booster.apps.wayne.edu/docs/install.html#docker-only-no-php-windows-or-any-os)
 
 ```
 git clone https://github.com/waynestate/booster.git
@@ -88,7 +88,7 @@ Booster prints its progress lines on standard error. In Windows PowerShell they 
 
 Booster is also on Packagist as `waynestate/booster`: give it its own folder, not your app's `vendor/`, because it needs PHP 8.3 even when your app doesn't. Clone it as above, or run `composer create-project waynestate/booster booster ^1.0`.
 
-## Single-file download[#](https://booster.apps.wayne.edu/docs/install.html#single-file-download)
+## Single-file download [#](https://booster.apps.wayne.edu/docs/install.html#single-file-download)
 
 Booster ships as a single-file PHAR, so Preflight and apps without Composer access can run it as one file. The first route above downloads it; every version tag publishes the same `booster.phar`: the GitLab release carries it as an asset, and the GitHub release at github.com/waynestate/booster carries it as an attachment. Run it with `php booster.phar`.
 

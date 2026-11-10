@@ -6,7 +6,7 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# Booster[#](https://booster.apps.wayne.edu/docs/#booster)
+# Booster [#](https://booster.apps.wayne.edu/docs/#booster)
 
 This page says what Booster is and where to go next. Install it on [Install](https://booster.apps.wayne.edu/docs/install.html), then follow [Quick start](https://booster.apps.wayne.edu/docs/guides/quick-start.html).
 
@@ -20,7 +20,7 @@ Booster edits your working copy and prints a report. It never commits to, pushes
 
 **Not to be confused with:** Booster moves an app to a newer PHP or framework version; Pinstripe's Rector set only modernizes code within the PHP version the app already runs.
 
-## Where it fits in WELD[#](https://booster.apps.wayne.edu/docs/#where-it-fits-in-weld)
+## Where it fits in WELD [#](https://booster.apps.wayne.edu/docs/#where-it-fits-in-weld)
 
 WELD is the Wayne State application stack. Booster is its upgrade layer.
 
@@ -44,7 +44,7 @@ WELD is the Wayne State application stack. Booster is its upgrade layer.
 
 It works for all five permutations of the stack: raw PHP, raw PHP with a Vue SPA, Laravel with Blade, Laravel with Blade and Vue islands, and Laravel with Inertia and Vue.
 
-## Run it today[#](https://booster.apps.wayne.edu/docs/#run-it-today)
+## Run it today [#](https://booster.apps.wayne.edu/docs/#run-it-today)
 
 Two one-liners get Booster onto your machine:
 
@@ -90,7 +90,7 @@ Next: php bin/booster plan --path=.
 
 Every route, per OS, is on [Install](https://booster.apps.wayne.edu/docs/install.html). Moving Booster itself to a new release, and what an app an older Booster moved needs then, is on [Upgrading](https://booster.apps.wayne.edu/docs/upgrading.html).
 
-## Guides[#](https://booster.apps.wayne.edu/docs/#guides)
+## Guides [#](https://booster.apps.wayne.edu/docs/#guides)
 
 - [Quick start](https://booster.apps.wayne.edu/docs/guides/quick-start.html)
 - [How do I...](https://booster.apps.wayne.edu/docs/recipes.html)

@@ -6,7 +6,7 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# Behavior changes[#](https://booster.apps.wayne.edu/docs/guides/behaviour-changes.html#behavior-changes)
+# Behavior changes [#](https://booster.apps.wayne.edu/docs/guides/behaviour-changes.html#behavior-changes)
 
 This page explains the behavior-change blocks `plan` and `run` print, one per PHP and Laravel hop. Next: [The baseline](https://booster.apps.wayne.edu/docs/guides/baseline.html).
 

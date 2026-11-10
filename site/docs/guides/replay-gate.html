@@ -41,7 +41,7 @@
   <nav class="docs-nav docs-nav--sidebar" aria-label="Documentation"><ul class="docs-nav__list"><li><a href="../../docs/index.html">Overview</a></li><li><a href="../../docs/install.html">Install</a></li><li class="docs-nav__group"><span class="docs-nav__label">Guides</span><ul><li><a href="../../docs/guides/quick-start.html">Quick start</a></li><li><a href="../../docs/recipes.html">How do I...</a></li><li><a href="../../docs/guides/scans.html">The scans</a></li><li><a href="../../docs/guides/dependency-check.html">The dependency check</a></li><li><a href="../../docs/guides/behaviour-changes.html">Behavior changes</a></li><li><a href="../../docs/guides/baseline.html">The baseline</a></li><li><a href="../../docs/guides/smoke-test.html">A smoke test for WSU apps</a></li><li><a href="../../docs/guides/hops.html">What a hop does</a></li><li><a href="../../docs/guides/replay-gate.html" aria-current="page">The replay gate</a></li><li><a href="../../docs/guides/framework-hops.html">Hand-copied libraries to Composer</a></li><li><a href="../../docs/guides/strict-sessions.html">Strict session IDs</a></li><li><a href="../../docs/guides/laravel-and-vendor.html">Laravel hops and vendor/</a></li><li><a href="../../docs/guides/citadel.html">Deploying on Citadel</a></li></ul></li><li class="docs-nav__group"><span class="docs-nav__label">Reference</span><ul><li><a href="../../docs/reference/commands.html">Commands</a></li><li><a href="../../docs/reference/configuration.html">Configuration</a></li><li><a href="../../docs/reference/hops.html">Hops</a></li></ul></li><li><a href="../../docs/checks.html">Checks</a></li><li><a href="../../docs/next.html">Next</a></li><li><a href="../../docs/upgrading.html">Upgrading</a></li><li><a href="../../docs/changelog.html">Changelog</a></li></ul></nav>
   <div class="docs-content">
     <main id="main">
-      <article class="docs-article"><h1 id="the-replay-gate">The replay gate<a class="docs-heading-link" aria-label="Link to this section" href="#the-replay-gate">#</a></h1>
+      <article class="docs-article"><h1 id="the-replay-gate">The replay <span class="docs-heading-tail"><span>gate</span><a class="docs-heading-link" aria-label="Link to this section" href="#the-replay-gate">#</a></span></h1>
 <p>This page shows how to make the gate prove more than the tests do: Booster records how the app answers a list of
 requests before the upgrade, replays the same requests after every hop, and fails the hop when an answer changes.
 Before this: <a href="hops.html">What a hop does</a>. Next: <a href="framework-hops.html">Hand-copied libraries to Composer</a>.</p>
@@ -58,7 +58,7 @@ Step 1 (php-74-to-80) is the hop most likely to change an answer: loose comparis
 <p>The last line shows only when the plan has the PHP 8.0 hop, and the second one asks for just <code>--replay</code> when
 <code>booster-replay.json</code> is already there. The JSON report carries the same nudge as <code>replay_suggestion</code>. It is advice,
 never a failure: the exit code is the same with or without it.</p>
-<h2 id="in-three-commands">In three commands<a class="docs-heading-link" aria-label="Link to this section" href="#in-three-commands">#</a></h2>
+<h2 id="in-three-commands">In three <span class="docs-heading-tail"><span>commands</span><a class="docs-heading-link" aria-label="Link to this section" href="#in-three-commands">#</a></span></h2>
 <!-- docs-test: skip needs Docker, run on your own app -->
 <pre tabindex="0"><code class="language-sh">booster replay init --path=&lt;app&gt;           # draft booster-replay.json from the app's routes
 # edit booster-replay.json: fill in every &quot;todo&quot;, then delete it
@@ -69,7 +69,7 @@ booster run --path=&lt;app&gt; --replay          # record, then replay after eve
 (right after the test baseline), so <code>replay record</code> is only for when you want to look at the answers first, keep
 them, or check a hand-made change with <code>booster replay check --php=8.4</code>. <code>--replay=FILE</code> names another request file;
 <code>--replay-out=DIR</code> picks where the transcripts go.</p>
-<h2 id="what-a-run-does-with-it">What a run does with it<a class="docs-heading-link" aria-label="Link to this section" href="#what-a-run-does-with-it">#</a></h2>
+<h2 id="what-a-run-does-with-it">What a run does with <span class="docs-heading-tail"><span>it</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-a-run-does-with-it">#</a></span></h2>
 <ol>
 <li>
 <p>Before the first hop, Booster serves the untouched app with PHP's built-in server inside
@@ -105,7 +105,7 @@ Every difference: diff /tmp/booster-replay-notes-20261105-201500/baseline-php7.4
 <code>--replay-out</code> says otherwise), so <code>diff</code> and any editor read them. PHP errors and deprecations logged while serving are
 counted and written next to the transcript (<code>baseline-php7.4.php-errors.txt</code>); they are reported, never compared,
 because a hop is supposed to change them.</p>
-<h2 id="the-request-file">The request file<a class="docs-heading-link" aria-label="Link to this section" href="#the-request-file">#</a></h2>
+<h2 id="the-request-file">The request <span class="docs-heading-tail"><span>file</span><a class="docs-heading-link" aria-label="Link to this section" href="#the-request-file">#</a></span></h2>
 <p><code>booster-replay.json</code> sits in the app's root. Keys that start with <code>$</code> are comments. A small one:</p>
 <pre tabindex="0"><code class="language-json">{
     &quot;version&quot;: 1,
@@ -148,13 +148,13 @@ already broken (a 500 where a 200 belongs) is refused instead of faithfully reco
 <li><strong><code>todo</code></strong>: a note for a person, on the file, <code>serve</code> or a request. <code>record</code>, <code>check</code> and <code>run --replay</code> refuse a
 file that still has one.</li>
 </ul>
-<h3 id="what-is-compared">What is compared<a class="docs-heading-link" aria-label="Link to this section" href="#what-is-compared">#</a></h3>
+<h3 id="what-is-compared">What is <span class="docs-heading-tail"><span>compared</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-is-compared">#</a></span></h3>
 <p>For each answer: the status, <code>Content-Type</code>, <code>Location</code> (with the server's own address written as <code>&lt;app&gt;</code>), <code>Allow</code>,
 the names of the cookies set (never their values), and the body. Everything else (<code>Date</code>, <code>X-Powered-By</code>, the
 values of cookies) changes on every request or every PHP, and is left out. By default runs of spaces and blank
 lines do not matter, and a JSON body is compared by value, so a reordered key or <code>1.0</code> against <code>1</code> is not a
 difference. <code>&quot;compare&quot;: {&quot;whitespace&quot;: &quot;exact&quot;, &quot;json&quot;: &quot;exact&quot;}</code> compares byte for byte.</p>
-<h3 id="normalizers">Normalizers<a class="docs-heading-link" aria-label="Link to this section" href="#normalizers">#</a></h3>
+<h3 id="normalizers"><span class="docs-heading-tail"><span>Normalizers</span><a class="docs-heading-link" aria-label="Link to this section" href="#normalizers">#</a></span></h3>
 <p>A normalizer rewrites the volatile parts of an answer before it is compared and written. The presets:</p>
 <div class="docs-table" role="region" aria-label="Table" tabindex="0"><table>
 <thead>
@@ -197,7 +197,7 @@ requires <code>inertiajs/inertia-laravel</code>. Without them the first front-en
 where <code>in</code> is <code>body</code> (the default), <code>headers</code> or <code>all</code>. The patterns are PCRE without delimiters. Normalizers are
 not part of the recording's fingerprint, so adding one after a failed check does not mean recording again; changing a
 request does, and <code>check</code> says so.</p>
-<h2 id="design">Design<a class="docs-heading-link" aria-label="Link to this section" href="#design">#</a></h2>
+<h2 id="design"><span class="docs-heading-tail"><span>Design</span><a class="docs-heading-link" aria-label="Link to this section" href="#design">#</a></span></h2>
 <ul>
 <li><strong>Served the way the gate already runs.</strong> The app is served by <code>php -S</code> inside the same <code>booster-target</code> image as
 the test gate, on the same PHP, with the app folder mounted. No Apache, no nginx, no second image to build. A
@@ -219,7 +219,7 @@ that got no answer is a difference, not a pass.</li>
 good); Booster's scratch files live in a temp folder it mounts and removes. <code>booster replay record</code> saves
 <code>booster-replay.recording.json</code> in the app because you asked it to keep the answers; commit it or ignore it.</li>
 </ul>
-<h2 id="drafting-the-file">Drafting the file<a class="docs-heading-link" aria-label="Link to this section" href="#drafting-the-file">#</a></h2>
+<h2 id="drafting-the-file">Drafting the <span class="docs-heading-tail"><span>file</span><a class="docs-heading-link" aria-label="Link to this section" href="#drafting-the-file">#</a></span></h2>
 <p><code>booster replay init</code> writes a first draft and never overwrites one. It looks, in order, for:</p>
 <ol>
 <li><code>php artisan route:list --json</code>, when the app is Laravel and <code>vendor/</code> is installed (otherwise the <code>Route::</code>
@@ -230,7 +230,7 @@ calls in <code>routes/</code>);</li>
 <p>Every GET without parameters becomes a request, plus one unknown path (an honest 404 is an answer too). Every path
 parameter, form and setup command gets a <code>todo</code>, because Booster cannot know which note id exists or what a valid
 form looks like. Fill those in, delete the <code>todo</code> lines, and record.</p>
-<h2 id="pages-behind-sign-in">Pages behind sign-in<a class="docs-heading-link" aria-label="Link to this section" href="#pages-behind-sign-in">#</a></h2>
+<h2 id="pages-behind-sign-in">Pages behind <span class="docs-heading-tail"><span>sign-in</span><a class="docs-heading-link" aria-label="Link to this section" href="#pages-behind-sign-in">#</a></span></h2>
 <p>The replay never signs in through a real CAS, Entra or Wayne Auth server, so an app that sends every guest to its
 sign-in page answers every request with the same redirect. That baseline matches on every hop, and proves only that
 the front controller still reaches its sign-in check: a rehearsal on an empty launch pad. Booster says so when it
@@ -249,7 +249,7 @@ its ID (<code>&quot;cookies&quot;: {&quot;PHPSESSID&quot;: &quot;replay-user&quo
 that. Move it to SESAME's Wayne Auth bridge first; <code>booster plan</code> names it as a stop sign.</li>
 </ul>
 <p>Keep the guest's redirect as one request either way: it is the honest answer for a visitor who is not signed in.</p>
-<h2 id="limits-honestly">Limits, honestly<a class="docs-heading-link" aria-label="Link to this section" href="#limits-honestly">#</a></h2>
+<h2 id="limits-honestly">Limits, <span class="docs-heading-tail"><span>honestly</span><a class="docs-heading-link" aria-label="Link to this section" href="#limits-honestly">#</a></span></h2>
 <ul>
 <li><strong>No real Oracle, SSO or CAS.</strong> The replay never reaches a real system, by design. An app that cannot render a
 page without Oracle needs a fake for that page (an environment switch to SQLite, a stub repository), or that page

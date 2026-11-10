@@ -6,7 +6,7 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# Commands[#](https://booster.apps.wayne.edu/docs/reference/commands.html#commands)
+# Commands [#](https://booster.apps.wayne.edu/docs/reference/commands.html#commands)
 
 This page lists every command and option Booster takes; the table is generated from the tool by the docs build. With no flags, `detect`, `plan` and `run` start from what Booster finds in the app and climb to the newest PHP and Laravel the policy supports; see [What a run does by default](https://booster.apps.wayne.edu/docs/guides/quick-start.html#what-a-run-does-by-default).
 
@@ -168,7 +168,7 @@ Usage: `booster scan [--path PATH] [--php PHP] [--removals] [--format FORMAT] [-
 | `--phpstan` | Also run the PHPStan scan (Pinstripe preset) at the same PHP version. |  |
 | `--silent` | Do not output any message |  |
 
-### Options every command accepts[#](https://booster.apps.wayne.edu/docs/reference/commands.html#options-every-command-accepts)
+### Options every command accepts [#](https://booster.apps.wayne.edu/docs/reference/commands.html#options-every-command-accepts)
 
 | Option | Meaning | Default |
 | --- | --- | --- |
@@ -196,6 +196,6 @@ Booster never commits `booster-hop.json`; the developer commits it with the hop.
 
 Example: an app moving from Laravel 8 to 13 takes the climb in parts. `booster plan --path=../my-app --until=laravel-8-to-9` keeps every hop up to and including the move to Laravel 9, and `booster run` with the same flag applies exactly those hops.
 
-## Exit codes[#](https://booster.apps.wayne.edu/docs/reference/commands.html#exit-codes)
+## Exit codes [#](https://booster.apps.wayne.edu/docs/reference/commands.html#exit-codes)
 
 Exit codes: `0` pass, `1` the baseline failed, a hop was capped, errored or failed its gate, or the PROCTOR check found new findings, `2` bad usage (bad option, unreadable policy, broken `composer.json`, a target the policy does not know).

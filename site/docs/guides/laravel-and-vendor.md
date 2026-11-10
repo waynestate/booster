@@ -6,7 +6,7 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# Laravel hops and vendor/[#](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html#laravel-hops-and-vendor)
+# Laravel hops and vendor/ [#](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html#laravel-hops-and-vendor)
 
 This page covers what Laravel hops need from the app, and where the hop data comes from. Next: [Deploying on Citadel](https://booster.apps.wayne.edu/docs/guides/citadel.html).
 
@@ -14,7 +14,7 @@ rector-laravel needs Laravel's classes to recognize a model or a controller. For
 
 For an Inertia/Vue app, each Laravel hop also raises the Inertia constraints the app already carries: `inertiajs/inertia-laravel` and `@inertiajs/vue3` move to the constraint the hop data pairs with the target major (`^2.0` for Laravel 11 and newer). Booster never adds a package the app does not have, and below Laravel 11 it pins nothing and says so, because the hop data carries no constraint there.
 
-## Hop data[#](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html#hop-data)
+## Hop data [#](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html#hop-data)
 
 `data/versions.json` holds the version facts Booster plans against: the PHP, Laravel and PHPUnit chains, the PHP range each Laravel major supports, the PHPUnit floor each Laravel major ships, the Node floor the `node-pin-24` hop writes, the Vite major and plugin pins the `vite-major` hop uses, and the fixed Tailwind, TypeScript and vue-tsc pins, the fixed Inertia 3 constraints and the Inertia constraint tables the front-end hops use. The file ships inside the PHAR. A new major appears in the file as soon as its feed says so; Booster offers a hop for it only once Rector ships a ruleset for it, and a plan toward a major without one stops there with a warning instead of failing.
 

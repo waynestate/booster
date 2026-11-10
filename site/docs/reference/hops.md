@@ -6,7 +6,7 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# Hops[#](https://booster.apps.wayne.edu/docs/reference/hops.html#hops)
+# Hops [#](https://booster.apps.wayne.edu/docs/reference/hops.html#hops)
 
 This page lists every hop Booster knows; the list is generated from the hop data by the docs build.
 

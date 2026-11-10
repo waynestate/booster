@@ -6,7 +6,7 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# What a hop does[#](https://booster.apps.wayne.edu/docs/guides/hops.html#what-a-hop-does)
+# What a hop does [#](https://booster.apps.wayne.edu/docs/guides/hops.html#what-a-hop-does)
 
 This page walks through one hop step by step. The full list of hops is in [the reference](https://booster.apps.wayne.edu/docs/reference/hops.html).
 

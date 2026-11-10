@@ -41,17 +41,17 @@
   <nav class="docs-nav docs-nav--sidebar" aria-label="Documentation"><ul class="docs-nav__list"><li><a href="../docs/index.html">Overview</a></li><li><a href="../docs/install.html">Install</a></li><li class="docs-nav__group"><span class="docs-nav__label">Guides</span><ul><li><a href="../docs/guides/quick-start.html">Quick start</a></li><li><a href="../docs/recipes.html">How do I...</a></li><li><a href="../docs/guides/scans.html">The scans</a></li><li><a href="../docs/guides/dependency-check.html">The dependency check</a></li><li><a href="../docs/guides/behaviour-changes.html">Behavior changes</a></li><li><a href="../docs/guides/baseline.html">The baseline</a></li><li><a href="../docs/guides/smoke-test.html">A smoke test for WSU apps</a></li><li><a href="../docs/guides/hops.html">What a hop does</a></li><li><a href="../docs/guides/replay-gate.html">The replay gate</a></li><li><a href="../docs/guides/framework-hops.html">Hand-copied libraries to Composer</a></li><li><a href="../docs/guides/strict-sessions.html">Strict session IDs</a></li><li><a href="../docs/guides/laravel-and-vendor.html">Laravel hops and vendor/</a></li><li><a href="../docs/guides/citadel.html">Deploying on Citadel</a></li></ul></li><li class="docs-nav__group"><span class="docs-nav__label">Reference</span><ul><li><a href="../docs/reference/commands.html">Commands</a></li><li><a href="../docs/reference/configuration.html">Configuration</a></li><li><a href="../docs/reference/hops.html">Hops</a></li></ul></li><li><a href="../docs/checks.html">Checks</a></li><li><a href="../docs/next.html">Next</a></li><li><a href="../docs/upgrading.html" aria-current="page">Upgrading</a></li><li><a href="../docs/changelog.html">Changelog</a></li></ul></nav>
   <div class="docs-content">
     <main id="main">
-      <article class="docs-article"><h1 id="upgrading">Upgrading<a class="docs-heading-link" aria-label="Link to this section" href="#upgrading">#</a></h1>
+      <article class="docs-article"><h1 id="upgrading"><span class="docs-heading-tail"><span>Upgrading</span><a class="docs-heading-link" aria-label="Link to this section" href="#upgrading">#</a></span></h1>
 <p>This page says what changes when you move Booster itself to a new release, newest first. Every section follows the
 <a href="changelog.html">Changelog</a>. Moving Booster changes no app by itself: a new booster stage does not re-fly the rockets
 already in orbit. An app that an older Booster already moved keeps what that Booster wrote, and the sections below say
 when that needs a step of yours.</p>
 <p>To take a new Booster, download the PHAR again (the same <code>curl</code> line as on <a href="install.html">Install</a>; its
 <code>releases/latest</code> link always names the newest release), or run <code>git pull</code> and <code>composer install</code> in your clone. <code>booster --version</code> prints the version you have.</p>
-<h2 id="1-17-0">1.17.0<a class="docs-heading-link" aria-label="Link to this section" href="#1-17-0">#</a></h2>
+<h2 id="1-17-0"><span class="docs-heading-tail"><span>1.17.0</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-17-0">#</a></span></h2>
 <p>Released 2026-11-09. Follow-ups to 1.16.0. No hop was added or removed, no option changed and no exit code changed.
 Two environment variables are new, and both are off unless you set them.</p>
-<h3 id="what-you-see">What you see<a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see">#</a></h3>
+<h3 id="what-you-see">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see">#</a></span></h3>
 <ul>
 <li><strong>A Node pin that builds.</strong> On an app whose <code>package.json</code> has a <code>build</code> script and a <code>package-lock.json</code>,
 <code>node-pin-24</code> now runs <code>npm ci</code> and <code>npm run build</code> in the <code>node:&lt;major&gt;</code> container before the tests, so a real run
@@ -65,14 +65,14 @@ report and <code>booster-hop.json</code> gain <code>regate</code> on such a run;
 that every gate container shares (see <a href="reference/configuration.html">Configuration</a>). The WSU stack's volumes are
 <code>stack-composer-cache</code> and <code>stack-npm-cache</code>.</li>
 </ul>
-<h3 id="an-app-that-an-older-booster-already-moved">An app that an older Booster already moved<a class="docs-heading-link" aria-label="Link to this section" href="#an-app-that-an-older-booster-already-moved">#</a></h3>
+<h3 id="an-app-that-an-older-booster-already-moved">An app that an older Booster already <span class="docs-heading-tail"><span>moved</span><a class="docs-heading-link" aria-label="Link to this section" href="#an-app-that-an-older-booster-already-moved">#</a></span></h3>
 <p>Nothing to do. An app that an older Booster already pinned keeps its pin, and its front end was never built on that
 Node by Booster: run <code>npm ci</code> and <code>npm run build</code> on that Node once to be sure.</p>
-<h2 id="1-16-0">1.16.0<a class="docs-heading-link" aria-label="Link to this section" href="#1-16-0">#</a></h2>
+<h2 id="1-16-0"><span class="docs-heading-tail"><span>1.16.0</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-16-0">#</a></span></h2>
 <p>Released 2026-11-09. Lessons from a real Laravel app taken from PHP 8.3 to 8.5. No hop was added or removed and no
 exit code changed. <code>plan</code> and <code>run</code> gain <code>--node</code>. The gate's target images are the same; five <code>booster init</code>
 playbooks carry new notes, so <code>booster init --check</code> reports them stale until you run <code>booster init</code> again.</p>
-<h3 id="what-you-see-1">What you see<a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-1">#</a></h3>
+<h3 id="what-you-see-1">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-1">#</a></span></h3>
 <ul>
 <li><strong>A different Citadel deploy step.</strong> A run whose lock change touched only dev packages, or an app with
 <code>scripts/release.sh</code>, or an app with no <code>deployments/</code> folder, gets no <code>deployments/0000_composer_install_*</code> script
@@ -91,7 +91,7 @@ counts the baseline. A script that counts progress lines sees two more.</li>
 <li><strong>Local dates.</strong> With no <code>date.timezone</code> in php.ini, or <code>UTC</code>, &quot;today&quot; and the deploy stamp follow the machine's time zone
 instead of UTC, so an evening run no longer plans for tomorrow.</li>
 </ul>
-<h3 id="an-app-that-an-older-booster-already-moved-1">An app that an older Booster already moved<a class="docs-heading-link" aria-label="Link to this section" href="#an-app-that-an-older-booster-already-moved-1">#</a></h3>
+<h3 id="an-app-that-an-older-booster-already-moved-1">An app that an older Booster already <span class="docs-heading-tail"><span>moved</span><a class="docs-heading-link" aria-label="Link to this section" href="#an-app-that-an-older-booster-already-moved-1">#</a></span></h3>
 <p>Booster 1.15.0 and earlier wrote <code>deployments/0000_composer_install_&lt;stamp&gt;</code> with <code>php artisan migrate --force</code> at
 its end. Citadel runs deploy scripts once each, in name order, so that script migrates before every other script in
 <code>deployments/</code>. If the app has not deployed it yet, look before you release:</p>
@@ -104,11 +104,11 @@ parks old tables before it migrates.</li>
 <p>An app that <code>node-pin-24</code> already pinned to Node 26 keeps that pin: a newer Booster never lowers one. When its
 server runs an older Node (Citadel's PHP image ships 22), set <code>engines.node</code> in <code>package.json</code> and <code>.nvmrc</code> to that
 major by hand; <code>npm ci</code> on the server stops warning <code>EBADENGINE</code>.</p>
-<h2 id="1-15-0">1.15.0<a class="docs-heading-link" aria-label="Link to this section" href="#1-15-0">#</a></h2>
+<h2 id="1-15-0"><span class="docs-heading-tail"><span>1.15.0</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-15-0">#</a></span></h2>
 <p>Released 2026-11-09. Lessons from a real 2012 raw PHP app taken from PHP 5.6 to 8.5. No hop was added or removed,
 no option or exit code changed, and the gate's target images and the <code>booster init</code> playbooks are the same, so
 <code>booster init --check</code> stays green.</p>
-<h3 id="what-you-see-2">What you see<a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-2">#</a></h3>
+<h3 id="what-you-see-2">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-2">#</a></span></h3>
 <ul>
 <li><strong>New lines in <code>detect</code> and <code>plan</code>.</strong> <code>detect</code> prints a <code>wayne_auth</code> line and lists hand-copied libraries; <code>plan</code>
 lists dynamic properties on the step that crosses PHP 8.2. The JSON reports gain <code>wayne_auth</code> and
@@ -126,17 +126,17 @@ about a major line <code>composer update</code> would never pick is gone.</li>
 <li><strong>Tests wait for the vendored move.</strong> With <code>--vendored</code> and a test command, the steps before <code>vendored-to-composer</code>
 run the syntax check and say &quot;Tests deferred&quot;; the baseline and every step from the move on run your tests.</li>
 </ul>
-<h3 id="an-app-that-vendored-to-composer-already-moved">An app that <code>vendored-to-composer</code> already moved<a class="docs-heading-link" aria-label="Link to this section" href="#an-app-that-vendored-to-composer-already-moved">#</a></h3>
+<h3 id="an-app-that-vendored-to-composer-already-moved">An app that <code>vendored-to-composer</code> already <span class="docs-heading-tail"><span>moved</span><a class="docs-heading-link" aria-label="Link to this section" href="#an-app-that-vendored-to-composer-already-moved">#</a></span></h3>
 <p>Rector on Booster 1.14.0 or earlier rewrote <code>slim1-bridge.php</code> on the PHP hops after the move. That file still works.
 It no longer matches the file Booster ships, so Booster treats it as the app's own code from now on, and Rector may
 visit it again. Nothing to do.</p>
-<h2 id="1-14-0">1.14.0<a class="docs-heading-link" aria-label="Link to this section" href="#1-14-0">#</a></h2>
+<h2 id="1-14-0"><span class="docs-heading-tail"><span>1.14.0</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-14-0">#</a></span></h2>
 <p>Released 2026-11-09. Nothing to do: no hop, command, option, exit code or gate image changed. Booster's own CI moves
 to the Preflight 0.5.0 components, Booster locks Pinstripe 0.1.5, and this page is new.</p>
-<h2 id="1-13-1">1.13.1<a class="docs-heading-link" aria-label="Link to this section" href="#1-13-1">#</a></h2>
+<h2 id="1-13-1"><span class="docs-heading-tail"><span>1.13.1</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-13-1">#</a></span></h2>
 <p>Released 2026-11-09. The stack sweep: the <code>cas-to-sesame</code> hop writes <code>waynestate/sesame:^0.7</code>, and the gate's target
 image runs Composer 2.11.1. No command, option or exit code changed.</p>
-<h3 id="what-you-see-3">What you see<a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-3">#</a></h3>
+<h3 id="what-you-see-3">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-3">#</a></span></h3>
 <ul>
 <li><strong>A fresh image on the first gate.</strong> For an app on PHP 7.2 or newer, the gate's target image now installs Composer
 2.11.1 (it was 2.10.3, which is no longer maintained). The images for PHP 5.6 and 7.0 build again with Debian's
@@ -146,7 +146,7 @@ image again, and that first gate takes a little longer. Images for older PHP kee
 <code>booster init</code> writes carry those notes. In an app where you ran <code>booster init</code> with an earlier Booster,
 <code>booster init --check</code> reports that playbook as stale until you run <code>booster init</code> again.</li>
 </ul>
-<h3 id="an-app-that-cas-to-sesame-already-moved">An app that <code>cas-to-sesame</code> already moved<a class="docs-heading-link" aria-label="Link to this section" href="#an-app-that-cas-to-sesame-already-moved">#</a></h3>
+<h3 id="an-app-that-cas-to-sesame-already-moved">An app that <code>cas-to-sesame</code> already <span class="docs-heading-tail"><span>moved</span><a class="docs-heading-link" aria-label="Link to this section" href="#an-app-that-cas-to-sesame-already-moved">#</a></span></h3>
 <p>An app that ran the <code>cas-to-sesame</code> hop on Booster 1.13.0 or earlier stays on the SESAME line that Booster wrote:
 <code>waynestate/sesame:^0.6</code> from Booster 1.12.0 and 1.13.0, <code>^0.5</code> from 1.11.0, and <code>^0.4</code> before that. SESAME is below
 1.0, so a caret stops at the next minor: <code>composer update</code> never takes 0.7.0 on its own. A newer Booster does not plan

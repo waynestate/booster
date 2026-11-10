@@ -41,7 +41,7 @@
   <nav class="docs-nav docs-nav--sidebar" aria-label="Documentation"><ul class="docs-nav__list"><li><a href="../../docs/index.html">Overview</a></li><li><a href="../../docs/install.html">Install</a></li><li class="docs-nav__group"><span class="docs-nav__label">Guides</span><ul><li><a href="../../docs/guides/quick-start.html">Quick start</a></li><li><a href="../../docs/recipes.html">How do I...</a></li><li><a href="../../docs/guides/scans.html">The scans</a></li><li><a href="../../docs/guides/dependency-check.html">The dependency check</a></li><li><a href="../../docs/guides/behaviour-changes.html">Behavior changes</a></li><li><a href="../../docs/guides/baseline.html">The baseline</a></li><li><a href="../../docs/guides/smoke-test.html">A smoke test for WSU apps</a></li><li><a href="../../docs/guides/hops.html">What a hop does</a></li><li><a href="../../docs/guides/replay-gate.html">The replay gate</a></li><li><a href="../../docs/guides/framework-hops.html" aria-current="page">Hand-copied libraries to Composer</a></li><li><a href="../../docs/guides/strict-sessions.html">Strict session IDs</a></li><li><a href="../../docs/guides/laravel-and-vendor.html">Laravel hops and vendor/</a></li><li><a href="../../docs/guides/citadel.html">Deploying on Citadel</a></li></ul></li><li class="docs-nav__group"><span class="docs-nav__label">Reference</span><ul><li><a href="../../docs/reference/commands.html">Commands</a></li><li><a href="../../docs/reference/configuration.html">Configuration</a></li><li><a href="../../docs/reference/hops.html">Hops</a></li></ul></li><li><a href="../../docs/checks.html">Checks</a></li><li><a href="../../docs/next.html">Next</a></li><li><a href="../../docs/upgrading.html">Upgrading</a></li><li><a href="../../docs/changelog.html">Changelog</a></li></ul></nav>
   <div class="docs-content">
     <main id="main">
-      <article class="docs-article"><h1 id="hand-copied-libraries-to-composer">Hand-copied libraries to Composer<a class="docs-heading-link" aria-label="Link to this section" href="#hand-copied-libraries-to-composer">#</a></h1>
+      <article class="docs-article"><h1 id="hand-copied-libraries-to-composer">Hand-copied libraries to <span class="docs-heading-tail"><span>Composer</span><a class="docs-heading-link" aria-label="Link to this section" href="#hand-copied-libraries-to-composer">#</a></span></h1>
 <p>This page covers the first framework hop, <code>vendored-to-composer</code>: what it moves, what it writes, what makes it refuse,
 and how the replay gate proves the app still answers the same. Before this: <a href="replay-gate.html">The replay gate</a>. Next:
 <a href="strict-sessions.html">Strict session IDs for raw PHP apps</a>.</p>
@@ -51,7 +51,7 @@ never edits a library's files, and a 2012 copy of Doctrine crashes on PHP 7.4 be
 hop moves the app instead. The hand copies leave, <code>composer.json</code> asks for the maintained release of the same library,
 and the lines that loaded the copies load Composer's autoloader. Every other hop lifts the engine; this one finally
 gets the parts from a dealer instead of the junkyard.</p>
-<h2 id="in-two-commands">In two commands<a class="docs-heading-link" aria-label="Link to this section" href="#in-two-commands">#</a></h2>
+<h2 id="in-two-commands">In two <span class="docs-heading-tail"><span>commands</span><a class="docs-heading-link" aria-label="Link to this section" href="#in-two-commands">#</a></span></h2>
 <!-- docs-test: skip run on your own app -->
 <pre tabindex="0"><code class="language-sh">booster plan --path=&lt;app&gt; --from-php=5.6 --vendored          # where the move fits, or the stop signs that block it
 booster run --path=&lt;app&gt; --from-php=5.6 --vendored --replay  # move it, with the replay as proof
@@ -69,7 +69,7 @@ Booster can move Doctrine, Slim and Smarty onto Composer, so the line below adds
 </code></pre>
 <p>Draft the replay file first (<code>booster replay init</code>, see <a href="replay-gate.html">The replay gate</a>). The drafter reads Slim 1
 routes (<code>$app-&gt;get('/batches/:id', ...)</code>), so an old Slim app gets a useful first draft.</p>
-<h2 id="the-recipes">The recipes<a class="docs-heading-link" aria-label="Link to this section" href="#the-recipes">#</a></h2>
+<h2 id="the-recipes">The <span class="docs-heading-tail"><span>recipes</span><a class="docs-heading-link" aria-label="Link to this section" href="#the-recipes">#</a></span></h2>
 <p>Each recipe goes to the nearest maintained release that keeps the API the app already calls, so the app's own code
 does not change. Booster checked these against Packagist on 2026-11-06.</p>
 <div class="docs-table" role="region" aria-label="Table" tabindex="0"><table>
@@ -105,7 +105,7 @@ does not change. Booster checked these against Packagist on 2026-11-06.</p>
 <p>The planner puts the hop at the first PHP every recipe's release runs on: right after the PHP hop that lands on 7.4
 when the app has Slim 1, on 7.1 when it has only Doctrine and Smarty, and first when the app is already there. A plan
 that ends below that leaves the hop out with a warning.</p>
-<h2 id="what-the-hop-changes">What the hop changes<a class="docs-heading-link" aria-label="Link to this section" href="#what-the-hop-changes">#</a></h2>
+<h2 id="what-the-hop-changes">What the hop <span class="docs-heading-tail"><span>changes</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-the-hop-changes">#</a></span></h2>
 <ul>
 <li>Deletes each moved copy (<code>vendor/Doctrine/</code>, <code>vendor/Smarty/</code>, <code>vendor/Slim/</code>), and <code>vendor/</code> itself when nothing
 else is left in it. That is the only thing it does to <code>vendor/</code>: it never edits a library file.</li>
@@ -128,7 +128,7 @@ lock. Each later PHP hop therefore reads the lock first and updates just the pac
 inside <code>composer.json</code>'s constraints. On a real app's <code>composer.json</code> that update moved two packages, and nothing in
 the lock refused 8.1 through 8.5 after it. One lock for every PHP from 7.4 to the target is not on offer: Composer picks the newest release each
 PHP allows, so no <code>config.platform.php</code> pin finds that lock on its own, and Booster never creates that key.</p>
-<h2 id="the-slim-1-bridge">The Slim 1 bridge<a class="docs-heading-link" aria-label="Link to this section" href="#the-slim-1-bridge">#</a></h2>
+<h2 id="the-slim-1-bridge">The Slim 1 <span class="docs-heading-tail"><span>bridge</span><a class="docs-heading-link" aria-label="Link to this section" href="#the-slim-1-bridge">#</a></span></h2>
 <p>Slim 4 is not Slim 1: different classes, PSR-7 requests, a different router. Rewriting every route by hand is how a
 framework move eats a semester. Instead the hop writes <code>slim1-bridge.php</code>, about 1,200 lines ported from Slim
 1.6.7 (MIT), that keeps Slim 1's classes and behavior and hands the routing and the sending to Slim 4:</p>
@@ -144,7 +144,7 @@ pattern order, echoed output as the body, <code>Content-Type: text/html</code> b
 deprecation would become a 500, which is a strange way to celebrate an upgrade. The bridge is the app's code from
 then on. Move one route at a time to plain Slim 4 (or to Laravel) with the replay green after each, and delete the
 file when nothing calls <code>new Slim()</code> any more.</p>
-<h2 id="stop-signs">Stop signs<a class="docs-heading-link" aria-label="Link to this section" href="#stop-signs">#</a></h2>
+<h2 id="stop-signs">Stop <span class="docs-heading-tail"><span>signs</span><a class="docs-heading-link" aria-label="Link to this section" href="#stop-signs">#</a></span></h2>
 <p>The hop rewrites a few exact line shapes and nothing else. Anything that touches a moved library in another way is a
 stop sign: the plan leaves the hop out and names the file and line, and a run that finds one refuses the step and
 changes nothing.</p>
@@ -167,14 +167,14 @@ starting with a <code>Smarty version ... compiled from</code> comment) are a cac
 rewrite and lists each folder as a MANUAL line. Delete the compiled files (Smarty rebuilds them on the next request)
 and keep the folder out of git. A <code>SMARTY_DIR</code> stop sign on a file in a cache or compile folder without that header
 says so too, because deleting the cache is the likely fix.</p>
-<h2 id="what-stays">What stays<a class="docs-heading-link" aria-label="Link to this section" href="#what-stays">#</a></h2>
+<h2 id="what-stays">What <span class="docs-heading-tail"><span>stays</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-stays">#</a></span></h2>
 <ul>
 <li>Libraries without a recipe (PHPMailer, Swift Mailer, Twig, Monolog, anything Booster does not recognize) stay where
 they are, still loaded the way they always were, and the hop lists each one as a MANUAL line.</li>
 <li>Copies in a nested <code>vendor/</code> (say <code>admin/vendor/Smarty</code>) stay too: <code>composer.json</code> goes at the app root, so only the
 root's <code>vendor/</code> can be pointed at Composer.</li>
 </ul>
-<h2 id="why-the-replay-and-the-tests-wait">Why the replay and the tests wait<a class="docs-heading-link" aria-label="Link to this section" href="#why-the-replay-and-the-tests-wait">#</a></h2>
+<h2 id="why-the-replay-and-the-tests-wait">Why the replay and the tests <span class="docs-heading-tail"><span>wait</span><a class="docs-heading-link" aria-label="Link to this section" href="#why-the-replay-and-the-tests-wait">#</a></span></h2>
 <p>With <code>--replay</code>, the baseline is recorded on the app's current PHP as always. The PHP hops before
 <code>vendored-to-composer</code> defer the replay, because the app still loads its 2012 copies and those may not run on the
 new PHP; that is the problem the hop exists to fix. From the hop on, every step is compared against the baseline:</p>
@@ -187,7 +187,7 @@ from; the PHP hops before the move run the syntax check instead, and the tests t
 <p>A real app's replay found two Doctrine changes no test asked about: <code>DISTINCT(alias.field)</code> in DQL reads as an
 expression in ORM 2.20, and an entity whose id holds a date needs a custom column type. The hop lists both as MANUAL
 lines, so you know where to look when the replay says an answer changed.</p>
-<h2 id="after-the-hop">After the hop<a class="docs-heading-link" aria-label="Link to this section" href="#after-the-hop">#</a></h2>
+<h2 id="after-the-hop">After the <span class="docs-heading-tail"><span>hop</span><a class="docs-heading-link" aria-label="Link to this section" href="#after-the-hop">#</a></span></h2>
 <ul>
 <li>Commit <code>composer.json</code>, <code>composer.lock</code> and, for Slim, <code>slim1-bridge.php</code>. Later hops leave the bridge alone
 while it is still the file Booster wrote, so it does not churn in every hop's diff; once you edit it, it is the

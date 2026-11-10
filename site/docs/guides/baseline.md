@@ -6,7 +6,7 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# The baseline[#](https://booster.apps.wayne.edu/docs/guides/baseline.html#the-baseline)
+# The baseline [#](https://booster.apps.wayne.edu/docs/guides/baseline.html#the-baseline)
 
 This page explains the baseline `run` takes before the first hop. Next: [A smoke test for WSU apps](https://booster.apps.wayne.edu/docs/guides/smoke-test.html).
 

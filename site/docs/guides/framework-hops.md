@@ -6,13 +6,13 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# Hand-copied libraries to Composer[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#hand-copied-libraries-to-composer)
+# Hand-copied libraries to Composer [#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#hand-copied-libraries-to-composer)
 
 This page covers the first framework hop, `vendored-to-composer`: what it moves, what it writes, what makes it refuse, and how the replay gate proves the app still answers the same. Before this: [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html). Next: [Strict session IDs for raw PHP apps](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html).
 
 Some apps never met Composer. In 2012 a real WSU app copied Doctrine 2.2, Smarty 3.1 and Slim 1.6 straight into `vendor/`, loaded them with `require` lines, and ran happily until PHP moved on. The PHP hops cannot help it: Booster never edits a library's files, and a 2012 copy of Doctrine crashes on PHP 7.4 before the app's own code runs. So this hop moves the app instead. The hand copies leave, `composer.json` asks for the maintained release of the same library, and the lines that loaded the copies load Composer's autoloader. Every other hop lifts the engine; this one finally gets the parts from a dealer instead of the junkyard.
 
-## In two commands[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#in-two-commands)
+## In two commands [#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#in-two-commands)
 
 ```sh
 booster plan --path=<app> --from-php=5.6 --vendored          # where the move fits, or the stop signs that block it
@@ -37,7 +37,7 @@ The app hand-copied Doctrine, Slim and Smarty into vendor/. Add --vendored to pl
 
 Draft the replay file first (`booster replay init`, see [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html)). The drafter reads Slim 1 routes (`$app->get('/batches/:id', ...)`), so an old Slim app gets a useful first draft.
 
-## The recipes[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#the-recipes)
+## The recipes [#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#the-recipes)
 
 Each recipe goes to the nearest maintained release that keeps the API the app already calls, so the app's own code does not change. Booster checked these against Packagist on 2026-11-06.
 
@@ -49,7 +49,7 @@ Each recipe goes to the nearest maintained release that keeps the API the app al
 
 The planner puts the hop at the first PHP every recipe's release runs on: right after the PHP hop that lands on 7.4 when the app has Slim 1, on 7.1 when it has only Doctrine and Smarty, and first when the app is already there. A plan that ends below that leaves the hop out with a warning.
 
-## What the hop changes[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#what-the-hop-changes)
+## What the hop changes [#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#what-the-hop-changes)
 
 - Deletes each moved copy (`vendor/Doctrine/`, `vendor/Smarty/`, `vendor/Slim/`), and `vendor/` itself when nothing else is left in it. That is the only thing it does to `vendor/`: it never edits a library file.
 - Writes `composer.json` (or adds to the app's own): the packages above, `php` at the hop's PHP when the app named none, and `autoload.classmap` for the bridge. A package the app already requires keeps its constraint.
@@ -60,7 +60,7 @@ The gate then runs `composer install` on the hop's PHP inside the target image, 
 
 That lock is right for the hop's PHP and no newer. On 7.4, Slim 4's `psr/container` 2.0 holds `symfony/service-contracts` at v1.1.2, which needs PHP below 8.0, so a plain `composer install` on 8.0 refuses the lock. Each later PHP hop therefore reads the lock first and updates just the packages that refuse its PHP (here `composer update -W symfony/service-contracts` on the 8.0 hop, which also lifts `symfony/deprecation-contracts`), inside `composer.json`'s constraints. On a real app's `composer.json` that update moved two packages, and nothing in the lock refused 8.1 through 8.5 after it. One lock for every PHP from 7.4 to the target is not on offer: Composer picks the newest release each PHP allows, so no `config.platform.php` pin finds that lock on its own, and Booster never creates that key.
 
-## The Slim 1 bridge[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#the-slim-1-bridge)
+## The Slim 1 bridge [#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#the-slim-1-bridge)
 
 Slim 4 is not Slim 1: different classes, PSR-7 requests, a different router. Rewriting every route by hand is how a framework move eats a semester. Instead the hop writes `slim1-bridge.php`, about 1,200 lines ported from Slim 1.6.7 (MIT), that keeps Slim 1's classes and behavior and hands the routing and the sending to Slim 4:
 
@@ -70,7 +70,7 @@ Slim 4 is not Slim 1: different classes, PSR-7 requests, a different router. Rew
 
 It does not turn a PHP notice into an error page the way Slim 1 did in development mode: on a new PHP every deprecation would become a 500, which is a strange way to celebrate an upgrade. The bridge is the app's code from then on. Move one route at a time to plain Slim 4 (or to Laravel) with the replay green after each, and delete the file when nothing calls `new Slim()` any more.
 
-## Stop signs[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#stop-signs)
+## Stop signs [#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#stop-signs)
 
 The hop rewrites a few exact line shapes and nothing else. Anything that touches a moved library in another way is a stop sign: the plan leaves the hop out and names the file and line, and a run that finds one refuses the step and changes nothing.
 
@@ -84,12 +84,12 @@ A commented-out call is not a stop sign. Booster reads the line, not the vibe.
 
 Smarty's compiled templates (the files a hand copy writes into `templates_c/` or `tmp/template_compile/`, each starting with a `Smarty version ... compiled from` comment) are a cache, not code: the hop leaves them out of the rewrite and lists each folder as a MANUAL line. Delete the compiled files (Smarty rebuilds them on the next request) and keep the folder out of git. A `SMARTY_DIR` stop sign on a file in a cache or compile folder without that header says so too, because deleting the cache is the likely fix.
 
-## What stays[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#what-stays)
+## What stays [#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#what-stays)
 
 - Libraries without a recipe (PHPMailer, Swift Mailer, Twig, Monolog, anything Booster does not recognize) stay where they are, still loaded the way they always were, and the hop lists each one as a MANUAL line.
 - Copies in a nested `vendor/` (say `admin/vendor/Smarty`) stay too: `composer.json` goes at the app root, so only the root's `vendor/` can be pointed at Composer.
 
-## Why the replay and the tests wait[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#why-the-replay-and-the-tests-wait)
+## Why the replay and the tests wait [#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#why-the-replay-and-the-tests-wait)
 
 With `--replay`, the baseline is recorded on the app's current PHP as always. The PHP hops before `vendored-to-composer` defer the replay, because the app still loads its 2012 copies and those may not run on the new PHP; that is the problem the hop exists to fix. From the hop on, every step is compared against the baseline:
 
@@ -105,7 +105,7 @@ Tests deferred to step 6 (vendored-to-composer): the app still loads its hand-co
 
 A real app's replay found two Doctrine changes no test asked about: `DISTINCT(alias.field)` in DQL reads as an expression in ORM 2.20, and an entity whose id holds a date needs a custom column type. The hop lists both as MANUAL lines, so you know where to look when the replay says an answer changed.
 
-## After the hop[#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#after-the-hop)
+## After the hop [#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#after-the-hop)
 
 - Commit `composer.json`, `composer.lock` and, for Slim, `slim1-bridge.php`. Later hops leave the bridge alone while it is still the file Booster wrote, so it does not churn in every hop's diff; once you edit it, it is the app's code and gets the hops like the rest. Citadel never runs `composer install`, so commit `vendor/` on the deploy branch or let Booster's `deployments/` script install it (see [Deploying on Citadel](https://booster.apps.wayne.edu/docs/guides/citadel.html)).
 - ORM 2.20 is the last line that reads docblock annotations, and `doctrine/annotations` 1.x is abandoned. ORM 3 (PHP 8.1 or newer, attributes instead of annotations) is the next move, by hand for now. Smarty 5 likewise, once the templates stop using PHP functions as modifiers.

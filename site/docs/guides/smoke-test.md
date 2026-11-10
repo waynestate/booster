@@ -6,7 +6,7 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# A smoke test for WSU apps[#](https://booster.apps.wayne.edu/docs/guides/smoke-test.html#a-smoke-test-for-wsu-apps)
+# A smoke test for WSU apps [#](https://booster.apps.wayne.edu/docs/guides/smoke-test.html#a-smoke-test-for-wsu-apps)
 
 This page shows the one small test that gives the gate something real to prove. Next: [What a hop does](https://booster.apps.wayne.edu/docs/guides/hops.html).
 
@@ -62,7 +62,7 @@ Those values live in `phpunit.xml`, committed with the app. When you would rathe
 booster run --path=<app> --test-env DB_CONNECTION=sqlite --test-env DB_DATABASE=:memory:
 ```
 
-## A raw PHP app[#](https://booster.apps.wayne.edu/docs/guides/smoke-test.html#a-raw-php-app)
+## A raw PHP app [#](https://booster.apps.wayne.edu/docs/guides/smoke-test.html#a-raw-php-app)
 
 A raw PHP app (no framework, often no tests at all) gets the built-in syntax check, which proves the files parse on the new PHP and nothing more. Give it the same kind of smoke test, as a plain script with no PHPUnit to install: load what every page loads and touch each library the app leans on, then exit 0. Save it as `tests/smoke.php`:
 

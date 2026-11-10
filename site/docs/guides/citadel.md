@@ -6,7 +6,7 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# Deploying on Citadel[#](https://booster.apps.wayne.edu/docs/guides/citadel.html#deploying-on-citadel)
+# Deploying on Citadel [#](https://booster.apps.wayne.edu/docs/guides/citadel.html#deploying-on-citadel)
 
 This page covers what a real run says about the next deploy, and the deployment script it writes when one is needed. Next: [Checks](https://booster.apps.wayne.edu/docs/checks.html).
 

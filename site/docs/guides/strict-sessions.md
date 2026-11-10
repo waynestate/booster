@@ -6,7 +6,7 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# Strict session IDs for raw PHP apps[#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#strict-session-ids-for-raw-php-apps)
+# Strict session IDs for raw PHP apps [#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#strict-session-ids-for-raw-php-apps)
 
 This page covers `session-strict-mode`: which apps it is for, the line it adds, what counts as already covered, and what makes it refuse. Before this: [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html). Next: [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html).
 
@@ -14,7 +14,7 @@ PHP ships with `session.use_strict_mode` off. With it off, PHP takes any session
 
 HELMET sets both for apps that boot it, and Laravel runs its own session store, so neither needs this hop. It is for the older raw PHP apps that call plain `session_start()` and use none of the stack's packages.
 
-## In two commands[#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#in-two-commands)
+## In two commands [#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#in-two-commands)
 
 ```sh
 booster plan --path=<app> --strict-session            # the calls it would cover, or the stop signs that block it
@@ -29,7 +29,7 @@ The app starts PHP sessions without strict session IDs (3 session_start() calls 
 
 `--only session-strict-mode` (with `--strict-session`) runs just this hop. The planner puts it first, on the PHP the app runs today, so its gate proves this one change, and the hardening lands even when a later hop stalls.
 
-## The line it adds[#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#the-line-it-adds)
+## The line it adds [#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#the-line-it-adds)
 
 Before the statement that holds each `session_start()` call, Booster adds one comment and one guarded line, at the same indent:
 
@@ -43,7 +43,7 @@ The guard matters. PHP warns when a session setting changes while a session is a
 
 "Before the statement" means the whole statement: a braceless `if (...) session_start();` gets the line above the `if`, an `else session_start();` gets it above the `if` it belongs to, and a call inside a `match` arm gets it above the `match`. A call that shares its line with other code (minified files, `<?php session_start(); ?>` in a template) gets the guard inline, right before it. Booster reads the file with PHP's own tokenizer, skips comments, strings and methods named `session_start`, and checks that every file it edits still parses.
 
-## Why a line in the code, not a config file[#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#why-a-line-in-the-code-not-a-config-file)
+## Why a line in the code, not a config file [#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#why-a-line-in-the-code-not-a-config-file)
 
 - **Not `.user.ini`.** PHP reads `.user.ini` files only under CGI and FastCGI. Citadel runs PHP as an Apache module, which never reads one, so a `.user.ini` would look like a fix and do nothing.
 - **Not `.htaccess`.** `php_flag` lines work under the Apache module but are a server error under PHP-FPM, and Booster's changes must keep working off Citadel too.
@@ -51,7 +51,7 @@ The guard matters. PHP warns when a session setting changes while a session is a
 
 A php.ini change on Citadel would cover every app at once. That is a separate proposal, not this hop.
 
-## Already covered, left alone[#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#already-covered-left-alone)
+## Already covered, left alone [#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#already-covered-left-alone)
 
 The hop changes nothing for:
 
@@ -64,7 +64,7 @@ The hop changes nothing for:
 
 So a second run changes nothing. Any other `php.ini` in the repository (a Docker one, say) is noted, but Citadel's PHP does not read it, so the hop still adds the lines.
 
-## Stop signs[#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#stop-signs)
+## Stop signs [#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#stop-signs)
 
 Strict mode changes how some apps hand out session IDs. When Booster finds one of these, it refuses, changes nothing, and names each one:
 
@@ -78,7 +78,7 @@ Strict mode changes how some apps hand out session IDs. When Booster finds one o
 
 These are read from `ini_set()` calls, `session_start([...])` options, `.htaccess` and ini files. A value Booster cannot read (a variable, say) counts as a stop sign. Settings that keep IDs in cookies, such as `ini_set('session.use_trans_sid', false)`, are fine. After fixing or reviewing each one, set the two options by hand where it is safe.
 
-## By hand, after the run[#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#by-hand-after-the-run)
+## By hand, after the run [#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#by-hand-after-the-run)
 
 - **Sign in on pre-production.** Sign in, use a page that keeps session data, and sign out. A session the server already holds keeps working; a browser that sends an ID the server never issued gets a fresh one.
 - **Custom session handlers.** An app that calls `session_set_save_handler()` only gets strict mode when its handler implements `validateId()` (`SessionUpdateTimestampHandlerInterface`). PHP's own `SessionHandler` class does not. The hop names each handler as a MANUAL line.

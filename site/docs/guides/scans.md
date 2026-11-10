@@ -6,11 +6,11 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# The scans[#](https://booster.apps.wayne.edu/docs/guides/scans.html#the-scans)
+# The scans [#](https://booster.apps.wayne.edu/docs/guides/scans.html#the-scans)
 
 This page covers both advisory scans Booster runs with `plan`, how to run either one alone, the audit `run` adds, and the dynamic-properties list on the PHP 8.2 step. Next: [The dependency check](https://booster.apps.wayne.edu/docs/guides/dependency-check.html).
 
-## The PHPCompatibility scan[#](https://booster.apps.wayne.edu/docs/guides/scans.html#the-phpcompatibility-scan)
+## The PHPCompatibility scan [#](https://booster.apps.wayne.edu/docs/guides/scans.html#the-phpcompatibility-scan)
 
 `plan` ends with an advisory scan: PHP_CodeSniffer runs the PHPCompatibility standard over the app and asks what will break on the PHP version the first PHP hop lands on. The findings are hints for the person doing the upgrade, never a gate: they do not change the exit code, and a scan that cannot run (missing tooling, a crash) is reported as "could not run" while the plan still prints in full. `--no-scan` skips both advisory scans.
 
@@ -18,7 +18,7 @@ The scan needs no change to the app: Booster ships PHP_CodeSniffer and the PHPCo
 
 The scan ignores `vendor/`, `node_modules/` and `storage/`, because those hold third-party code and generated files, not the app's. It reads the app only and changes nothing. `booster scan --path=../my-app --php=<target>` runs the same scan on its own, for any PHP version Booster knows, and exits 0 even when it finds a wall of removed functions. If the app's `composer.json` declares `ext-oci8` (in `require`, `require-dev` or `config.platform`), the scan leaves out the "`oci_*()` is removed since PHP 8.4" findings: PHP 8.4 moved oci8 out of the PHP download and into PECL, and an app that declares the extension installs the PECL one on purpose, so those lines would be false alarms. Every other finding stays.
 
-## The PHPStan scan[#](https://booster.apps.wayne.edu/docs/guides/scans.html#the-phpstan-scan)
+## The PHPStan scan [#](https://booster.apps.wayne.edu/docs/guides/scans.html#the-phpstan-scan)
 
 `plan` ends with a second advisory scan: PHPStan runs over the app at the destination PHP version, using Pinstripe's `base.neon` preset. The findings are hints for the person doing the upgrade, never a gate: they do not change the exit code, and a scan that cannot run is reported with the fix that enables it, while the plan still prints in full. `--no-scan` skips it.
 
@@ -26,13 +26,13 @@ The scan needs no change to the app: Booster ships PHPStan and Pinstripe's prese
 
 It ignores `vendor/`, `node_modules/` and `storage/`, reads the app only and changes nothing. `booster scan --path=../my-app --php=8.5 --phpstan` runs the same scan on its own, for any PHP version Booster knows, and exits 0 even when it finds a wall of missing types.
 
-## The composer audit during the run[#](https://booster.apps.wayne.edu/docs/guides/scans.html#the-composer-audit-during-the-run)
+## The composer audit during the run [#](https://booster.apps.wayne.edu/docs/guides/scans.html#the-composer-audit-during-the-run)
 
 `run` carries a third advisory check, per hop: after a hop changes `composer.json` or `composer.lock`, Booster runs `composer audit --format=json --no-interaction` in the app and lists advisories and abandoned packages in the step's report with counts. It never changes the exit code, a clean audit says `Composer audit: clean (no advisories, no abandoned packages).`, and a hop that changed no composer file skips it and says so. A dry run previews the hops and runs no audit.
 
 Composer's audit exits 1 for advisories, 2 for abandoned packages and 3 for both. Booster reads the JSON report on every one of those exits, so an app with abandoned packages gets the list, not a "could not run". Only an exit with no JSON report behind it (Composer missing, a crash) is reported as "could not run".
 
-## Dynamic properties[#](https://booster.apps.wayne.edu/docs/guides/scans.html#dynamic-properties)
+## Dynamic properties [#](https://booster.apps.wayne.edu/docs/guides/scans.html#dynamic-properties)
 
 PHP 8.2 deprecates dynamic properties: assigning `$this->name` in a class that never declares `$name`. The plan step that crosses PHP 8.2 reads the app's own classes (it skips `vendor/`, `node_modules/` and `storage/`) and lists every such assignment as `file:line Class::$prop`, or says how many classes it read and found none. `run` repeats them on that step as MANUAL lines. Booster never changes them: declare each property in its class, or mark the class `#[\AllowDynamicProperties]`.
 

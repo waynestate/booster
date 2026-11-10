@@ -6,7 +6,7 @@ llms: https://booster.apps.wayne.edu/llms.txt
 generator: Squire agent-ready
 ---
 
-# Checks[#](https://booster.apps.wayne.edu/docs/checks.html#checks)
+# Checks [#](https://booster.apps.wayne.edu/docs/checks.html#checks)
 
 This page is for maintainers: how Booster is checked, and where its proof lives. Next: [Next](https://booster.apps.wayne.edu/docs/next.html) for what is not built yet.
 
@@ -28,7 +28,7 @@ docker run --rm -v "${PWD}:/app" -w /app composer:2.11.1@sha256:8de2184c6de224f4
 
 `contract/expectations.json` says what Booster must detect, plan and change for each example app in `examples/`; `tests/ContractTest.php` enforces it with the real Rector, so a Rector release that changes a hop shows up in CI.
 
-## Proof[#](https://booster.apps.wayne.edu/docs/checks.html#proof)
+## Proof [#](https://booster.apps.wayne.edu/docs/checks.html#proof)
 
 Proof runs against real Wayne State applications are on a private site, [proof.apps.wayne.edu/booster](https://proof.apps.wayne.edu/booster/), behind a Wayne State employee sign-in. The [Real output page](https://booster.apps.wayne.edu/proof.html) shows Booster's own plan and dry-run output on each example app, and `composer ci` keeps it current.
 
@@ -38,6 +38,6 @@ The front-end hops (`vite-major`, `tailwind-3-to-4`, `typescript-major`, `inerti
 
 The same day, the whole chain ran on a copy of WELD's own site app with every gate and the replay gate on: PHP 8.3 to 8.5, PHPUnit 12 to 13 with Pest 4 to 5, Node 26, Vite 8, TypeScript 6 and Inertia 3, seven hops, ten recorded pages matching after each one. That run found eight more bugs, each fixed with a test and listed in the changelog.
 
-## Status[#](https://booster.apps.wayne.edu/docs/checks.html#status)
+## Status [#](https://booster.apps.wayne.edu/docs/checks.html#status)
 
 See [CHANGELOG.md](https://github.com/waynestate/booster/blob/main/CHANGELOG.md) for what changed, [OPEN_QUESTIONS.md](https://github.com/waynestate/booster/blob/main/OPEN_QUESTIONS.md) for what stays open, and [BEST_PRACTICES.md](https://github.com/waynestate/booster/blob/main/BEST_PRACTICES.md) for the rules Booster follows.

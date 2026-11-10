@@ -41,7 +41,7 @@
   <nav class="docs-nav docs-nav--sidebar" aria-label="Documentation"><ul class="docs-nav__list"><li><a href="../docs/index.html">Overview</a></li><li><a href="../docs/install.html">Install</a></li><li class="docs-nav__group"><span class="docs-nav__label">Guides</span><ul><li><a href="../docs/guides/quick-start.html">Quick start</a></li><li><a href="../docs/recipes.html">How do I...</a></li><li><a href="../docs/guides/scans.html">The scans</a></li><li><a href="../docs/guides/dependency-check.html">The dependency check</a></li><li><a href="../docs/guides/behaviour-changes.html">Behavior changes</a></li><li><a href="../docs/guides/baseline.html">The baseline</a></li><li><a href="../docs/guides/smoke-test.html">A smoke test for WSU apps</a></li><li><a href="../docs/guides/hops.html">What a hop does</a></li><li><a href="../docs/guides/replay-gate.html">The replay gate</a></li><li><a href="../docs/guides/framework-hops.html">Hand-copied libraries to Composer</a></li><li><a href="../docs/guides/strict-sessions.html">Strict session IDs</a></li><li><a href="../docs/guides/laravel-and-vendor.html">Laravel hops and vendor/</a></li><li><a href="../docs/guides/citadel.html">Deploying on Citadel</a></li></ul></li><li class="docs-nav__group"><span class="docs-nav__label">Reference</span><ul><li><a href="../docs/reference/commands.html">Commands</a></li><li><a href="../docs/reference/configuration.html">Configuration</a></li><li><a href="../docs/reference/hops.html">Hops</a></li></ul></li><li><a href="../docs/checks.html" aria-current="page">Checks</a></li><li><a href="../docs/next.html">Next</a></li><li><a href="../docs/upgrading.html">Upgrading</a></li><li><a href="../docs/changelog.html">Changelog</a></li></ul></nav>
   <div class="docs-content">
     <main id="main">
-      <article class="docs-article"><h1 id="checks">Checks<a class="docs-heading-link" aria-label="Link to this section" href="#checks">#</a></h1>
+      <article class="docs-article"><h1 id="checks"><span class="docs-heading-tail"><span>Checks</span><a class="docs-heading-link" aria-label="Link to this section" href="#checks">#</a></span></h1>
 <p>This page is for maintainers: how Booster is checked, and where its proof lives. Next: <a href="next.html">Next</a> for what is not built yet.</p>
 <p>Maintainers: how to build, test and release this project, and where its data comes from, is in
 <a rel="noopener" href="https://github.com/waynestate/booster/blob/main/MAINTAINING.md">MAINTAINING.md</a>.</p>
@@ -59,7 +59,7 @@ agent-ready check, the Real output page check (<code>bin/build-proof.php --check
 </code></pre>
 <p><code>contract/expectations.json</code> says what Booster must detect, plan and change for each example app in <code>examples/</code>;
 <code>tests/ContractTest.php</code> enforces it with the real Rector, so a Rector release that changes a hop shows up in CI.</p>
-<h2 id="proof">Proof<a class="docs-heading-link" aria-label="Link to this section" href="#proof">#</a></h2>
+<h2 id="proof"><span class="docs-heading-tail"><span>Proof</span><a class="docs-heading-link" aria-label="Link to this section" href="#proof">#</a></span></h2>
 <p>Proof runs against real Wayne State applications are on a private site,
 <a rel="noopener" href="https://proof.apps.wayne.edu/booster/">proof.apps.wayne.edu/booster</a>, behind a Wayne State employee sign-in. The
 <a rel="noopener" href="https://booster.apps.wayne.edu/proof.html">Real output page</a> shows Booster's own plan and dry-run output on each
@@ -74,7 +74,7 @@ browser. The private proof site has the hop-by-hop table.</p>
 <p>The same day, the whole chain ran on a copy of WELD's own site app with every gate and the replay gate on: PHP 8.3
 to 8.5, PHPUnit 12 to 13 with Pest 4 to 5, Node 26, Vite 8, TypeScript 6 and Inertia 3, seven hops, ten recorded
 pages matching after each one. That run found eight more bugs, each fixed with a test and listed in the changelog.</p>
-<h2 id="status">Status<a class="docs-heading-link" aria-label="Link to this section" href="#status">#</a></h2>
+<h2 id="status"><span class="docs-heading-tail"><span>Status</span><a class="docs-heading-link" aria-label="Link to this section" href="#status">#</a></span></h2>
 <p>See <a rel="noopener" href="https://github.com/waynestate/booster/blob/main/CHANGELOG.md">CHANGELOG.md</a> for what changed,
 <a rel="noopener" href="https://github.com/waynestate/booster/blob/main/OPEN_QUESTIONS.md">OPEN_QUESTIONS.md</a> for what stays open, and
 <a rel="noopener" href="https://github.com/waynestate/booster/blob/main/BEST_PRACTICES.md">BEST_PRACTICES.md</a> for the rules Booster follows.</p>

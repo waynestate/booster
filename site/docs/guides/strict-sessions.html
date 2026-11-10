@@ -41,7 +41,7 @@
   <nav class="docs-nav docs-nav--sidebar" aria-label="Documentation"><ul class="docs-nav__list"><li><a href="../../docs/index.html">Overview</a></li><li><a href="../../docs/install.html">Install</a></li><li class="docs-nav__group"><span class="docs-nav__label">Guides</span><ul><li><a href="../../docs/guides/quick-start.html">Quick start</a></li><li><a href="../../docs/recipes.html">How do I...</a></li><li><a href="../../docs/guides/scans.html">The scans</a></li><li><a href="../../docs/guides/dependency-check.html">The dependency check</a></li><li><a href="../../docs/guides/behaviour-changes.html">Behavior changes</a></li><li><a href="../../docs/guides/baseline.html">The baseline</a></li><li><a href="../../docs/guides/smoke-test.html">A smoke test for WSU apps</a></li><li><a href="../../docs/guides/hops.html">What a hop does</a></li><li><a href="../../docs/guides/replay-gate.html">The replay gate</a></li><li><a href="../../docs/guides/framework-hops.html">Hand-copied libraries to Composer</a></li><li><a href="../../docs/guides/strict-sessions.html" aria-current="page">Strict session IDs</a></li><li><a href="../../docs/guides/laravel-and-vendor.html">Laravel hops and vendor/</a></li><li><a href="../../docs/guides/citadel.html">Deploying on Citadel</a></li></ul></li><li class="docs-nav__group"><span class="docs-nav__label">Reference</span><ul><li><a href="../../docs/reference/commands.html">Commands</a></li><li><a href="../../docs/reference/configuration.html">Configuration</a></li><li><a href="../../docs/reference/hops.html">Hops</a></li></ul></li><li><a href="../../docs/checks.html">Checks</a></li><li><a href="../../docs/next.html">Next</a></li><li><a href="../../docs/upgrading.html">Upgrading</a></li><li><a href="../../docs/changelog.html">Changelog</a></li></ul></nav>
   <div class="docs-content">
     <main id="main">
-      <article class="docs-article"><h1 id="strict-session-ids-for-raw-php-apps">Strict session IDs for raw PHP apps<a class="docs-heading-link" aria-label="Link to this section" href="#strict-session-ids-for-raw-php-apps">#</a></h1>
+      <article class="docs-article"><h1 id="strict-session-ids-for-raw-php-apps">Strict session IDs for raw PHP <span class="docs-heading-tail"><span>apps</span><a class="docs-heading-link" aria-label="Link to this section" href="#strict-session-ids-for-raw-php-apps">#</a></span></h1>
 <p>This page covers <code>session-strict-mode</code>: which apps it is for, the line it adds, what counts as already covered, and
 what makes it refuse. Before this: <a href="framework-hops.html">Hand-copied libraries to Composer</a>. Next:
 <a href="laravel-and-vendor.html">Laravel hops and vendor/</a>.</p>
@@ -51,7 +51,7 @@ plants an ID on a victim, waits for the victim to sign in, and then rides the sa
 throws an unknown ID away and issues a fresh one. <code>session.use_only_cookies</code> (on by default) keeps the ID out of URLs.</p>
 <p>HELMET sets both for apps that boot it, and Laravel runs its own session store, so neither needs this hop. It is for
 the older raw PHP apps that call plain <code>session_start()</code> and use none of the stack's packages.</p>
-<h2 id="in-two-commands">In two commands<a class="docs-heading-link" aria-label="Link to this section" href="#in-two-commands">#</a></h2>
+<h2 id="in-two-commands">In two <span class="docs-heading-tail"><span>commands</span><a class="docs-heading-link" aria-label="Link to this section" href="#in-two-commands">#</a></span></h2>
 <!-- docs-test: skip run on your own app -->
 <pre tabindex="0"><code class="language-sh">booster plan --path=&lt;app&gt; --strict-session            # the calls it would cover, or the stop signs that block it
 booster run --path=&lt;app&gt; --strict-session --dry-run   # read the diff, then run again without --dry-run
@@ -61,7 +61,7 @@ booster run --path=&lt;app&gt; --strict-session --dry-run   # read the diff, the
 </code></pre>
 <p><code>--only session-strict-mode</code> (with <code>--strict-session</code>) runs just this hop. The planner puts it first, on the PHP the
 app runs today, so its gate proves this one change, and the hardening lands even when a later hop stalls.</p>
-<h2 id="the-line-it-adds">The line it adds<a class="docs-heading-link" aria-label="Link to this section" href="#the-line-it-adds">#</a></h2>
+<h2 id="the-line-it-adds">The line it <span class="docs-heading-tail"><span>adds</span><a class="docs-heading-link" aria-label="Link to this section" href="#the-line-it-adds">#</a></span></h2>
 <p>Before the statement that holds each <code>session_start()</code> call, Booster adds one comment and one guarded line, at the
 same indent:</p>
 <pre tabindex="0"><code class="language-php">// Booster: strict session IDs, set before the session starts (refuses IDs this server never issued).
@@ -76,7 +76,7 @@ never adds a warning to a page.</p>
 the <code>match</code>. A call that shares its line with other code (minified files, <code>&lt;?php session_start(); ?&gt;</code> in a template)
 gets the guard inline, right before it. Booster reads the file with PHP's own tokenizer, skips comments, strings and
 methods named <code>session_start</code>, and checks that every file it edits still parses.</p>
-<h2 id="why-a-line-in-the-code-not-a-config-file">Why a line in the code, not a config file<a class="docs-heading-link" aria-label="Link to this section" href="#why-a-line-in-the-code-not-a-config-file">#</a></h2>
+<h2 id="why-a-line-in-the-code-not-a-config-file">Why a line in the code, not a config <span class="docs-heading-tail"><span>file</span><a class="docs-heading-link" aria-label="Link to this section" href="#why-a-line-in-the-code-not-a-config-file">#</a></span></h2>
 <ul>
 <li><strong>Not <code>.user.ini</code>.</strong> PHP reads <code>.user.ini</code> files only under CGI and FastCGI. Citadel runs PHP as an Apache module,
 which never reads one, so a <code>.user.ini</code> would look like a fix and do nothing.</li>
@@ -87,7 +87,7 @@ everyone out once, and it adds headers. That is a bigger change than this hop pr
 HELMET gets a MANUAL line suggesting it instead.</li>
 </ul>
 <p>A php.ini change on Citadel would cover every app at once. That is a separate proposal, not this hop.</p>
-<h2 id="already-covered-left-alone">Already covered, left alone<a class="docs-heading-link" aria-label="Link to this section" href="#already-covered-left-alone">#</a></h2>
+<h2 id="already-covered-left-alone">Already covered, left <span class="docs-heading-tail"><span>alone</span><a class="docs-heading-link" aria-label="Link to this section" href="#already-covered-left-alone">#</a></span></h2>
 <p>The hop changes nothing for:</p>
 <ul>
 <li>a Laravel app (the planner skips it and says why),</li>
@@ -99,7 +99,7 @@ HELMET gets a MANUAL line suggesting it instead.</li>
 </ul>
 <p>So a second run changes nothing. Any other <code>php.ini</code> in the repository (a Docker one, say) is noted, but Citadel's
 PHP does not read it, so the hop still adds the lines.</p>
-<h2 id="stop-signs">Stop signs<a class="docs-heading-link" aria-label="Link to this section" href="#stop-signs">#</a></h2>
+<h2 id="stop-signs">Stop <span class="docs-heading-tail"><span>signs</span><a class="docs-heading-link" aria-label="Link to this section" href="#stop-signs">#</a></span></h2>
 <p>Strict mode changes how some apps hand out session IDs. When Booster finds one of these, it refuses, changes nothing,
 and names each one:</p>
 <div class="docs-table" role="region" aria-label="Table" tabindex="0"><table>
@@ -136,7 +136,7 @@ and names each one:</p>
 cannot read (a variable, say) counts as a stop sign. Settings that keep IDs in cookies, such as
 <code>ini_set('session.use_trans_sid', false)</code>, are fine. After fixing or reviewing each one, set the two options by hand
 where it is safe.</p>
-<h2 id="by-hand-after-the-run">By hand, after the run<a class="docs-heading-link" aria-label="Link to this section" href="#by-hand-after-the-run">#</a></h2>
+<h2 id="by-hand-after-the-run">By hand, after the <span class="docs-heading-tail"><span>run</span><a class="docs-heading-link" aria-label="Link to this section" href="#by-hand-after-the-run">#</a></span></h2>
 <ul>
 <li><strong>Sign in on pre-production.</strong> Sign in, use a page that keeps session data, and sign out. A session the server
 already holds keeps working; a browser that sends an ID the server never issued gets a fresh one.</li>

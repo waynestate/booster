@@ -42,14 +42,15 @@
   <div class="docs-content">
     <main id="main">
       <article class="docs-article"><!-- Generated from CHANGELOG.md by bin/docs-site.php. Edit CHANGELOG.md, not this file. -->
-<h1 id="changelog">Changelog<a class="docs-heading-link" aria-label="Link to this section" href="#changelog">#</a></h1>
+<h1 id="changelog"><span class="docs-heading-tail"><span>Changelog</span><a class="docs-heading-link" aria-label="Link to this section" href="#changelog">#</a></span></h1>
 <p>All notable changes to Booster are recorded here. The format follows Keep a Changelog.</p>
-<h2 id="unreleased">[Unreleased]<a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></h2>
+<h2 id="unreleased"><span class="docs-heading-tail"><span>[Unreleased]</span><a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></span></h2>
 <ul>
+<li>Changed: the docs, agent-ready and deploy kits are Squire 0.10.6 (was 0.10.5): the docs builder and agent-ready generator see every file on Docker Desktop mounts.</li>
 <li>Site: <code>assets/stack-env.js</code> knows Parity, so a pre-production page links Parity's pre-production site and a dev page links its local <code>site/</code> folder. Until now Parity, of all parts, was the one link that ignored its environment.</li>
 <li>Changed: housekeeping to keep pace with the stack. The <code>waynestate/pinstripe</code> requirement moves from <code>^0.1.4</code> to <code>^0.3</code> (the lock resolves to 0.3.1), the bundled SESAME config that <code>cas-to-sesame</code> falls back on when an app has no vendor copy is now SESAME 0.7.3's (it was 0.5.0's; the hop still writes <code>^0.7</code>, which reaches it), the deploy kit in <code>deploy/</code> is Squire 0.10.5's, and the Where it fits tables in the README and the docs overview now show the full WELD cast.</li>
 </ul>
-<h2 id="1-17-0-2026-11-09">[1.17.0] - 2026-11-09<a class="docs-heading-link" aria-label="Link to this section" href="#1-17-0-2026-11-09">#</a></h2>
+<h2 id="1-17-0-2026-11-09">[1.17.0] - <span class="docs-heading-tail"><span>2026-11-09</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-17-0-2026-11-09">#</a></span></h2>
 <p>Follow-ups to 1.16.0: download caches for the gate, a rerun that re-gates the hop that stopped, and a Node pin that proves the front end still builds.</p>
 <ul>
 <li>Added: an opt-in Composer download cache for the gate. Every gate container started with an empty cache, so a real Laravel app's run downloaded every package once for the baseline and again for each of its four hops. Set <code>BOOSTER_COMPOSER_CACHE</code> to a Docker volume name (the WSU stack's is <code>stack-composer-cache</code>) or a host folder, and Booster mounts it at <code>/tmp/composer-cache</code> as <code>COMPOSER_CACHE_DIR</code> in the baseline and every gate. On Linux and macOS, where the gate runs as your own user, a volume gets a folder of its own (<code>booster-uid-&lt;uid&gt;</code>, made once per run by a short root container) so Composer can write to it; the rest of the volume is left alone. A folder that cannot be created or written stops the run with the variable named. Unset, nothing changes. Guide: &quot;Configuration&quot;, <code>.env.example</code>.</li>
@@ -57,7 +58,7 @@
 <li>Added: the <code>node-pin-24</code> hop proves the front end still builds on the Node it pins. It used to change <code>engines.node</code> and <code>.nvmrc</code> and run only the PHP tests, so a front end that no longer built on the new Node passed the hop unnoticed, and the next front-end hop or the next deploy found out instead. When <code>package.json</code> has a <code>build</code> script and a <code>package-lock.json</code>, the hop now runs <code>npm ci</code> and <code>npm run build</code> in the <code>node:&lt;pinned&gt;</code> container before the tests; a red build stops the run at that hop with the pin in place, and the rerun builds it again (the re-gate above). With no build script, or a build script and no lock (<code>npm ci</code> needs one), the hop says so plainly and runs the tests as before. A dry run says which it will be, and <code>--skip-gate</code> names the build to run by hand. A <code>--replay</code> run that pins Node builds the front end before it records, like the other front-end hops.</li>
 <li>Added: an opt-in npm download cache for the Node containers, the same way as Composer's. Set <code>BOOSTER_NPM_CACHE</code> to a Docker volume name (the WSU stack's is <code>stack-npm-cache</code>) or a host folder, and Booster mounts it at <code>/root/.npm</code> in every Node container: the build gate, the pin hop's build and the front-end hops' npm steps. Those containers run as root, so a volume suits them better than a folder. Unset, nothing changes. Guide: &quot;Configuration&quot;, <code>.env.example</code>.</li>
 </ul>
-<h2 id="1-16-0-2026-11-09">[1.16.0] - 2026-11-09<a class="docs-heading-link" aria-label="Link to this section" href="#1-16-0-2026-11-09">#</a></h2>
+<h2 id="1-16-0-2026-11-09">[1.16.0] - <span class="docs-heading-tail"><span>2026-11-09</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-16-0-2026-11-09">#</a></span></h2>
 <p>Lessons from a real Laravel app that Booster took from PHP 8.3 to 8.5: the code edits were right, and the gaps were in what Booster wrote or left alone around the code.</p>
 <ul>
 <li>Fixed: the Citadel deploy script never migrates, and Booster writes it only when it is needed. A run that changed <code>composer.lock</code> used to add <code>deployments/0000_composer_install_&lt;stamp&gt;</code>, which ran <code>composer install --no-dev</code> and then <code>php artisan migrate --force</code>. Citadel runs deploy scripts in name order, so it migrated ahead of the app's own deploy scripts: on a Laravel app whose first release parks old tables before it migrates, the migration would have landed in the old tables. Now Booster compares the production packages (<code>packages</code> in the lock, not <code>packages-dev</code>) before and after the run: when only dev packages moved, it writes nothing and says why; when the app has <code>scripts/release.sh</code> (Squire's kit installs on every release), it writes nothing and says so; when the app has no <code>deployments/</code> folder, it writes nothing and says what every server must run on the next release; otherwise it writes an install-only script and leaves migrations to the app's own deploy scripts. The JSON report gains <code>deploy_notes</code>. Guide: &quot;Deploying on Citadel&quot;.</li>
@@ -72,7 +73,7 @@
 <li>Changed: the PHP 8.5 hop's note says Rector moves PDO driver constants (<code>PDO::MYSQL_ATTR_SSL_CA</code> to <code>Pdo\Mysql::ATTR_SSL_CA</code>) inside <code>PHP_VERSION_ID</code> guards too and leaves the guard in place; the PHPUnit hops ask for <code>phpunit --migrate-configuration</code> only when PHPUnit warns about a deprecated schema. Five <code>booster init</code> playbooks carry the new notes.</li>
 <li>Docs: README status, the front page masthead and its Version label say 1.16; the Real output page is captured again with 1.16.0.</li>
 </ul>
-<h2 id="1-15-0-2026-11-09">[1.15.0] - 2026-11-09<a class="docs-heading-link" aria-label="Link to this section" href="#1-15-0-2026-11-09">#</a></h2>
+<h2 id="1-15-0-2026-11-09">[1.15.0] - <span class="docs-heading-tail"><span>2026-11-09</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-15-0-2026-11-09">#</a></span></h2>
 <p>Lessons from a real 2012 raw PHP app that Booster took from PHP 5.6 to 8.5, with its hand-copied Doctrine, Smarty and Slim moved onto Composer.</p>
 <ul>
 <li>Added: a Wayne Auth stop sign. An app that still signs people in through the old Wayne Auth service (the <code>WayneAuth</code> class copied into the app, the <code>validUser</code> cookie, the <code>sso_host</code> setting) loses its sign-in on the first hop off PHP 5.6, because PHP 7 and later verify the service's TLS certificate. <code>detect</code> gains a <code>wayne_auth</code> line and JSON key, and both <code>detect</code> and <code>plan</code> open with a stop sign that names up to three of the lines and points at SESAME's Wayne Auth bridge guide. An app already on the bridge gets none.</li>
@@ -89,14 +90,14 @@
 <li>Changed: with <code>--vendored</code>, the steps before the move to Composer run the syntax check instead of your test command, as the replay already waited, because the hand-copied libraries may not load on that PHP yet. The report says &quot;Tests deferred to step N (vendored-to-composer)&quot;. Your tests run on the baseline and from the move on.</li>
 <li>Docs: &quot;A smoke test for WSU apps&quot; gains a raw PHP app section: one plain script, run with <code>--test-command</code>, that proves the bootstrap and the libraries load. The framework hops guide says why the replay and the tests wait for the vendored move, recipes name the Wayne Auth stop sign and SESAME's bridge, and the README, quick start and front page printouts match <code>detect</code> and <code>plan</code> as they print today.</li>
 </ul>
-<h2 id="1-14-0-2026-11-09">[1.14.0] - 2026-11-09<a class="docs-heading-link" aria-label="Link to this section" href="#1-14-0-2026-11-09">#</a></h2>
+<h2 id="1-14-0-2026-11-09">[1.14.0] - <span class="docs-heading-tail"><span>2026-11-09</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-14-0-2026-11-09">#</a></span></h2>
 <ul>
 <li>Docs: a new Upgrading page (<code>docs/upgrading.md</code>, in the docs menu and linked from the overview) says what changes when you move Booster to a new release, newest first: nothing to do for 1.14.0, and for 1.13.1 the fresh gate image, the stale <code>cas-to-sesame</code> playbook, and the one <code>composer require waynestate/sesame:^0.7</code> line an app that an earlier Booster moved to SESAME needs, with what SESAME 0.7.0 changes (nothing, for a Laravel app).</li>
 <li>Docs: README status, the front page masthead and its Version label say 1.14; the Real output page and the docs pages stamp 1.14.0. No hop changed since 1.13.1, so the captured plans are the same.</li>
 <li>Changed: Booster locks Pinstripe 0.1.5 (was 0.1.4), whose package metadata names git.wayne.edu, so <code>composer.lock</code> no longer carries an internal hostname in Pinstripe's support links. No other package moved.</li>
 <li>Changed: CI pins the Preflight components to 0.5.0 (was 0.4.0). The composer-audit include drops its <code>image</code> input and runs 0.5.0's default, Composer 2.11.1 by its multi-arch list digest (it ran a floating <code>composer:2</code> digest), and the proctor job now keeps PROCTOR's JSON report as <code>proctor.json</code> in its artifact for ROLLCALL. The vendored a11y checker is byte for byte the same at 0.5.0, so its pin test, the a11y scripts, the README and MAINTAINING name the new tag. The GitHub workflow stays on 0.1.4's commit, since the GitHub mirror has no 0.5.0.</li>
 </ul>
-<h2 id="1-13-1-2026-11-09">[1.13.1] - 2026-11-09<a class="docs-heading-link" aria-label="Link to this section" href="#1-13-1-2026-11-09">#</a></h2>
+<h2 id="1-13-1-2026-11-09">[1.13.1] - <span class="docs-heading-tail"><span>2026-11-09</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-13-1-2026-11-09">#</a></span></h2>
 <ul>
 <li>Fixed: a hand-copied library's version is also read from the <code>@version x.y.z</code> tag in its main file's docblock when the code does not state it (a <code>const VERSION</code> or <code>SMARTY_VERSION</code> still wins). A real app's Slim 1.6.0 copy says its version only there, so <code>vendored-to-composer</code> raised a wrong stop sign (&quot;holds Slim of an unknown version&quot;) and left the hop out. A version-control keyword such as Doctrine's <code>@version $Revision$</code> still leaves the version unknown. The test fixture's Slim now ships as the real copy does, docblock only.</li>
 <li>Fixed: a PHP hop no longer stops on a lock that cannot install on its PHP. Found on a real 2012 app: <code>vendored-to-composer</code> resolved the first <code>composer.lock</code> on PHP 7.4, where Slim 4's <code>psr/container</code> 2.0 holds <code>symfony/service-contracts</code> at v1.1.2 (php ^7.1.3), so the 7.4 to 8.0 hop's plain <code>composer install</code> refused the lock every time. A PHP hop now reads the lock first and, when locked packages' own <code>require.php</code> leaves out its PHP, the gate runs <code>composer update -W</code> for just those packages, inside <code>composer.json</code>'s constraints; the report says which (<code>The gate refreshed composer.lock (composer update -W symfony/service-contracts): the lock held symfony/service-contracts v1.1.2, which needs php ^7.1.3, not PHP 8.0.</code>), a dry run says <code>would run:</code> it, and a hop with no other change still runs its gate for it. On that app's <code>composer.json</code> the 8.0 hop moves two packages and nothing refuses 8.1 to 8.5 after it. Booster still never creates <code>config.platform.php</code>: Composer picks the newest release each PHP allows, so no pin finds one lock for 7.4 through 8.5 on its own. The plan's lock-ceiling warning says the hop's gate does the update (it said the hop &quot;will need composer update&quot;).</li>
@@ -112,7 +113,7 @@
 <li>Docs: <code>.env.example</code> says an unset <code>BOOSTER_POLICY</code> uses the policy.json in the waynestate/creed package (it said a snapshot bundled with Booster, which Booster no longer ships).</li>
 <li>Changed: Booster requires CREED ^0.1.8 (locked 0.1.8, was ^0.1 at 0.1.7), PROCTOR ^0.11 (locked 0.11.1, was 0.11.0) and Pinstripe ^0.1.4 (locked 0.1.4, was ^0.1 at 0.1.1). The deploy layer requires HELMET ^1.3 (locked 1.3.0, was ^1.0 at 1.0.1), CREED ^0.1.8 (locked 0.1.8, was 0.1.7) and PROCTOR ^0.11 (locked 0.11.1, was 0.11.0).</li>
 </ul>
-<h2 id="1-13-0-2026-11-09">[1.13.0] - 2026-11-09<a class="docs-heading-link" aria-label="Link to this section" href="#1-13-0-2026-11-09">#</a></h2>
+<h2 id="1-13-0-2026-11-09">[1.13.0] - <span class="docs-heading-tail"><span>2026-11-09</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-13-0-2026-11-09">#</a></span></h2>
 <ul>
 <li>Changed: the deploy kit is Squire 0.10.1 (was 0.10.0): <code>.squire/base-fallback.Dockerfile</code> copies Composer 2.11.1 (was 2.10.3, no longer maintained); every other kit file was already current. PROCTOR moves to ^0.11 (locked 0.11.0, was ^0.8 at 0.8.0) for Booster's own check gate and for the deploy layer.</li>
 <li>Docs: truth pass. The PowerShell PHAR lines in the README and the install page lost their backslashes (<code>&quot;$HOME\bin\booster.phar&quot;</code> and <code>C:\path\to\your-app</code> printed as control characters) and are whole again. A target past security support is a warned stop on the way up, not refused, in BEST_PRACTICES (now <code>Checked</code>), the quick start, the README and the front page. The README, the configuration page and the front page name Booster's own read-only network calls (the Packagist dependency check and the wayne-cas repository probe) instead of saying it makes none. The <code>composer ci</code> lists name the Real output and docs site checks; MAINTAINING names the scan tools and Pinstripe among the runtime dependencies, the Preflight a11y component, and the proof re-capture every release needs. The front page says PROCTOR runs before the first hop and after the last, and that <code>--proctor-command</code> adds a check rather than replacing it; its Next list and the docs Next page match OPEN_QUESTIONS (the pilot re-run, the signed-in SESAME run, the MySQL 5.6 question). The docs overview lists the replay gate, hand-copied libraries and strict session guides. The sample plan in the README and the quick start shows the two new Laravel 13 behavior rows, as a fresh <code>plan</code> prints them.</li>
@@ -128,14 +129,14 @@
 <li>Docs: OPEN_QUESTIONS and the GitHub workflow comment name the pins in use (Preflight 0.3.1 on GitLab, 0.1.4's commit on GitHub).</li>
 <li>Changed: the deploy layer runs Squire's kit 0.7.1 (was 0.6.0): <code>.squire/php.ini</code> no longer sets the deprecated <code>session.sid_*</code> lines, web requests get a <code>disable_functions</code> list and Apache hardening (<code>.squire/php-web.ini</code>, <code>.squire/apache-hardening.conf</code>), and opcache gets production settings with <code>SQUIRE_OPCACHE_VALIDATE</code> as the one switch.</li>
 </ul>
-<h2 id="1-12-0-2026-11-08">[1.12.0] - 2026-11-08<a class="docs-heading-link" aria-label="Link to this section" href="#1-12-0-2026-11-08">#</a></h2>
+<h2 id="1-12-0-2026-11-08">[1.12.0] - <span class="docs-heading-tail"><span>2026-11-08</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-12-0-2026-11-08">#</a></span></h2>
 <ul>
 <li>Changed: the cas-to-sesame hop writes waynestate/sesame ^0.6 (was ^0.5), the current SESAME line; 0.6.0 has no breaking change for an app that keeps its driver.</li>
 <li>Changed: the front page deploy layer requires HELMET ^1.0 (lock at 1.0.1, was 0.4.0), like the rest of the stack; its shared front controller already runs on HELMET 1.0 in Squire, Sourdough and Pinstripe.</li>
 <li>Fixed: the front page stops hiding sideways overflow behind a page-wide <code>overflow-x: clip</code> on <code>html</code> and <code>body</code>, so the 320 px reflow check (WCAG 1.4.10) can see real overflow; the masthead nav now wraps, right aligned, between roughly 640 and 840 px instead of running past the viewport.</li>
 <li>Changed: the local a11y scripts run Preflight's own checker (vendored from 0.3.1 and pinned by a test), so they check what CI checks: axe-core 4.14.0, 320 and 1280 px, and the reflow check.</li>
 </ul>
-<h2 id="1-11-0-2026-11-08">[1.11.0] - 2026-11-08<a class="docs-heading-link" aria-label="Link to this section" href="#1-11-0-2026-11-08">#</a></h2>
+<h2 id="1-11-0-2026-11-08">[1.11.0] - <span class="docs-heading-tail"><span>2026-11-08</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-11-0-2026-11-08">#</a></span></h2>
 <ul>
 <li>Added: CI runs Preflight's a11y component (0.3.1) on site/, every page in light and dark at 320 and 1280 px with the WCAG 1.4.10 reflow check, blocking.</li>
 <li>Changed: CI pins the Preflight components to 0.3.1 (fixed cache keys, and caches saved even when a job fails; D-072).</li>
@@ -146,13 +147,13 @@
 <li>Fixed: the docs menu closes with Escape and hands focus back to its button (docs kit synced from Squire).</li>
 <li>Changed: the pipeline pins every Preflight CI component to 0.3.0 (<a rel="noopener" href="mailto:preflight@0.3.0">preflight@0.3.0</a>); component image inputs are plain image names, since Preflight adds the Dependency Proxy prefix itself.</li>
 </ul>
-<h3 id="added">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added">#</a></h3>
+<h3 id="added"><span class="docs-heading-tail"><span>Added</span><a class="docs-heading-link" aria-label="Link to this section" href="#added">#</a></span></h3>
 <ul>
 <li>Added: a real <code>booster run</code> writes <code>booster-hop.json</code> at the app root (start and end time, from and to versions, Rector and rule-package versions, each hop's status and rules) for ROLLCALL to read; dry runs write nothing (BOOSTER-24).</li>
 <li>Added: real .vue fixtures under tests/fixtures/vue-compat/ and a Docker-gated test that runs vue-upgrade-tool on them (BOOSTER-21).</li>
 <li>Added: Booster checks the Rector config with rector validate-config before a Rector hop changes anything, and the run report records the Rector version.</li>
 </ul>
-<h3 id="changed">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed">#</a></h3>
+<h3 id="changed"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed">#</a></span></h3>
 <ul>
 <li>Changed: the dev dependency on PROCTOR moves to ^0.8 (was ^0.3, locked 0.8.0), and the deploy layer requires PROCTOR ^0.8 (locked 0.8.0).</li>
 <li>Docs: the README's Commands section gains the stack's &quot;Which command when&quot; table, copied word for word from WELD's docs: <code>booster plan</code>, <code>booster replay check</code>, <code>booster init --check</code>, <code>proctor check</code> and the other look-alikes, with what each checks, when to run it and where it runs (D-064).</li>
@@ -164,7 +165,7 @@
 <li>The lock moves to CREED 0.1.7 (was 0.1.4), the policy every plan reads. The Real output page is captured again (<code>build-proof.php --capture</code>), so its plans name <code>waynestate/creed 0.1.7</code>; the plan samples in the README, the quick start and the front page match a fresh run.</li>
 <li>Docs: source comments, messages and art titles write Booster as a word, not in capitals; wordmarks keep their display type.</li>
 </ul>
-<h3 id="fixed">Fixed<a class="docs-heading-link" aria-label="Link to this section" href="#fixed">#</a></h3>
+<h3 id="fixed"><span class="docs-heading-tail"><span>Fixed</span><a class="docs-heading-link" aria-label="Link to this section" href="#fixed">#</a></span></h3>
 <ul>
 <li>Fixed: the docs kit's copy button no longer covers the first line of code when it says Copied or Failed: over the code it keeps its resting width and shows a check or a cross when the word does not fit (docs kit synced from Squire).</li>
 <li>Fixed: the header button on the front page and the proof page says Run it today, as it does on the docs pages (it said Install).</li>
@@ -174,8 +175,8 @@
 <li>The pipeline's PROCTOR jobs no longer pass <code>--policy</code>, which PROCTOR 0.7 refuses in CI; PROCTOR checks against the CREED policy it bundles.</li>
 <li>The front page's &quot;Next&quot; label reads Version 1.10 (it said 1.8, beside a 1.10 masthead), and its cast says Sourdough starts new apps in all five shapes, not raw PHP only.</li>
 </ul>
-<h2 id="1-10-0-2026-11-07">[1.10.0] - 2026-11-07<a class="docs-heading-link" aria-label="Link to this section" href="#1-10-0-2026-11-07">#</a></h2>
-<h3 id="added-1">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-1">#</a></h3>
+<h2 id="1-10-0-2026-11-07">[1.10.0] - <span class="docs-heading-tail"><span>2026-11-07</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-10-0-2026-11-07">#</a></span></h2>
+<h3 id="added-1"><span class="docs-heading-tail"><span>Added</span><a class="docs-heading-link" aria-label="Link to this section" href="#added-1">#</a></span></h3>
 <ul>
 <li>
 <p>The first framework hop, <code>vendored-to-composer</code>, planned with the new <code>--vendored</code> option: it moves an app's hand-copied Doctrine 2, Smarty 3 and Slim 1 out of <code>vendor/</code> and onto the maintained Composer releases that keep the same API (<code>doctrine/orm ^2.20</code> with <code>doctrine/annotations ^1.14</code> and <code>symfony/cache</code>, <code>smarty/smarty ^4.5</code>, <code>slim/slim ^4.15</code> with <code>slim/psr7</code>). It deletes the copies, writes or extends <code>composer.json</code>, points each file's <code>require</code> of a copy at <code>vendor/autoload.php</code> and drops the 2012 bootstrap lines (<code>Setup::registerAutoloadDirectory()</code>, <code>define('SMARTY_DIR')</code>). A Slim 1 app keeps its routes through <code>slim1-bridge.php</code>, written at the app root and loaded by Composer's classmap: Slim 1.6's API (<code>:param</code> routes and conditions, first match wins, <code>render()</code> through the app's <code>Slim_View</code>, <code>halt()</code>, <code>redirect()</code>, the 404, 405 and 500 pages byte for byte) on Slim 4's router. The planner places the hop at the first PHP every release runs on (7.4 with Slim, 7.1 without); anything the hop cannot rewrite exactly (Doctrine's <code>ClassLoader</code>, Slim hooks, cookies, middleware or regex routes, a Smarty 2 copy) is a stop sign that leaves the hop out with the file and line. With <code>--replay</code>, steps before the hop defer their replay, since the old copies may not run on the new PHP. Libraries without a recipe and nested copies stay where they are and are listed as MANUAL lines. Guide: <code>docs/guides/framework-hops.md</code>.</p>
@@ -187,12 +188,12 @@
 <p>An advisory <code>composer audit</code> after composer hops: when a hop changes the app's <code>composer.json</code> or <code>composer.lock</code>, <code>run</code> executes <code>composer audit --format=json --no-interaction</code> in the app and lists advisories (package, advisory id or CVE, affected versions, title) and abandoned packages in the text and JSON reports, with counts. Advisory only: it never changes the exit code, a clean audit stays silent, a hop that changed no composer file skips it and says so in one line, and an audit that cannot run is reported with the command to run by hand. Source: <code>src/Scan/ComposerAuditScan.php</code>; tests: <code>tests/ComposerAuditHopTest.php</code>, <code>tests/ComposerAuditScanTest.php</code>. Guide: <code>docs/guides/scans.md</code>.</p>
 </li>
 </ul>
-<h3 id="changed-1">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed-1">#</a></h3>
+<h3 id="changed-1"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed-1">#</a></span></h3>
 <ul>
 <li>The front page's deploy layer (<code>deploy/</code>) runs Squire's kit 0.5.0 (was 0.3.4): <code>oracle-check.php</code> arrives, <code>scripts/release.sh</code>, <code>scripts/parity.ps1</code> and <code>.squire/base-fallback.Dockerfile</code> take the new templates, and <code>docker-compose.squire.yml</code>, which Renovate had edited, is Squire's template again, so <code>squire init --check</code> passes. <code>site/assets/stack-env.js</code> takes the stack's one copy, with bindingless catch blocks.</li>
 <li>The canonical repository is git.wayne.edu (ADR-0021); docs, links and package metadata no longer point at the archived nougat copy.</li>
 </ul>
-<h3 id="fixed-1">Fixed<a class="docs-heading-link" aria-label="Link to this section" href="#fixed-1">#</a></h3>
+<h3 id="fixed-1"><span class="docs-heading-tail"><span>Fixed</span><a class="docs-heading-link" aria-label="Link to this section" href="#fixed-1">#</a></span></h3>
 <ul>
 <li>The gate and the baseline skip the Composer phase for an app with no <code>composer.json</code>: before, <code>composer install</code> failed on the missing file and the run stopped at the baseline (&quot;composer install failed&quot;) before the syntax check ever ran, so an app that never met Composer could not be upgraded at all.</li>
 <li>PHP hops on an app that pins <code>config.platform.php</code> (every Sourdough app, WELD included) no longer fail their own gate: <code>composer.lock</code> kept the old pin in its <code>platform-overrides</code>, so <code>composer install</code> refused the raised <code>php</code> constraint (&quot;your php version (8.3.0; overridden via config.platform)&quot;). The gate now runs <code>composer update --lock</code> for those hops, which moves no package and rewrites the lock's hash and overrides; apps without the pin keep the plain install. Found by running Booster on WELD, 2026-11-06.</li>
@@ -206,12 +207,12 @@
 <li>The dependency check: a package whose newest release cannot install at the plan's starting version (a floor above it, or a ceiling below it) now gets its own finding that names where the plan starts, instead of blocking the first hop in the plan (such as <code>node-pin-24</code>, which moves nothing in PHP). Only a hop whose own destination violates the constraint is blamed.</li>
 <li><code>laravel-12-to-13</code>: the hop now raises the companion packages its target major pairs with (for Laravel 13, laravel/tinker to ^3.0) alongside laravel/framework, so a stock Laravel 12 app no longer blocks on tinker ^2. A companion is raised only where the app already lists it in require or require-dev and its constraint floors below the pin's floor; absent packages are never added, and the gate's composer update refreshes the listed companions together with the framework. The pins live in a new <code>laravel_companion_pins</code> table in <code>data/versions.json</code>, which the refresh carries through per major like the other fixed tables.</li>
 </ul>
-<h2 id="1-9-0-2026-11-06">[1.9.0] - 2026-11-06<a class="docs-heading-link" aria-label="Link to this section" href="#1-9-0-2026-11-06">#</a></h2>
-<h3 id="security">Security<a class="docs-heading-link" aria-label="Link to this section" href="#security">#</a></h3>
+<h2 id="1-9-0-2026-11-06">[1.9.0] - <span class="docs-heading-tail"><span>2026-11-06</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-9-0-2026-11-06">#</a></span></h2>
+<h3 id="security"><span class="docs-heading-tail"><span>Security</span><a class="docs-heading-link" aria-label="Link to this section" href="#security">#</a></span></h3>
 <ul>
 <li>The front-page deploy layer moves to Symfony 7.4.23 (symfony/http-foundation and symfony/yaml advisories, including CVE-2026-118514).</li>
 </ul>
-<h3 id="added-2">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-2">#</a></h3>
+<h3 id="added-2"><span class="docs-heading-tail"><span>Added</span><a class="docs-heading-link" aria-label="Link to this section" href="#added-2">#</a></span></h3>
 <ul>
 <li>The <code>vite-major</code> hop: for an app whose <code>package.json</code> lists <code>vite</code> below the hop data's Vite major, it pins <code>vite</code> to the hop data's version wherever it sits, pins <code>laravel-vite-plugin</code> and <code>@vitejs/plugin-vue</code> to the hop data's versions when they are already listed, runs <code>npm install</code> in the Node container and asks for a build gate. The planner offers it after <code>node-pin-24</code> and ahead of <code>tailwind-3-to-4</code>, and never alongside <code>mix-to-vite</code>, which installs the new Vite itself. It reuses the existing <code>vite_version</code>, <code>laravel_vite_plugin_version</code> and <code>vue_plugin_version</code> keys in <code>data/versions.json</code>.</li>
 <li>A new hop, <code>typescript-major</code>: for an app whose <code>typescript</code> constraint in <code>package.json</code> floors below major 6, it pins <code>typescript</code> to <code>^6.0</code> wherever it sits, and <code>vue-tsc</code> to <code>^3.0</code> when the app lists it, then runs the build gate (<code>npm ci</code>, <code>npm run build</code>) and the tests. Offered after <code>node-pin-24</code>, <code>mix-to-vite</code> and <code>tailwind-3-to-4</code>; running the type check and fixing what the new major flags stay manual work, and the hop says so.</li>
@@ -219,11 +220,11 @@
 <li>Vendored libraries: <code>plan</code> and <code>run</code> find the libraries copied into <code>vendor/</code> (a name and version from its <code>composer.json</code> or <code>VERSION</code> file, or <code>version unknown</code>) and list each with the Composer package that replaces it. The plan text and the run report get a block for them, and the JSON gains <code>vendored_libraries</code> and <code>from_php</code> (the PHP version the run starts from, when it differs from the app's own).</li>
 <li>An <code>inertia-2-to-3</code> hop for apps that require <code>inertiajs/inertia-laravel</code> or carry <code>@inertiajs/vue3</code> below 3, planned last when the plan lands on Laravel 11 or newer on PHP 8.2 or newer: it pins <code>inertiajs/inertia-laravel</code> to <code>^3.0</code> and <code>@inertiajs/vue3</code> to <code>^3.0</code>, runs the composer and npm installs, and lists the Inertia 3 breaking changes (Axios out of the core, <code>qs</code> and <code>lodash-es</code> no longer bundled, renamed events, <code>router.cancelAll()</code>, the restructured config, ESM only, ES2022) as manual lines.</li>
 </ul>
-<h3 id="changed-2">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed-2">#</a></h3>
+<h3 id="changed-2"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed-2">#</a></span></h3>
 <ul>
 <li>Docs theme: the docs read as the front page's own. Dark mode is no longer a deep green page: it is the record room after hours (graphite ground, cream type, pale mint links and titles, gold for focus and the current page), with every kit dark token set by the theme. The hero's graph paper lies under the top of each page and fades out before the reading; the footer is the front page's deep green band, with the version stamped on it like a dose that passed its gate (the stamp lands once, only without reduced motion); pager cards wear the record card's green and gold top edge; wide tables shade the edge that scrolls.</li>
 </ul>
-<h3 id="fixed-2">Fixed<a class="docs-heading-link" aria-label="Link to this section" href="#fixed-2">#</a></h3>
+<h3 id="fixed-2"><span class="docs-heading-tail"><span>Fixed</span><a class="docs-heading-link" aria-label="Link to this section" href="#fixed-2">#</a></span></h3>
 <ul>
 <li><code>tailwind-3-to-4</code> on a real app: the upgrade tool is pinned to one exact release (<code>4.3.3</code>) instead of <code>^4.1</code>, because 4.3.4 needs a compiler and Python to install and npx failed silently in the slim Node image. The tool now runs with <code>--force</code>, since its clean-tree check needs git, which that image lacks, and earlier hops have already edited the tree. When the tool fails having printed only npm notices, the step says it likely never installed and gives the <code>docker run</code> line to try it by hand.</li>
 <li><code>tailwind-3-to-4</code>, <code>typescript-major</code> and <code>inertia-2-to-3</code> on a real app: after BOOSTER edits <code>package.json</code> it now runs <code>npm install</code> in the Node container, as <code>vite-major</code> does, so <code>package-lock.json</code> matches the new pins. Before, the build gate's <code>npm ci</code> (or, for Inertia, the hop's own <code>npm ci</code>) refused the stale lock and the hop failed on a sound change. The lock sync runs with <code>--skip-gate</code> too.</li>
@@ -232,37 +233,37 @@
 <li><code>inertia-2-to-3</code>: <code>php artisan view:clear</code> is now its own MANUAL line, saying why: on a real app, compiled Blade views kept printing the Inertia 2 page data and the Inertia 3 client showed a blank page until they were cleared. The hop's summary note now says <code>npm install</code>, which is what it runs.</li>
 <li>The gate container sets <code>COMPOSER_PROCESS_TIMEOUT=0</code>, so a slow <code>composer test</code> is no longer cut off by Composer's own 300 second limit (a real app's baseline failed that way); the gate's one-hour limit governs.</li>
 </ul>
-<h2 id="1-8-3-2026-11-04">[1.8.3] - 2026-11-04<a class="docs-heading-link" aria-label="Link to this section" href="#1-8-3-2026-11-04">#</a></h2>
-<h3 id="changed-3">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed-3">#</a></h3>
+<h2 id="1-8-3-2026-11-04">[1.8.3] - <span class="docs-heading-tail"><span>2026-11-04</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-8-3-2026-11-04">#</a></span></h2>
+<h3 id="changed-3"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed-3">#</a></span></h3>
 <ul>
 <li>Docs: a new &quot;How do I...&quot; page (<code>docs/recipes.md</code>) with 14 recipes: look first, go all the way, PHP only, a specific Laravel, one hop at a time, dry run, backend only, skipping a hop, big apps, tests and the gate, offline and dirty trees, SESAME and WayneUI, other dates and policies, and what to do after a stop. Linked from the docs menu, the front page of the docs, the quick start and the README.</li>
 <li>Docs: the quick start and README gain &quot;What a run does by default&quot;: what <code>detect</code>, <code>plan</code> and <code>run</code> do with no flags, the hop-count rule (one hop per PHP minor, Laravel major and PHPUnit major), the extras that come by default or only on request, what a run does per hop, and the ways to stop early. The command reference points to it.</li>
 </ul>
-<h3 id="fixed-3">Fixed<a class="docs-heading-link" aria-label="Link to this section" href="#fixed-3">#</a></h3>
+<h3 id="fixed-3"><span class="docs-heading-tail"><span>Fixed</span><a class="docs-heading-link" aria-label="Link to this section" href="#fixed-3">#</a></span></h3>
 <ul>
 <li>The second Booster run on a machine no longer dies on hop 1 with <code>&quot;phar:///tmp/booster-phar-.../phpstan.phar/.../standard_10.stub&quot; is not a file</code>. The phar unpacks into a new temp directory each run and removes it at exit, but Rector's PHPStan cached its container (and the PHPStan scan its result cache) in the shared temp directory, with absolute paths into the first run's deleted copy. Every Rector cache, PHPStan container, PHPStan scan <code>tmpDir</code> and the child processes' <code>TMPDIR</code> now live in a per-run scratch directory (<code>booster-run-&lt;random&gt;</code>) that is removed at exit, so no run reads another's cache. Tests prove each path is per-run and that the real Rector writes its container there.</li>
 <li>The <code>php-74-to-80</code> hop no longer turns a loose <code>switch</code> into a strict <code>match</code>. Rector's <code>ChangeSwitchToMatchRector</code> rewrote <code>switch ($get['order'][0]['column'])</code> with <code>case 1:</code> into <code>match (...) { 1 =&gt; ... }</code>, which never matches the string <code>&quot;1&quot;</code> from a query string, so every request silently fell to <code>default</code>. The rule is skipped for every hop; a test runs the real Rector on a string subject and asserts no <code>match</code> appears.</li>
 <li>The gate image builds for PHP 5.5 and 5.6 (Debian jessie): the archive.debian.org rewrite now covers jessie, reads the codename from <code>VERSION</code> when <code>VERSION_CODENAME</code> is missing, maps <code>httpredir.debian.org</code> and a bare <code>security.debian.org</code> to the archive, and lets apt use the archive whose signing keys have expired.</li>
 <li>When the gate image cannot be built, <code>booster run</code> exits non-zero and says so: &quot;Could not build booster-target:<php>-<stamp> (docker build exit N), so the gate cannot run&quot;, with the ways out (<code>--image</code>, <code>--skip-gate</code>) and the last 40 lines of the build output instead of BuildKit's whole log.</li>
 </ul>
-<h2 id="1-8-2-2026-11-04">[1.8.2] - 2026-11-04<a class="docs-heading-link" aria-label="Link to this section" href="#1-8-2-2026-11-04">#</a></h2>
-<h3 id="added-3">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-3">#</a></h3>
+<h2 id="1-8-2-2026-11-04">[1.8.2] - <span class="docs-heading-tail"><span>2026-11-04</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-8-2-2026-11-04">#</a></span></h2>
+<h3 id="added-3"><span class="docs-heading-tail"><span>Added</span><a class="docs-heading-link" aria-label="Link to this section" href="#added-3">#</a></span></h3>
 <ul>
 <li>The Real output page, <code>site/proof.html</code>: Booster's own plan and dry-run output on each example app, captured from the real tool, linked from the front page, with a Markdown twin and entries in <code>llms.txt</code> and <code>llms-full.txt</code>. <code>composer proof</code> rebuilds it, <code>composer proof:capture</code> re-captures it, and <code>composer ci</code> fails when it is stale.</li>
 </ul>
-<h3 id="changed-4">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed-4">#</a></h3>
+<h3 id="changed-4"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed-4">#</a></span></h3>
 <ul>
 <li>The docs pages wear Booster's own look instead of the generic builder one: the front page's masthead and main menu (Docs marked as the current item, and a gold &quot;Run it today&quot; pill on every page that lands on the install one-liners), Barlow Condensed titles with the hero's gold underline, the install section's green slab for commands, the greenbar printout for output, Booster's palette in light mode and a derived deep-green dark mode. It comes from the docs builder's new <code>theme</code> key (<code>docs/_header.html</code> and <code>docs/theme/booster.css</code>); the builder and kit come from Squire's theme-hook branch, which also fixes two kit bugs: the copy button said &quot;Copy failed&quot; after every successful copy, and code blocks that scroll sideways could not be reached by keyboard.</li>
 <li>OPEN_QUESTIONS: the &quot;Not built yet&quot; list now says what shipped (the <code>&amp;new</code> pre-pass in 1.0.0, the real-app <code>cas-to-sesame</code> hop in 1.6.0, the proof runs of 2026-10-28 and 2026-11-01) and what is still open.</li>
 <li>The front page main menu now links to the docs site (<code>docs/</code>), between the Agents and Proof links.</li>
 </ul>
-<h3 id="fixed-4">Fixed<a class="docs-heading-link" aria-label="Link to this section" href="#fixed-4">#</a></h3>
+<h3 id="fixed-4"><span class="docs-heading-tail"><span>Fixed</span><a class="docs-heading-link" aria-label="Link to this section" href="#fixed-4">#</a></span></h3>
 <ul>
 <li><code>booster run</code> (dry or real) no longer stops a hop with &quot;Rector reported errors&quot; and <code>PHPStan\PhpDocParser\Ast\Type\CallableTypeNode::__construct(): Argument #1 ($identifier) must be of type ... IdentifierTypeNode, ... FullyQualifiedNameNode given</code> on any app that has a closure (an <code>array_map(function ...)</code>, a route closure). 1.8.0 and 1.8.1 locked Rector 2.8.1 next to PHPStan 2.3.4, and the two load different copies of phpdoc-parser in one process. The lock now pairs Rector 2.8.4 with PHPStan 2.3.5, a new test runs the real Rector (not the fake runner) on a tiny app with a closure so <code>composer ci</code> fails if the pair splits again, and Renovate updates the two packages together.</li>
 <li>The Real output page's Markdown twin link points at proof.md, so the agent-ready check passes.</li>
 </ul>
-<h2 id="1-8-1-2026-11-03">[1.8.1] - 2026-11-03<a class="docs-heading-link" aria-label="Link to this section" href="#1-8-1-2026-11-03">#</a></h2>
-<h3 id="changed-5">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed-5">#</a></h3>
+<h2 id="1-8-1-2026-11-03">[1.8.1] - <span class="docs-heading-tail"><span>2026-11-03</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-8-1-2026-11-03">#</a></span></h2>
+<h3 id="changed-5"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed-5">#</a></span></h3>
 <ul>
 <li>Synced Squire's docs builder and agent-ready kit (<code>bin/docs-site.php</code>, <code>bin/agent-ready.php</code>, <code>site/assets/agent-ready.js</code>): table cells strip Symfony console style tags, and the kit JS uses bindingless catch blocks. The command reference and docs site are rebuilt.</li>
 <li>The PHPCompatibility check no longer calls <code>oci_*()</code> functions &quot;removed since PHP 8.4&quot; for an app that declares <code>ext-oci8</code> in <code>require</code>, <code>require-dev</code> or <code>config.platform</code>: PHP 8.4 moved oci8 out of the PHP download and into PECL, and such an app installs the PECL extension on purpose. Other findings are unchanged.</li>
@@ -280,26 +281,26 @@
 <li>Docs: the front-page samples show waynestate/creed 0.1.6.</li>
 <li>Tests: phpunit skips tests/docs-fixture, which only feeds the docs examples.</li>
 </ul>
-<h3 id="added-4">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-4">#</a></h3>
+<h3 id="added-4"><span class="docs-heading-tail"><span>Added</span><a class="docs-heading-link" aria-label="Link to this section" href="#added-4">#</a></span></h3>
 <ul>
 <li>The documentation site: <code>site/docs/</code> is built from <code>docs/</code> by <code>bin/docs-site.php</code> (<code>composer docs</code>), the built pages are committed, and <code>composer docs:check</code> (part of <code>composer ci</code>) fails when they drift from the sources.</li>
 <li>Every shell block in <code>docs/</code> is tagged for the examples runner: <code>booster detect</code> and the quick start's <code>booster plan</code> run against <code>tests/docs-fixture/</code> with their output committed beside them, and the rest carry a <code>docs-test: skip</code> reason (needs network, needs Docker, installs software, run on your own app).</li>
 </ul>
-<h2 id="1-8-0-2026-11-03">[1.8.0] - 2026-11-03<a class="docs-heading-link" aria-label="Link to this section" href="#1-8-0-2026-11-03">#</a></h2>
-<h3 id="changed-6">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed-6">#</a></h3>
+<h2 id="1-8-0-2026-11-03">[1.8.0] - <span class="docs-heading-tail"><span>2026-11-03</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-8-0-2026-11-03">#</a></span></h2>
+<h3 id="changed-6"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed-6">#</a></span></h3>
 <ul>
 <li>Changed: docs and package metadata name nougat as the canonical repository, with git.wayne.edu and GitHub as read-only mirrors, until git.wayne.edu has CI runners.</li>
 <li>The advisory scans bundle their tools: phpstan/phpstan, squizlabs/php_codesniffer, phpcompatibility/php-compatibility and waynestate/pinstripe moved from require-dev to require, so plan and scan run them from the PHAR or a clone without installing anything into the app. When Booster runs its own vendor/bin/phpcs it points PHP_CodeSniffer at the bundled standard with --runtime-set installed_paths; the skip messages now say to reinstall Booster's dependencies instead of editing the app's composer.json.</li>
 <li>The plan and scan text reports speak plainly: an automatic step no longer carries the internal <code>[target-image-tests]</code> label and instead says &quot;After this step your tests run in Docker.&quot; after its summary; a step you do by hand is marked <code>[manual: you do this one by hand]</code>; the advisory scan line reads &quot;PHPCompatibility check for PHP X: N errors, M warnings.&quot; with singular counts (&quot;1 error&quot;, &quot;1 warning&quot;) instead of &quot;Will break on PHP X&quot;; and packages the dependency check cannot reach are reported as &quot;not on Packagist or unreachable&quot; instead of &quot;offline&quot;. JSON output is unchanged.</li>
 <li>User-facing text uses US spelling (behavior, color, license and so on); command and JSON key names are unchanged.</li>
 </ul>
-<h3 id="added-5">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-5">#</a></h3>
+<h3 id="added-5"><span class="docs-heading-tail"><span>Added</span><a class="docs-heading-link" aria-label="Link to this section" href="#added-5">#</a></span></h3>
 <ul>
 <li><code>booster run</code> prints one line per hop to standard error while it works: the hop's position in the plan, its id, its status, the number of files it changed and the seconds it took, and a closing line totals the hops run, the stops and the whole run. The lines go to standard error so the report on standard output is unchanged and <code>--format json</code> stays valid JSON.</li>
 <li><code>--path</code> accepts a leading <code>~</code> for your home folder: <code>~</code> and <code>~/...</code> (or <code>~\...</code> on Windows) are rewritten from <code>HOME</code>, or <code>USERPROFILE</code> on Windows, because the shell does not expand a tilde after <code>=</code> or inside quotes. <code>~user/...</code> stays as typed.</li>
 <li>A test keeps the reported version, the newest CHANGELOG heading, the README and the front page in step, and the tag build refuses a phar that reports a different version than its tag.</li>
 </ul>
-<h3 id="changed-7">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed-7">#</a></h3>
+<h3 id="changed-7"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed-7">#</a></span></h3>
 <ul>
 <li>
 <p>The README and the front page install docs put the single-file PHAR first, downloaded straight from the GitHub release (<code>releases/latest/download/booster.phar</code>), and make the clone route second. The Linux, macOS and WSL route opens with <code>sudo apt install php-cli php-xml php-mbstring php-zip php-curl unzip git composer</code>, because a stock Ubuntu <code>php-cli</code> lacks the XML extension Composer's dev dependencies need. The Windows tab no longer claims &quot;no bash or WSL needed&quot;; it says PHP and Composer must be present instead. The Docker-only route states plainly that it can run <code>detect</code>, <code>plan</code>, <code>scan</code> and <code>run --dry-run</code>, and that a real <code>run</code> needs the single-file or clone route.</p>
@@ -323,7 +324,7 @@
 <p>Every text report now ends with a short plain-English note: what happened, whether anything was changed, and the exact next command with your <code>--path</code> filled in (<code>detect</code>, <code>plan</code>, <code>scan</code>, <code>hops</code>, <code>init</code> and <code>run</code>, dry or real; a failed real run names the step it stopped at). <code>--format json</code> output is unchanged.</p>
 </li>
 </ul>
-<h3 id="fixed-5">Fixed<a class="docs-heading-link" aria-label="Link to this section" href="#fixed-5">#</a></h3>
+<h3 id="fixed-5"><span class="docs-heading-tail"><span>Fixed</span><a class="docs-heading-link" aria-label="Link to this section" href="#fixed-5">#</a></span></h3>
 <ul>
 <li>The single-file PHAR now carries the launchers for its bundled PHPStan and PHP_CodeSniffer, so <code>scan</code> and the plan no longer print &quot;could not run&quot; when started from the PHAR.</li>
 <li>The package-block warning now says &quot;needs PHP X or newer&quot; when the package's PHP floor is above the hop's target, instead of naming a cap that is not the real reason the step fails.</li>
@@ -337,9 +338,9 @@
 <li><code>bin/booster</code> is committed as executable, so <code>bin/booster --version</code> works on a plain clone (Linux, macOS, WSL); a test keeps it that way.</li>
 <li>A PHP hop adds <code>require.php</code> when <code>composer.json</code> has none, so PROCTOR no longer flags the upgraded app for a missing PHP constraint. (The lock file's hash is refreshed by the next <code>composer update</code>.)</li>
 </ul>
-<h2 id="1-7-0-2026-11-01">[1.7.0] - 2026-11-01<a class="docs-heading-link" aria-label="Link to this section" href="#1-7-0-2026-11-01">#</a></h2>
+<h2 id="1-7-0-2026-11-01">[1.7.0] - <span class="docs-heading-tail"><span>2026-11-01</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-7-0-2026-11-01">#</a></span></h2>
 <p>WayneUI joins the stack: a hop for the 1.x to 2.x move, and ten more behavior-change warnings.</p>
-<h3 id="added-6">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-6">#</a></h3>
+<h3 id="added-6"><span class="docs-heading-tail"><span>Added</span><a class="docs-heading-link" aria-label="Link to this section" href="#added-6">#</a></span></h3>
 <ul>
 <li>The <code>wayneui-1-to-2</code> hop, opt-in with <code>--wayneui</code>, for apps that require <code>cit-web-infra/wayne-ui</code>. It runs after the last Laravel hop and before the Vue hops and only when the plan reaches Laravel 11 or later (WayneUI 2.x supports 11 and newer); a plan that ends lower warns and leaves the hop out, and an app that uses WayneUI 1.x without the flag gets a nudge.</li>
 <li>The hop rewrites only the one-to-one items of WayneUI's <code>MIGRATING.md</code>, about 57 percent of the mapping: Bootstrap 3 class tokens in class attributes (whole tokens only), Font Awesome icons without size modifiers, five brand colors in CSS and Blade, the Breadcrumbs renames and three <code>config/wayne-ui.php</code> keys. It swaps the Composer requirement to <code>waynestate/wayne-ui</code> <code>^2.0</code>.</li>
@@ -348,9 +349,9 @@
 <li>Three more behaviour-change rows: Sanctum 4 stops loading its migrations, and yajra/laravel-oci8 adds the case-insensitive NLS defaults at 8.1.0 and drops them at 9.0.0.</li>
 <li>Seven doctrine/dbal rows: getDatabase() on Oracle, BIGINT as int, update and delete with empty criteria, nested savepoints, MySQL foreign keys by engine, BinaryType as string, and Table::getColumns() as a list.</li>
 </ul>
-<h2 id="1-6-0-2026-11-01">[1.6.0] - 2026-11-01<a class="docs-heading-link" aria-label="Link to this section" href="#1-6-0-2026-11-01">#</a></h2>
+<h2 id="1-6-0-2026-11-01">[1.6.0] - <span class="docs-heading-tail"><span>2026-11-01</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-6-0-2026-11-01">#</a></span></h2>
 <p>The cas-to-sesame hop now finishes what a person had to do by hand on a real app.</p>
-<h3 id="changed-8">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed-8">#</a></h3>
+<h3 id="changed-8"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed-8">#</a></span></h3>
 <ul>
 <li><code>cas-to-sesame</code> drops the <code>wayne-cas</code> path and vcs repositories from <code>composer.json</code>, so the moved package no longer lingers as a repository entry.</li>
 <li><code>cas-to-sesame</code> writes <code>config/sesame.php</code> from the SESAME defaults when the app has no <code>wayne-cas</code> config to carry over.</li>
@@ -358,9 +359,9 @@
 <li><code>cas-to-sesame</code> flags dead <code>DUO_*</code> settings left in the app's configuration.</li>
 <li>The README documents the full cas-to-sesame recipe.</li>
 </ul>
-<h2 id="1-5-0-2026-10-31">[1.5.0] - 2026-10-31<a class="docs-heading-link" aria-label="Link to this section" href="#1-5-0-2026-10-31">#</a></h2>
+<h2 id="1-5-0-2026-10-31">[1.5.0] - <span class="docs-heading-tail"><span>2026-10-31</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-5-0-2026-10-31">#</a></span></h2>
 <p>Behavior-change warnings, from the second real-use report: a hop can pass every gate and still change what users see.</p>
-<h3 id="added-7">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-7">#</a></h3>
+<h3 id="added-7"><span class="docs-heading-tail"><span>Added</span><a class="docs-heading-link" aria-label="Link to this section" href="#added-7">#</a></span></h3>
 <ul>
 <li>Behavior changes to check: <code>booster plan</code>, the run report and <code>--format=json</code> (<code>behaviour_changes</code>) now name the
 silent changes a step brings: things that still pass every gate but behave differently, such as Carbon 3 reading
@@ -372,9 +373,9 @@ majors of sweet-alert, Guzzle and Sanctum), each with its source link. An entry 
 config or composer.json shows it is affected; three apply to every app crossing their step. Package entries print
 on the plan's last step, compared against the lock as it was before the run.</li>
 </ul>
-<h2 id="1-4-0-2026-10-30">[1.4.0] - 2026-10-30<a class="docs-heading-link" aria-label="Link to this section" href="#1-4-0-2026-10-30">#</a></h2>
+<h2 id="1-4-0-2026-10-30">[1.4.0] - <span class="docs-heading-tail"><span>2026-10-30</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-4-0-2026-10-30">#</a></span></h2>
 <p>Fixes from the second real-use report (two apps taken to PHP 7.4/Laravel 8 and PHP 8.5/Laravel 13 with SESAME).</p>
-<h3 id="added-8">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-8">#</a></h3>
+<h3 id="added-8"><span class="docs-heading-tail"><span>Added</span><a class="docs-heading-link" aria-label="Link to this section" href="#added-8">#</a></span></h3>
 <ul>
 <li><code>--test-env KEY=VALUE</code> (repeatable) passes settings, such as a database host, to the baseline and every gate.
 Reports name the keys only, never the values.</li>
@@ -383,7 +384,7 @@ changes <code>composer.lock</code>, because Citadel copies the old <code>vendor/
 deployment script that already ran. It adds <code>php artisan migrate --force</code> only when the app has <code>artisan</code>.</li>
 <li>The skill has an optional ADVISOR section with the real install lines.</li>
 </ul>
-<h3 id="changed-9">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed-9">#</a></h3>
+<h3 id="changed-9"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed-9">#</a></span></h3>
 <ul>
 <li><code>cas-to-sesame</code> leaves an app that signs people in. Before, the hop reported success on an app that would not boot.
 The hop now requires <code>waynestate/sesame:^0.3</code> and:
@@ -409,7 +410,7 @@ only when the app sets <code>config.sort-packages</code>.</li>
 <li>The weekly hop-data refresh treats a change of date alone as no change, so it opens a merge request only when the
 data changed.</li>
 </ul>
-<h3 id="fixed-6">Fixed<a class="docs-heading-link" aria-label="Link to this section" href="#fixed-6">#</a></h3>
+<h3 id="fixed-6"><span class="docs-heading-tail"><span>Fixed</span><a class="docs-heading-link" aria-label="Link to this section" href="#fixed-6">#</a></span></h3>
 <ul>
 <li>The hop-data robot crashed on its first GitLab API call. Booster now locks CREED 0.1.4, whose bot client is fixed.</li>
 <li>PROCTOR runs as the final target even when the plan has nothing left to do.</li>
@@ -419,9 +420,9 @@ helper files, so Laravel apps no longer get a wall of false &quot;undefined meth
 <code>Illuminate\Http\Middleware\TrustProxies</code>; a customized one gets a manual note. The plan suggests HELMET when that hop
 is in it and the app has no HELMET.</li>
 </ul>
-<h2 id="1-3-0-2026-10-30">[1.3.0] - 2026-10-30<a class="docs-heading-link" aria-label="Link to this section" href="#1-3-0-2026-10-30">#</a></h2>
+<h2 id="1-3-0-2026-10-30">[1.3.0] - <span class="docs-heading-tail"><span>2026-10-30</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-3-0-2026-10-30">#</a></span></h2>
 <p>Fixes from the first real use of Booster on two Laravel apps (PHP 7.1 and 7.3, Laravel 5.8 and 8, CAS, oci8).</p>
-<h3 id="changed-10">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed-10">#</a></h3>
+<h3 id="changed-10"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed-10">#</a></span></h3>
 <ul>
 <li>Laravel and PHPUnit hops now update <code>composer.lock</code>: the gate runs <code>composer update -W</code> for the packages the hop
 changed, inside the target image, and the new lock is part of the hop's diff. Before, the gate failed at
@@ -440,7 +441,7 @@ that skipped every PHPUnit hop.</li>
 <li>The SESAME report says what the swap actually wrote to each model.</li>
 <li>Laravel hops remove the imports their Rector rules left unused.</li>
 </ul>
-<h3 id="added-9">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-9">#</a></h3>
+<h3 id="added-9"><span class="docs-heading-tail"><span>Added</span><a class="docs-heading-link" aria-label="Link to this section" href="#added-9">#</a></span></h3>
 <ul>
 <li><code>plan</code> checks each direct dependency's newest release (Packagist, and composer-type repositories the app lists)
 against every planned hop: it names the first hop a package blocks and flags abandoned packages.
@@ -456,8 +457,8 @@ PHP hop can gate on a different image from its baseline. The README covers arm64
 <li>A warning when the app's tests are only Laravel's stock examples, and a README section on a smoke test that works
 for apps behind CAS.</li>
 </ul>
-<h2 id="1-2-0-2026-10-30">[1.2.0] - 2026-10-30<a class="docs-heading-link" aria-label="Link to this section" href="#1-2-0-2026-10-30">#</a></h2>
-<h3 id="changed-11">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed-11">#</a></h3>
+<h2 id="1-2-0-2026-10-30">[1.2.0] - <span class="docs-heading-tail"><span>2026-10-30</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-2-0-2026-10-30">#</a></span></h2>
+<h3 id="changed-11"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed-11">#</a></span></h3>
 <ul>
 <li>The gate's target image carries the extension set Citadel's apps run with: intl, ldap, soap, zip, gd, pdo_mysql,
 mysqli, bcmath, pcntl, exif, redis, imagick and oci8 (before: zip, pdo_mysql, mysqli and bcmath). The extensions
@@ -466,27 +467,27 @@ oci8, so the first build takes a few minutes.</li>
 <li>Target image tags are stamped with a short hash of <code>docker/Dockerfile</code> (<code>booster-target:&lt;php&gt;-&lt;stamp&gt;</code>), so an
 edited recipe rebuilds the image instead of reusing a stale tag.</li>
 </ul>
-<h3 id="added-10">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-10">#</a></h3>
+<h3 id="added-10"><span class="docs-heading-tail"><span>Added</span><a class="docs-heading-link" aria-label="Link to this section" href="#added-10">#</a></span></h3>
 <ul>
 <li><code>--image</code> for <code>run</code>: run the gate in a Docker image of your own instead of building <code>booster-target</code>. The image
 needs <code>php</code> and <code>composer</code> on <code>PATH</code>; Booster uses it when it is present locally and pulls it otherwise.</li>
 <li><code>scripts/check-target-image.sh</code> and <code>scripts/check-target-image.ps1</code>: build the target image for each PHP version
 and verify its extension list.</li>
 </ul>
-<h2 id="1-1-0-2026-10-30">[1.1.0] - 2026-10-30<a class="docs-heading-link" aria-label="Link to this section" href="#1-1-0-2026-10-30">#</a></h2>
-<h3 id="changed-12">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed-12">#</a></h3>
+<h2 id="1-1-0-2026-10-30">[1.1.0] - <span class="docs-heading-tail"><span>2026-10-30</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-1-0-2026-10-30">#</a></span></h2>
+<h3 id="changed-12"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed-12">#</a></span></h3>
 <ul>
 <li>The 50-file cap per hop becomes a 200-file review threshold: an interactive run shows the per-rule summary and asks
 before applying a bigger hop, while non-interactive and JSON runs stop at the threshold. <code>--max-changes</code> is now an
 explicit hard limit that never prompts, and <code>0</code> lifts the limit entirely.</li>
 </ul>
-<h3 id="fixed-7">Fixed<a class="docs-heading-link" aria-label="Link to this section" href="#fixed-7">#</a></h3>
+<h3 id="fixed-7"><span class="docs-heading-tail"><span>Fixed</span><a class="docs-heading-link" aria-label="Link to this section" href="#fixed-7">#</a></span></h3>
 <ul>
 <li>The GitLab release job runs on any runner architecture: it calls the Releases API with curl from a multi-arch image
 instead of the deprecated release-cli.</li>
 </ul>
-<h2 id="1-0-0-2026-10-30">[1.0.0] - 2026-10-30<a class="docs-heading-link" aria-label="Link to this section" href="#1-0-0-2026-10-30">#</a></h2>
-<h3 id="added-11">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-11">#</a></h3>
+<h2 id="1-0-0-2026-10-30">[1.0.0] - <span class="docs-heading-tail"><span>2026-10-30</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-0-0-2026-10-30">#</a></span></h2>
+<h3 id="added-11"><span class="docs-heading-tail"><span>Added</span><a class="docs-heading-link" aria-label="Link to this section" href="#added-11">#</a></span></h3>
 <ul>
 <li>The PROCTOR policy gate: a baseline before the first hop and a final check after the last, so only findings new
 against the baseline block the run. The report groups New, Already present and Fixed; <code>--proctor-advisory</code> makes it
@@ -524,7 +525,7 @@ Booster when the refresh changes <code>data/versions.json</code>; a person revie
 the accepted calls.</li>
 <li>A failed baseline whose output mentions a Mix or Vite manifest now names the missing build artifact.</li>
 </ul>
-<h3 id="changed-13">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed-13">#</a></h3>
+<h3 id="changed-13"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed-13">#</a></span></h3>
 <ul>
 <li>The version policy is read straight from the <code>waynestate/creed</code> package (<code>^0.1</code>) in Booster's own <code>vendor/</code>, and the
 plan names it as <code>waynestate/creed &lt;version&gt;</code>. There is no bundled copy to refresh.</li>
@@ -537,37 +538,37 @@ git-ignored).</li>
 <li>Bound targets (--to-php and the rest) leave Node and Vue hops out unless --with-node is passed; the plan says
 so.</li>
 </ul>
-<h3 id="removed">Removed<a class="docs-heading-link" aria-label="Link to this section" href="#removed">#</a></h3>
+<h3 id="removed"><span class="docs-heading-tail"><span>Removed</span><a class="docs-heading-link" aria-label="Link to this section" href="#removed">#</a></span></h3>
 <ul>
 <li>The generated copy of CREED under <code>src/Creed/</code> (reader, <code>policy.json</code>, manifest) and the <code>composer creed-copy:check</code>
 script: the policy comes from the <code>waynestate/creed</code> package.</li>
 </ul>
-<h3 id="fixed-8">Fixed<a class="docs-heading-link" aria-label="Link to this section" href="#fixed-8">#</a></h3>
+<h3 id="fixed-8"><span class="docs-heading-tail"><span>Fixed</span><a class="docs-heading-link" aria-label="Link to this section" href="#fixed-8">#</a></span></h3>
 <ul>
 <li>Invalid UTF-8 in a Rector report is repaired instead of stopping the run; the report notes the repair.</li>
 <li>Rector parse errors keep their line numbers.</li>
 <li><code>vue-compat-codemod</code> keeps unrecognised output lines whole and cuts long output on a character boundary.</li>
 </ul>
-<h2 id="0-1-3-2026-10-29">[0.1.3] - 2026-10-29<a class="docs-heading-link" aria-label="Link to this section" href="#0-1-3-2026-10-29">#</a></h2>
-<h3 id="added-12">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-12">#</a></h3>
+<h2 id="0-1-3-2026-10-29">[0.1.3] - <span class="docs-heading-tail"><span>2026-10-29</span><a class="docs-heading-link" aria-label="Link to this section" href="#0-1-3-2026-10-29">#</a></span></h2>
+<h3 id="added-12"><span class="docs-heading-tail"><span>Added</span><a class="docs-heading-link" aria-label="Link to this section" href="#added-12">#</a></span></h3>
 <ul>
 <li>Added: agent-ready site (prompt blocks, Markdown twins, llms.txt), from Squire's kit.</li>
 </ul>
-<h3 id="fixed-9">Fixed<a class="docs-heading-link" aria-label="Link to this section" href="#fixed-9">#</a></h3>
+<h3 id="fixed-9"><span class="docs-heading-tail"><span>Fixed</span><a class="docs-heading-link" aria-label="Link to this section" href="#fixed-9">#</a></span></h3>
 <ul>
 <li>Fixed: stale capability claims in the site and README.</li>
 </ul>
-<h3 id="changed-14">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed-14">#</a></h3>
+<h3 id="changed-14"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed-14">#</a></span></h3>
 <ul>
 <li>Changed: the proof page moves to a private site that needs a Wayne State sign-in.</li>
 <li>Changed: project names written as words except acronyms.</li>
 </ul>
-<h2 id="0-1-2-2026-10-29">[0.1.2] - 2026-10-29<a class="docs-heading-link" aria-label="Link to this section" href="#0-1-2-2026-10-29">#</a></h2>
+<h2 id="0-1-2-2026-10-29">[0.1.2] - <span class="docs-heading-tail"><span>2026-10-29</span><a class="docs-heading-link" aria-label="Link to this section" href="#0-1-2-2026-10-29">#</a></span></h2>
 <ul>
 <li>CREED reader re-exported from CREED 0.1.2: versions older than the oldest listed line are now end of life instead of refused.</li>
 </ul>
-<h2 id="0-1-1-2026-10-29">[0.1.1] - 2026-10-29<a class="docs-heading-link" aria-label="Link to this section" href="#0-1-1-2026-10-29">#</a></h2>
-<h3 id="added-13">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-13">#</a></h3>
+<h2 id="0-1-1-2026-10-29">[0.1.1] - <span class="docs-heading-tail"><span>2026-10-29</span><a class="docs-heading-link" aria-label="Link to this section" href="#0-1-1-2026-10-29">#</a></span></h2>
+<h3 id="added-13"><span class="docs-heading-tail"><span>Added</span><a class="docs-heading-link" aria-label="Link to this section" href="#added-13">#</a></span></h3>
 <ul>
 <li><code>data/versions.json</code>, the hop data file (shipped in the PHAR), and <code>bin/refresh-hop-data.php</code>, which rewrites it
 from the Packagist, endoflife.date and npm feeds plus CREED's policy. <code>composer ci</code> ends with the offline <code>--check</code>
@@ -578,15 +579,15 @@ would change, so a feed that moved while the file slept is visible until someone
 <li>A plan warning when the target major has no Rector ruleset yet: BOOSTER stops short of the target instead of
 failing.</li>
 </ul>
-<h3 id="changed-15">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed-15">#</a></h3>
+<h3 id="changed-15"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed-15">#</a></span></h3>
 <ul>
 <li>The PHP, Laravel and PHPUnit hop lists now come from <code>data/versions.json</code>; a major whose Rector ruleset is not
 installed gets no hop.</li>
 <li>The <code>node-pin-24</code> hop now floors Node at the hop data's target (26 today, following the policy's newest supported
 major) and runs its npm work in the matching <code>node:</code> container.</li>
 </ul>
-<h2 id="0-1-0-2026-10-29">[0.1.0] - 2026-10-29<a class="docs-heading-link" aria-label="Link to this section" href="#0-1-0-2026-10-29">#</a></h2>
-<h3 id="added-14">Added<a class="docs-heading-link" aria-label="Link to this section" href="#added-14">#</a></h3>
+<h2 id="0-1-0-2026-10-29">[0.1.0] - <span class="docs-heading-tail"><span>2026-10-29</span><a class="docs-heading-link" aria-label="Link to this section" href="#0-1-0-2026-10-29">#</a></span></h2>
+<h3 id="added-14"><span class="docs-heading-tail"><span>Added</span><a class="docs-heading-link" aria-label="Link to this section" href="#added-14">#</a></span></h3>
 <ul>
 <li><code>booster plan</code>, <code>run</code>, <code>hops</code>, <code>detect</code> and <code>init</code> commands (also <code>vendor/bin/booster</code>).</li>
 <li>App-type detection for the five stack permutations from <code>composer.json</code> and <code>package.json</code>.</li>
@@ -634,7 +635,7 @@ tests.</li>
 scan that cannot run is reported as &quot;could not run&quot; without failing the plan. The scan ignores <code>vendor/</code>,
 <code>node_modules/</code> and <code>storage/</code>; <code>plan --no-scan</code> skips it.</li>
 </ul>
-<h3 id="changed-16">Changed<a class="docs-heading-link" aria-label="Link to this section" href="#changed-16">#</a></h3>
+<h3 id="changed-16"><span class="docs-heading-tail"><span>Changed</span><a class="docs-heading-link" aria-label="Link to this section" href="#changed-16">#</a></span></h3>
 <ul>
 <li>The PHPCompatibility packages (<code>phpcompatibility/php-compatibility</code>, <code>squizlabs/php_codesniffer</code>) moved from <code>require</code>
 to <code>require-dev</code> and <code>suggest</code>: the advisory scan is now optional, and BOOSTER reports a skip when no installed
