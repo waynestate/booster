@@ -33,7 +33,7 @@
       <a class="masthead__install" href="../../docs/index.html#run-it-today">Run it today</a>
     </nav>
   </div>
-</header><div class="docs-layout">
+</header><div class="docs-layout docs-layout--toc">
   <details class="docs-menu">
     <summary>Menu</summary>
     <nav class="docs-nav" aria-label="Documentation"><ul class="docs-nav__list"><li><a href="../../docs/index.html">Overview</a></li><li><a href="../../docs/install.html">Install</a></li><li class="docs-nav__group"><span class="docs-nav__label">Guides</span><ul><li><a href="../../docs/guides/quick-start.html">Quick start</a></li><li><a href="../../docs/recipes.html">How do I...</a></li><li><a href="../../docs/guides/scans.html">The scans</a></li><li><a href="../../docs/guides/dependency-check.html">The dependency check</a></li><li><a href="../../docs/guides/behaviour-changes.html">Behavior changes</a></li><li><a href="../../docs/guides/baseline.html">The baseline</a></li><li><a href="../../docs/guides/smoke-test.html">A smoke test for WSU apps</a></li><li><a href="../../docs/guides/hops.html">What a hop does</a></li><li><a href="../../docs/guides/replay-gate.html">The replay gate</a></li><li><a href="../../docs/guides/framework-hops.html">Hand-copied libraries to Composer</a></li><li><a href="../../docs/guides/strict-sessions.html">Strict session IDs</a></li><li><a href="../../docs/guides/laravel-and-vendor.html">Laravel hops and vendor/</a></li><li><a href="../../docs/guides/citadel.html" aria-current="page">Deploying on Citadel</a></li></ul></li><li class="docs-nav__group"><span class="docs-nav__label">Reference</span><ul><li><a href="../../docs/reference/commands.html">Commands</a></li><li><a href="../../docs/reference/configuration.html">Configuration</a></li><li><a href="../../docs/reference/hops.html">Hops</a></li></ul></li><li><a href="../../docs/checks.html">Checks</a></li><li><a href="../../docs/next.html">Next</a></li><li><a href="../../docs/upgrading.html">Upgrading</a></li><li><a href="../../docs/changelog.html">Changelog</a></li></ul></nav>
@@ -42,7 +42,7 @@
   <div class="docs-content">
     <main id="main">
       <article class="docs-article"><h1 id="deploying-on-citadel">Deploying on <span class="docs-heading-tail"><span>Citadel</span><a class="docs-heading-link" aria-label="Link to this section" href="#deploying-on-citadel">#</a></span></h1>
-<p>This page covers what a real run says about the next deploy, and the deployment script it writes when one is needed. Next: <a href="../checks.html">Checks</a>.</p>
+<p>This page covers what a real run says about the next deploy, the deployment script it writes when one is needed, and how to try the upgraded app on Citadel's twin first. Next: <a href="../checks.html">Checks</a>.</p>
 <p>When a real (not dry) run moves the app's <strong>production</strong> packages in <code>composer.lock</code>, Booster works out what the next
 deploy needs and says so at the end of the report, in a <code>Deploy:</code> line or an <code>Added deployments/...</code> line:</p>
 <div class="docs-table" role="region" aria-label="Table" tabindex="0"><table>
@@ -87,10 +87,33 @@ something before it migrates (a Laravel app whose first release parks old tables
 migrated first. Migrations stay with your own deploy scripts; for a Laravel app the report adds a line saying to run
 <code>php artisan migrate --force</code> after the deploy if none of them does. Commit the script with the rest of the upgrade.
 To drop it again, delete the named file. The stamp is local time.</p>
+<h2 id="try-it-on-citadel-s-twin-first">Try it on Citadel's twin <span class="docs-heading-tail"><span>first</span><a class="docs-heading-link" aria-label="Link to this section" href="#try-it-on-citadel-s-twin-first">#</a></span></h2>
+<p>Booster's gate runs your tests on the new PHP in a plain PHP image with Citadel's extensions. That proves the code; it
+does not prove the server. <a rel="noopener" href="https://parity.apps.wayne.edu/">Parity</a> goes the rest of the way on your own computer:
+Citadel's own image, the same kind of proxy in front, and MySQL 5.6, so a query or a migration that Citadel's shared
+MySQL refuses fails on your laptop instead of on the next release. After a run that raised the PHP floor:</p>
+<ol>
+<li>Move the <code>image</code> in <code>parity.json</code> to one on the new PHP. The report's <code>Next:</code> line names the line, and
+<code>parity image list</code> shows the Citadel images Parity can run. No <code>parity.json</code> yet? <code>parity init</code> writes one from
+what is in the folder.</li>
+<li>Run the app, then test it through the proxy:</li>
+</ol>
+<!-- docs-test: skip needs Parity and a container engine -->
+<pre tabindex="0"><code class="language-sh">parity image get
+parity up
+parity test
+</code></pre>
+<ol start="3">
+<li>Click through the pages the replay could not reach (anything behind sign-in), then <code>parity down</code>. Your database
+stays for the next try.</li>
+</ol>
+<p><code>parity test</code> exits 1 on a failed request or a PHP fatal error in Apache's log, the same promise Booster's gate makes,
+one floor up. Booster never runs Parity for you: it moves the code, and you decide when the app is ready to try.</p>
 </article>
     </main>
     <nav class="docs-pager" aria-label="Pages"><a class="docs-pager__link" href="../../docs/guides/laravel-and-vendor.html"><span class="docs-pager__dir">Previous</span><span class="docs-pager__title">Laravel hops and vendor/</span></a><a class="docs-pager__link docs-pager__link--next" href="../../docs/reference/commands.html"><span class="docs-pager__dir">Next</span><span class="docs-pager__title">Commands</span></a></nav>
   </div>
+  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#try-it-on-citadel-s-twin-first">Try it on Citadel&#039;s twin first</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
   <span>Documents Booster <span data-docs-version>1.18.0</span></span>

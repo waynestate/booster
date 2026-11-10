@@ -70,7 +70,7 @@ WELD is the Wayne State application stack. Booster is its upgrade layer.
 | HELMET | The baseline runtime |
 | Sourdough | The starters |
 | Squire | The Citadel deploy kit; the layer that serves this repo's front page is one |
-| Parity | Citadel on your computer: its PHP image, its proxy and MySQL 5.6, so an app that works here works on Citadel (0.1.0 coming) |
+| Parity | Citadel on your computer: its PHP image, its proxy and MySQL 5.6, so an app that works here works on Citadel. Try an upgraded app there before you deploy it |
 | Preflight | The CI templates |
 | Pinstripe | The coding standard |
 | Booster | This project: moves apps forward |

@@ -422,6 +422,7 @@ WELD is the Wayne State application stack. Booster is its upgrade layer, and it 
 - [WELD](https://weld.apps.wayne.edu/)The Laravel and Vue starter, with the stack already installed.
 - BoosterMoves apps forward, one dose at a time.You are here
 - [Squire](https://squire.apps.wayne.edu/)Carries the release out the door.
+- [Parity](https://parity.apps.wayne.edu/)Citadel on your computer: `parity up` runs the upgraded app on Citadel's own image and MySQL 5.6 before you deploy.
 - [Rollcall](https://rollcall.apps.wayne.edu/)Every app answers “present”, with its PHP version.
 - [ADVISOR](https://advisor.apps.wayne.edu/)An MCP server your agent can ask about the stack.
 - [Drawbridge](https://drawbridge.apps.wayne.edu/)The sign-in gateway, lowered on request.
@@ -436,4 +437,4 @@ The six example apps prove the plumbing end to end, and the gate now ends with P
 - Not yet A signed-in run of an app that cas-to-sesame swapped; Duo two-factor stays manual work
 - Decided No `booster mcp`: ADVISOR is the stack's read-only MCP server
 - Decided No merge-request automation on app code; a person reads the diff and merges it
-- Open The shared MySQL 5.6 database floor (question 8); the hop notes tell the reviewer to check it
+- Open The shared MySQL 5.6 database floor (question 8); the hop notes tell the reviewer to check it, and [Parity](https://parity.apps.wayne.edu/) runs the result on MySQL 5.6 before you deploy

@@ -1762,8 +1762,9 @@ html:not(.motion) .dose__no,
 }
 
 .team {
+  /* Fifteen parts: three rows of five, so nobody waits alone on a row of their own. */
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.75rem;
   margin: 0;
   padding: 0;
@@ -1949,15 +1950,12 @@ html:not(.motion) .dose__no,
 
 /* -------------------------------------------------------------- 10. responsive */
 
-@media (max-width: 1180px) {
-  .team { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-}
 
 @media (max-width: 1023px) {
   .hero__grid { grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr); }
   .sequence { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .never { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .team { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .team { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .card__head { grid-template-columns: minmax(0, 1fr); }
   .card__cols, .dose { grid-template-columns: 2.6rem minmax(0, 1.5fr) minmax(0, 1fr) 7rem; }
   .card__cols span:nth-child(4), .dose__gate { display: none; }
@@ -1994,7 +1992,10 @@ html:not(.motion) .dose__no,
   .masthead__nav a:not(.masthead__install) { display: none; }
   .sequence,
   .never { grid-template-columns: minmax(0, 1fr); }
-  .team { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Two across: Booster's own card takes a whole row, and dense packing fills the gap it leaves, so fifteen parts
+     make full rows. */
+  .team { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: row dense; }
+  .member--self { grid-column: 1 / -1; }
   .card { padding: 0 1rem 0 2.2rem; }
   .card__holes { inline-size: 1.4rem; }
   .card__fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
@@ -2025,6 +2026,7 @@ html:not(.motion) .dose__no,
   .stamp { padding: 0.25rem 0.4rem; }
   .stamp__mid { font-size: 1rem; }
   .team { grid-template-columns: minmax(0, 1fr); }
+  .member--self { grid-column: auto; }
   .member { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 0.75rem; }
   .member__role { inline-size: 100%; }
   .grid__col .pill { display: none; }

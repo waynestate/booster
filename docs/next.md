@@ -10,7 +10,7 @@ This page lists what Booster does not do yet, and what it decided not to build. 
 ## Open
 
 - **The gate needs a real app.** The contract tests cover the bundled example apps. A full `run` against a real Wayne State application with the gate on has not been proven in CI yet; the proof site carries those runs.
-- **The shared MySQL 5.6 database floor.** Which PHP and Laravel pairs Citadel's shared MySQL server allows waits on the platform owner (question 8 in OPEN_QUESTIONS.md). Until then each Laravel hop's notes tell the reviewer to check the database version, and Booster does not look at the database.
+- **The shared MySQL 5.6 database floor.** Which PHP and Laravel pairs Citadel's shared MySQL server allows waits on the platform owner (question 8 in OPEN_QUESTIONS.md). Until then each Laravel hop's notes tell the reviewer to check the database version, and Booster does not look at the database. Parity runs the upgraded app against MySQL 5.6 on your own computer, so that check can happen before a deploy (see "Try it on Citadel's twin first" in the Citadel guide).
 
 ## Decided not to build
 

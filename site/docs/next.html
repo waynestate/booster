@@ -46,7 +46,7 @@
 <h2 id="open"><span class="docs-heading-tail"><span>Open</span><a class="docs-heading-link" aria-label="Link to this section" href="#open">#</a></span></h2>
 <ul>
 <li><strong>The gate needs a real app.</strong> The contract tests cover the bundled example apps. A full <code>run</code> against a real Wayne State application with the gate on has not been proven in CI yet; the proof site carries those runs.</li>
-<li><strong>The shared MySQL 5.6 database floor.</strong> Which PHP and Laravel pairs Citadel's shared MySQL server allows waits on the platform owner (question 8 in OPEN_QUESTIONS.md). Until then each Laravel hop's notes tell the reviewer to check the database version, and Booster does not look at the database.</li>
+<li><strong>The shared MySQL 5.6 database floor.</strong> Which PHP and Laravel pairs Citadel's shared MySQL server allows waits on the platform owner (question 8 in OPEN_QUESTIONS.md). Until then each Laravel hop's notes tell the reviewer to check the database version, and Booster does not look at the database. Parity runs the upgraded app against MySQL 5.6 on your own computer, so that check can happen before a deploy (see &quot;Try it on Citadel's twin first&quot; in the Citadel guide).</li>
 </ul>
 <h2 id="decided-not-to-build">Decided not to <span class="docs-heading-tail"><span>build</span><a class="docs-heading-link" aria-label="Link to this section" href="#decided-not-to-build">#</a></span></h2>
 <ul>

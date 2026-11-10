@@ -5,7 +5,7 @@ description: What a real run tells a Citadel app about its next deploy, and the 
 
 # Deploying on Citadel
 
-This page covers what a real run says about the next deploy, and the deployment script it writes when one is needed. Next: [Checks](../checks.md).
+This page covers what a real run says about the next deploy, the deployment script it writes when one is needed, and how to try the upgraded app on Citadel's twin first. Next: [Checks](../checks.md).
 
 When a real (not dry) run moves the app's **production** packages in `composer.lock`, Booster works out what the next
 deploy needs and says so at the end of the report, in a `Deploy:` line or an `Added deployments/...` line:
@@ -36,3 +36,28 @@ something before it migrates (a Laravel app whose first release parks old tables
 migrated first. Migrations stay with your own deploy scripts; for a Laravel app the report adds a line saying to run
 `php artisan migrate --force` after the deploy if none of them does. Commit the script with the rest of the upgrade.
 To drop it again, delete the named file. The stamp is local time.
+
+## Try it on Citadel's twin first
+
+Booster's gate runs your tests on the new PHP in a plain PHP image with Citadel's extensions. That proves the code; it
+does not prove the server. [Parity](https://parity.apps.wayne.edu/) goes the rest of the way on your own computer:
+Citadel's own image, the same kind of proxy in front, and MySQL 5.6, so a query or a migration that Citadel's shared
+MySQL refuses fails on your laptop instead of on the next release. After a run that raised the PHP floor:
+
+1. Move the `image` in `parity.json` to one on the new PHP. The report's `Next:` line names the line, and
+   `parity image list` shows the Citadel images Parity can run. No `parity.json` yet? `parity init` writes one from
+   what is in the folder.
+2. Run the app, then test it through the proxy:
+
+<!-- docs-test: skip needs Parity and a container engine -->
+```sh
+parity image get
+parity up
+parity test
+```
+
+3. Click through the pages the replay could not reach (anything behind sign-in), then `parity down`. Your database
+   stays for the next try.
+
+`parity test` exits 1 on a failed request or a PHP fatal error in Apache's log, the same promise Booster's gate makes,
+one floor up. Booster never runs Parity for you: it moves the code, and you decide when the app is ready to try.
