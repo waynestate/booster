@@ -259,9 +259,10 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  /* Above 640 px every link is visible, and between roughly 640 and 840 px
-     brand plus links outgrow the container. Wrap the links, right aligned,
-     instead of running past the viewport (html and body no longer clip). */
+  /* Every link needs about 930 px. Below 960 px the section links step aside
+     (section 10) so the bar stays one row on a tablet; the wrap is only a
+     safety net for a bigger font, right aligned instead of running past the
+     viewport (html and body no longer clip). */
   flex-wrap: wrap;
   gap: 0.25rem;
 }
@@ -1978,6 +1979,15 @@ html:not(.motion) .dose__no,
   .install__side { margin-block-start: 1.25rem; }
   .printout { rotate: 0deg; }
   .out { min-block-size: 0; }
+}
+
+/* A tablet keeps the masthead to one row too: the links to this page's own
+   sections (and, on proof.html, the front page's) give way to Docs, Real
+   output, Proof and the gold pill, as the docs pages do below 1100 px. The
+   sections are a scroll away; a second row of links over the hero was not. */
+@media (max-width: 960px) {
+  .masthead__nav a[href^="#"]:not(.masthead__install),
+  .masthead__nav a[href*="index.html#"]:not(.masthead__install) { display: none; }
 }
 
 /* A phone keeps the masthead to one line: the call to action never wraps into a

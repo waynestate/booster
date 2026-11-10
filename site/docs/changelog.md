@@ -12,6 +12,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## \[Unreleased\] [#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Site: the masthead stays one row on a tablet. Between 641 and 960 px the links to the page's own sections (Record, Pairs, Commands, Agents) step aside for Docs, Real output, Proof and Run it today, as the docs pages already do, instead of wrapping into a second row over the hero (an iPad in portrait got two).
 - Docs: Parity joins Booster's care team. The Citadel guide gains "Try it on Citadel's twin first": move `parity.json` to the new PHP, then `parity up` and `parity test` run the upgraded app on Citadel's own image and MySQL 5.6 before the deploy. The front page's cast lists Parity with its mark, the README and docs overview no longer call Parity's 0.1.0 coming (it shipped), and the MySQL 5.6 floor (question 8) says where to check it today.
 - Added: the list of places that still name an older PHP after a floor rise also reads Parity's `parity.json` (its `image`, with a pointer to `parity image list`), the app's own `Dockerfile`, `docker-compose.yml`, `docker-compose.yaml`, `compose.yml` and `compose.yaml`, and Laravel Sail's runtime (`vendor/laravel/sail/runtimes/8.3` and `sail-8.3/app`). Each was a place a raised floor quietly left behind: Parity would start the app on an image that can no longer run it, and a Sail app's local container stayed on the old PHP. Booster still edits none of them; it names each with its file and line.
 
