@@ -4,6 +4,7 @@
 declare(strict_types=1);
 
 use Waynestate\Booster\Console\BoosterApplication;
+use Waynestate\Booster\Console\LocalTimeZone;
 
 // Works from a clone (vendor next to bin) and as a Composer dependency
 // (vendor/waynestate/booster/bin, autoloader two levels up).
@@ -11,6 +12,8 @@ $candidates = [__DIR__ . '/../vendor/autoload.php', __DIR__ . '/../../../autoloa
 foreach ($candidates as $autoload) {
     if (is_file($autoload)) {
         require $autoload;
+        // A php.ini with no date.timezone means UTC: use the machine's zone, so "today" is today.
+        LocalTimeZone::apply();
         exit((new BoosterApplication())->run());
     }
 }

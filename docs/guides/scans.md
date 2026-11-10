@@ -46,7 +46,7 @@ even when it finds a wall of missing types.
 
 ## The composer audit during the run
 
-`run` carries a third advisory check, per hop: after a hop changes `composer.json` or `composer.lock`, Booster runs `composer audit --format=json --no-interaction` in the app and lists advisories and abandoned packages in the step's report with counts. It never changes the exit code, a clean audit stays silent, and a hop that changed no composer file skips it and says so. A dry run previews the hops and runs no audit.
+`run` carries a third advisory check, per hop: after a hop changes `composer.json` or `composer.lock`, Booster runs `composer audit --format=json --no-interaction` in the app and lists advisories and abandoned packages in the step's report with counts. It never changes the exit code, a clean audit says `Composer audit: clean (no advisories, no abandoned packages).`, and a hop that changed no composer file skips it and says so. A dry run previews the hops and runs no audit.
 
 Composer's audit exits 1 for advisories, 2 for abandoned packages and 3 for both. Booster reads the JSON report on every one of those exits, so an app with abandoned packages gets the list, not a "could not run". Only an exit with no JSON report behind it (Composer missing, a crash) is reported as "could not run".
 

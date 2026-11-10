@@ -241,7 +241,7 @@ Some hops come along by default, and some only when you ask:
 - `--skip <hop id>` drops a hop you do not want.
 - If you pass a target past security support, the plan still goes there as a stop on the way up and warns with the date its support ended. If Rector has no ruleset for a step yet, the plan stops short and warns.
 
-`run` handles each hop the same way: a Rector preview, then the edits (if a hop would change more than 200 files it asks first, or stops when it cannot ask; `--max-changes` sets a hard limit), then the Composer constraints, then your tests in the target PHP image. That last part is the gate. The first hop that fails stops the run, and the hops after it are reported as "not run". Booster never commits; the changes sit in your working copy for you to review. Progress prints one line per hop, like `hop 3/11 <hop id>: <status>, 12 files, 41 s`, and ends with `run finished: 11 of 11 hops run, 0 stopped, ...`.
+`run` handles each hop the same way: a Rector preview, then the edits (if a hop would change more than 200 files it asks first, or stops when it cannot ask; `--max-changes` sets a hard limit), then the Composer constraints, then your tests in the target PHP image. That last part is the gate. The first hop that fails stops the run, and the hops after it are reported as "not run". Booster never commits; the changes sit in your working copy for you to review. Progress prints a line as the baseline starts and ends (`baseline: passed, 150 s`; the first run on a machine builds the gate image, so it takes a few minutes), one line per hop, like `hop 3/11 <hop id>: <status>, 12 files, 41 s`, and ends with `run finished: 11 of 11 hops run, 0 stopped, total ...`, a total that counts the baseline.
 
 Looking for a specific situation (only PHP, one hop at a time, backend only, a big app, no tests)? See [How do I...](docs/recipes.md).
 
@@ -838,7 +838,8 @@ first.
 
 A run prints one line per hop to standard error while it works: the hop's position in the plan, its id, its status,
 the number of files it changed and the seconds it took, and a final line totals the hops run, the stops and the whole
-run. They go to standard error so the report on standard output is untouched and `--format json` stays valid JSON.
+run, baseline included. The baseline gets a line as it starts and one as it ends, since its first run on a machine
+builds the gate image and can take minutes before the first hop line. They go to standard error so the report on standard output is untouched and `--format json` stays valid JSON.
 
 `node-pin-24` floors Node at the Node the app deploys on, not just the newest one. A floor above the server's Node
 makes every `npm ci` there warn (`EBADENGINE`), and the hop's gate never builds on the server's Node either. So the

@@ -432,9 +432,9 @@ final class TextWriter
     /**
      * The advisory composer audit block for one hop: what the audit found in
      * the app's packages after the hop changed its composer files, or why the
-     * audit could not run. Null and a clean audit print nothing: the hop's
-     * own lines already say what changed, and an empty section would only add
-     * noise. Sub-lines carry three leading spaces; the caller adds its own
+     * audit could not run. Null and a clean audit print nothing here: the
+     * step's own messages say "clean" or "skipped" (HopExecutor::runStep).
+     * Sub-lines carry three leading spaces; the caller adds its own
      * indent.
      *
      * @return list<string>
@@ -618,6 +618,12 @@ final class TextWriter
                 'Nothing was changed. RESULT: PASS means the preview worked; no tests ran.',
                 sprintf('Next, if the edits look right: %s run --path=%s%s', $program, Invocation::pathArg($path), Invocation::flagsText($flags)),
                 '(It needs Docker and a clean git folder. Commit or stash first.)',
+                // The values may be credentials, so the line above never carries them: say so,
+                // or a copied line runs the gates without them.
+                ...($report->testEnvKeys !== [] ? [sprintf(
+                    '(Add your --test-env again (%s): the line above leaves it out, because its values may be secrets.)',
+                    implode(', ', array_map(self::clean(...), $report->testEnvKeys)),
+                )] : []),
             ]);
         }
 

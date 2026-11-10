@@ -732,7 +732,7 @@ final class HopRegistry
             ],
             '8.5' => [
                 'Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().',
-                'PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.',
+                'Rector moves PDO driver constants such as PDO::MYSQL_ATTR_SSL_CA to Pdo\Mysql::ATTR_SSL_CA, inside PHP_VERSION_ID guards too. A guard such as (PHP_VERSION_ID >= 80500 ? Pdo\Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA), which a stock Laravel config/database.php carries, then names one constant twice. It still works on the new floor; Booster leaves the guard in place, so shorten it to the first branch by hand if you like.',
             ],
             default => [],
         };
@@ -813,7 +813,7 @@ final class HopRegistry
                 composerSet: ['phpunit/phpunit' => '^' . $to . '.0'],
                 composerSetIfPresent: $this->phpunitCompanionPins($to),
                 notes: [
-                    'Run phpunit --migrate-configuration after this hop; Rector rewrites the test code but not phpunit.xml.',
+                    'Rector rewrites the test code but not phpunit.xml. If PHPUnit in the gate warns that phpunit.xml uses a deprecated schema, run phpunit --migrate-configuration; with no warning, there is nothing to do.',
                 ],
                 links: [sprintf('https://phpunit.de/articles/migrating-to-phpunit-%s.html', $to)],
             ));

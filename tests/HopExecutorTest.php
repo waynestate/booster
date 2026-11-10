@@ -174,10 +174,14 @@ final class HopExecutorTest extends TestCase
             $lines[] = $line;
         }));
 
-        self::assertCount(3, $lines);
-        self::assertMatchesRegularExpression('/^hop 1\/2 [a-z0-9-]+: [a-z-]+, \d+ files?, \d+ s$/', $lines[0]);
-        self::assertMatchesRegularExpression('/^hop 2\/2 [a-z0-9-]+: [a-z-]+, \d+ files?, \d+ s$/', $lines[1]);
-        self::assertMatchesRegularExpression('/^run finished: 2 of 2 hops run, 0 stopped, total \d+ s$/', $lines[2]);
+        // The baseline gets a line before and after it: it can take minutes
+        // before the first hop starts. The closing total counts it too.
+        self::assertCount(5, $lines);
+        self::assertMatchesRegularExpression('/^baseline: testing the app on PHP \d+\.\d+ before any hop \(the first run on a machine also builds the gate image, which takes a few minutes\)$/', $lines[0]);
+        self::assertMatchesRegularExpression('/^baseline: passed, \d+ s$/', $lines[1]);
+        self::assertMatchesRegularExpression('/^hop 1\/2 [a-z0-9-]+: [a-z-]+, \d+ files?, \d+ s$/', $lines[2]);
+        self::assertMatchesRegularExpression('/^hop 2\/2 [a-z0-9-]+: [a-z-]+, \d+ files?, \d+ s$/', $lines[3]);
+        self::assertMatchesRegularExpression('/^run finished: 2 of 2 hops run, 0 stopped, total \d+ s$/', $lines[4]);
     }
 
     public function test_progress_closing_line_counts_a_stopped_hop(): void
@@ -187,9 +191,9 @@ final class HopExecutorTest extends TestCase
             $lines[] = $line;
         }));
 
-        self::assertCount(2, $lines);
-        self::assertMatchesRegularExpression('/^hop 1\/2 [a-z0-9-]+: [a-z-]+, \d+ files?, \d+ s$/', $lines[0]);
-        self::assertMatchesRegularExpression('/^run finished: 1 of 2 hops run, 1 stopped, total \d+ s$/', $lines[1]);
+        self::assertCount(4, $lines);
+        self::assertMatchesRegularExpression('/^hop 1\/2 [a-z0-9-]+: [a-z-]+, \d+ files?, \d+ s$/', $lines[2]);
+        self::assertMatchesRegularExpression('/^run finished: 1 of 2 hops run, 1 stopped, total \d+ s$/', $lines[3]);
     }
 
     public function test_the_gate_uses_the_php_the_step_moves_to(): void

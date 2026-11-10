@@ -32,7 +32,7 @@ Boost is read-only help. Booster's gate stays the authority: never skip a gate b
 
 What Rector cannot do (check these by hand):
 
-- Run phpunit --migrate-configuration after this hop; Rector rewrites the test code but not phpunit.xml.
+- Rector rewrites the test code but not phpunit.xml. If PHPUnit in the gate warns that phpunit.xml uses a deprecated schema, run phpunit --migrate-configuration; with no warning, there is nothing to do.
 
 Official notes:
 

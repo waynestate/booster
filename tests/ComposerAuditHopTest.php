@@ -157,16 +157,17 @@ final class ComposerAuditHopTest extends TestCase
         self::assertArrayNotHasKey('composer_audit', $json['results'][0]);
     }
 
-    public function test_a_clean_audit_stays_silent(): void
+    public function test_a_clean_audit_says_clean_in_one_line(): void
     {
         $fake = $this->fake();
         $report = $this->execute($fake, new RunOptions());
 
         // The hops changed composer files, so the audit ran...
         self::assertCount(2, $this->auditRuns($fake));
-        // ...but a clean report attaches nothing and prints nothing.
+        // ...and a clean report says so in one line per hop, next to the
+        // "skipped" a hop that changed no composer file prints.
         $text = (new TextWriter())->run($report);
-        self::assertStringNotContainsString('Composer audit', $text);
+        self::assertSame(2, substr_count($text, 'Composer audit: clean (no advisories, no abandoned packages).'));
         $json = $report->toArray();
         self::assertArrayNotHasKey('composer_audit', $json['results'][0]);
     }

@@ -34,7 +34,7 @@ Boost is read-only help. Booster's gate stays the authority: never skip a gate b
 What Rector cannot do (check these by hand):
 
 - Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
-- PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
+- Rector moves PDO driver constants such as PDO::MYSQL_ATTR_SSL_CA to Pdo\Mysql::ATTR_SSL_CA, inside PHP_VERSION_ID guards too. A guard such as (PHP_VERSION_ID >= 80500 ? Pdo\Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA), which a stock Laravel config/database.php carries, then names one constant twice. It still works on the new floor; Booster leaves the guard in place, so shorten it to the first branch by hand if you like.
 
 Official notes:
 

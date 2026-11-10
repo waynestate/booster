@@ -104,7 +104,8 @@ first.
 
 A run prints one line per hop to standard error while it works: the hop's position in the plan, its id, its status,
 the number of files it changed and the seconds it took, and a final line totals the hops run, the stops and the whole
-run. They go to standard error so the report on standard output is untouched and `--format json` stays valid JSON.
+run, baseline included. The baseline gets a line as it starts and one as it ends, since its first run on a machine
+builds the gate image and can take minutes before the first hop line. They go to standard error so the report on standard output is untouched and `--format json` stays valid JSON.
 
 `node-pin-24` floors Node at the Node the app deploys on, not just the newest one. A floor above the server's Node
 makes every `npm ci` there warn (`EBADENGINE`), and the hop's gate never builds on the server's Node either. So the

@@ -1219,6 +1219,8 @@ final class CliTest extends TestCase
             $out,
         );
         self::assertStringNotContainsString('secret-value', $out);
+        // The env stays behind, and the footer says so, naming keys only.
+        self::assertStringContainsString('(Add your --test-env again (APP_KEY): the line above leaves it out, because its values may be secrets.)', $out);
     }
 
     public function test_the_plan_footer_keeps_the_plan_flags(): void

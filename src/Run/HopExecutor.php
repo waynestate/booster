@@ -173,6 +173,9 @@ final class HopExecutor
         // The locked versions before any hop, for the package rows above.
         $this->startingLockedVersions = BehaviourScan::lockedVersions($path);
 
+        // The total on the closing progress line counts from here, so the
+        // baseline (and the first build of a gate image) is in it.
+        $started = microtime(true);
         $baseline = $this->runBaseline($plan, $path, $options);
         if ($baseline->failed() && !$options->allowFailingBaseline) {
             // The suite is red (or never ran) before Booster touches anything, so a later red
@@ -223,7 +226,6 @@ final class HopExecutor
         $proctorBaseline = $this->runProctorBaseline($plan, $path, $options);
         // One line per hop to whoever passed a progress callback, so a long run
         // shows which hop it is in without touching the report on stdout.
-        $started = microtime(true);
         $progress = $options->progress;
         foreach ($plan->steps as $step) {
             $hopStarted = microtime(true);
@@ -400,6 +402,12 @@ final class HopExecutor
         }
 
         $test = $options->testCommand ?? $this->defaultTestCommand($path);
+        // The baseline can take minutes before the first hop line (the first
+        // run on a machine builds the gate image), so it gets its own lines.
+        $started = microtime(true);
+        if ($options->progress !== null) {
+            ($options->progress)(sprintf('baseline: testing the app on PHP %s before any hop (the first run on a machine also builds the gate image, which takes a few minutes)', $php));
+        }
         $result = $this->gate->run($path, $php, $test, $options->proctorCommand, $options->gateImage, [], $options->testEnv);
         $outcome = TargetImageRunner::gateOutcome($result);
         $status = match (true) {
@@ -407,6 +415,9 @@ final class HopExecutor
             $outcome->phase === GateOutcome::PHASE_INSTALL => BaselineResult::INSTALL_FAILED,
             default => BaselineResult::FAILED,
         };
+        if ($options->progress !== null) {
+            ($options->progress)(sprintf('baseline: %s, %d s', $status, (int) floor(microtime(true) - $started)));
+        }
         $advice = $status === BaselineResult::INSTALL_FAILED ? $this->installAdvice($plan, $path, $php, $outcome->output) : null;
 
         return new BaselineResult($status, $php, $outcome->exitCode, $outcome->output, $warning, $kind, $advice);
@@ -497,8 +508,8 @@ final class HopExecutor
      * plan's last step) the curated behaviour changes: advisories in the
      * step's messages, never a failure and never a reason to stop. When the
      * hop changed the app's composer files it then audits the packages the
-     * app now declares, again advisory only: the audit never fails the step
-     * and a clean audit stays silent.
+     * app now declares, again advisory only: the audit never fails the step,
+     * and a clean one says so in one line, as a skipped one does.
      */
     private function runStep(PlanStep $step, string $path, Plan $plan, RunOptions $options, BaselineResult $baseline): StepResult
     {
@@ -514,15 +525,18 @@ final class HopExecutor
         $result = $this->runStepCore($step, $path, $plan, $options, $baseline);
 
         // After the hop: did it change what the app declares? Then audit the
-        // packages, again advisory only. A clean audit stays silent. A dry
+        // packages, again advisory only. A clean audit attaches no report but
+        // says "clean", so an audited hop never reads like a skipped one. A dry
         // run neither audits nor says it skipped.
         $audit = null;
         $skipAudit = false;
+        $cleanAudit = false;
         if (!$options->dryRun) {
             if ($this->composerFingerprint($path) !== $composerBefore) {
                 $audit = $this->composerAuditScanner()->scan($path);
                 if ($audit->ok && !$audit->hasFindings()) {
                     $audit = null;
+                    $cleanAudit = true;
                 }
             } else {
                 $skipAudit = true;
@@ -541,6 +555,9 @@ final class HopExecutor
         }
         if ($skipAudit) {
             $messages[] = 'Composer audit: skipped (this hop changed no composer file).';
+        }
+        if ($cleanAudit) {
+            $messages[] = 'Composer audit: clean (no advisories, no abandoned packages).';
         }
 
         return new StepResult($step->number, $step->hop->id, $result->status, $result->files, $messages, $result->incomplete, $result->prepass, $result->rules, $audit);
