@@ -25,6 +25,8 @@ final readonly class RunReport
         public array $testEnvKeys = [],
         /** The deployments/ script this run wrote because composer.lock changed, or null when it wrote none. */
         public ?string $deployScript = null,
+        /** @var list<string> what the next deploy needs after this run (CitadelDeployScript): empty when the production packages did not move */
+        public array $deployNotes = [],
         /** The replay baseline (--replay): recorded, failed or skipped; null when the run did not replay. */
         public ?ReplayOutcome $replay = null,
         /** The rector/rector version that ran the hops, or null when no Rector hop ran. */
@@ -67,6 +69,7 @@ final readonly class RunReport
             'proctor' => $this->proctorArray(),
             'proctor_advisory' => $this->proctorAdvisory,
             'deploy_script' => $this->deployScript,
+            'deploy_notes' => $this->deployNotes,
             'rector_version' => $this->rectorVersion,
         ];
         // Only runs with --replay carry the key, so every other report keeps its shape.

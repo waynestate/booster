@@ -166,9 +166,10 @@ final class HopExecutor
             static fn(string $pair): string => substr($pair, 0, (int) strpos($pair, '=')),
             $options->testEnv,
         );
-        // The composer.lock fingerprint before any hop, so the run can tell
-        // whether the upgrade changed it and write the Citadel install script.
-        $lockBefore = $options->dryRun ? null : $this->lockFingerprint($path);
+        // composer.lock as it was before any hop, so the run can tell whether
+        // the upgrade moved the production packages and what the next deploy
+        // needs (CitadelDeployScript).
+        $lockBefore = $options->dryRun || !is_file($path . '/composer.lock') ? null : (string) file_get_contents($path . '/composer.lock');
         // The locked versions before any hop, for the package rows above.
         $this->startingLockedVersions = BehaviourScan::lockedVersions($path);
 
@@ -279,14 +280,15 @@ final class HopExecutor
         // --only) cannot prove the app at that target, so the PROCTOR gate
         // reports instead of blocking.
         $advisory = $options->proctorAdvisory || $plan->stopsEarly;
-        // When the upgrade changed composer.lock and the app deploys on Citadel,
-        // write the once-only install script so existing deployments pick up the
-        // new vendor/ first. A dry run changes no lock, so it writes none.
-        $deployScript = $options->dryRun
-            ? null
-            : (new CitadelDeployScript())->writeIfLockChanged($path, $lockBefore, (new \DateTimeImmutable('now'))->format('YmdHi'));
+        // When the upgrade moved the production packages, say what the next
+        // deploy needs, and on a Citadel app with no release script write the
+        // once-only install script. A dry run changes no lock, so it says
+        // nothing here.
+        $deploy = $options->dryRun
+            ? new DeployScriptResult(null, [])
+            : (new CitadelDeployScript())->decide($path, $lockBefore, (new \DateTimeImmutable('now'))->format('YmdHi'));
 
-        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys, deployScript: $deployScript, replay: $replay, rectorVersion: $this->ranRector ? $this->rector->installedVersion() : null, replaySuggestion: $replaySuggestion);
+        return new RunReport($plan, $options->dryRun, $baseline, $results, $proctor, $advisory, $comparison, testEnvKeys: $testEnvKeys, deployScript: $deploy->script, deployNotes: $deploy->lines, replay: $replay, rectorVersion: $this->ranRector ? $this->rector->installedVersion() : null, replaySuggestion: $replaySuggestion);
     }
 
     /**
@@ -3234,19 +3236,9 @@ final class HopExecutor
     }
 
     /**
-     * The composer.lock fingerprint (its md5, or null when the file is absent),
-     * so the run can tell whether the upgrade changed the lock at all.
-     */
-    private function lockFingerprint(string $path): ?string
-    {
-        // A lock we cannot read counts as absent, so no change is reported.
-        return self::fileFingerprint($path . '/composer.lock');
-    }
-
-    /**
      * The fingerprint of the app's composer files, so a step can tell whether
      * it changed what the app declares. Each entry is the file's md5, or null
-     * when the file is absent or unreadable, mirroring lockFingerprint.
+     * when the file is absent or unreadable.
      *
      * @return array{json: ?string, lock: ?string}
      */

@@ -538,9 +538,8 @@ final class TextWriter
         foreach ($this->proctorLines($report) as $line) {
             $lines[] = $line;
         }
-        if ($report->deployScript !== null) {
-            $lines[] = 'Added deployments/' . $report->deployScript . ': Citadel runs it once, first, so existing deployments install the upgraded vendor/.';
-            $lines[] = 'Undo with: rm deployments/' . $report->deployScript . ' (inside the app).';
+        foreach ($report->deployNotes as $line) {
+            $lines[] = self::clean($line);
         }
         $vendored = $this->vendoredLibraries($report->plan);
         if ($vendored !== []) {

@@ -2119,13 +2119,13 @@ final class HopExecutorTest extends TestCase
     {
         $dir = $this->copyExample('raw-php');
         mkdir($dir . '/deployments', 0775, true);
-        file_put_contents($dir . '/composer.lock', '{"original":true}');
+        file_put_contents($dir . '/composer.lock', '{"packages":[{"name":"slim/slim","version":"4.14.0"}],"packages-dev":[]}');
         $lock = $dir . '/composer.lock';
         // A docker run stands in for the gate's composer update rewriting the lock.
         $onDockerRun = null;
         if ($changeLock) {
             $onDockerRun = static function () use ($lock): void {
-                file_put_contents($lock, '{"updated":true}');
+                file_put_contents($lock, '{"packages":[{"name":"slim/slim","version":"4.15.0"}],"packages-dev":[]}');
             };
         }
         $fake = $this->fake(onDockerRun: $onDockerRun);
@@ -2148,8 +2148,9 @@ final class HopExecutorTest extends TestCase
         self::assertStringNotContainsString('artisan', (string) file_get_contents($file));
         self::assertStringContainsString('composer install --no-dev --no-interaction --optimize-autoloader', (string) file_get_contents($file));
         $text = (new TextWriter())->run($report);
-        self::assertStringContainsString('Added deployments/' . $report->deployScript . ': Citadel runs it once, first, so existing deployments install the upgraded vendor/.', $text);
+        self::assertStringContainsString('Added deployments/' . $report->deployScript . ': Citadel runs it once, first, so existing deployments install the upgraded production packages.', $text);
         self::assertStringContainsString('Undo with: rm deployments/' . $report->deployScript . ' (inside the app).', $text);
+        self::assertSame($report->deployNotes, $report->toArray()['deploy_notes']);
     }
 
     public function test_no_deploy_script_when_the_lock_is_unchanged(): void
