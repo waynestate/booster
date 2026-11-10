@@ -6,9 +6,11 @@ namespace Waynestate\Booster\Run;
 
 /**
  * After a run raises the app's PHP floor, the other places the app names a
- * PHP version: the CI test matrix and the deploy kit's image tags. Booster
- * never edits CI or deploy files (they belong to the app's own pipeline and
- * to Squire's kit), so each one below the new floor becomes a "Next" line
+ * PHP version: the CI test matrix, the deploy kit's image tags, Parity's
+ * parity.json, and the app's own Dockerfile and Compose files (Laravel
+ * Sail's runtime too). Booster never edits CI or deploy files (they belong
+ * to the app's own pipeline, to Squire's kit and to Parity), so each one
+ * below the new floor becomes a "Next" line
  * with its file and line. Left alone, a matrix entry below the floor fails
  * on the first push (Composer's platform check refuses it) and an image tag
  * below it can no longer run the app. A rocket that clears the pad but
@@ -21,8 +23,16 @@ final class FloorFollowUps
 
     private const WORKFLOW_DIR = '.github/workflows';
 
-    /** The Squire deploy kit's files that name the app's base image. */
-    private const KIT_FILES = ['.env.squire.example', '.env.squire', 'docker-compose.squire.yml', '.squire/Dockerfile', '.squire/portable.Dockerfile', '.squire/base-fallback.Dockerfile'];
+    /**
+     * The files that name the image the app runs on: the Squire deploy kit's,
+     * Parity's parity.json (Citadel on your own computer), and the app's own
+     * Dockerfile and Compose files (Laravel Sail's included).
+     */
+    private const DEPLOY_FILES = [
+        '.env.squire.example', '.env.squire', 'docker-compose.squire.yml', '.squire/Dockerfile', '.squire/portable.Dockerfile', '.squire/base-fallback.Dockerfile',
+        'parity.json',
+        'Dockerfile', 'docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml',
+    ];
 
     /**
      * A key that holds PHP versions: php, php_version, php-versions, and so on.
@@ -32,6 +42,13 @@ final class FloorFollowUps
 
     /** An image whose name ends in php or php-<variant>, tagged major.minor: php:8.3-cli, citadel/php-apache:8.4r5. */
     private const IMAGE = '/(?<![\w.])((?:[a-z0-9][\w.-]*\/)*php(?:-[a-z]+)?):(\d+\.\d+)/i';
+
+    /**
+     * Laravel Sail's runtime, which a Sail app's docker-compose.yml names twice:
+     * the build context (vendor/laravel/sail/runtimes/8.4) and the image it
+     * tags (sail-8.4/app).
+     */
+    private const SAIL = '#(?:vendor/laravel/sail/runtimes/|(?<![\w.-])sail-)(\d+\.\d+)(?![\d])#';
 
     /**
      * The follow-up lines for an app whose floor is now $floor (major.minor),
@@ -47,7 +64,7 @@ final class FloorFollowUps
                 $lines[] = $line;
             }
         }
-        foreach (self::KIT_FILES as $file) {
+        foreach (self::DEPLOY_FILES as $file) {
             foreach (self::imageLines($appPath, $file, $floor) as $line) {
                 $lines[] = $line;
             }
@@ -143,6 +160,15 @@ final class FloorFollowUps
             foreach (self::imageMatches($row, $floor) as [$image, $version]) {
                 $out[] = self::imageLine($file, $i + 1, $image, $version, $floor);
             }
+            if (preg_match(self::SAIL, $row, $sail) === 1 && version_compare($sail[1], $floor, '<')) {
+                $out[] = sprintf(
+                    'Next: %1$s:%2$d names Laravel Sail\'s PHP %3$s runtime, below the new floor %4$s, which can no longer run the app. Move it to %4$s (the runtimes/%4$s build context and the sail-%4$s/app image go together; update laravel/sail first if it has no %4$s runtime yet).',
+                    $file,
+                    $i + 1,
+                    $sail[1],
+                    $floor,
+                );
+            }
         }
 
         return $out;
@@ -188,9 +214,20 @@ final class FloorFollowUps
             $version,
             $floor,
             $floor,
-            // A Citadel tag carries a build revision (8.5r3) Booster cannot know.
-            str_starts_with(strtolower($image), 'citadel/') ? ' (Citadel tags carry a build revision, such as 8.5r3, that Booster cannot know, so it leaves the edit to you)' : '',
+            self::imageHint($file, $image),
         );
+    }
+
+    private static function imageHint(string $file, string $image): string
+    {
+        if (!str_starts_with(strtolower($image), 'citadel/')) {
+            return '';
+        }
+        // A Citadel tag carries a build revision (8.5r3) Booster cannot know.
+        $hint = ' (Citadel tags carry a build revision, such as 8.5r3, that Booster cannot know, so it leaves the edit to you';
+
+        // Parity runs only the Citadel images it can check, and says which.
+        return $hint . ($file === 'parity.json' ? '; parity image list shows the ones Parity can run)' : ')');
     }
 
     /**

@@ -85,11 +85,14 @@ own output, because the tests never ran.</li>
 <p>When the run raised the app's PHP floor, its report ends with a list of the other places that still name an older
 PHP, each with its file and line: PHP versions in the CI matrix (Preflight's <code>php_versions</code>, a GitHub workflow's
 <code>php:</code> matrix, a <code>PHP_VERSIONS</code> list) and PHP images (<code>php:8.3-cli</code> in a CI job, <code>citadel/php-apache:8.4r5</code> in the
-Squire kit's <code>.env.squire.example</code> or <code>docker-compose.squire.yml</code>). Booster never edits CI or deploy files, so it
-lists them instead: a matrix entry below the floor fails on the first push, because Composer refuses to install
-below it, and an image below it can no longer run the app. A Citadel tag also carries a build revision (<code>8.5r3</code>)
-that Booster cannot know. A dry run lists them too, from the floor its last PHP step would set. The JSON report
-carries them as <code>floor_follow_ups</code>.</p>
+Squire kit's <code>.env.squire.example</code> or <code>docker-compose.squire.yml</code>, the <code>image</code> in Parity's <code>parity.json</code>, a <code>FROM</code>
+line in the app's own <code>Dockerfile</code>, an <code>image:</code> in its <code>docker-compose.yml</code> or <code>compose.yaml</code>), and Laravel Sail's
+runtime (<code>vendor/laravel/sail/runtimes/8.3</code> and <code>sail-8.3/app</code> in a Sail app's <code>docker-compose.yml</code>). Booster never
+edits CI or deploy files, so it lists them instead: a matrix entry below the floor fails on the first push, because
+Composer refuses to install below it, and an image below it can no longer run the app. A Citadel tag also carries a
+build revision (<code>8.5r3</code>) that Booster cannot know; for <code>parity.json</code>, <code>parity image list</code> shows the Citadel images
+Parity can run. A dry run lists them too, from the floor its last PHP step would set. The JSON report carries them
+as <code>floor_follow_ups</code>.</p>
 <p>Composer 2.10 refuses to load tagged releases Packagist has flagged with a security advisory, and hops that move
 onto Laravel 9 or 10 most often meet that block. The refusal has two faces. The loud one fails the install phase
 and names the advisories. The quiet one happens when the app allows dev stability: Composer does not fail at all,

@@ -12,6 +12,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## \[Unreleased\] [#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Added: the list of places that still name an older PHP after a floor rise also reads Parity's `parity.json` (its `image`, with a pointer to `parity image list`), the app's own `Dockerfile`, `docker-compose.yml`, `docker-compose.yaml`, `compose.yml` and `compose.yaml`, and Laravel Sail's runtime (`vendor/laravel/sail/runtimes/8.3` and `sail-8.3/app`). Each was a place a raised floor quietly left behind: Parity would start the app on an image that can no longer run it, and a Sail app's local container stayed on the old PHP. Booster still edits none of them; it names each with its file and line.
+
 ## \[1.18.0\] - 2026-11-10 [#](https://booster.apps.wayne.edu/docs/changelog.html#1-18-0-2026-11-10)
 
 - Changed: `scripts/check-scans-bundled.sh` carries the `# proctor-ignore script-pair:` marker: it runs only inside the composer:2 container, so PROCTOR's `script-pair` reports it as an info note, not a missing twin.

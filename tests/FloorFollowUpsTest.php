@@ -57,11 +57,40 @@ final class FloorFollowUpsTest extends TestCase
         ], FloorFollowUps::find($dir, '8.4'));
     }
 
+    public function test_parity_json_an_apps_own_dockerfile_and_compose_files_below_the_floor_are_listed(): void
+    {
+        $dir = $this->app([
+            'parity.json' => "{\n  \"version\": 1,\n  \"name\": \"hello\",\n  \"image\": \"citadel/php-apache:8.4r5\",\n  \"public_dir\": \"public\"\n}\n",
+            'Dockerfile' => "# syntax=docker/dockerfile:1\nFROM php:8.3-apache\nCOPY . /var/www/html\n",
+            'compose.yaml' => "services:\n  app:\n    image: php:8.5-fpm\n  worker:\n    image: php:8.2-cli\n",
+        ]);
+
+        self::assertSame([
+            'Next: parity.json:4 names citadel/php-apache:8.4, below the new floor 8.5, which can no longer run the app. Move it to a PHP 8.5 image (Citadel tags carry a build revision, such as 8.5r3, that Booster cannot know, so it leaves the edit to you; parity image list shows the ones Parity can run).',
+            'Next: Dockerfile:2 names php:8.3, below the new floor 8.5, which can no longer run the app. Move it to a PHP 8.5 image.',
+            'Next: compose.yaml:5 names php:8.2, below the new floor 8.5, which can no longer run the app. Move it to a PHP 8.5 image.',
+        ], FloorFollowUps::find($dir, '8.5'));
+    }
+
+    public function test_a_laravel_sail_runtime_below_the_floor_is_listed_on_both_its_lines(): void
+    {
+        // The docker-compose.yml that php artisan sail:install writes.
+        $dir = $this->app([
+            'docker-compose.yml' => "services:\n    laravel.test:\n        build:\n            context: './vendor/laravel/sail/runtimes/8.3'\n            dockerfile: Dockerfile\n        image: 'sail-8.3/app'\n    mysql:\n        image: 'mysql/mysql-server:8.0'\n",
+        ]);
+        $line = static fn(int $n): string => 'Next: docker-compose.yml:' . $n . ' names Laravel Sail\'s PHP 8.3 runtime, below the new floor 8.4, which can no longer run the app. Move it to 8.4 (the runtimes/8.4 build context and the sail-8.4/app image go together; update laravel/sail first if it has no 8.4 runtime yet).';
+
+        self::assertSame([$line(4), $line(6)], FloorFollowUps::find($dir, '8.4'));
+        self::assertSame([], FloorFollowUps::find($dir, '8.3'), 'a runtime at the floor is fine');
+    }
+
     public function test_nothing_at_or_above_the_floor_and_no_files_means_no_lines(): void
     {
         $dir = $this->app([
             '.gitlab-ci.yml' => "image: composer:2.11.1\nphp_versions: [\"8.5\"]\n# php_versions: [\"8.3\"] in a comment\n",
             '.env.squire.example' => "SQUIRE_BASE_IMAGE=citadel/php-apache:8.5r3\n",
+            'parity.json' => "{\"version\": 1, \"image\": \"citadel/php-apache:8.5r3\"}\n",
+            'docker-compose.yml' => "services:\n  app:\n    build:\n      context: ./vendor/laravel/sail/runtimes/8.5\n    image: sail-8.5/app\n  db:\n    image: mysql:5.6\n",
         ]);
 
         self::assertSame([], FloorFollowUps::find($dir, '8.5'));
