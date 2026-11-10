@@ -24,6 +24,9 @@ final readonly class CacheMount
     /** Composer's download cache, mounted as COMPOSER_CACHE_DIR in the baseline and every gate. */
     public const COMPOSER = 'BOOSTER_COMPOSER_CACHE';
 
+    /** npm's download cache, mounted at /root/.npm in every Node container. */
+    public const NPM = 'BOOSTER_NPM_CACHE';
+
     /** What Docker accepts as a volume name. */
     private const VOLUME_NAME = '/^[A-Za-z0-9][A-Za-z0-9_.-]*$/';
 

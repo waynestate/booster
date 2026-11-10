@@ -49,6 +49,10 @@
                     "Opt-in Composer download cache for the baseline and every gate: a Docker volume name or a host folder, mounted as COMPOSER_CACHE_DIR",
                     "none (each gate container downloads every package)"
                 ],
+                "BOOSTER_NPM_CACHE": [
+                    "Opt-in npm download cache for every Node container (npm ci, npm run build, the front-end hops): a Docker volume name or a host folder, mounted at /root/.npm",
+                    "none (each Node container downloads every package)"
+                ],
                 "BOOSTER_BOT_TOKEN": [
                     "Push token for the hop data robot (bin/hop-data-bot.php). Never in git, never logged, never printed",
                     "none"

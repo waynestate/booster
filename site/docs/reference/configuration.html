@@ -67,6 +67,12 @@
 <td>src/Run/CacheMount.php</td>
 </tr>
 <tr>
+<td>BOOSTER_NPM_CACHE</td>
+<td>Opt-in npm download cache for every Node container (npm ci, npm run build, the front-end hops): a Docker volume name or a host folder, mounted at /root/.npm</td>
+<td>none (each Node container downloads every package)</td>
+<td>src/Run/CacheMount.php</td>
+</tr>
+<tr>
 <td>BOOSTER_POLICY</td>
 <td>Path to CREED's policy.json</td>
 <td>none (uses the policy.json in the waynestate/creed package)</td>
@@ -97,6 +103,14 @@ belongs to root, so Booster makes a folder of its own inside the volume, <code>b
 root container per run, and leaves the rest of the volume alone. A folder on your machine is already yours and is
 used as it is.</li>
 </ul>
+<p>The Node containers (the build gate's <code>npm ci</code> and <code>npm run build</code>, and the front-end hops' own npm steps) take
+<code>BOOSTER_NPM_CACHE</code> the same way, mounted at <code>/root/.npm</code>, npm's cache folder for the container's root user:</p>
+<!-- docs-test: skip sets your shell's environment -->
+<pre tabindex="0"><code>export BOOSTER_NPM_CACHE=stack-npm-cache              # a Docker volume, the one the WSU stack already uses
+export BOOSTER_NPM_CACHE=~/.cache/booster-npm         # or a folder on your machine
+</code></pre>
+<p>The Node containers run as root, so on Linux a host folder fills with files root owns; a Docker volume keeps them out
+of your way.</p>
 <p><code>.env.example</code> holds the placeholders. Booster reads no secrets and talks to no Citadel host. Its own network calls
 only read: the dependency check asks Packagist (and any composer-type repository the app declares) about the app's
 direct dependencies, which <code>--no-package-check</code> turns off, and a plan for an app on <code>wayne-cas</code> with no <code>vendor/</code>

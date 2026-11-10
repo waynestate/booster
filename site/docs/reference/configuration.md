@@ -14,6 +14,7 @@ This page lists the environment variables Booster reads; the table is generated 
 | --- | --- | --- | --- |
 | BOOSTER_BOT_TOKEN | Push token for the hop data robot (bin/hop-data-bot.php). Never in git, never logged, never printed | none | src/Refresh/HopDataBot.php |
 | BOOSTER_COMPOSER_CACHE | Opt-in Composer download cache for the baseline and every gate: a Docker volume name or a host folder, mounted as COMPOSER_CACHE_DIR | none (each gate container downloads every package) | src/Run/CacheMount.php |
+| BOOSTER_NPM_CACHE | Opt-in npm download cache for every Node container (npm ci, npm run build, the front-end hops): a Docker volume name or a host folder, mounted at /root/.npm | none (each Node container downloads every package) | src/Run/CacheMount.php |
 | BOOSTER_POLICY | Path to CREED's policy.json | none (uses the policy.json in the waynestate/creed package) | bin/refresh-hop-data.php |
 
 Booster reads the policy straight from the `waynestate/creed` package in its own `vendor/`, so there is no copy to drift: `composer update waynestate/creed` is the whole refresh. `--policy` and `BOOSTER_POLICY` still override it for one run.
@@ -32,6 +33,15 @@ In PowerShell: `$env:BOOSTER_COMPOSER_CACHE = "stack-composer-cache"`.
 - A plain name (letters, digits, `.`, `_`, `-`) is a Docker volume, created on first use. Anything with a slash, a backslash, a leading `.` or a leading `~` is a folder, created when it is missing; a folder that cannot be created or written stops the run before the baseline, with the variable named.
 - Booster mounts it at `/tmp/composer-cache` in the baseline and in every gate, and sets `COMPOSER_CACHE_DIR` there.
 - On Linux and macOS the gate runs as your own user, so the files it writes in the app stay yours. A Docker volume belongs to root, so Booster makes a folder of its own inside the volume, `booster-uid-<your uid>`, with one short root container per run, and leaves the rest of the volume alone. A folder on your machine is already yours and is used as it is.
+
+The Node containers (the build gate's `npm ci` and `npm run build`, and the front-end hops' own npm steps) take `BOOSTER_NPM_CACHE` the same way, mounted at `/root/.npm`, npm's cache folder for the container's root user:
+
+```
+export BOOSTER_NPM_CACHE=stack-npm-cache              # a Docker volume, the one the WSU stack already uses
+export BOOSTER_NPM_CACHE=~/.cache/booster-npm         # or a folder on your machine
+```
+
+The Node containers run as root, so on Linux a host folder fills with files root owns; a Docker volume keeps them out of your way.
 
 `.env.example` holds the placeholders. Booster reads no secrets and talks to no Citadel host. Its own network calls only read: the dependency check asks Packagist (and any composer-type repository the app declares) about the app's direct dependencies, which `--no-package-check` turns off, and a plan for an app on `wayne-cas` with no `vendor/` checks the VCS repository `composer.json` names for that package with `git ls-remote`. Everything it prints from an app (file names, diffs) has control characters stripped.
 

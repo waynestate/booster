@@ -354,7 +354,30 @@ final class HopExecutor
      */
     private function hopBuildsFrontEnd(Hop $hop, string $path): bool
     {
-        return $hop->buildGate;
+        return $hop->buildGate || ($hop->pinNode && $this->pinBuildSkipReason($hop, $path) === null);
+    }
+
+    /**
+     * Why the Node pin hop cannot build the app's front end on the pinned
+     * Node, or null when it can: package.json has a build script, a lock
+     * npm ci can install from, and there is a Node runner to run it in.
+     */
+    private function pinBuildSkipReason(Hop $hop, string $path): ?string
+    {
+        $packageFile = $path . '/package.json';
+        $package = is_file($packageFile) ? json_decode((string) file_get_contents($packageFile), true) : null;
+        $scripts = is_array($package) ? ($package['scripts'] ?? null) : null;
+        if (!is_array($scripts) || !array_key_exists('build', $scripts)) {
+            return 'No build script in package.json, so the front-end build was not checked.';
+        }
+        if (!is_file($path . '/package-lock.json') && !is_file($path . '/npm-shrinkwrap.json')) {
+            return sprintf('package.json has a build script but no package-lock.json, so the front-end build was not checked (npm ci needs the lock). Build it by hand on Node %s with your package manager.', $hop->to);
+        }
+        if ($this->node === null) {
+            return 'No Node runner is configured, so the front-end build was not checked.';
+        }
+
+        return null;
     }
 
     /**
@@ -1250,11 +1273,15 @@ final class HopExecutor
             : 'composer update -W ' . implode(' ', $update);
     }
 
-    /** True when a step of the plan runs the build gate (npm ci, npm run build). */
-    private static function planBuildsFrontEnd(Plan $plan): bool
+    /**
+     * True when a step of the plan runs the build gate (npm ci, npm run
+     * build): a front-end hop, or the Node pin hop on an app with a build
+     * script.
+     */
+    private function planBuildsFrontEnd(Plan $plan, string $path): bool
     {
         foreach ($plan->steps as $step) {
-            if ($step->hop->buildGate) {
+            if ($this->hopBuildsFrontEnd($step->hop, $path)) {
                 return true;
             }
         }
@@ -1349,7 +1376,7 @@ final class HopExecutor
         // end too, or every page differs from a baseline that served no build
         // or a test stub manifest (found on WELD, 2026-11-06).
         $built = null;
-        if ($this->node !== null && self::planBuildsFrontEnd($plan)) {
+        if ($this->node !== null && $this->planBuildsFrontEnd($plan, $path)) {
             $buildFailure = $this->runBuildGate($path);
             if ($buildFailure !== null) {
                 return new ReplayOutcome(ReplayOutcome::FAILED, $php, [
@@ -1616,8 +1643,17 @@ final class HopExecutor
         if ($options->dryRun) {
             $phrases = self::nodeChangePhrases($hop);
 
+            $build = [];
+            if ($hop->pinNode && !$hop->buildGate) {
+                $reason = $this->pinBuildSkipReason($hop, $path);
+                $build[] = $reason === null
+                    ? sprintf('A real run then builds the front end (npm ci, npm run build) in the node:%s container, to prove it still builds on the pinned Node.', $hop->to)
+                    : $reason;
+            }
+
             return new StepResult($step->number, $hop->id, StepResult::PREVIEWED, [], [
                 $phrases === [] ? 'Dry run: would edit package.json.' : 'Dry run: would ' . self::joinPhrases($phrases) . '.',
+                ...$build,
                 ...$hop->notes,
             ]);
         }
@@ -1639,13 +1675,34 @@ final class HopExecutor
             }
             $changes[] = 'Build gate passed: npm ci and npm run build are green in the Node container.';
         } elseif (!$options->skipGate) {
+            // The pin changes the Node every later front-end step runs on, so
+            // prove the front end still builds there before the PHP tests:
+            // a pin that only edits two files proves nothing on its own.
+            if ($hop->pinNode) {
+                $reason = $this->pinBuildSkipReason($hop, $path);
+                if ($reason === null) {
+                    $failure = $this->runBuildGate($path);
+                    if ($failure !== null) {
+                        return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [
+                            ...$changes,
+                            ...$failure,
+                            sprintf('The front end does not build on Node %s. Fix the build (often a dependency that needs a newer release for this Node), commit, then run again: the rerun builds it again before it carries on.', $hop->to),
+                        ]);
+                    }
+                    $changes[] = sprintf('Build gate passed: npm ci and npm run build are green in the node:%s container.', $hop->to);
+                } else {
+                    $changes[] = $reason;
+                }
+            }
             $gate = $this->runGate($step, $path, $options, $baseline);
             if (!$gate->passed) {
                 return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$changes, ...$gate->lines]);
             }
             $changes = [...$changes, ...$gate->lines, $this->gatePassedLine($step->phpAfter, $this->stepGateKind($step, $baseline->gateKind))];
         } else {
-            $changes[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?') . ' before the next step.';
+            $changes[] = 'Gate skipped. Run the tests on PHP ' . ($step->phpAfter ?? '?')
+                . ($hop->pinNode && $this->pinBuildSkipReason($hop, $path) === null ? sprintf(', and npm ci and npm run build on Node %s,', $hop->to) : '')
+                . ' before the next step.';
         }
 
         return new StepResult($step->number, $hop->id, StepResult::APPLIED, $files, [...$changes, ...$hop->notes]);

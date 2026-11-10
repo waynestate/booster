@@ -835,7 +835,9 @@ plan that passed a target version, as `--with-node` does. The later front-end ho
 container. A Node floor is like a shelf: put it higher than the server can reach and nothing lands on it.
 
 Four hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`,
-then the app's usual gate applies. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (below) and asks for a
+then proves the front end still builds on the pinned Node: when `package.json` has a `build` script and a
+`package-lock.json`, it runs `npm ci` and `npm run build` in the `node:` container before the app's usual
+gate, and a red build stops the run there. With no build script it says so plainly and runs the usual gate. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (below) and asks for a
 build gate, which runs `npm ci` and `npm run build` in the `node:` container (the plan's Node pin, 26 by default) before the app's tests.
 `vite-major` moves a Vite front end onto the Vite major in the hop data: it pins `vite` wherever it sits in
 `package.json`, pins `laravel-vite-plugin` and `@vitejs/plugin-vue` to the hop data's versions when they are already
@@ -885,7 +887,7 @@ leaves forked views under `resources/views/vendor/wayne-ui` and `public/vendor/w
 delete, and it cannot rotate a deploy token a repository URL may carry); `node-pin-24` (planned for any app with a
 `package.json` that does
 not already floor Node at the plan's Node: sets `engines.node` to `>=` and writes `.nvmrc`, ahead of the
-front-end hops. The major is `--node`, else the Node the app's Citadel image ships (`NODE_IMAGE` in the Squire kit's
+front-end hops, and builds the front end on that Node when there is a `build` script. The major is `--node`, else the Node the app's Citadel image ships (`NODE_IMAGE` in the Squire kit's
 `.squire/base-fallback.Dockerfile`), else the hop data's target, 26 today); `mix-to-vite` (planned when the app has a `webpack.mix.js` and the plan lands on Laravel 9 or
 newer, after `node-pin-24`: writes `vite.config.js`, swaps `laravel-mix` for `vite` and `laravel-vite-plugin` in
 `package.json`, renames `MIX_` keys to `VITE_` in `.env.example`, rewrites Blade `mix()` script and link tags into one
@@ -930,6 +932,7 @@ refused by name.
 |---|---|---|
 | `BOOSTER_POLICY` | Path to CREED's `policy.json` | the copy in the `waynestate/creed` package |
 | `BOOSTER_COMPOSER_CACHE` | Opt-in Composer download cache for the baseline and every gate: a Docker volume name or a host folder | none: each gate container downloads every package |
+| `BOOSTER_NPM_CACHE` | Opt-in npm download cache for every Node container, mounted at `/root/.npm`: a Docker volume name or a host folder | none: each `npm ci` downloads every package |
 
 Booster reads the policy straight from the `waynestate/creed` package in its own `vendor/`, so there is no copy to
 drift: `composer update waynestate/creed` is the whole refresh. `--policy` and `BOOSTER_POLICY` still override it for
@@ -947,9 +950,11 @@ A plain name is a Docker volume (created on first use); anything with a slash, a
 folder, created when it is missing. Booster mounts it at `/tmp/composer-cache` and sets `COMPOSER_CACHE_DIR`. The gate
 runs as your own user on Linux and macOS, and a volume belongs to root, so there Booster makes a folder of its own
 inside the volume (`booster-uid-`) once per run and leaves the rest of the volume alone. Unset, nothing is
-mounted and the gate behaves exactly as before.
+mounted and the gate behaves exactly as before. `BOOSTER_NPM_CACHE` does the same for the Node containers (`npm ci`,
+`npm run build` and the front-end hops), mounted at `/root/.npm`; the stack's volume is `stack-npm-cache`. Those
+containers run as root, so a volume suits them better than a folder on your machine.
 
-`.env.example` holds the placeholder. Booster reads no secrets and talks to no Citadel host. Its own network calls
+`.env.example` holds the placeholders. Booster reads no secrets and talks to no Citadel host. Its own network calls
 only read: the dependency check asks Packagist (and any composer-type repository the app declares) about the app's
 direct dependencies, which `--no-package-check` turns off, and a plan for an app on `wayne-cas` with no `vendor/`
 checks the VCS repository `composer.json` names for that package with `git ls-remote`. Everything it prints from an app (file names, diffs) has control characters stripped.
@@ -1167,7 +1172,7 @@ Inside one dose
    ### The gate
    Before the first hop your tests run once on the app's current PHP as the baseline; a red one stops the run unless you pass `--allow-failing-baseline`. An app with no tests of its own gets a built-in syntax check (php -l on every PHP file outside vendor/ and node_modules/) instead, and the report says so: it proves the code loads on the new PHP, not that it works. After each hop they run inside `booster-target:<php>`, built from `docker/Dockerfile` on the PHP the hop moves to. On Laravel and PHPUnit hops the gate refreshes `composer.lock` for the package the hop moved, so the lock lands on the new major version; if Packagist's security advisories block those releases, whether the install fails outright or Composer quietly locks a branch version where the hop asked for a tag, the gate writes a scoped temporary ignore, retries once, and tells you what it did. The plan's last step then fails until that entry is out of `composer.json`, so the upgrade never finishes with the unblock still in place. After the last hop PROCTOR checks the upgraded app against CREED's policy, blocking only on findings the upgrade introduced. If a red baseline names a missing Mix or Vite manifest, build the front-end assets first. A failure stops the run and leaves the changes for you to read. `git checkout .` undoes them. Fix the cause, commit, and run again: the stopped hop's gate runs again first (its build too, for a front-end hop), so it is neither redone nor skipped.
 
-Not every hop is Rector. `node-pin-24` pins Node 26 in `package.json` and writes `.nvmrc`; `mix-to-vite` converts a simple `webpack.mix.js` and moves the build to Vite; `vite-major` pins `vite` and the plugin packages in `package.json` to the hop data's versions. The Vue 2 to 3 move is staged: `vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod`, with the `vue-2-to-3` playbook standing in for all three. Rector doesn't read Vue, so a person works those steps. `inertia-2-to-3` pins `inertiajs/inertia-laravel` and `@inertiajs/vue3` at 3 and hands its breaking changes over as manual lines. The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.
+Not every hop is Rector. `node-pin-24` pins Node 26 in `package.json`, writes `.nvmrc` and proves the front end still builds there; `mix-to-vite` converts a simple `webpack.mix.js` and moves the build to Vite; `vite-major` pins `vite` and the plugin packages in `package.json` to the hop data's versions. The Vue 2 to 3 move is staged: `vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod`, with the `vue-2-to-3` playbook standing in for all three. Rector doesn't read Vue, so a person works those steps. `inertia-2-to-3` pins `inertiajs/inertia-laravel` and `@inertiajs/vue3` at 3 and hands its breaking changes over as manual lines. The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.
 
 The commands
 
@@ -1423,7 +1428,7 @@ Task:
 
 Constraints:
 - Plan and dry run only, until I say so. Never commit or push.
-- The mix-to-vite gate runs npm ci and npm run build in a node:26 container before the tests, so it needs a Docker daemon.
+- The node-pin-24 and mix-to-vite gates run npm ci and npm run build in a node:26 container before the tests, so they need a Docker daemon.
 - Ask me before you guess: a Mix config Booster refuses, or an asset no Mix entry covers.
 
 Output: the plan, the Mix to Vite verdict, the dry-run summary, the manual renames, then your questions.
@@ -1523,6 +1528,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 - Added: an opt-in Composer download cache for the gate. Every gate container started with an empty cache, so a real Laravel app's run downloaded every package once for the baseline and again for each of its four hops. Set `BOOSTER_COMPOSER_CACHE` to a Docker volume name (the WSU stack's is `stack-composer-cache`) or a host folder, and Booster mounts it at `/tmp/composer-cache` as `COMPOSER_CACHE_DIR` in the baseline and every gate. On Linux and macOS, where the gate runs as your own user, a volume gets a folder of its own (`booster-uid-<uid>`, made once per run by a short root container) so Composer can write to it; the rest of the volume is left alone. A folder that cannot be created or written stops the run with the variable named. Unset, nothing changes. Guide: "Configuration", `.env.example`.
 - Fixed: a rerun after a stopped hop runs that hop's gate again instead of skipping it. A hop that stops at a red gate keeps its edits; the person fixes the cause, commits and runs again, and Booster plans from the app as it is, so the stopped hop had either left the plan (its target was reached) or came back with nothing to edit, which read as "nothing to do, so the gate was skipped". For a PHP hop the baseline on the new PHP covered the tests, but a front-end hop's build never ran again: a Vite hop whose build went red and was fixed by hand went on to the next hop unbuilt. Booster now reads the stopped hop from the last run's `booster-hop.json`. When the hop left the plan, its build gate (for a hop that builds the front end) runs right after the baseline, shown as `Re-gate: PASS` or `FAIL`; a red one stops the run before step 1. When the hop is back with nothing to edit, its step runs its build and test gates against the committed lock instead of skipping them. A dry run and `--skip-gate` never re-gate. The JSON report and `booster-hop.json` gain `regate` on such a rerun, so a red re-gate is re-gated again on the run after it. Recipe 14, "After a stop", says how.
+- Added: the `node-pin-24` hop proves the front end still builds on the Node it pins. It used to change `engines.node` and `.nvmrc` and run only the PHP tests, so a front end that no longer built on the new Node passed the hop unnoticed, and the next front-end hop or the next deploy found out instead. When `package.json` has a `build` script and a `package-lock.json`, the hop now runs `npm ci` and `npm run build` in the `node:<pinned>` container before the tests; a red build stops the run at that hop with the pin in place, and the rerun builds it again (the re-gate above). With no build script, or a build script and no lock (`npm ci` needs one), the hop says so plainly and runs the tests as before. A dry run says which it will be, and `--skip-gate` names the build to run by hand. A `--replay` run that pins Node builds the front end before it records, like the other front-end hops.
+- Added: an opt-in npm download cache for the Node containers, the same way as Composer's. Set `BOOSTER_NPM_CACHE` to a Docker volume name (the WSU stack's is `stack-npm-cache`) or a host folder, and Booster mounts it at `/root/.npm` in every Node container: the build gate, the pin hop's build and the front-end hops' npm steps. Those containers run as root, so a volume suits them better than a folder. Unset, nothing changes. Guide: "Configuration", `.env.example`.
 
 ### \[1.16.0\] - 2026-11-09[#](https://booster.apps.wayne.edu/docs/changelog.html#1-16-0-2026-11-09)
 
@@ -2311,7 +2318,7 @@ A run prints one line per hop to standard error while it works: the hop's positi
 
 `node-pin-24` floors Node at the Node the app deploys on, not just the newest one. A floor above the server's Node makes every `npm ci` there warn (`EBADENGINE`), and the hop's gate never builds on the server's Node either. So the major comes from, in order: `--node=<major>` (22, 24 or 26 today; the policy must still support it); the Node the app's Citadel image ships, which the Squire kit mirrors as `NODE_IMAGE` in `.squire/base-fallback.Dockerfile`; and otherwise the hop data's target, the newest Node the policy supports (26 today). The plan's step line says `node-pin-24 (pins Node 22)`, and its summary says where the 22 came from. `--node` also puts the Node hops back in a plan that passed a target version, as `--with-node` does. The later front-end hops run in the same `node:<major>` container. A Node floor is like a shelf: put it higher than the server can reach and nothing lands on it.
 
-Four hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`, then the app's usual gate applies. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (see [the hop list](https://booster.apps.wayne.edu/docs/reference/hops.html)) and asks for a build gate, which runs `npm ci` and `npm run build` in the `node:<major>` container (the plan's Node pin, 26 by default) before the app's tests. `vite-major` moves a Vite front end onto the Vite major in the hop data: it pins `vite` wherever it sits in `package.json`, pins `laravel-vite-plugin` and `@vitejs/plugin-vue` to the hop data's versions when they are already listed, runs `npm install` in the Node container and asks for a build gate. `tailwind-3-to-4` runs the official `@tailwindcss/upgrade` tool (one exact release, with `--force`) in the Node container, then pins `tailwindcss` to `^4.1`, adds the matching Vite or PostCSS plugin, removes `autoprefixer` and `postcss-import`, which Tailwind 4 folds in, moves an inline `css.postcss` Tailwind block in `vite.config` to the `@tailwindcss/vite` plugin (the early 2025 Laravel starter kit shape; any other config that still imports them gets a MANUAL line), and runs `npm install` so the lock matches; plugins listed in `tailwind.config.js` and `@apply` inside Vue SFC `<style>` blocks stay manual work, and the hop says so. `inertia-2-to-3` raises `inertiajs/inertia-laravel` and `@inertiajs/vue3` to `^3.0` when the plan lands on Laravel 11 or newer on PHP 8.2 or newer, runs `composer update` and `npm install`, and lists the v3 breaking changes as manual lines, because a person works them. `typescript-major` pins `typescript` to `^6.0` wherever it sits in `package.json`, and `vue-tsc` to `^3.0` when the app lists it, runs `npm install` so the lock matches, then asks for the same build gate; when that install has to override a peer dependency, the hop names the package to raise, because the next plain `npm install` would refuse the tree; running the type check and fixing what the new major flags stay manual work, and the hop says so.
+Four hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`, then proves the front end still builds on the pinned Node: when `package.json` has a `build` script and a `package-lock.json`, it runs `npm ci` and `npm run build` in the `node:<major>` container before the app's usual gate, and a red build stops the run there. With no build script it says so plainly and runs the usual gate. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (see [the hop list](https://booster.apps.wayne.edu/docs/reference/hops.html)) and asks for a build gate, which runs `npm ci` and `npm run build` in the `node:<major>` container (the plan's Node pin, 26 by default) before the app's tests. `vite-major` moves a Vite front end onto the Vite major in the hop data: it pins `vite` wherever it sits in `package.json`, pins `laravel-vite-plugin` and `@vitejs/plugin-vue` to the hop data's versions when they are already listed, runs `npm install` in the Node container and asks for a build gate. `tailwind-3-to-4` runs the official `@tailwindcss/upgrade` tool (one exact release, with `--force`) in the Node container, then pins `tailwindcss` to `^4.1`, adds the matching Vite or PostCSS plugin, removes `autoprefixer` and `postcss-import`, which Tailwind 4 folds in, moves an inline `css.postcss` Tailwind block in `vite.config` to the `@tailwindcss/vite` plugin (the early 2025 Laravel starter kit shape; any other config that still imports them gets a MANUAL line), and runs `npm install` so the lock matches; plugins listed in `tailwind.config.js` and `@apply` inside Vue SFC `<style>` blocks stay manual work, and the hop says so. `inertia-2-to-3` raises `inertiajs/inertia-laravel` and `@inertiajs/vue3` to `^3.0` when the plan lands on Laravel 11 or newer on PHP 8.2 or newer, runs `composer update` and `npm install`, and lists the v3 breaking changes as manual lines, because a person works them. `typescript-major` pins `typescript` to `^6.0` wherever it sits in `package.json`, and `vue-tsc` to `^3.0` when the app lists it, runs `npm install` so the lock matches, then asks for the same build gate; when that install has to override a peer dependency, the hop names the package to raise, because the next plain `npm install` would refuse the tree; running the type check and fixing what the new major flags stay manual work, and the hop says so.
 
 Vue 2 to Vue 3 is staged. `vue-26-to-27` moves the front end to the last Vue 2 release, which carries the Vue 3 reactivity API; `vue-27-to-compat` switches to the `@vue/compat` build; `vue-compat-codemod` runs the `vue-upgrade-tool` codemod and keeps every manual item it lists. `vue-2-to-3` is the playbook that stands in for all three: skipping it skips them, and a person finishes the job, because Rector does not read Vue.
 
@@ -3549,6 +3556,7 @@ This page lists the environment variables Booster reads; the table is generated 
 | --- | --- | --- | --- |
 | BOOSTER_BOT_TOKEN | Push token for the hop data robot (bin/hop-data-bot.php). Never in git, never logged, never printed | none | src/Refresh/HopDataBot.php |
 | BOOSTER_COMPOSER_CACHE | Opt-in Composer download cache for the baseline and every gate: a Docker volume name or a host folder, mounted as COMPOSER_CACHE_DIR | none (each gate container downloads every package) | src/Run/CacheMount.php |
+| BOOSTER_NPM_CACHE | Opt-in npm download cache for every Node container (npm ci, npm run build, the front-end hops): a Docker volume name or a host folder, mounted at /root/.npm | none (each Node container downloads every package) | src/Run/CacheMount.php |
 | BOOSTER_POLICY | Path to CREED's policy.json | none (uses the policy.json in the waynestate/creed package) | bin/refresh-hop-data.php |
 
 Booster reads the policy straight from the `waynestate/creed` package in its own `vendor/`, so there is no copy to drift: `composer update waynestate/creed` is the whole refresh. `--policy` and `BOOSTER_POLICY` still override it for one run.
@@ -3567,6 +3575,15 @@ In PowerShell: `$env:BOOSTER_COMPOSER_CACHE = "stack-composer-cache"`.
 - A plain name (letters, digits, `.`, `_`, `-`) is a Docker volume, created on first use. Anything with a slash, a backslash, a leading `.` or a leading `~` is a folder, created when it is missing; a folder that cannot be created or written stops the run before the baseline, with the variable named.
 - Booster mounts it at `/tmp/composer-cache` in the baseline and in every gate, and sets `COMPOSER_CACHE_DIR` there.
 - On Linux and macOS the gate runs as your own user, so the files it writes in the app stay yours. A Docker volume belongs to root, so Booster makes a folder of its own inside the volume, `booster-uid-<your uid>`, with one short root container per run, and leaves the rest of the volume alone. A folder on your machine is already yours and is used as it is.
+
+The Node containers (the build gate's `npm ci` and `npm run build`, and the front-end hops' own npm steps) take `BOOSTER_NPM_CACHE` the same way, mounted at `/root/.npm`, npm's cache folder for the container's root user:
+
+```
+export BOOSTER_NPM_CACHE=stack-npm-cache              # a Docker volume, the one the WSU stack already uses
+export BOOSTER_NPM_CACHE=~/.cache/booster-npm         # or a folder on your machine
+```
+
+The Node containers run as root, so on Linux a host folder fills with files root owns; a Docker volume keeps them out of your way.
 
 `.env.example` holds the placeholders. Booster reads no secrets and talks to no Citadel host. Its own network calls only read: the dependency check asks Packagist (and any composer-type repository the app declares) about the app's direct dependencies, which `--no-package-check` turns off, and a plan for an app on `wayne-cas` with no `vendor/` checks the VCS repository `composer.json` names for that package with `git ls-remote`. Everything it prints from an app (file names, diffs) has control characters stripped.
 
@@ -3622,7 +3639,7 @@ This page lists every hop Booster knows; the list is generated from the hop data
 | `vue-2-to-3` | vue | 2 | 3 | Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue). |
 | `inertia-2-to-3` | node | 2 | 3 | Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0. |
 
-The hop id `node-pin-24` is a stable id. The table shows the hop data's target (26); an app's plan pins the Node its Citadel image ships, or the major `--node` names, and the plan's step line says which (`node-pin-24 (pins Node 22)`).
+The hop id `node-pin-24` is a stable id. The table shows the hop data's target (26); an app's plan pins the Node its Citadel image ships, or the major `--node` names, and the plan's step line says which (`node-pin-24 (pins Node 22)`). Its gate builds the front end on that Node (`npm ci`, `npm run build`) when `package.json` has a `build` script and a lock, then runs the app's tests.
 
 > Every other hop lifts the engine; `wayneui-1-to-2` is the one that repaints the bodywork.
 

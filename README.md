@@ -851,7 +851,9 @@ plan that passed a target version, as `--with-node` does. The later front-end ho
 container. A Node floor is like a shelf: put it higher than the server can reach and nothing lands on it.
 
 Four hops edit manifests instead of code. `node-pin-24` sets `engines.node` in `package.json` and writes `.nvmrc`,
-then the app's usual gate applies. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (below) and asks for a
+then proves the front end still builds on the pinned Node: when `package.json` has a `build` script and a
+`package-lock.json`, it runs `npm ci` and `npm run build` in the `node:<major>` container before the app's usual
+gate, and a red build stops the run there. With no build script it says so plainly and runs the usual gate. `mix-to-vite` converts a simple `webpack.mix.js` to Vite (below) and asks for a
 build gate, which runs `npm ci` and `npm run build` in the `node:<major>` container (the plan's Node pin, 26 by default) before the app's tests.
 `vite-major` moves a Vite front end onto the Vite major in the hop data: it pins `vite` wherever it sits in
 `package.json`, pins `laravel-vite-plugin` and `@vitejs/plugin-vue` to the hop data's versions when they are already
@@ -901,7 +903,7 @@ leaves forked views under `resources/views/vendor/wayne-ui` and `public/vendor/w
 delete, and it cannot rotate a deploy token a repository URL may carry); `node-pin-24` (planned for any app with a
 `package.json` that does
 not already floor Node at the plan's Node: sets `engines.node` to `>=<major>` and writes `.nvmrc`, ahead of the
-front-end hops. The major is `--node`, else the Node the app's Citadel image ships (`NODE_IMAGE` in the Squire kit's
+front-end hops, and builds the front end on that Node when there is a `build` script. The major is `--node`, else the Node the app's Citadel image ships (`NODE_IMAGE` in the Squire kit's
 `.squire/base-fallback.Dockerfile`), else the hop data's target, 26 today); `mix-to-vite` (planned when the app has a `webpack.mix.js` and the plan lands on Laravel 9 or
 newer, after `node-pin-24`: writes `vite.config.js`, swaps `laravel-mix` for `vite` and `laravel-vite-plugin` in
 `package.json`, renames `MIX_` keys to `VITE_` in `.env.example`, rewrites Blade `mix()` script and link tags into one
@@ -946,6 +948,7 @@ refused by name.
 |---|---|---|
 | `BOOSTER_POLICY` | Path to CREED's `policy.json` | the copy in the `waynestate/creed` package |
 | `BOOSTER_COMPOSER_CACHE` | Opt-in Composer download cache for the baseline and every gate: a Docker volume name or a host folder | none: each gate container downloads every package |
+| `BOOSTER_NPM_CACHE` | Opt-in npm download cache for every Node container, mounted at `/root/.npm`: a Docker volume name or a host folder | none: each `npm ci` downloads every package |
 
 Booster reads the policy straight from the `waynestate/creed` package in its own `vendor/`, so there is no copy to
 drift: `composer update waynestate/creed` is the whole refresh. `--policy` and `BOOSTER_POLICY` still override it for
@@ -963,9 +966,11 @@ A plain name is a Docker volume (created on first use); anything with a slash, a
 folder, created when it is missing. Booster mounts it at `/tmp/composer-cache` and sets `COMPOSER_CACHE_DIR`. The gate
 runs as your own user on Linux and macOS, and a volume belongs to root, so there Booster makes a folder of its own
 inside the volume (`booster-uid-<your uid>`) once per run and leaves the rest of the volume alone. Unset, nothing is
-mounted and the gate behaves exactly as before.
+mounted and the gate behaves exactly as before. `BOOSTER_NPM_CACHE` does the same for the Node containers (`npm ci`,
+`npm run build` and the front-end hops), mounted at `/root/.npm`; the stack's volume is `stack-npm-cache`. Those
+containers run as root, so a volume suits them better than a folder on your machine.
 
-`.env.example` holds the placeholder. Booster reads no secrets and talks to no Citadel host. Its own network calls
+`.env.example` holds the placeholders. Booster reads no secrets and talks to no Citadel host. Its own network calls
 only read: the dependency check asks Packagist (and any composer-type repository the app declares) about the app's
 direct dependencies, which `--no-package-check` turns off, and a plan for an app on `wayne-cas` with no `vendor/`
 checks the VCS repository `composer.json` names for that package with `git ls-remote`. Everything it prints from an app (file names, diffs) has control characters stripped.

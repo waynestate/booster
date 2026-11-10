@@ -143,7 +143,9 @@ otherwise the hop data's target, the newest Node the policy supports (26 today).
 plan that passed a target version, as <code>--with-node</code> does. The later front-end hops run in the same <code>node:&lt;major&gt;</code>
 container. A Node floor is like a shelf: put it higher than the server can reach and nothing lands on it.</p>
 <p>Four hops edit manifests instead of code. <code>node-pin-24</code> sets <code>engines.node</code> in <code>package.json</code> and writes <code>.nvmrc</code>,
-then the app's usual gate applies. <code>mix-to-vite</code> converts a simple <code>webpack.mix.js</code> to Vite (see <a href="../reference/hops.html">the hop list</a>) and asks for a
+then proves the front end still builds on the pinned Node: when <code>package.json</code> has a <code>build</code> script and a
+<code>package-lock.json</code>, it runs <code>npm ci</code> and <code>npm run build</code> in the <code>node:&lt;major&gt;</code> container before the app's usual
+gate, and a red build stops the run there. With no build script it says so plainly and runs the usual gate. <code>mix-to-vite</code> converts a simple <code>webpack.mix.js</code> to Vite (see <a href="../reference/hops.html">the hop list</a>) and asks for a
 build gate, which runs <code>npm ci</code> and <code>npm run build</code> in the <code>node:&lt;major&gt;</code> container (the plan's Node pin, 26 by default) before the app's tests.
 <code>vite-major</code> moves a Vite front end onto the Vite major in the hop data: it pins <code>vite</code> wherever it sits in
 <code>package.json</code>, pins <code>laravel-vite-plugin</code> and <code>@vitejs/plugin-vue</code> to the hop data's versions when they are already

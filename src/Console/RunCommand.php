@@ -108,7 +108,7 @@ final class RunCommand extends BaseCommand
             new ComposerEditor(),
             new TargetImageRunner($this->processes, composerCache: CacheMount::fromEnvironment(CacheMount::COMPOSER)),
             $this->processes,
-            new NodeRunner($this->processes, (int) $registry->nodePinTarget()),
+            new NodeRunner($this->processes, (int) $registry->nodePinTarget(), npmCache: CacheMount::fromEnvironment(CacheMount::NPM)),
             $registry,
             new ProctorRunner($this->processes),
         );

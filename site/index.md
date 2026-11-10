@@ -94,7 +94,7 @@ Inside one dose
    ### The gate
    Before the first hop your tests run once on the app's current PHP as the baseline; a red one stops the run unless you pass `--allow-failing-baseline`. An app with no tests of its own gets a built-in syntax check (php -l on every PHP file outside vendor/ and node_modules/) instead, and the report says so: it proves the code loads on the new PHP, not that it works. After each hop they run inside `booster-target:<php>`, built from `docker/Dockerfile` on the PHP the hop moves to. On Laravel and PHPUnit hops the gate refreshes `composer.lock` for the package the hop moved, so the lock lands on the new major version; if Packagist's security advisories block those releases, whether the install fails outright or Composer quietly locks a branch version where the hop asked for a tag, the gate writes a scoped temporary ignore, retries once, and tells you what it did. The plan's last step then fails until that entry is out of `composer.json`, so the upgrade never finishes with the unblock still in place. After the last hop PROCTOR checks the upgraded app against CREED's policy, blocking only on findings the upgrade introduced. If a red baseline names a missing Mix or Vite manifest, build the front-end assets first. A failure stops the run and leaves the changes for you to read. `git checkout .` undoes them. Fix the cause, commit, and run again: the stopped hop's gate runs again first (its build too, for a front-end hop), so it is neither redone nor skipped.
 
-Not every hop is Rector. `node-pin-24` pins Node 26 in `package.json` and writes `.nvmrc`; `mix-to-vite` converts a simple `webpack.mix.js` and moves the build to Vite; `vite-major` pins `vite` and the plugin packages in `package.json` to the hop data's versions. The Vue 2 to 3 move is staged: `vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod`, with the `vue-2-to-3` playbook standing in for all three. Rector doesn't read Vue, so a person works those steps. `inertia-2-to-3` pins `inertiajs/inertia-laravel` and `@inertiajs/vue3` at 3 and hands its breaking changes over as manual lines. The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.
+Not every hop is Rector. `node-pin-24` pins Node 26 in `package.json`, writes `.nvmrc` and proves the front end still builds there; `mix-to-vite` converts a simple `webpack.mix.js` and moves the build to Vite; `vite-major` pins `vite` and the plugin packages in `package.json` to the hop data's versions. The Vue 2 to 3 move is staged: `vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod`, with the `vue-2-to-3` playbook standing in for all three. Rector doesn't read Vue, so a person works those steps. `inertia-2-to-3` pins `inertiajs/inertia-laravel` and `@inertiajs/vue3` at 3 and hands its breaking changes over as manual lines. The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.
 
 The commands
 
@@ -350,7 +350,7 @@ Task:
 
 Constraints:
 - Plan and dry run only, until I say so. Never commit or push.
-- The mix-to-vite gate runs npm ci and npm run build in a node:26 container before the tests, so it needs a Docker daemon.
+- The node-pin-24 and mix-to-vite gates run npm ci and npm run build in a node:26 container before the tests, so they need a Docker daemon.
 - Ask me before you guess: a Mix config Booster refuses, or an asset no Mix entry covers.
 
 Output: the plan, the Mix to Vite verdict, the dry-run summary, the manual renames, then your questions.

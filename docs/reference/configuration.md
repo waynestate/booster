@@ -12,6 +12,7 @@ This page lists the environment variables Booster reads; the table is generated 
 | --- | --- | --- | --- |
 | BOOSTER_BOT_TOKEN | Push token for the hop data robot (bin/hop-data-bot.php). Never in git, never logged, never printed | none | src/Refresh/HopDataBot.php |
 | BOOSTER_COMPOSER_CACHE | Opt-in Composer download cache for the baseline and every gate: a Docker volume name or a host folder, mounted as COMPOSER_CACHE_DIR | none (each gate container downloads every package) | src/Run/CacheMount.php |
+| BOOSTER_NPM_CACHE | Opt-in npm download cache for every Node container (npm ci, npm run build, the front-end hops): a Docker volume name or a host folder, mounted at /root/.npm | none (each Node container downloads every package) | src/Run/CacheMount.php |
 | BOOSTER_POLICY | Path to CREED's policy.json | none (uses the policy.json in the waynestate/creed package) | bin/refresh-hop-data.php |
 <!-- /generated -->
 
@@ -41,6 +42,18 @@ In PowerShell: `$env:BOOSTER_COMPOSER_CACHE = "stack-composer-cache"`.
   belongs to root, so Booster makes a folder of its own inside the volume, `booster-uid-<your uid>`, with one short
   root container per run, and leaves the rest of the volume alone. A folder on your machine is already yours and is
   used as it is.
+
+The Node containers (the build gate's `npm ci` and `npm run build`, and the front-end hops' own npm steps) take
+`BOOSTER_NPM_CACHE` the same way, mounted at `/root/.npm`, npm's cache folder for the container's root user:
+
+<!-- docs-test: skip sets your shell's environment -->
+```
+export BOOSTER_NPM_CACHE=stack-npm-cache              # a Docker volume, the one the WSU stack already uses
+export BOOSTER_NPM_CACHE=~/.cache/booster-npm         # or a folder on your machine
+```
+
+The Node containers run as root, so on Linux a host folder fills with files root owns; a Docker volume keeps them out
+of your way.
 
 `.env.example` holds the placeholders. Booster reads no secrets and talks to no Citadel host. Its own network calls
 only read: the dependency check asks Packagist (and any composer-type repository the app declares) about the app's

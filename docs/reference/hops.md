@@ -53,6 +53,8 @@ This page lists every hop Booster knows; the list is generated from the hop data
 
 The hop id `node-pin-24` is a stable id. The table shows the hop data's target (26); an app's plan pins the Node its
 Citadel image ships, or the major `--node` names, and the plan's step line says which (`node-pin-24 (pins Node 22)`).
+Its gate builds the front end on that Node (`npm ci`, `npm run build`) when `package.json` has a `build` script and a
+lock, then runs the app's tests.
 
 > Every other hop lifts the engine; `wayneui-1-to-2` is the one that repaints the bodywork.
 
