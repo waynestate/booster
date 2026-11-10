@@ -3,7 +3,7 @@ BOOSTER plan for examples/laravel-blade
   PHP: 8.2 -> 8.5
   Laravel: 10 -> 13
   PHPUnit: 10 -> 13
-  policy: waynestate/creed 0.1.8 (today 2026-11-09)
+  policy: waynestate/creed 0.1.8 (today 2026-11-10)
 
 Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.
 
@@ -63,5 +63,5 @@ https://github.com/sebastianbergmann/phpunit/issues/6052
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/laravel-blade --today=2026-11-09 --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade --today=2026-11-09)
+Preview the edits: php bin/booster run --path=examples/laravel-blade --today=2026-11-10 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade --today=2026-11-10)

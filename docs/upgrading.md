@@ -13,6 +13,23 @@ when that needs a step of yours.
 To take a new Booster, download the PHAR again (the same `curl` line as on [Install](install.md); its
 `releases/latest` link always names the newest release), or run `git pull` and `composer install` in your clone. `booster --version` prints the version you have.
 
+## 1.18.0
+
+Released 2026-11-10. Housekeeping to keep pace with the stack. No hop was added or removed, no option changed and no
+exit code changed.
+
+### What you see
+
+- **A newer SESAME starting point.** When an app has no vendor copy of SESAME's config, `cas-to-sesame` now writes
+  SESAME 0.7.3's (it was 0.5.0's). The hop still requires `^0.7`, so an app that already ran it needs nothing.
+- **Pinstripe 0.3.** Booster requires `waynestate/pinstripe` `^0.3` (was `^0.1.4`); the lint presets it reads are
+  0.3.1's.
+- **PROCTOR ^0.15** in Booster and its deploy layer: the newer checks only warn.
+
+### An app that an older Booster already moved
+
+Nothing to do.
+
 ## 1.17.0
 
 Released 2026-11-09. Follow-ups to 1.16.0. No hop was added or removed, no option changed and no exit code changed.

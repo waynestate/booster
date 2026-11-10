@@ -1,7 +1,7 @@
 BOOSTER plan for examples/vue-spa
   app type: raw-php-vue
   PHP: 8.0 -> 8.5
-  policy: waynestate/creed 0.1.8 (today 2026-11-09)
+  policy: waynestate/creed 0.1.8 (today 2026-11-10)
 
 1. php-80-to-81
    Move PHP 8.0 code to PHP 8.1.
@@ -41,5 +41,5 @@ PHPStan on PHP 8.5: no findings.
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/vue-spa --today=2026-11-09 --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/vue-spa --today=2026-11-09)
+Preview the edits: php bin/booster run --path=examples/vue-spa --today=2026-11-10 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/vue-spa --today=2026-11-10)

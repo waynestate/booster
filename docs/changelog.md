@@ -11,6 +11,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-11-10
+
 - Changed: `scripts/check-scans-bundled.sh` carries the `# proctor-ignore script-pair:` marker: it runs only inside the composer:2 container, so PROCTOR's `script-pair` reports it as an info note, not a missing twin.
 - Changed: requires PROCTOR ^0.15 (locked 0.15.0, was ^0.12), and so does the deploy layer: 0.13 checks the release cooldown against the CREED policy and 0.14 adds `script-pair`; both only warn, nothing breaks.
 - Changed: requires PROCTOR ^0.12 (locked 0.12.0, was ^0.11), and so does the deploy layer.
