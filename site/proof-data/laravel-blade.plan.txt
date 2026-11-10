@@ -5,6 +5,8 @@ BOOSTER plan for examples/laravel-blade
   PHPUnit: 10 -> 13
   policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
+Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.
+
 1. phpunit-10-to-11
    Move PHPUnit 10 tests to PHPUnit 11.
    After this step your tests run in Docker.
@@ -56,7 +58,7 @@ PHPStan on PHP 8.5: 5 findings (code quality hints, not upgrade blockers).
    tests/PostTest.php:27 [staticMethod.deprecated] Call to deprecated method isType() of class PHPUnit\Framework\Assert:
 https://github.com/sebastianbergmann/phpunit/issues/6052
    tests/PostTest.php:33 [method.alreadyNarrowedType] Call to method PHPUnit\Framework\Assert::assertNotNull() with PHPUnit\Framework\MockObject\Rule\AnyInvokedCount will always evaluate to true.
-   Hint: Laravel app without Larastan: Eloquent and facade calls show as errors. composer require --dev larastan/larastan for a cleaner scan.
+   Hint: vendor/ is not installed, so the classes your packages provide cannot resolve and most of these findings are noise. Run composer install in the app, then scan again.
 
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.

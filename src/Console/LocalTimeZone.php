@@ -10,20 +10,22 @@ use IntlTimeZone;
 /**
  * The machine's own time zone, for a PHP that was never told one.
  *
- * A PHP with no date.timezone in its php.ini runs on UTC, so in the evening
- * in Detroit the plan said "today 2026-11-10" and a deploy script was stamped
- * after midnight. When php.ini names no zone, Booster asks the machine: the TZ
- * variable, then /etc/localtime (Linux, macOS, WSL), then /etc/timezone, then
- * ICU (intl), which reads Windows' setting too. A zone it cannot verify is
- * ignored, and with no answer PHP stays on UTC, as before. Time zones: proof
- * that even the clock has a dependency tree.
+ * A PHP with no date.timezone in its php.ini runs on UTC, and many php.ini
+ * files set UTC only to silence PHP's warning, so in the evening in Detroit
+ * the plan said "today 2026-11-10" and a deploy script was stamped after
+ * midnight. When php.ini names no zone, or UTC, Booster asks the machine: the
+ * TZ variable, then /etc/localtime (Linux, macOS, WSL), then /etc/timezone,
+ * then ICU (intl), which reads Windows' setting too. Any other php.ini zone
+ * is a choice and wins. A zone it cannot verify is ignored, and with no
+ * answer PHP keeps the zone it has. Time zones: proof that even the clock has
+ * a dependency tree.
  */
 final class LocalTimeZone
 {
-    /** Sets PHP's default zone to the machine's when php.ini names none; returns the zone in use. */
+    /** Sets PHP's default zone to the machine's when php.ini names none or UTC; returns the zone in use. */
     public static function apply(): string
     {
-        if ((string) ini_get('date.timezone') !== '') {
+        if (!self::machineZoneWins((string) ini_get('date.timezone'))) {
             return date_default_timezone_get();
         }
         $zone = self::detect(
@@ -37,6 +39,12 @@ final class LocalTimeZone
         }
 
         return date_default_timezone_get();
+    }
+
+    /** Whether the machine's zone should replace php.ini's date.timezone: when it names none, or UTC. */
+    public static function machineZoneWins(string $ini): bool
+    {
+        return in_array(strtoupper(trim($ini)), ['', 'UTC', 'ETC/UTC'], true);
     }
 
     /**

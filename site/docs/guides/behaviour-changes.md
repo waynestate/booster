@@ -35,7 +35,7 @@ An entry may also carry an optional `parity` object: one observable thing, how t
 }
 ```
 
-The list lives in `data/behaviour-changes.json`, bundled with the phar. An entry names the hop it applies to (`php-80-to-81`, `laravel-10-to-11`, or `package:vendor/name@2` for a floor a package raises), how to find it (`detect`: a `function`, `method`, `class`, `property`, string `token`, blade snippet, config `file` and `key`, composer `package`, or `always`), and a `source` link that confirms the change:
+The list lives in `data/behaviour-changes.json`, bundled with the phar. An entry names the hop it applies to (`php-80-to-81`, `laravel-10-to-11`, or `package:vendor/name@2` for a floor a package raises), how to find it (`detect`: a `function`, `method`, `class`, a class instantiated with `new` (or its `::connect()` factory), `property`, string `token`, blade snippet, config `file` and `key`, composer `package`, or `always`), and a `source` link that confirms the change:
 
 ```json
 {

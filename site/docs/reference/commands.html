@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Commands | Booster docs</title>
 <meta name="description" content="Every Booster command and option, generated from the tool itself.">
-<meta name="docs-version" content="1.15.0">
+<meta name="docs-version" content="1.16.0">
 <link rel="stylesheet" href="../../assets/wayne-ui/wayne-ui.css">
 <link rel="stylesheet" href="../../assets/docs.css">
 <link rel="stylesheet" href="../../docs/theme/booster.css">
@@ -20,7 +20,7 @@
     <a class="masthead__brand" href="../../index.html">
       <img src="../../brand/booster-avatar-256.png" width="36" height="36" alt="">
       <span class="masthead__name">BOOSTER</span>
-      <span class="masthead__ver">1.15.0</span>
+      <span class="masthead__ver">1.16.0</span>
     </a>
     <nav class="masthead__nav" aria-label="Site">
       <a href="../../index.html#record">Record</a>
@@ -171,7 +171,7 @@
 </table></div>
 <h3 id="booster-plan"><code>booster plan</code><a class="docs-heading-link" aria-label="Link to this section" href="#booster-plan">#</a></h3>
 <p>Show the ordered hops from the app to a supported version. Changes nothing.</p>
-<p>Usage: <code>booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--no-scan]</code></p>
+<p>Usage: <code>booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--node NODE] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--no-scan]</code></p>
 <div class="docs-table" role="region" aria-label="Table" tabindex="0"><table>
 <thead>
 <tr>
@@ -234,6 +234,11 @@
 <tr>
 <td><code>--with-node</code></td>
 <td>Include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version</td>
+<td></td>
+</tr>
+<tr>
+<td><code>--node=VALUE</code></td>
+<td>The Node major to pin (22, 24 or 26 today). Default: the Node the app's Citadel image ships, else the newest the policy supports. Implies --with-node</td>
 <td></td>
 </tr>
 <tr>
@@ -370,7 +375,7 @@
 </table></div>
 <h3 id="booster-run"><code>booster run</code><a class="docs-heading-link" aria-label="Link to this section" href="#booster-run">#</a></h3>
 <p>Run the plan: Rector, composer.json edits and a test gate per hop. Edits the working copy only.</p>
-<p>Usage: <code>booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory] [--replay [REPLAY]] [--replay-out REPLAY-OUT]</code></p>
+<p>Usage: <code>booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--node NODE] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory] [--replay [REPLAY]] [--replay-out REPLAY-OUT]</code></p>
 <div class="docs-table" role="region" aria-label="Table" tabindex="0"><table>
 <thead>
 <tr>
@@ -433,6 +438,11 @@
 <tr>
 <td><code>--with-node</code></td>
 <td>Include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version</td>
+<td></td>
+</tr>
+<tr>
+<td><code>--node=VALUE</code></td>
+<td>The Node major to pin (22, 24 or 26 today). Default: the Node the app's Citadel image ships, else the newest the policy supports. Implies --with-node</td>
 <td></td>
 </tr>
 <tr>
@@ -663,7 +673,7 @@ not know).</p>
   <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item docs-toc__item--sub"><a href="#booster-detect">booster detect</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#booster-hops">booster hops</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#booster-init">booster init</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#booster-plan">booster plan</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#booster-replay">booster replay</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#booster-run">booster run</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#booster-scan">booster scan</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#options-every-command-accepts">Options every command accepts</a></li><li class="docs-toc__item"><a href="#exit-codes">Exit codes</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
-  <span>Documents Booster <span data-docs-version>1.15.0</span></span>
+  <span>Documents Booster <span data-docs-version>1.16.0</span></span>
   <span><a rel="noopener" href="https://github.com/waynestate/booster">Source</a> <a href="commands.md">Markdown</a></span>
 </footer>
 </body>

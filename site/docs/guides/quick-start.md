@@ -21,6 +21,8 @@ booster init   --path=../my-app        # optional: writes playbooks for AI codin
 
 Replace `<target>` with the PHP version you are heading for, for example the one `plan` shows on its last step.
 
+Install the app's packages first (`composer install` in the app). Without `vendor/`, Rector and PHPStan cannot see the classes your packages provide: on one Laravel app the dry run previewed 10 files instead of 21, and PHPStan counted 3387 findings instead of 707. `detect` says when `vendor/` is missing, and `plan` and the dry run open with a warning. A real run is not affected, because its baseline installs `vendor/` before the first hop.
+
 A real run needs git and Docker on the machine that runs Booster. If you used the Docker-only route, the first four commands above work as they are, but the last one does not: its `php:8.4-cli` image has no git. Use the single-file or clone route for `booster run` (see Install).
 
 Booster prints its progress lines on standard error. In Windows PowerShell they print in red, as if they were errors. They are not errors; the exit code tells you whether the run worked.
@@ -51,7 +53,7 @@ Some hops come along by default, and some only when you ask:
 - `--skip <hop id>` drops a hop you do not want.
 - If you pass a target past security support, the plan still goes there as a stop on the way up and warns with the date its support ended. If Rector has no ruleset for a step yet, the plan stops short and warns.
 
-`run` handles each hop the same way: a Rector preview, then the edits (if a hop would change more than 200 files it asks first, or stops when it cannot ask; `--max-changes` sets a hard limit), then the Composer constraints, then your tests in the target PHP image. That last part is the gate. The first hop that fails stops the run, and the hops after it are reported as "not run". Booster never commits; the changes sit in your working copy for you to review. Progress prints one line per hop, like `hop 3/11 <hop id>: <status>, 12 files, 41 s`, and ends with `run finished: 11 of 11 hops run, 0 stopped, ...`.
+`run` handles each hop the same way: a Rector preview, then the edits (if a hop would change more than 200 files it asks first, or stops when it cannot ask; `--max-changes` sets a hard limit), then the Composer constraints, then your tests in the target PHP image. That last part is the gate. The first hop that fails stops the run, and the hops after it are reported as "not run". Booster never commits; the changes sit in your working copy for you to review. Progress prints a line as the baseline starts and ends (`baseline: passed, 150 s`; the first run on a machine builds the gate image, so it takes a few minutes), one line per hop, like `hop 3/11 <hop id>: <status>, 12 files, 41 s`, and ends with `run finished: 11 of 11 hops run, 0 stopped, total ...`, a total that counts the baseline.
 
 Looking for a specific situation (only PHP, one hop at a time, backend only, a big app, no tests)? See [How do I...](https://booster.apps.wayne.edu/docs/recipes.html).
 

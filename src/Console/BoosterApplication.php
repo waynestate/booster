@@ -19,7 +19,7 @@ use Waynestate\Booster\Run\SymfonyProcessRunner;
  */
 final class BoosterApplication extends Application
 {
-    public const VERSION = '1.15.0';
+    public const VERSION = '1.16.0';
 
     /** The first line of the overview that `booster --help` and `booster -h` print. */
     private const OVERVIEW_INTRO = 'Booster moves an app to a supported PHP or Laravel version, one step at a time. Nothing is committed for you.';

@@ -13,6 +13,46 @@ when that needs a step of yours.
 To take a new Booster, download the PHAR again (the same `curl` line as on [Install](install.md); its
 `releases/latest` link always names the newest release), or run `git pull` and `composer install` in your clone. `booster --version` prints the version you have.
 
+## 1.16.0
+
+Released 2026-11-09. Lessons from a real Laravel app taken from PHP 8.3 to 8.5. No hop was added or removed and no
+exit code changed. `plan` and `run` gain `--node`. The gate's target images are the same; five `booster init`
+playbooks carry new notes, so `booster init --check` reports them stale until you run `booster init` again.
+
+### What you see
+
+- **A different Citadel deploy step.** A run whose lock change touched only dev packages, or an app with
+  `scripts/release.sh`, or an app with no `deployments/` folder, gets no `deployments/0000_composer_install_*` script
+  any more; the report's `Deploy:` line says why and, for the last case, what each server must run. When Booster
+  does write the script, it installs the production packages and stops there: it no longer runs
+  `php artisan migrate --force`.
+- **A Node pin that matches the server.** An app with the Squire kit is pinned to the Node in its Citadel image
+  (`NODE_IMAGE` in `.squire/base-fallback.Dockerfile`, 22 today), not to 26. Any other app still gets the newest Node
+  the policy supports. `--node=<major>` picks one yourself.
+- **New lines in reports.** `plan` and the dry run warn when `vendor/` is missing; `detect` says so too and adds
+  `vendor_missing` to its JSON. A run that raised the PHP floor ends with the CI matrix entries and kit images that
+  still name an older PHP (`floor_follow_ups` in JSON), and its `Deploy:` lines are in `deploy_notes`. A clean audit
+  prints one line. A script that reads the JSON by key keeps working.
+- **Two more progress lines.** Standard error gets `baseline: ...` lines before the first hop, and the closing total
+  counts the baseline. A script that counts progress lines sees two more.
+- **Local dates.** With no `date.timezone` in php.ini, or `UTC`, "today" and the deploy stamp follow the machine's time zone
+  instead of UTC, so an evening run no longer plans for tomorrow.
+
+### An app that an older Booster already moved
+
+Booster 1.15.0 and earlier wrote `deployments/0000_composer_install_<stamp>` with `php artisan migrate --force` at
+its end. Citadel runs deploy scripts once each, in name order, so that script migrates before every other script in
+`deployments/`. If the app has not deployed it yet, look before you release:
+
+- When the app's own deploy scripts migrate (Squire's `scripts/release.sh` does), delete Booster's script: they
+  already install and migrate, in the order the app needs. That matters most for a Laravel app whose first release
+  parks old tables before it migrates.
+- Otherwise keep the script, and decide whether its migrate line belongs there or in the app's release flow.
+
+An app that `node-pin-24` already pinned to Node 26 keeps that pin: a newer Booster never lowers one. When its
+server runs an older Node (Citadel's PHP image ships 22), set `engines.node` in `package.json` and `.nvmrc` to that
+major by hand; `npm ci` on the server stops warning `EBADENGINE`.
+
 ## 1.15.0
 
 Released 2026-11-09. Lessons from a real 2012 raw PHP app taken from PHP 5.6 to 8.5. No hop was added or removed,

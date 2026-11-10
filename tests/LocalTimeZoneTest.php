@@ -29,6 +29,15 @@ final class LocalTimeZoneTest extends TestCase
         self::assertSame('Europe/Paris', LocalTimeZone::detect(false, false, false, 'Europe/Paris'));
     }
 
+    public function test_a_php_ini_utc_gives_way_but_a_chosen_zone_wins(): void
+    {
+        // Seen on WSL: php.ini said UTC, /etc/localtime said America/New_York.
+        self::assertTrue(LocalTimeZone::machineZoneWins(''));
+        self::assertTrue(LocalTimeZone::machineZoneWins('UTC'));
+        self::assertTrue(LocalTimeZone::machineZoneWins('Etc/UTC'));
+        self::assertFalse(LocalTimeZone::machineZoneWins('America/Chicago'));
+    }
+
     public function test_unknown_values_are_skipped_and_none_means_null(): void
     {
         self::assertSame('UTC', LocalTimeZone::detect('Not/AZone', false, false, 'UTC'));

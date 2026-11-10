@@ -82,7 +82,7 @@ docker run --rm -v "${PWD}:/booster" -v "/path/to/app:/app" -w /booster php:8.4-
 
 Run these from inside the booster folder.
 
-This route can run `detect`, `plan`, `scan` and `run --dry-run`. A real `run` starts Docker and uses git from inside Booster, which the `php:8.4-cli` image lacks, so for a real run use the single-file or clone route (in WSL on Windows). When Booster itself runs in a container, pass `--skip-gate` to `run` and run the tests yourself. Node hops run `npm` in a `node:26` container, so they need the same daemon but no Node installed on the machine.
+This route can run `detect`, `plan`, `scan` and `run --dry-run`. A real `run` starts Docker and uses git from inside Booster, which the `php:8.4-cli` image lacks, so for a real run use the single-file or clone route (in WSL on Windows). When Booster itself runs in a container, pass `--skip-gate` to `run` and run the tests yourself. Node hops run `npm` in a `node:<major>` container (26 unless the plan pins another Node), so they need the same daemon but no Node installed on the machine.
 
 Booster prints its progress lines on standard error. In Windows PowerShell they print in red, as if they were errors. They are not errors; the exit code tells you whether the run worked.
 

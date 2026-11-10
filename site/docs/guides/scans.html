@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The scans | Booster docs</title>
 <meta name="description" content="The two advisory scans Booster runs, and how to run either one alone.">
-<meta name="docs-version" content="1.15.0">
+<meta name="docs-version" content="1.16.0">
 <link rel="stylesheet" href="../../assets/wayne-ui/wayne-ui.css">
 <link rel="stylesheet" href="../../assets/docs.css">
 <link rel="stylesheet" href="../../docs/theme/booster.css">
@@ -20,7 +20,7 @@
     <a class="masthead__brand" href="../../index.html">
       <img src="../../brand/booster-avatar-256.png" width="36" height="36" alt="">
       <span class="masthead__name">BOOSTER</span>
-      <span class="masthead__ver">1.15.0</span>
+      <span class="masthead__ver">1.16.0</span>
     </a>
     <nav class="masthead__nav" aria-label="Site">
       <a href="../../index.html#record">Record</a>
@@ -72,7 +72,7 @@ Booster's folder) or download the PHAR again.</p>
 <p>It ignores <code>vendor/</code>, <code>node_modules/</code> and <code>storage/</code>, reads the app only and changes nothing. <code>booster scan --path=../my-app --php=8.5 --phpstan</code> runs the same scan on its own, for any PHP version Booster knows, and exits 0
 even when it finds a wall of missing types.</p>
 <h2 id="the-composer-audit-during-the-run">The composer audit during the run<a class="docs-heading-link" aria-label="Link to this section" href="#the-composer-audit-during-the-run">#</a></h2>
-<p><code>run</code> carries a third advisory check, per hop: after a hop changes <code>composer.json</code> or <code>composer.lock</code>, Booster runs <code>composer audit --format=json --no-interaction</code> in the app and lists advisories and abandoned packages in the step's report with counts. It never changes the exit code, a clean audit stays silent, and a hop that changed no composer file skips it and says so. A dry run previews the hops and runs no audit.</p>
+<p><code>run</code> carries a third advisory check, per hop: after a hop changes <code>composer.json</code> or <code>composer.lock</code>, Booster runs <code>composer audit --format=json --no-interaction</code> in the app and lists advisories and abandoned packages in the step's report with counts. It never changes the exit code, a clean audit says <code>Composer audit: clean (no advisories, no abandoned packages).</code>, and a hop that changed no composer file skips it and says so. A dry run previews the hops and runs no audit.</p>
 <p>Composer's audit exits 1 for advisories, 2 for abandoned packages and 3 for both. Booster reads the JSON report on every one of those exits, so an app with abandoned packages gets the list, not a &quot;could not run&quot;. Only an exit with no JSON report behind it (Composer missing, a crash) is reported as &quot;could not run&quot;.</p>
 <h2 id="dynamic-properties">Dynamic properties<a class="docs-heading-link" aria-label="Link to this section" href="#dynamic-properties">#</a></h2>
 <p>PHP 8.2 deprecates dynamic properties: assigning <code>$this-&gt;name</code> in a class that never declares <code>$name</code>. The plan step that crosses PHP 8.2 reads the app's own classes (it skips <code>vendor/</code>, <code>node_modules/</code> and <code>storage/</code>) and lists every such assignment as <code>file:line Class::$prop</code>, or says how many classes it read and found none. <code>run</code> repeats them on that step as MANUAL lines. Booster never changes them: declare each property in its class, or mark the class <code>#[\AllowDynamicProperties]</code>.</p>
@@ -84,7 +84,7 @@ even when it finds a wall of missing types.</p>
   <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#the-phpcompatibility-scan">The PHPCompatibility scan</a></li><li class="docs-toc__item"><a href="#the-phpstan-scan">The PHPStan scan</a></li><li class="docs-toc__item"><a href="#the-composer-audit-during-the-run">The composer audit during the run</a></li><li class="docs-toc__item"><a href="#dynamic-properties">Dynamic properties</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
-  <span>Documents Booster <span data-docs-version>1.15.0</span></span>
+  <span>Documents Booster <span data-docs-version>1.16.0</span></span>
   <span><a rel="noopener" href="https://github.com/waynestate/booster">Source</a> <a href="scans.md">Markdown</a></span>
 </footer>
 </body>

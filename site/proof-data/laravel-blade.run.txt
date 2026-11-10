@@ -1,10 +1,12 @@
 BOOSTER dry run (nothing was changed)
 
+Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.
+
 Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
 
 1. phpunit-10-to-11: PREVIEWED (1 file)
    would run: composer update -W phpunit/phpunit
-   Run phpunit --migrate-configuration after this hop; Rector rewrites the test code but not phpunit.xml.
+   Rector rewrites the test code but not phpunit.xml. If PHPUnit in the gate warns that phpunit.xml uses a deprecated schema, run phpunit --migrate-configuration; with no warning, there is nothing to do.
    --- tests/PostTest.php
    --- Original
    +++ New
@@ -44,7 +46,7 @@ Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests a
    No edits needed for this step (dry run).
 5. phpunit-11-to-12: PREVIEWED (1 file)
    would run: composer update -W phpunit/phpunit
-   Run phpunit --migrate-configuration after this hop; Rector rewrites the test code but not phpunit.xml.
+   Rector rewrites the test code but not phpunit.xml. If PHPUnit in the gate warns that phpunit.xml uses a deprecated schema, run phpunit --migrate-configuration; with no warning, there is nothing to do.
    --- tests/PostTest.php
    --- Original
    +++ New
@@ -90,7 +92,7 @@ Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests a
    Implicitly nullable parameters (T $a = null) are deprecated; fputcsv(), fgetcsv() and str_getcsv() want an explicit escape argument.
 8. phpunit-12-to-13: PREVIEWED (1 file)
    would run: composer update -W phpunit/phpunit
-   Run phpunit --migrate-configuration after this hop; Rector rewrites the test code but not phpunit.xml.
+   Rector rewrites the test code but not phpunit.xml. If PHPUnit in the gate warns that phpunit.xml uses a deprecated schema, run phpunit --migrate-configuration; with no warning, there is nothing to do.
    --- tests/PostTest.php
    --- Original
    +++ New
@@ -128,7 +130,7 @@ Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests a
    No edits needed for this step (dry run).
    General notes for this step (nothing found in your app, just good to know):
    Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
-   PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
+   Rector moves PDO driver constants such as PDO::MYSQL_ATTR_SSL_CA to Pdo\Mysql::ATTR_SSL_CA, inside PHP_VERSION_ID guards too. A guard such as (PHP_VERSION_ID >= 80500 ? Pdo\Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA), which a stock Laravel config/database.php carries, then names one constant twice. It still works on the new floor; Booster leaves the guard in place, so shorten it to the first branch by hand if you like.
 
 Unique files across hops: 1. Later hops were previewed against the original tree, so the same file can appear in several hops.
 

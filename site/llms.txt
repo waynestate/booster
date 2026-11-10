@@ -13,7 +13,7 @@ Every page below is Markdown. The HTML pages send the same Markdown to a client 
 - [Checks | Booster docs](https://booster.apps.wayne.edu/docs/checks.md): How Booster is built, tested and released, and where its proof lives.
 - [The baseline | Booster docs](https://booster.apps.wayne.edu/docs/guides/baseline.md): The test run that separates a bad hop from a suite that was already red.
 - [Behavior changes | Booster docs](https://booster.apps.wayne.edu/docs/guides/behaviour-changes.md): The silent changes between versions that Rector does not rewrite, one block per hop.
-- [Deploying on Citadel | Booster docs](https://booster.apps.wayne.edu/docs/guides/citadel.md): The deployment script Booster writes when a real run changes composer.lock.
+- [Deploying on Citadel | Booster docs](https://booster.apps.wayne.edu/docs/guides/citadel.md): What a real run tells a Citadel app about its next deploy, and the install script it writes when one is needed.
 - [The dependency check | Booster docs](https://booster.apps.wayne.edu/docs/guides/dependency-check.md): How Booster asks Packagist whether your direct dependencies can follow the plan.
 - [Hand-copied libraries to Composer | Booster docs](https://booster.apps.wayne.edu/docs/guides/framework-hops.md): The vendored-to-composer hop moves an app's hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto their maintained Composer releases, with the replay gate as proof.
 - [What a hop does | Booster docs](https://booster.apps.wayne.edu/docs/guides/hops.md): What happens inside one hop, from the Rector dry run to the gate.

@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Behavior changes | Booster docs</title>
 <meta name="description" content="The silent changes between versions that Rector does not rewrite, one block per hop.">
-<meta name="docs-version" content="1.15.0">
+<meta name="docs-version" content="1.16.0">
 <link rel="stylesheet" href="../../assets/wayne-ui/wayne-ui.css">
 <link rel="stylesheet" href="../../assets/docs.css">
 <link rel="stylesheet" href="../../docs/theme/booster.css">
@@ -20,7 +20,7 @@
     <a class="masthead__brand" href="../../index.html">
       <img src="../../brand/booster-avatar-256.png" width="36" height="36" alt="">
       <span class="masthead__name">BOOSTER</span>
-      <span class="masthead__ver">1.15.0</span>
+      <span class="masthead__ver">1.16.0</span>
     </a>
     <nav class="masthead__nav" aria-label="Site">
       <a href="../../index.html#record">Record</a>
@@ -73,7 +73,7 @@ hop. The field is optional; entries without it print exactly as before.</p>
 </code></pre>
 <p>The list lives in <code>data/behaviour-changes.json</code>, bundled with the phar. An entry names the hop it applies to
 (<code>php-80-to-81</code>, <code>laravel-10-to-11</code>, or <code>package:vendor/name@2</code> for a floor a package raises), how to find it
-(<code>detect</code>: a <code>function</code>, <code>method</code>, <code>class</code>, <code>property</code>, string <code>token</code>, blade snippet, config <code>file</code> and <code>key</code>,
+(<code>detect</code>: a <code>function</code>, <code>method</code>, <code>class</code>, a class instantiated with <code>new</code> (or its <code>::connect()</code> factory), <code>property</code>, string <code>token</code>, blade snippet, config <code>file</code> and <code>key</code>,
 composer <code>package</code>, or <code>always</code>), and a <code>source</code> link that confirms the change:</p>
 <pre tabindex="0"><code class="language-json">{
   &quot;id&quot;: &quot;laravel-11-config-key&quot;,
@@ -94,7 +94,7 @@ tell you what is missing.</p>
   </div>
 </div>
 <footer class="docs-footer">
-  <span>Documents Booster <span data-docs-version>1.15.0</span></span>
+  <span>Documents Booster <span data-docs-version>1.16.0</span></span>
   <span><a rel="noopener" href="https://github.com/waynestate/booster">Source</a> <a href="behaviour-changes.md">Markdown</a></span>
 </footer>
 </body>

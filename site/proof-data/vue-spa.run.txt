@@ -21,8 +21,8 @@ Record the answers first: php bin/booster replay init --path=examples/vue-spa dr
    No edits needed for this step (dry run).
    General notes for this step (nothing found in your app, just good to know):
    Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
-   PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
-6. node-pin-24: PREVIEWED (0 files)
+   Rector moves PDO driver constants such as PDO::MYSQL_ATTR_SSL_CA to Pdo\Mysql::ATTR_SSL_CA, inside PHP_VERSION_ID guards too. A guard such as (PHP_VERSION_ID >= 80500 ? Pdo\Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA), which a stock Laravel config/database.php carries, then names one constant twice. It still works on the new floor; Booster leaves the guard in place, so shorten it to the first branch by hand if you like.
+6. node-pin-24 (pins Node 26): PREVIEWED (0 files)
    Dry run: would set engines.node to >=26 in package.json and write .nvmrc with 26.
    The pin is a floor, not a ceiling: engines.node ">=26" still allows newer Node majors.
    Later front-end hops run in the same node:26 container, so this hop comes before them.

@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quick start | Booster docs</title>
 <meta name="description" content="The first commands to run, and what a plan looks like.">
-<meta name="docs-version" content="1.15.0">
+<meta name="docs-version" content="1.16.0">
 <link rel="stylesheet" href="../../assets/wayne-ui/wayne-ui.css">
 <link rel="stylesheet" href="../../assets/docs.css">
 <link rel="stylesheet" href="../../docs/theme/booster.css">
@@ -20,7 +20,7 @@
     <a class="masthead__brand" href="../../index.html">
       <img src="../../brand/booster-avatar-256.png" width="36" height="36" alt="">
       <span class="masthead__name">BOOSTER</span>
-      <span class="masthead__ver">1.15.0</span>
+      <span class="masthead__ver">1.16.0</span>
     </a>
     <nav class="masthead__nav" aria-label="Site">
       <a href="../../index.html#record">Record</a>
@@ -52,6 +52,10 @@ booster run    --path=../my-app        # apply the plan, one hop at a time, with
 booster init   --path=../my-app        # optional: writes playbooks for AI coding tools into the app; commit them before a real run
 </code></pre>
 <p>Replace <code>&lt;target&gt;</code> with the PHP version you are heading for, for example the one <code>plan</code> shows on its last step.</p>
+<p>Install the app's packages first (<code>composer install</code> in the app). Without <code>vendor/</code>, Rector and PHPStan cannot see
+the classes your packages provide: on one Laravel app the dry run previewed 10 files instead of 21, and PHPStan
+counted 3387 findings instead of 707. <code>detect</code> says when <code>vendor/</code> is missing, and <code>plan</code> and the dry run open with a
+warning. A real run is not affected, because its baseline installs <code>vendor/</code> before the first hop.</p>
 <p>A real run needs git and Docker on the machine that runs Booster. If you used the Docker-only route, the first four commands above work as they are, but the last one does not: its <code>php:8.4-cli</code> image has no git. Use the single-file or clone route for <code>booster run</code> (see Install).</p>
 <p>Booster prints its progress lines on standard error. In Windows PowerShell they print in red, as if they were errors. They are not errors; the exit code tells you whether the run worked.</p>
 <h2 id="what-a-run-does-by-default">What a run does by default<a class="docs-heading-link" aria-label="Link to this section" href="#what-a-run-does-by-default">#</a></h2>
@@ -93,7 +97,7 @@ booster init   --path=../my-app        # optional: writes playbooks for AI codin
 <li><code>--skip &lt;hop id&gt;</code> drops a hop you do not want.</li>
 <li>If you pass a target past security support, the plan still goes there as a stop on the way up and warns with the date its support ended. If Rector has no ruleset for a step yet, the plan stops short and warns.</li>
 </ul>
-<p><code>run</code> handles each hop the same way: a Rector preview, then the edits (if a hop would change more than 200 files it asks first, or stops when it cannot ask; <code>--max-changes</code> sets a hard limit), then the Composer constraints, then your tests in the target PHP image. That last part is the gate. The first hop that fails stops the run, and the hops after it are reported as &quot;not run&quot;. Booster never commits; the changes sit in your working copy for you to review. Progress prints one line per hop, like <code>hop 3/11 &lt;hop id&gt;: &lt;status&gt;, 12 files, 41 s</code>, and ends with <code>run finished: 11 of 11 hops run, 0 stopped, ...</code>.</p>
+<p><code>run</code> handles each hop the same way: a Rector preview, then the edits (if a hop would change more than 200 files it asks first, or stops when it cannot ask; <code>--max-changes</code> sets a hard limit), then the Composer constraints, then your tests in the target PHP image. That last part is the gate. The first hop that fails stops the run, and the hops after it are reported as &quot;not run&quot;. Booster never commits; the changes sit in your working copy for you to review. Progress prints a line as the baseline starts and ends (<code>baseline: passed, 150 s</code>; the first run on a machine builds the gate image, so it takes a few minutes), one line per hop, like <code>hop 3/11 &lt;hop id&gt;: &lt;status&gt;, 12 files, 41 s</code>, and ends with <code>run finished: 11 of 11 hops run, 0 stopped, total ...</code>, a total that counts the baseline.</p>
 <p>Looking for a specific situation (only PHP, one hop at a time, backend only, a big app, no tests)? See <a href="../recipes.html">How do I...</a>.</p>
 <p>Want less than the whole climb (we will not judge, it is a long way up)?</p>
 <ul>
@@ -203,7 +207,7 @@ Preview the edits: php bin/booster run --path=examples/laravel-blade --today=202
   <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#what-a-run-does-by-default">What a run does by default</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
-  <span>Documents Booster <span data-docs-version>1.15.0</span></span>
+  <span>Documents Booster <span data-docs-version>1.16.0</span></span>
   <span><a rel="noopener" href="https://github.com/waynestate/booster">Source</a> <a href="quick-start.md">Markdown</a></span>
 </footer>
 </body>

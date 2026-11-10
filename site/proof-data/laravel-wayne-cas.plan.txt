@@ -4,6 +4,8 @@ BOOSTER plan for examples/laravel-wayne-cas
   Laravel: 12 -> 13
   policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
+Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.
+
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
    After this step your tests run in Docker.
@@ -36,7 +38,7 @@ PHPStan on PHP 8.5: 16 findings (code quality hints, not upgrade blockers).
    app/Http/Kernel.php:15 [missingType.property] Property App\Http\Kernel::$routeMiddleware has no type specified.
    app/Http/Kernel.php:16 [class.notFound] Class WSU\WayneCas\WayneAuthenticate not found.
    (11 more; run `booster scan --phpstan` to see all)
-   Hint: Laravel app without Larastan: Eloquent and facade calls show as errors. composer require --dev larastan/larastan for a cleaner scan.
+   Hint: vendor/ is not installed, so the classes your packages provide cannot resolve and most of these findings are noise. Run composer install in the app, then scan again.
 
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.

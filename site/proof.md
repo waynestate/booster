@@ -8,7 +8,7 @@ generator: Squire agent-ready
 
 # Real output, from Booster's own example apps
 
-Captured on 2026-11-09 with Booster 1.15.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
+Captured on 2026-11-09 with Booster 1.16.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
 
 ## laravel-blade
 
@@ -23,6 +23,8 @@ BOOSTER plan for examples/laravel-blade
   Laravel: 10 -> 13
   PHPUnit: 10 -> 13
   policy: waynestate/creed 0.1.8 (today 2026-11-09)
+
+Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.
 
 1. phpunit-10-to-11
    Move PHPUnit 10 tests to PHPUnit 11.
@@ -75,7 +77,7 @@ PHPStan on PHP 8.5: 5 findings (code quality hints, not upgrade blockers).
    tests/PostTest.php:27 [staticMethod.deprecated] Call to deprecated method isType() of class PHPUnit\Framework\Assert:
 https://github.com/sebastianbergmann/phpunit/issues/6052
    tests/PostTest.php:33 [method.alreadyNarrowedType] Call to method PHPUnit\Framework\Assert::assertNotNull() with PHPUnit\Framework\MockObject\Rule\AnyInvokedCount will always evaluate to true.
-   Hint: Laravel app without Larastan: Eloquent and facade calls show as errors. composer require --dev larastan/larastan for a cleaner scan.
+   Hint: vendor/ is not installed, so the classes your packages provide cannot resolve and most of these findings are noise. Run composer install in the app, then scan again.
 
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
@@ -91,11 +93,13 @@ Preview the edits: php bin/booster run --path=examples/laravel-blade --today=202
 ```
 BOOSTER dry run (nothing was changed)
 
+Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.
+
 Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
 
 1. phpunit-10-to-11: PREVIEWED (1 file)
    would run: composer update -W phpunit/phpunit
-   Run phpunit --migrate-configuration after this hop; Rector rewrites the test code but not phpunit.xml.
+   Rector rewrites the test code but not phpunit.xml. If PHPUnit in the gate warns that phpunit.xml uses a deprecated schema, run phpunit --migrate-configuration; with no warning, there is nothing to do.
    --- tests/PostTest.php
    --- Original
    +++ New
@@ -135,7 +139,7 @@ Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests a
    No edits needed for this step (dry run).
 5. phpunit-11-to-12: PREVIEWED (1 file)
    would run: composer update -W phpunit/phpunit
-   Run phpunit --migrate-configuration after this hop; Rector rewrites the test code but not phpunit.xml.
+   Rector rewrites the test code but not phpunit.xml. If PHPUnit in the gate warns that phpunit.xml uses a deprecated schema, run phpunit --migrate-configuration; with no warning, there is nothing to do.
    --- tests/PostTest.php
    --- Original
    +++ New
@@ -181,7 +185,7 @@ Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests a
    Implicitly nullable parameters (T $a = null) are deprecated; fputcsv(), fgetcsv() and str_getcsv() want an explicit escape argument.
 8. phpunit-12-to-13: PREVIEWED (1 file)
    would run: composer update -W phpunit/phpunit
-   Run phpunit --migrate-configuration after this hop; Rector rewrites the test code but not phpunit.xml.
+   Rector rewrites the test code but not phpunit.xml. If PHPUnit in the gate warns that phpunit.xml uses a deprecated schema, run phpunit --migrate-configuration; with no warning, there is nothing to do.
    --- tests/PostTest.php
    --- Original
    +++ New
@@ -219,7 +223,7 @@ Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests a
    No edits needed for this step (dry run).
    General notes for this step (nothing found in your app, just good to know):
    Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
-   PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
+   Rector moves PDO driver constants such as PDO::MYSQL_ATTR_SSL_CA to Pdo\Mysql::ATTR_SSL_CA, inside PHP_VERSION_ID guards too. A guard such as (PHP_VERSION_ID >= 80500 ? Pdo\Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA), which a stock Laravel config/database.php carries, then names one constant twice. It still works on the new floor; Booster leaves the guard in place, so shorten it to the first branch by hand if you like.
 
 Unique files across hops: 1. Later hops were previewed against the original tree, so the same file can appear in several hops.
 
@@ -244,6 +248,8 @@ BOOSTER plan for examples/laravel-blade-vue
   Laravel: 12 -> 13
   policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
+Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.
+
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
    After this step your tests run in Docker.
@@ -262,8 +268,8 @@ BOOSTER plan for examples/laravel-blade-vue
    Move PHP 8.4 code to PHP 8.5.
    After this step your tests run in Docker.
    Removed between PHP 8.4 and PHP 8.5: none found.
-4. node-pin-24
-   Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
+4. node-pin-24 (pins Node 26)
+   Pin the app to Node 26: set engines.node in package.json and write .nvmrc. Node 26, the newest the policy supports. Booster cannot see which Node the app's deploy image ships (no .squire/base-fallback.Dockerfile); if it ships an older one, pass --node=<major> to match it.
    After this step your tests run in Docker.
 
 PHPCompatibility check for PHP 8.4: no findings.
@@ -285,6 +291,8 @@ Preview the edits: php bin/booster run --path=examples/laravel-blade-vue --today
 
 ```
 BOOSTER dry run (nothing was changed)
+
+Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.
 
 Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
 Replay: off, and the gate only proves every PHP file parses, so a hop can change what a page answers and still pass.
@@ -310,8 +318,8 @@ Record the answers first: php bin/booster replay init --path=examples/laravel-bl
    No edits needed for this step (dry run).
    General notes for this step (nothing found in your app, just good to know):
    Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
-   PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
-4. node-pin-24: PREVIEWED (0 files)
+   Rector moves PDO driver constants such as PDO::MYSQL_ATTR_SSL_CA to Pdo\Mysql::ATTR_SSL_CA, inside PHP_VERSION_ID guards too. A guard such as (PHP_VERSION_ID >= 80500 ? Pdo\Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA), which a stock Laravel config/database.php carries, then names one constant twice. It still works on the new floor; Booster leaves the guard in place, so shorten it to the first branch by hand if you like.
+4. node-pin-24 (pins Node 26): PREVIEWED (0 files)
    Dry run: would set engines.node to >=26 in package.json and write .nvmrc with 26.
    The pin is a floor, not a ceiling: engines.node ">=26" still allows newer Node majors.
    Later front-end hops run in the same node:26 container, so this hop comes before them.
@@ -334,6 +342,8 @@ BOOSTER plan for examples/laravel-inertia-vue
   Laravel: 12 -> 13
   policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
+Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.
+
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
    After this step your tests run in Docker.
@@ -352,8 +362,8 @@ BOOSTER plan for examples/laravel-inertia-vue
    Move PHP 8.4 code to PHP 8.5.
    After this step your tests run in Docker.
    Removed between PHP 8.4 and PHP 8.5: none found.
-4. node-pin-24
-   Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
+4. node-pin-24 (pins Node 26)
+   Pin the app to Node 26: set engines.node in package.json and write .nvmrc. Node 26, the newest the policy supports. Booster cannot see which Node the app's deploy image ships (no .squire/base-fallback.Dockerfile); if it ships an older one, pass --node=<major> to match it.
    After this step your tests run in Docker.
 5. inertia-2-to-3
    Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0.
@@ -379,6 +389,8 @@ Preview the edits: php bin/booster run --path=examples/laravel-inertia-vue --tod
 ```
 BOOSTER dry run (nothing was changed)
 
+Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.
+
 Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
 Replay: off, and the gate only proves every PHP file parses, so a hop can change what a page answers and still pass.
 Record the answers first: php bin/booster replay init --path=examples/laravel-inertia-vue drafts booster-replay.json from the routes; fill in its todo items, then run again with --replay.
@@ -403,8 +415,8 @@ Record the answers first: php bin/booster replay init --path=examples/laravel-in
    No edits needed for this step (dry run).
    General notes for this step (nothing found in your app, just good to know):
    Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
-   PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
-4. node-pin-24: PREVIEWED (0 files)
+   Rector moves PDO driver constants such as PDO::MYSQL_ATTR_SSL_CA to Pdo\Mysql::ATTR_SSL_CA, inside PHP_VERSION_ID guards too. A guard such as (PHP_VERSION_ID >= 80500 ? Pdo\Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA), which a stock Laravel config/database.php carries, then names one constant twice. It still works on the new floor; Booster leaves the guard in place, so shorten it to the first branch by hand if you like.
+4. node-pin-24 (pins Node 26): PREVIEWED (0 files)
    Dry run: would set engines.node to >=26 in package.json and write .nvmrc with 26.
    The pin is a floor, not a ceiling: engines.node ">=26" still allows newer Node majors.
    Later front-end hops run in the same node:26 container, so this hop comes before them.
@@ -453,6 +465,8 @@ BOOSTER plan for examples/laravel-wayne-cas
   Laravel: 12 -> 13
   policy: waynestate/creed 0.1.8 (today 2026-11-09)
 
+Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.
+
 1. laravel-12-to-13
    Move a Laravel 12 app to Laravel 13.
    After this step your tests run in Docker.
@@ -485,7 +499,7 @@ PHPStan on PHP 8.5: 16 findings (code quality hints, not upgrade blockers).
    app/Http/Kernel.php:15 [missingType.property] Property App\Http\Kernel::$routeMiddleware has no type specified.
    app/Http/Kernel.php:16 [class.notFound] Class WSU\WayneCas\WayneAuthenticate not found.
    (11 more; run `booster scan --phpstan` to see all)
-   Hint: Laravel app without Larastan: Eloquent and facade calls show as errors. composer require --dev larastan/larastan for a cleaner scan.
+   Hint: vendor/ is not installed, so the classes your packages provide cannot resolve and most of these findings are noise. Run composer install in the app, then scan again.
 
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
@@ -500,6 +514,8 @@ Preview the edits: php bin/booster run --path=examples/laravel-wayne-cas --today
 
 ```
 BOOSTER dry run (nothing was changed)
+
+Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.
 
 Baseline: SKIPPED (no tests ran in this run). A real run first runs your tests as they are now (the baseline), then again after every step (the gate).
 Replay: off, and the gate only proves every PHP file parses, so a hop can change what a page answers and still pass.
@@ -525,7 +541,7 @@ Record the answers first: php bin/booster replay init --path=examples/laravel-wa
    No edits needed for this step (dry run).
    General notes for this step (nothing found in your app, just good to know):
    Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
-   PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
+   Rector moves PDO driver constants such as PDO::MYSQL_ATTR_SSL_CA to Pdo\Mysql::ATTR_SSL_CA, inside PHP_VERSION_ID guards too. A guard such as (PHP_VERSION_ID >= 80500 ? Pdo\Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA), which a stock Laravel config/database.php carries, then names one constant twice. It still works on the new floor; Booster leaves the guard in place, so shorten it to the first branch by hand if you like.
 
 RESULT: PASS (previewed, no tests ran)
 
@@ -670,7 +686,7 @@ Step 1 (php-74-to-80) is the hop most likely to change an answer: loose comparis
    No edits needed for this step (dry run).
    General notes for this step (nothing found in your app, just good to know):
    Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
-   PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
+   Rector moves PDO driver constants such as PDO::MYSQL_ATTR_SSL_CA to Pdo\Mysql::ATTR_SSL_CA, inside PHP_VERSION_ID guards too. A guard such as (PHP_VERSION_ID >= 80500 ? Pdo\Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA), which a stock Laravel config/database.php carries, then names one constant twice. It still works on the new floor; Booster leaves the guard in place, so shorten it to the first branch by hand if you like.
 
 Unique files across hops: 1. Later hops were previewed against the original tree, so the same file can appear in several hops.
 
@@ -715,8 +731,8 @@ BOOSTER plan for examples/vue-spa
    Move PHP 8.4 code to PHP 8.5.
    After this step your tests run in Docker.
    Removed between PHP 8.4 and PHP 8.5: none found.
-6. node-pin-24
-   Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
+6. node-pin-24 (pins Node 26)
+   Pin the app to Node 26: set engines.node in package.json and write .nvmrc. Node 26, the newest the policy supports. Booster cannot see which Node the app's deploy image ships (no .squire/base-fallback.Dockerfile); if it ships an older one, pass --node=<major> to match it.
    After this step your tests run in Docker.
 7. vue-27-to-compat
    Move a Vue 2.7 front end to Vue 3 through the @vue/compat build.
@@ -764,8 +780,8 @@ Record the answers first: php bin/booster replay init --path=examples/vue-spa dr
    No edits needed for this step (dry run).
    General notes for this step (nothing found in your app, just good to know):
    Deprecated: the (boolean), (integer), (double) and (binary) casts, the backtick operator, __sleep() and __wakeup(), curl_close() and imagedestroy().
-   PDO driver constants such as PDO::MYSQL_ATTR_* move to Pdo\Mysql::*; check them by hand.
-6. node-pin-24: PREVIEWED (0 files)
+   Rector moves PDO driver constants such as PDO::MYSQL_ATTR_SSL_CA to Pdo\Mysql::ATTR_SSL_CA, inside PHP_VERSION_ID guards too. A guard such as (PHP_VERSION_ID >= 80500 ? Pdo\Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA), which a stock Laravel config/database.php carries, then names one constant twice. It still works on the new floor; Booster leaves the guard in place, so shorten it to the first branch by hand if you like.
+6. node-pin-24 (pins Node 26): PREVIEWED (0 files)
    Dry run: would set engines.node to >=26 in package.json and write .nvmrc with 26.
    The pin is a floor, not a ceiling: engines.node ">=26" still allows newer Node majors.
    Later front-end hops run in the same node:26 container, so this hop comes before them.

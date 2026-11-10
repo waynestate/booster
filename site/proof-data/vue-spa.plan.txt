@@ -24,8 +24,8 @@ BOOSTER plan for examples/vue-spa
    Move PHP 8.4 code to PHP 8.5.
    After this step your tests run in Docker.
    Removed between PHP 8.4 and PHP 8.5: none found.
-6. node-pin-24
-   Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
+6. node-pin-24 (pins Node 26)
+   Pin the app to Node 26: set engines.node in package.json and write .nvmrc. Node 26, the newest the policy supports. Booster cannot see which Node the app's deploy image ships (no .squire/base-fallback.Dockerfile); if it ships an older one, pass --node=<major> to match it.
    After this step your tests run in Docker.
 7. vue-27-to-compat
    Move a Vue 2.7 front end to Vue 3 through the @vue/compat build.
