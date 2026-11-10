@@ -10,8 +10,8 @@ permissions:
 
 jobs:
   ci:
-    # pinned to Preflight 0.1.4's commit (the GitHub mirror has no 0.3 tag yet)
-    uses: waynestate/preflight/.github/workflows/php-package.yml@79029cc2300702d0d450c42cc699e12af1b731f8 # 0.1.4
+    # Pinned to a Preflight release tag's commit, never a branch or ~latest. Bump with each Preflight release.
+    uses: waynestate/preflight/.github/workflows/php-package.yml@60314791565a264e97cb210813ef4f3e76512402 # 0.5.0
     with:
       php-versions: '["8.3","8.4","8.5"]'
       ci-command: composer ci

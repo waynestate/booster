@@ -75,7 +75,7 @@ composer update waynestate/creed
 Then `composer ci`, and commit with the CREED release in the message. When a new Laravel or PHP line appears in
 CREED, check whether Booster needs a new hop for it.
 
-The constraint is `^0.1`, which covers only 0.1.x releases. When CREED crosses a minor, the bump is a person's
+The constraint is `^0.1.8`, which covers only 0.1.x releases from 0.1.8 on. When CREED crosses a minor, the bump is a person's
 job: edit `composer.json`, run the update, commit.
 
 ## Hop data (the scheduled refresh)

@@ -4,9 +4,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Changed: the GitHub workflow calls Preflight 0.5.0 by its commit (was 0.1.4's), now that GitHub's copy of Preflight has the tag; MAINTAINING.md quotes the CREED constraint as it is (^0.1.8).
 - Changed: the docs, agent-ready and deploy kits are Squire 0.10.6 (was 0.10.5): the docs builder and agent-ready generator see every file on Docker Desktop mounts.
 - Site: `assets/stack-env.js` knows Parity, so a pre-production page links Parity's pre-production site and a dev page links its local `site/` folder. Until now Parity, of all parts, was the one link that ignored its environment.
-- Changed: housekeeping to keep pace with the stack. The `waynestate/pinstripe` requirement moves from `^0.1.4` to `^0.3` (the lock resolves to 0.3.1), the bundled SESAME config that `cas-to-sesame` falls back on when an app has no vendor copy is now SESAME 0.7.3's (it was 0.5.0's; the hop still writes `^0.7`, which reaches it), the deploy kit in `deploy/` is Squire 0.10.5's, and the Where it fits tables in the README and the docs overview now show the full WELD cast.
+- Changed: housekeeping to keep pace with the stack. The `waynestate/pinstripe` requirement moves from `^0.1.4` to `^0.3` (the lock resolves to 0.3.1), the bundled SESAME config that `cas-to-sesame` falls back on when an app has no vendor copy is now SESAME 0.7.3's (it was 0.5.0's; the hop still writes `^0.7`, which reaches it), and the Where it fits tables in the README and the docs overview now show the full WELD cast.
 
 ## [1.17.0] - 2026-11-09
 

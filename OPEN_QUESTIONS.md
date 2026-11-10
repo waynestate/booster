@@ -21,7 +21,7 @@ open until the Citadel platform owner answers.
 | 12 | Which Composer release introduced the `config.policy` key the design guide mentions for `composer audit`? | CREED owner | Policy-driven audit settings | Not used. | Closed: not used. |
 | 13 | A first measured Rector pilot on a few real apps: what file cap and what time budget are right? | Stack lead | Tuning `--max-changes` | A 200-file review threshold; `--max-changes` is an explicit hard limit (`0` = none). | Closed: review threshold of 200 files; `--max-changes` is an explicit hard limit (0 = none). |
 | 14 | `composer audit` reports `symplify/rule-doc-generator-contracts` (a Rector dependency) as abandoned. Accept it? | Stack lead | `composer ci` | `config.audit.abandoned` is `report`: advisories still fail the build, an abandoned transitive does not. Revisit when Rector drops it. | Closed: report. |
-| 15 | Where does the GitHub Preflight reusable workflow get its release tag? | Preflight owner | Replacing the commit pin | Preflight publishes release tags now; the GitLab components pin `@0.5.0`; the GitHub reusable workflow is pinned to Preflight 0.1.4's commit until that mirror gets a 0.3 tag. | Closed: tag pin. |
+| 15 | Where does the GitHub Preflight reusable workflow get its release tag? | Preflight owner | Replacing the commit pin | Preflight publishes release tags now; the GitLab components pin `@0.5.0`; the GitHub reusable workflow is pinned to Preflight 0.5.0's commit, now that the GitHub mirror has the tag. | Closed: tag pin. |
 
 ## Missing configuration
 
