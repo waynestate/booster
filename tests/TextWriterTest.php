@@ -54,4 +54,24 @@ final class TextWriterTest extends TestCase
 
         self::assertStringStartsWith('PHPCompatibility check for PHP 8.0: 1 error, 0 warnings.', $this->render($findings));
     }
+
+    public function test_hints_print_after_the_findings(): void
+    {
+        $scan = ScanResult::ok('8.4', [new Finding('src/A.php', 1, 'm', 'error', 'S')], ['Read this first.']);
+
+        self::assertSame(
+            "PHPCompatibility check for PHP 8.4: 1 error, 0 warnings.\n   src/A.php:1 [error] m\n   Hint: Read this first.",
+            (new TextWriter())->phpCompat($scan),
+        );
+    }
+
+    public function test_a_hint_prints_when_nothing_was_found_too(): void
+    {
+        $scan = ScanResult::ok('8.4', [], ['Left out 2 findings.']);
+
+        self::assertSame(
+            "PHPCompatibility check for PHP 8.4: no findings.\n   Hint: Left out 2 findings.",
+            (new TextWriter())->phpCompat($scan),
+        );
+    }
 }

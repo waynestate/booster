@@ -222,7 +222,10 @@ final class TextWriter
         }
 
         if ($scan->findings === []) {
-            return sprintf('PHPCompatibility check for PHP %s: no findings.', $scan->testVersion);
+            return implode("\n", [
+                sprintf('PHPCompatibility check for PHP %s: no findings.', $scan->testVersion),
+                ...self::hintLines($scan),
+            ]);
         }
 
         $errors = $scan->errorCount();
@@ -243,7 +246,17 @@ final class TextWriter
             $lines[] = sprintf('   (%d more findings...)', $hidden);
         }
 
-        return implode("\n", $lines);
+        return implode("\n", [...$lines, ...self::hintLines($scan)]);
+    }
+
+    /**
+     * A scan's hints, one indented "Hint:" line each.
+     *
+     * @return list<string>
+     */
+    private static function hintLines(ScanResult $scan): array
+    {
+        return array_map(static fn(string $hint): string => '   Hint: ' . self::clean($hint), $scan->hints);
     }
 
     /**

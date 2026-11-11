@@ -7,6 +7,7 @@ namespace Waynestate\Booster\Tests;
 use Waynestate\Booster\Packaging\PharFiles;
 use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\Run\SymfonyProcessRunner;
+use Waynestate\Booster\Scan\Finding;
 use Waynestate\Booster\Scan\PhpCompatScan;
 
 final class PhpCompatScanTest extends TestCase
@@ -412,6 +413,107 @@ final class PhpCompatScanTest extends TestCase
         self::assertCount(2, $scan->findings);
         self::assertSame('PHPCompatibility.FunctionUse.RemovedFunctions.oci_errorRemoved', $scan->findings[0]->source);
         self::assertSame('PHPCompatibility.FunctionUse.RemovedFunctions.mysql_connectRemoved', $scan->findings[1]->source);
+    }
+
+    /**
+     * One oci function PHP 8.4 moved to PECL, one the oci8 extension itself
+     * dropped in PHP 8.0, and a mysql call, the way phpcs reports them.
+     *
+     * @return array<string, mixed>
+     */
+    private function ociJson(string $app): array
+    {
+        return $this->phpcsJson([
+            $app . '/oracle-check.php' => [
+                'errors' => 3,
+                'warnings' => 0,
+                'messages' => [
+                    ['message' => 'Function oci_connect() is removed since PHP 8.4', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.oci_connectRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 10, 'column' => 9],
+                    ['message' => 'Function oci_internal_debug() is removed since PHP 8.0', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.oci_internal_debugRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 20, 'column' => 9],
+                    ['message' => 'Function mysql_connect() is removed since PHP 7.0', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.mysql_connectRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 30, 'column' => 9],
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * @return array{list<string>, list<string>} "line:source" of each finding the scan kept, and its hints
+     */
+    private function ociScan(string $app): array
+    {
+        $json = $this->ociJson($app);
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.4');
+        self::assertTrue($scan->ok);
+
+        return [array_map(static fn(Finding $finding): string => $finding->line . ':' . $finding->source, $scan->findings), $scan->hints];
+    }
+
+    public function test_a_citadel_kit_leaves_out_the_oci_moved_to_pecl_findings_and_says_so(): void
+    {
+        foreach (['.env.squire.example', '.env.squire', 'docker-compose.squire.yml'] as $kitFile) {
+            $app = $this->tempDir();
+            file_put_contents($app . '/' . $kitFile, "SQUIRE_BASE_IMAGE=citadel/php-apache:8.4r5\n");
+
+            [$kept, $hints] = $this->ociScan($app);
+
+            self::assertSame([
+                '20:PHPCompatibility.FunctionUse.RemovedFunctions.oci_internal_debugRemoved',
+                '30:PHPCompatibility.FunctionUse.RemovedFunctions.mysql_connectRemoved',
+            ], $kept, $kitFile);
+            self::assertSame([
+                'Left out 1 "oci_*() is removed since PHP 8.4" finding: the app deploys on Citadel (citadel/php-apache in ' . $kitFile . '), and Citadel\'s PHP images install oci8 from PECL.',
+            ], $hints, $kitFile);
+        }
+    }
+
+    public function test_a_kit_on_another_image_keeps_the_oci_findings_and_explains_them(): void
+    {
+        $app = $this->tempDir();
+        file_put_contents($app . '/.env.squire.example', "SQUIRE_BASE_IMAGE=php:8.4-apache\n");
+
+        [$kept, $hints] = $this->ociScan($app);
+
+        self::assertCount(3, $kept);
+        self::assertCount(1, $hints);
+        self::assertStringStartsWith('The oci_*() lines mean PHP 8.4 moved oci8 out of its own download and into PECL', $hints[0]);
+        self::assertStringContainsString('Declare ext-oci8 in composer.json', $hints[0]);
+    }
+
+    public function test_declaring_ext_oci8_leaves_out_only_the_moved_functions_with_no_hint(): void
+    {
+        $app = $this->tempDir();
+        file_put_contents($app . '/composer.json', (string) json_encode(['require' => ['ext-oci8' => '*']]));
+        file_put_contents($app . '/.env.squire.example', "SQUIRE_BASE_IMAGE=citadel/php-apache:8.4r5\n");
+
+        [$kept, $hints] = $this->ociScan($app);
+
+        // The function oci8 itself dropped in 8.0 is gone from PECL too: it stays.
+        self::assertSame([
+            '20:PHPCompatibility.FunctionUse.RemovedFunctions.oci_internal_debugRemoved',
+            '30:PHPCompatibility.FunctionUse.RemovedFunctions.mysql_connectRemoved',
+        ], $kept);
+        self::assertSame([], $hints);
+    }
+
+    public function test_an_app_without_oci_calls_gets_no_oci_hint(): void
+    {
+        $app = $this->tempDir();
+        $json = $this->phpcsJson([
+            $app . '/legacy.php' => [
+                'errors' => 1,
+                'warnings' => 0,
+                'messages' => [
+                    ['message' => 'Function mysql_connect() is removed since PHP 7.0', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.mysql_connectRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 3, 'column' => 1],
+                ],
+            ],
+        ]);
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.4');
+
+        self::assertCount(1, $scan->findings);
+        self::assertSame([], $scan->hints);
     }
 
     public function test_oracle_removed_extension_finding_is_dropped_but_mysql_stays(): void

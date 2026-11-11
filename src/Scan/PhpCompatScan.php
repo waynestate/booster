@@ -36,6 +36,17 @@ final class PhpCompatScan
     private const IGNORE_PATTERN = '(?:^|/)(?:vendor|node_modules|storage)(?:/|\z)';
 
     /**
+     * "Function oci_connect() is removed since PHP 8.4": the sniff's way of
+     * saying PHP 8.4 moved the oci8 extension out of its own download and
+     * into PECL. Only 8.4: an oci function removed earlier is gone from the
+     * PECL extension too, so that finding always stays.
+     */
+    private const OCI_MOVED_TO_PECL = '/^Function oci\w*\(\) is removed since PHP 8\.4\b/i';
+
+    /** The Squire kit files that name the Citadel image an app deploys on. */
+    private const CITADEL_KIT_FILES = ['.env.squire.example', '.env.squire', 'docker-compose.squire.yml'];
+
+    /**
      * Shown when a PHP_CodeSniffer runs but does not offer the
      * PHPCompatibility standard. The tool ships with Booster, so the fix is to
      * reinstall Booster's own dependencies, never to change the app.
@@ -130,7 +141,7 @@ final class PhpCompatScan
             $boundThis[] = static fn(string $file): bool => $file === 'routes/console.php';
         }
 
-        return $this->parse($result, $testVersion, $prefix, $this->declaresOci8($appPath), $boundThis);
+        return $this->parse($result, $testVersion, $prefix, $this->declaresOci8($appPath), $boundThis, $this->citadelKit($appPath));
     }
 
     /**
@@ -301,9 +312,29 @@ final class PhpCompatScan
     }
 
     /**
-     * @param list<callable(string): bool> $boundThis files (relative to the app) where a framework binds every closure, so "$this outside a class" is not a finding there
+     * The Squire kit file that names Citadel's PHP image, or null when the app
+     * carries none. Squire's kit pins the Citadel image the app deploys on
+     * (SQUIRE_BASE_IMAGE=citadel/php-apache:8.4r5), and every Citadel PHP
+     * image from 8.0 on installs oci8 from PECL, so for such an app PHP 8.4
+     * moving oci8 out of the core download changes nothing.
      */
-    private function parse(ProcessResult $result, string $testVersion, string $prefix, bool $oci8Declared = false, array $boundThis = []): ScanResult
+    private function citadelKit(string $appPath): ?string
+    {
+        foreach (self::CITADEL_KIT_FILES as $name) {
+            $file = $appPath . '/' . $name;
+            if (is_file($file) && str_contains((string) file_get_contents($file), 'citadel/php-apache')) {
+                return $name;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<callable(string): bool> $boundThis files (relative to the app) where a framework binds every closure, so "$this outside a class" is not a finding there
+     * @param ?string $citadelKit the kit file that says the app deploys on Citadel's image, or null
+     */
+    private function parse(ProcessResult $result, string $testVersion, string $prefix, bool $oci8Declared = false, array $boundThis = [], ?string $citadelKit = null): ScanResult
     {
         $data = json_decode($result->stdout, true);
         if (!is_array($data) || !isset($data['files']) || !is_array($data['files'])) {
@@ -311,6 +342,8 @@ final class PhpCompatScan
         }
 
         $findings = [];
+        $ociLeftOut = 0;
+        $ociKept = 0;
         foreach ($data['files'] as $file => $info) {
             if (!is_string($file) || !is_array($info) || !isset($info['messages']) || !is_array($info['messages'])) {
                 continue;
@@ -328,12 +361,20 @@ final class PhpCompatScan
                 if (($message['source'] ?? '') === 'Internal.NoCodeFound') {
                     continue;
                 }
-                // When the app installs the PECL oci8 extension itself, PHP
-                // 8.4 moving the extension out of the core download is not a
-                // break for it, so the "oci_*() is removed since PHP" findings
-                // are dropped. Every other finding stays.
-                if ($oci8Declared && preg_match('/^Function (oci\w*)\(\) is removed since PHP/i', $message['message']) === 1) {
-                    continue;
+                // PHP 8.4 moved oci8 out of the core download and into PECL.
+                // When the app installs the PECL extension itself, or deploys
+                // on Citadel's image, which does, "oci_*() is removed since
+                // PHP 8.4" is not a break, so the finding is dropped (and
+                // counted, so the report can say why). Every other finding stays.
+                if (preg_match(self::OCI_MOVED_TO_PECL, $message['message']) === 1) {
+                    if ($oci8Declared) {
+                        continue;
+                    }
+                    if ($citadelKit !== null) {
+                        $ociLeftOut++;
+                        continue;
+                    }
+                    $ociKept++;
                 }
                 $source = is_string($message['source'] ?? null) ? $message['source'] : '';
                 // The RemovedExtensions.oracle sniff matches class names such as
@@ -363,7 +404,19 @@ final class PhpCompatScan
             }
         }
 
-        return ScanResult::ok($testVersion, $findings);
+        $hints = [];
+        if ($ociLeftOut > 0) {
+            $hints[] = sprintf(
+                'Left out %d "oci_*() is removed since PHP 8.4" %s: the app deploys on Citadel (citadel/php-apache in %s), and Citadel\'s PHP images install oci8 from PECL.',
+                $ociLeftOut,
+                $ociLeftOut === 1 ? 'finding' : 'findings',
+                $citadelKit,
+            );
+        } elseif ($ociKept > 0) {
+            $hints[] = 'The oci_*() lines mean PHP 8.4 moved oci8 out of its own download and into PECL, not that Oracle support is gone. Citadel\'s PHP images install it, so on Citadel they are not breaks; on another image, install the PECL extension. Declare ext-oci8 in composer.json (require or config.platform) and the scan leaves them out.';
+        }
+
+        return ScanResult::ok($testVersion, $findings, $hints);
     }
 
     private function noReport(ProcessResult $result, string $testVersion): ScanResult
