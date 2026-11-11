@@ -46,6 +46,7 @@
 <p>All notable changes to Booster are recorded here. The format follows Keep a Changelog.</p>
 <h2 id="unreleased"><span class="docs-heading-tail"><span>[Unreleased]</span><a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></span></h2>
 <ul>
+<li>Changed: the deploy kit is Squire 0.10.8 (was 0.10.7): 0.10.8 moves no template and no kit file (the last template move was the 0.10.7 <code>.gitattributes</code>, the last docs and agent-ready tool change was 0.10.6), so <code>deploy/.squire.json</code> records the new version and every kit file stays as it is.</li>
 <li>CI pins Preflight 0.8.0.</li>
 <li>Site: the masthead stays one row on a tablet. Between 641 and 960 px the links to the page's own sections (Record, Pairs, Commands, Agents) step aside for Docs, Real output, Proof and Run it today, as the docs pages already do, instead of wrapping into a second row over the hero (an iPad in portrait got two).</li>
 <li>Docs: Parity joins Booster's care team. The Citadel guide gains &quot;Try it on Citadel's twin first&quot;: move <code>parity.json</code> to the new PHP, then <code>parity up</code> and <code>parity test</code> run the upgraded app on Citadel's own image and MySQL 5.6 before the deploy. The front page's cast lists Parity with its mark, the README and docs overview no longer call Parity's 0.1.0 coming (it shipped), and the MySQL 5.6 floor (question 8) says where to check it today.</li>

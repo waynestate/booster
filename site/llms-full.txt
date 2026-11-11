@@ -1536,6 +1536,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### \[Unreleased\] [#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Changed: the deploy kit is Squire 0.10.8 (was 0.10.7): 0.10.8 moves no template and no kit file (the last template move was the 0.10.7 `.gitattributes`, the last docs and agent-ready tool change was 0.10.6), so `deploy/.squire.json` records the new version and every kit file stays as it is.
 - CI pins Preflight 0.8.0.
 - Site: the masthead stays one row on a tablet. Between 641 and 960 px the links to the page's own sections (Record, Pairs, Commands, Agents) step aside for Docs, Real output, Proof and Run it today, as the docs pages already do, instead of wrapping into a second row over the hero (an iPad in portrait got two).
 - Docs: Parity joins Booster's care team. The Citadel guide gains "Try it on Citadel's twin first": move `parity.json` to the new PHP, then `parity up` and `parity test` run the upgraded app on Citadel's own image and MySQL 5.6 before the deploy. The front page's cast lists Parity with its mark, the README and docs overview no longer call Parity's 0.1.0 coming (it shipped), and the MySQL 5.6 floor (question 8) says where to check it today.
