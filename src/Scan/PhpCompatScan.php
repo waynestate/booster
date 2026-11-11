@@ -6,6 +6,7 @@ namespace Waynestate\Booster\Scan;
 
 use Throwable;
 use Waynestate\Booster\Packaging\PharFiles;
+use Waynestate\Booster\Project\ProjectDetector;
 use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\Run\ProcessRunner;
 
@@ -115,7 +116,21 @@ final class PhpCompatScan
             return $this->noReport($result, $testVersion);
         }
 
-        return $this->parse($result, $testVersion, $prefix, $this->declaresOci8($appPath));
+        // Pest binds every test closure to a test case, so `$this` inside
+        // `it()` and `test()` is the test case, and the sniff that asks "is
+        // $this bound here?" fired on every one of them: a Laravel app on
+        // Pest got 51 such warnings and nothing else from the scan. Laravel
+        // binds the closures in routes/console.php to their command the same
+        // way, so its stock `inspire` command drew the warning on every app.
+        $boundThis = [];
+        if (ProjectDetector::requiresAt($appPath, 'pestphp/pest')) {
+            $boundThis[] = static fn(string $file): bool => str_starts_with($file, 'tests/');
+        }
+        if (ProjectDetector::requiresAt($appPath, 'laravel/framework')) {
+            $boundThis[] = static fn(string $file): bool => $file === 'routes/console.php';
+        }
+
+        return $this->parse($result, $testVersion, $prefix, $this->declaresOci8($appPath), $boundThis);
     }
 
     /**
@@ -285,7 +300,10 @@ final class PhpCompatScan
         return false;
     }
 
-    private function parse(ProcessResult $result, string $testVersion, string $prefix, bool $oci8Declared = false): ScanResult
+    /**
+     * @param list<callable(string): bool> $boundThis files (relative to the app) where a framework binds every closure, so "$this outside a class" is not a finding there
+     */
+    private function parse(ProcessResult $result, string $testVersion, string $prefix, bool $oci8Declared = false, array $boundThis = []): ScanResult
     {
         $data = json_decode($result->stdout, true);
         if (!is_array($data) || !isset($data['files']) || !is_array($data['files'])) {
@@ -324,6 +342,16 @@ final class PhpCompatScan
                 // finding is a false positive. Drop them and keep the rest.
                 if (str_starts_with(strtolower($source), 'phpcompatibility.extensions.removedextensions.oracle')) {
                     continue;
+                }
+                // Where the framework binds the closures (Pest's tests/,
+                // Laravel's routes/console.php), "$this outside a class" is
+                // how the code is written, not a bug. Elsewhere it stays.
+                if ($source === 'PHPCompatibility.FunctionDeclarations.NewClosure.ThisFoundOutsideClass') {
+                    foreach ($boundThis as $bound) {
+                        if ($bound($file)) {
+                            continue 2;
+                        }
+                    }
                 }
                 $findings[] = new Finding(
                     $file,

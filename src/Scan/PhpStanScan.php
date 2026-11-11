@@ -180,7 +180,7 @@ final class PhpStanScan
             }
         }
 
-        return $this->parse($result, $testVersion, $prefix, $hints);
+        return $this->parse($result, $testVersion, $prefix, $hints, ProjectDetector::requiresAt($absolute, 'pestphp/pest'));
     }
 
     /**
@@ -513,9 +513,15 @@ final class PhpStanScan
      * paths), so the exit code cannot tell the two apart: a parseable report
      * is the truth, and anything else is a skip with the reason on stderr.
      *
+     * In a Pest app, Pest's higher-order tests (`it('...')->get('/')`) call
+     * through magic proxies such as Pest\PendingCalls\TestCall that PHPStan
+     * cannot follow, so every one reads as "Call to an undefined method
+     * Pest\...". Those findings under tests/ are left out; a Laravel app on
+     * Pest got 16 of them in a 20-line preview. Any other finding stays.
+     *
      * @param list<string> $hints
      */
-    private function parse(ProcessResult $result, string $testVersion, string $prefix, array $hints): ScanResult
+    private function parse(ProcessResult $result, string $testVersion, string $prefix, array $hints, bool $pest = false): ScanResult
     {
         $data = json_decode($result->stdout, true);
         if (!is_array($data) || !isset($data['files']) || !is_array($data['files'])) {
@@ -535,12 +541,16 @@ final class PhpStanScan
                 if (!is_array($message) || !is_string($message['message'] ?? null) || !is_int($message['line'] ?? null)) {
                     continue;
                 }
+                $identifier = is_string($message['identifier'] ?? null) ? $message['identifier'] : '';
+                if ($pest && $identifier === 'method.notFound' && str_starts_with($file, 'tests/') && str_contains($message['message'], 'undefined method Pest\\')) {
+                    continue;
+                }
                 $findings[] = new Finding(
                     $file,
                     $message['line'],
                     $message['message'],
                     'error',
-                    is_string($message['identifier'] ?? null) ? $message['identifier'] : '',
+                    $identifier,
                 );
             }
         }

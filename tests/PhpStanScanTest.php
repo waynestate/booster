@@ -449,4 +449,58 @@ final class PhpStanScanTest extends TestCase
         self::assertSame('argument.type', $array['findings'][0]['source']);
         self::assertSame([], $array['hints']);
     }
+
+    /**
+     * PHPStan output for a Pest app: two higher-order calls through Pest's
+     * TestCall proxy in a test, a real finding in the same test, and an
+     * undefined method on the app's own class.
+     *
+     * @return array<string, mixed>
+     */
+    private function pestJson(string $app): array
+    {
+        return $this->phpstanJson([
+            $app . '/tests/Feature/AccessTest.php' => [
+                'errors' => 3,
+                'messages' => [
+                    ['message' => 'Call to an undefined method Pest\PendingCalls\TestCall::get().', 'line' => 14, 'ignorable' => true, 'identifier' => 'method.notFound'],
+                    ['message' => 'Call to an undefined method Pest\Support\HigherOrderTapProxy::assertOk().', 'line' => 15, 'ignorable' => true, 'identifier' => 'method.notFound'],
+                    ['message' => 'Call to an undefined method App\Models\User::nope().', 'line' => 20, 'ignorable' => true, 'identifier' => 'method.notFound'],
+                ],
+            ],
+            $app . '/app/Support/Proxy.php' => [
+                'errors' => 1,
+                'messages' => [
+                    ['message' => 'Call to an undefined method Pest\PendingCalls\TestCall::get().', 'line' => 9, 'ignorable' => true, 'identifier' => 'method.notFound'],
+                ],
+            ],
+        ]);
+    }
+
+    public function test_a_pest_app_drops_pest_proxy_calls_in_its_tests_only(): void
+    {
+        $app = $this->tempDir();
+        file_put_contents($app . '/composer.json', (string) json_encode(['require-dev' => ['pestphp/pest' => '^4.0']]));
+        $json = $this->pestJson($app);
+        $fake = $this->phpstanFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+
+        $scan = (new PhpStanScan($fake))->scan($app, '8.5');
+
+        self::assertTrue($scan->ok);
+        $kept = array_map(static fn($f): string => $f->file . ':' . $f->line, $scan->findings);
+        self::assertSame(['tests/Feature/AccessTest.php:20', 'app/Support/Proxy.php:9'], $kept);
+    }
+
+    public function test_without_pest_every_undefined_method_stays(): void
+    {
+        $app = $this->tempDir();
+        file_put_contents($app . '/composer.json', (string) json_encode(['require-dev' => ['phpunit/phpunit' => '^12.0']]));
+        $json = $this->pestJson($app);
+        $fake = $this->phpstanFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+
+        $scan = (new PhpStanScan($fake))->scan($app, '8.5');
+
+        self::assertTrue($scan->ok);
+        self::assertCount(4, $scan->findings);
+    }
 }

@@ -471,4 +471,80 @@ final class PhpCompatScanTest extends TestCase
         self::assertSame(3, $scan->errorCount());
         self::assertSame(0, $scan->warningCount());
     }
+
+    /**
+     * phpcs output for a Pest test file and a helper outside tests/, each
+     * using $this in a closure, plus one real finding in the test file.
+     *
+     * @return array<string, mixed>
+     */
+    private function pestJson(string $app): array
+    {
+        $thisOutside = static fn(int $line): array => ['message' => 'Closures / anonymous functions only have access to $this if used within a class or when bound to an object using bindTo(). Please verify.', 'source' => 'PHPCompatibility.FunctionDeclarations.NewClosure.ThisFoundOutsideClass', 'severity' => 5, 'fixable' => false, 'type' => 'WARNING', 'line' => $line, 'column' => 5];
+
+        return $this->phpcsJson([
+            $app . '/tests/Feature/AccessTest.php' => [
+                'errors' => 1,
+                'warnings' => 2,
+                'messages' => [
+                    $thisOutside(14),
+                    $thisOutside(24),
+                    ['message' => 'Function each() is deprecated since PHP 7.2 and removed since PHP 8.0; Use a foreach loop or ArrayIterator instead', 'source' => 'PHPCompatibility.FunctionUse.RemovedFunctions.eachDeprecatedRemoved', 'severity' => 5, 'fixable' => false, 'type' => 'ERROR', 'line' => 30, 'column' => 9],
+                ],
+            ],
+            $app . '/app/helpers.php' => [
+                'errors' => 0,
+                'warnings' => 1,
+                'messages' => [$thisOutside(7)],
+            ],
+        ]);
+    }
+
+    public function test_a_pest_app_drops_bound_this_warnings_in_its_tests_only(): void
+    {
+        foreach (['require-dev', 'require'] as $section) {
+            $app = $this->tempDir();
+            file_put_contents($app . '/composer.json', (string) json_encode([$section => ['pestphp/pest' => '^4.0']]));
+            $json = $this->pestJson($app);
+            $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+
+            $scan = (new PhpCompatScan($fake))->scan($app, '8.4');
+
+            self::assertTrue($scan->ok);
+            $kept = array_map(static fn($f): string => $f->file . ':' . $f->line, $scan->findings);
+            self::assertSame(['tests/Feature/AccessTest.php:30', 'app/helpers.php:7'], $kept, 'Pest in ' . $section . ': only the bound-$this warnings under tests/ go');
+        }
+    }
+
+    public function test_a_laravel_app_drops_the_bound_this_warning_in_routes_console_only(): void
+    {
+        $app = $this->tempDir();
+        file_put_contents($app . '/composer.json', (string) json_encode(['require' => ['laravel/framework' => '^13.0']]));
+        $thisOutside = static fn(int $line): array => ['message' => 'Closures / anonymous functions only have access to $this if used within a class or when bound to an object using bindTo(). Please verify.', 'source' => 'PHPCompatibility.FunctionDeclarations.NewClosure.ThisFoundOutsideClass', 'severity' => 5, 'fixable' => false, 'type' => 'WARNING', 'line' => $line, 'column' => 5];
+        $json = $this->phpcsJson([
+            $app . '/routes/console.php' => ['errors' => 0, 'warnings' => 1, 'messages' => [$thisOutside(7)]],
+            $app . '/routes/web.php' => ['errors' => 0, 'warnings' => 1, 'messages' => [$thisOutside(9)]],
+        ]);
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.4');
+
+        self::assertTrue($scan->ok);
+        self::assertCount(1, $scan->findings);
+        self::assertSame('routes/web.php', $scan->findings[0]->file);
+    }
+
+    public function test_without_pest_the_bound_this_warnings_stay(): void
+    {
+        $app = $this->tempDir();
+        file_put_contents($app . '/composer.json', (string) json_encode(['require-dev' => ['phpunit/phpunit' => '^12.0']]));
+        $json = $this->pestJson($app);
+        $fake = $this->phpcsFake(static fn(): ProcessResult => new ProcessResult(1, (string) json_encode($json), ''));
+
+        $scan = (new PhpCompatScan($fake))->scan($app, '8.4');
+
+        self::assertTrue($scan->ok);
+        self::assertCount(4, $scan->findings);
+        self::assertSame(3, $scan->warningCount());
+    }
 }

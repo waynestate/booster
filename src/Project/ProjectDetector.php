@@ -127,6 +127,29 @@ final class ProjectDetector
     }
 
     /**
+     * Whether the app at $path requires $package in composer.json (require or
+     * require-dev). The advisory scans use it to tell which findings a
+     * framework makes false: Pest binds test closures to a test case and
+     * chains higher-order calls through magic proxies, and Laravel binds the
+     * closures in routes/console.php to their command.
+     */
+    public static function requiresAt(string $path, string $package): bool
+    {
+        $raw = is_file($path . '/composer.json') ? file_get_contents($path . '/composer.json') : false;
+        $data = $raw === false ? null : json_decode($raw, true);
+        if (!is_array($data)) {
+            return false;
+        }
+        foreach (['require', 'require-dev'] as $section) {
+            if (is_array($data[$section] ?? null) && array_key_exists($package, $data[$section])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Whether composer.json asks for any package, not just the PHP version
      * and its extensions, so composer install would build a vendor/.
      *
