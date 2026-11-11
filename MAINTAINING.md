@@ -132,6 +132,12 @@ a version mismatch with `meta.json`.
 `site/` is the static front page, for `https://booster.apps.wayne.edu/` on Citadel, served through a small raw-PHP
 `deploy/` layer generated with Squire.
 
+The record card and the Commands panel are real Booster output copied by hand, so `tests/FrontPageTruthTest.php`
+holds them to their sources: every scenario in `site/assets/booster.js` and the static card in `site/index.html` to
+the captured plans in `site/proof-data/`, each dose's summary and version pair to the hop registry, the `hops` and
+`detect` panels to the commands themselves, and the `plan` panel to its capture. When a hop is added, renamed or
+re-summarized, or a re-capture changes a plan, the test names the copy to update.
+
 ## Who maintains it
 
 The stack maintainer (a role, not a named person), Wayne State University Enterprise Applications. To reach them, open

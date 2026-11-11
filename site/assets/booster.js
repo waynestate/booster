@@ -141,7 +141,7 @@
     capped: {
       title: "examples/laravel-blade",
       type: "laravel-blade (illustration)",
-      course: "PHP 8.2 → 8.5 · Laravel 10 → 13",
+      course: "PHP 8.2 → 8.5 · Laravel 10 → 13 · PHPUnit 10 → 13",
       due: "After a re-run",
       start: { php: "8.2", lara: "10" },
       doses: bladeDoses,
