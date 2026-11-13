@@ -37,7 +37,7 @@ fi
 
 # Pinned tool images (the same ones the README's Docker sections use).
 COMPOSER_IMAGE='composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0'
-PHP_IMAGE='php:8.4-cli'
+PHP_IMAGE='php:8.5-cli'
 
 # A unique temp dir for the no-dev build copy.
 TMP="$(mktemp -d)"

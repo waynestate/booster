@@ -4,7 +4,7 @@
 # will actually run: intl ldap soap zip gd pdo_mysql mysqli bcmath pcntl exif
 # redis imagick oci8. Oracle Instant Client (for oci8) is downloaded by the
 # installer from Oracle at build time on this machine; Booster never ships it.
-ARG PHP_VERSION=8.4
+ARG PHP_VERSION=8.5
 # Composer 2.3 and later require PHP 7.2.5, so builds for older PHP pass 2.2.
 # The default is pinned by its multi-arch list digest, so every build gets the same Composer.
 ARG COMPOSER_VERSION=2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0
