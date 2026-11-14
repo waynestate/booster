@@ -1662,7 +1662,7 @@ final class HopExecutorTest extends TestCase
         self::assertStringContainsString("'model' => App\User::class,", $auth);
         self::assertStringNotContainsString('wayneCas', $auth);
         $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
-        self::assertSame('^0.7.5', $composer['require']['waynestate/sesame']);
+        self::assertSame('^0.8', $composer['require']['waynestate/sesame']);
         self::assertArrayNotHasKey('cit-web-infra/wayne-cas', $composer['require']);
         self::assertSame(
             ['config/sesame.php', 'config/wayne-cas.php', 'app/Http/Kernel.php', 'app/Providers/RouteServiceProvider.php', 'config/auth.php', 'app/User.php', 'app/Models/Concerns/ReadOnlyAttributes.php'],
