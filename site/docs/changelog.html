@@ -46,6 +46,7 @@
 <p>All notable changes to Booster are recorded here. The format follows Keep a Changelog.</p>
 <h2 id="unreleased"><span class="docs-heading-tail"><span>[Unreleased]</span><a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></span></h2>
 <ul>
+<li>Changed: <code>deploy/</code> requires PROCTOR <code>^0.16</code> (was <code>^0.15</code>, which does not allow 0.16), whose <code>ci-pipelines</code> check no longer asks for a GitHub workflow (D-069).</li>
 <li>Changed: the <code>cas-to-sesame</code> hop sets SESAME <code>^0.8</code> (was <code>^0.7.5</code>; the hop already lands on native names, and 0.8.0 removed only the shim it moves apps off), and Booster requires PROCTOR <code>^0.16</code> and Pinstripe <code>^0.4</code>.</li>
 <li>Changed: the deploy kit is Squire 0.11.1 (was 0.10.8): the release script fetches PROCTOR when <code>--no-dev</code> left it out and installs the frontend from a <code>yarn.lock</code>, the HAProxy pin is current, the fallback base follows the app's PHP line, and the parity scripts carry the deprecation note.</li>
 <li>Added: two behaviour-change rows for WayneUI 2 (<code>package:cit-web-infra/wayne-ui@2</code>): <code>wayneui-bootstrap-data-hooks</code> and <code>wayneui-nav-active-prefix</code>, taken from WayneUI's MIGRATING guide, each with a data test and a scan test.</li>
