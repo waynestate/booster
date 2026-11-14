@@ -86,7 +86,7 @@ trait ReadOnlyAttributes
         // Now we refresh the read-only attributes and values
         $readOnlyAttributes = $this->getReadOnlyAttributes($attributes);
 
-        // merge them with the native attributes and values
+        // merge them with the native attributes
         $attributes = array_merge($attributes, $readOnlyAttributes);
 
         // set them on the instance
@@ -103,10 +103,10 @@ trait ReadOnlyAttributes
      */
     public function newFromBuilder($attributes = [], $connection = null)
     {
-        // Here we grab the attribute => attributeValue pairs the developer defines for their model
+        // Here we grab the attribute => attributeValue pairs the developer defines for this model
         $readOnlyAttributes = $this->getReadOnlyAttributes((array) $attributes); // @phpstan-ignore cast.useless (defensive cast: the parameter is untyped at runtime)
 
-        // merge them with the native attributes and values
+        // merge them with the native attributes
         $attributes = array_merge((array) $attributes, $readOnlyAttributes); // @phpstan-ignore cast.useless (defensive cast: the parameter is untyped at runtime)
 
         // let the parent method do the work of hydrating an instance with them
