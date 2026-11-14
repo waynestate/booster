@@ -116,6 +116,28 @@ final class BehaviourDataTest extends TestCase
         }
     }
 
+    public function test_the_wayne_ui_package_rows_ship_with_their_hops_and_checks(): void
+    {
+        $byId = [];
+        foreach ($this->changes as $entry) {
+            $byId[$entry['id']] = $entry;
+        }
+        foreach (['wayneui-bootstrap-data-hooks', 'wayneui-nav-active-prefix'] as $id) {
+            self::assertArrayHasKey($id, $byId);
+            self::assertSame('package:cit-web-infra/wayne-ui@2', $byId[$id]['hop']);
+            self::assertSame(['kind' => 'package'], $byId[$id]['detect']);
+            self::assertStringStartsWith('https://', (string) $byId[$id]['source']);
+        }
+        self::assertSame(
+            'Click through every menu, collapsible panel, modal and dismissible alert after the move',
+            $byId['wayneui-bootstrap-data-hooks']['check'],
+        );
+        self::assertSame(
+            'Open a child page of each menu item and confirm the right item is highlighted and announced as current (aria-current)',
+            $byId['wayneui-nav-active-prefix']['check'],
+        );
+    }
+
     public function test_a_full_parity_row_loads(): void
     {
         $path = $this->tempDir() . '/behaviour-changes.json';

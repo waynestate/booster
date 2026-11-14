@@ -690,6 +690,24 @@
       "keep_old": null,
       "check": "grep getColumns() and inspect each use site",
       "source": "https://raw.githubusercontent.com/doctrine/dbal/4.0.0/src/Schema/Table.php"
+    },
+    {
+      "id": "wayneui-bootstrap-data-hooks",
+      "hop": "package:cit-web-infra/wayne-ui@2",
+      "detect": { "kind": "package" },
+      "label": "WayneUI 2.x has no Bootstrap JavaScript: data-toggle, data-target, data-dismiss and data-ride do nothing, so menus, collapses, modals and dismissible alerts that relied on them stop working without an error. The 2.x equivalents are data-wsu-drawer-toggle, data-wsu-drawer-close and data-wsu-drawer-backdrop",
+      "keep_old": null,
+      "check": "Click through every menu, collapsible panel, modal and dismissible alert after the move",
+      "source": "https://git.wayne.edu/enterprise-apps/wayne-ui/-/blob/main/MIGRATING.md"
+    },
+    {
+      "id": "wayneui-nav-active-prefix",
+      "hop": "package:cit-web-infra/wayne-ui@2",
+      "detect": { "kind": "package" },
+      "label": "navActive() matched route names by prefix only in 1.x (forum matched forum.show and also forumadmin.index); the 2.x @navActive directive and Nav::isActive() match exactly unless you write a wildcard, so a bare route name stops highlighting its child routes",
+      "keep_old": "Write the wildcard you mean: @navActive('courses.*')",
+      "check": "Open a child page of each menu item and confirm the right item is highlighted and announced as current (aria-current)",
+      "source": "https://git.wayne.edu/enterprise-apps/wayne-ui/-/blob/main/MIGRATING.md#navactive"
     }
   ]
 }
