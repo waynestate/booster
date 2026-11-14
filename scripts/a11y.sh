@@ -1,6 +1,6 @@
 #!/bin/sh
 # Site accessibility gate: Preflight's a11y checker (vendored in
-# tools/a11y/check.mjs from Preflight 0.8.0, pinned by tests/A11yCheckerPinTest.php),
+# tools/a11y/check.mjs from Preflight 0.9.0, pinned by tests/A11yCheckerPinTest.php),
 # run in Docker so no host browser is needed. The same image, tags, color
 # schemes and widths as the a11y-site CI job, so a page that passes here
 # passes CI. Linux and macOS; on Windows use scripts/a11y.ps1, or this script
@@ -29,7 +29,7 @@ else
 fi
 
 # The a11y component's image default, digest included (templates/a11y/template.yml
-# of Preflight 0.8.0). Its tag sets the playwright npm version, so the package
+# of Preflight 0.9.0). Its tag sets the playwright npm version, so the package
 # and the image's browsers always match.
 IMAGE="mcr.microsoft.com/playwright:v1.65.0-noble@sha256:6e3fb709361521eb27161606e6da6d2674e5e89fa16516cb37d6fdd91372273d"
 PW=$(printf '%s\n' "$IMAGE" | sed -n 's/^.*playwright:v\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*$/\1/p')
