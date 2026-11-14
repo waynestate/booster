@@ -13,6 +13,7 @@
         "resources/replay/client.php",
         "resources/replay/router.php",
         "resources/sesame/config/sesame.php",
+        "resources/sesame/ReadOnlyAttributes.php",
         "resources/slim1/slim1-bridge.php",
         "vendor/bin/phpcs",
         "vendor/bin/phpstan",

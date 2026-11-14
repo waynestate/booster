@@ -134,7 +134,7 @@
         dose("laravel-12-to-13", "Move a Laravel 12 app to Laravel 13.", "8.3", "13"),
         dose("php-83-to-84", "Move PHP 8.3 code to PHP 8.4.", "8.4", "13"),
         dose("php-84-to-85", "Move PHP 8.4 code to PHP 8.5.", "8.5", "13"),
-        dose("cas-to-sesame", "Swap the wayne-cas package for SESAME using its compatibility classes.", "8.5", "13", { mid: "SESAME" })
+        dose("cas-to-sesame", "Swap the wayne-cas package for SESAME native names: ModelUserResolver, auth.sesame, and the app's own ReadOnlyAttributes.", "8.5", "13", { mid: "SESAME" })
       ],
       result: PASS
     },

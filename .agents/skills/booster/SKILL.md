@@ -47,7 +47,7 @@ Playbooks:
 - `booster-phpunit-11-to-12`: Move PHPUnit 11 tests to PHPUnit 12.
 - `booster-phpunit-12-to-13`: Move PHPUnit 12 tests to PHPUnit 13.
 - `booster-phpunit-to-9-manual`: Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves.
-- `booster-cas-to-sesame`: Swap the wayne-cas package for SESAME using its compatibility classes.
+- `booster-cas-to-sesame`: Swap the wayne-cas package for SESAME native names: ModelUserResolver, auth.sesame, and the app's own ReadOnlyAttributes.
 - `booster-wayneui-1-to-2`: Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest.
 - `booster-vendored-to-composer`: Move hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto their maintained Composer releases (doctrine/orm 2.20, smarty/smarty 4.5, slim/slim 4 through a Slim 1 bridge).
 - `booster-session-strict-mode`: Turn on strict session IDs in a raw PHP app: set session.use_strict_mode and session.use_only_cookies before each session_start() call.
