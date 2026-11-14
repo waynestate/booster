@@ -11,6 +11,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Changed: the deploy kit is Squire 0.11.1 (was 0.10.8): the release script fetches PROCTOR when `--no-dev` left it out and installs the frontend from a `yarn.lock`, the HAProxy pin is current, the fallback base follows the app's PHP line, and the parity scripts carry the deprecation note.
 - Added: two behaviour-change rows for WayneUI 2 (`package:cit-web-infra/wayne-ui@2`): `wayneui-bootstrap-data-hooks` and `wayneui-nav-active-prefix`, taken from WayneUI's MIGRATING guide, each with a data test and a scan test.
 - Changed: the `cas-to-sesame` hop lands on SESAME native names instead of the deprecated `Waynestate\Sesame\WayneCas` shim: `config/sesame.php` defaults to `ModelUserResolver`, the web routes run under `auth.sesame`, any `wayne.cas` alias registration is removed, user models drop `WayneCasable`, and a model's `ReadOnlyAttributes` trait moves to `app/Models/Concerns` (Booster writes the trait file from SESAME 0.7.5 when it is absent). The Composer requirement becomes `waynestate/sesame:^0.7.5`.
 - Changed: the deploy kit is Squire 0.10.8 (was 0.10.7): 0.10.8 moves no template and no kit file (the last template move was the 0.10.7 `.gitattributes`, the last docs and agent-ready tool change was 0.10.6), so `deploy/.squire.json` records the new version and every kit file stays as it is.

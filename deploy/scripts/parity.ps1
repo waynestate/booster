@@ -35,12 +35,24 @@ Set-Location -LiteralPath (Join-Path -Path $PSScriptRoot -ChildPath '..')
 
 $ComposeFile = 'docker-compose.squire.yml'
 $EnvFile = '.env.squire'
-$FallbackTag = 'squire/php-parity-base:8.4'
+$FallbackTag = 'squire/php-parity-base:8.4r5'
 
 function Exit-Parity {
     param([string]$Message)
-    Write-Error "parity: $Message"
+    # Not Write-Error: under 'Stop' it throws, so the message came wrapped in a stack of error-record lines and the
+    # `exit 1` below never ran. One plain line on stderr, then exit 1, like parity.sh.
+    [Console]::Error.WriteLine("parity: $Message")
     exit 1
+}
+
+function Invoke-NativeQuiet {
+    # Runs a native program with its stderr dropped and returns its stdout; the exit code is in $LASTEXITCODE.
+    # Windows PowerShell 5.1 turns redirected stderr into a terminating error while $ErrorActionPreference is
+    # 'Stop', so `docker image inspect <missing> 2>$null` threw before the friendly message below could show.
+    # The preference is 'Continue' inside this function only, which makes 5.1 behave like PowerShell 7.
+    param([string]$Program, [string[]]$Arguments)
+    $ErrorActionPreference = 'Continue'
+    & $Program @Arguments 2>$null
 }
 
 function Get-EnvValue {
@@ -68,8 +80,8 @@ function Get-SourceUidGid {
     if ($env:OS -eq 'Windows_NT') {
         return @('1000', '1000')
     }
-    $uid = (& id -u 2>$null) -join ''
-    $gid = (& id -g 2>$null) -join ''
+    $uid = (Invoke-NativeQuiet -Program 'id' -Arguments @('-u')) -join ''
+    $gid = (Invoke-NativeQuiet -Program 'id' -Arguments @('-g')) -join ''
     if ($uid -notmatch '^\d+$' -or [long]$uid -lt 1 -or [long]$uid -gt 65534) { $uid = '1000' }
     if ($gid -notmatch '^\d+$' -or [long]$gid -lt 1 -or [long]$gid -gt 65534) { $gid = '1000' }
     return @($uid, $gid)
@@ -78,7 +90,7 @@ function Get-SourceUidGid {
 if ($null -eq (Get-Command docker -ErrorAction SilentlyContinue)) {
     Exit-Parity 'docker is not installed or not on PATH'
 }
-& docker compose version *> $null
+$null = Invoke-NativeQuiet -Program 'docker' -Arguments @('compose', 'version')
 if ($LASTEXITCODE -ne 0) {
     Exit-Parity "'docker compose' (Compose v2) is required"
 }
@@ -107,10 +119,19 @@ switch ($Command) {
             $env:SQUIRE_BASE_IMAGE = $FallbackTag
         } else {
             $base = Get-EnvValue -Name 'SQUIRE_BASE_IMAGE' -Default 'citadel/php-apache:8.4r5'
-            & docker image inspect $base *> $null
+            $null = Invoke-NativeQuiet -Program 'docker' -Arguments @('image', 'inspect', $base)
             if ($LASTEXITCODE -ne 0) {
                 Exit-Parity "base image '$base' is not on this machine. Build it from the Citadel repository (php citadel build_images), pull it from your registry, or re-run with -Fallback."
             }
+        }
+        # Every app left on the default name is one compose project: one database, one logs volume, and in it the
+        # record of which deployments/ files already ran. A second app then finds its release "already run".
+        $project = $env:SQUIRE_PROJECT
+        if ([string]::IsNullOrEmpty($project)) {
+            $project = Get-EnvValue -Name 'SQUIRE_PROJECT' -Default 'squire-app'
+        }
+        if ([string]::IsNullOrEmpty($project) -or $project -eq 'squire-app') {
+            Write-Warning "SQUIRE_PROJECT is the default 'squire-app'. Apps on one name share a database and a release record, so a second app's release never runs; give this app its own name in $EnvFile."
         }
         if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
             Write-Warning 'ARM64 detected. MySQL 5.6 and the real Citadel images are amd64, so Docker emulates them; builds can take 30 minutes or more.'
@@ -142,7 +163,7 @@ switch ($Command) {
             if ($image -like 'squire-local/*') {
                 continue
             }
-            $digest = & docker image inspect --format '{{index .RepoDigests 0}}' $image 2>$null
+            $digest = (Invoke-NativeQuiet -Program 'docker' -Arguments @('image', 'inspect', '--format', '{{index .RepoDigests 0}}', $image)) -join ''
             if ([string]::IsNullOrEmpty($digest)) {
                 $digest = "not pulled yet (run 'up' first)"
             }
