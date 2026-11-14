@@ -57,7 +57,7 @@
 <ul>
 <li><strong>Custom rules</strong> beyond the CAS rename and the PHP 4 era <code>$a = &amp;new Foo();</code> pre-pass. Apps sometimes need a rewrite Rector does not ship; the proof corpus found no other pattern worth a rule, so such rewrites stay manual until one shows up.</li>
 <li><strong>Pilot numbers on the current release.</strong> The proof ran Booster over 95 Wayne State units on 2026-10-28 and again on 2026-11-01 (1.6.0); the aggregates are on the proof site, which needs an employee sign-in. A re-run on the current release is still open.</li>
-<li><strong>A signed-in <code>cas-to-sesame</code> run.</strong> The hop (opt in with <code>--sesame</code>) has run on a real app's shape since 1.6.0: it renames the classes, swaps the Composer requirement, writes <code>config/sesame.php</code> from the old config and rewrites the model trait. Duo two-factor stays manual work, and a signed-in run of the swapped app is still open, because the proof sandbox cannot sign in.</li>
+<li><strong>A signed-in <code>cas-to-sesame</code> run.</strong> The hop (opt in with <code>--sesame</code>) has run on a real app's shape since 1.6.0: it swaps the package, writes <code>config/sesame.php</code> from the old config, moves the middleware under <code>auth.sesame</code>, drops <code>WayneCasable</code> from the user model, and moves <code>ReadOnlyAttributes</code> into <code>app/Models/Concerns</code>. Duo two-factor stays manual work, and a signed-in run of the swapped app is still open, because the proof sandbox cannot sign in.</li>
 </ul>
 </article>
     </main>

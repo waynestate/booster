@@ -60,9 +60,7 @@
             "vue": null,
             "sesame": true,
             "plan": ["laravel-12-to-13", "php-83-to-84", "php-84-to-85", "cas-to-sesame"],
-            "rector": {
-                "cas-to-sesame": ["app/Http/Kernel.php", "app/User.php"]
-            }
+            "rector": {}
         }
     }
 }
