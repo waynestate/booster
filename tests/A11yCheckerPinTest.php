@@ -14,10 +14,10 @@ namespace Waynestate\Booster\Tests;
 final class A11yCheckerPinTest extends TestCase
 {
     /** Preflight tag the vendored checker comes from (the checker is unchanged since 0.3.1). */
-    private const PREFLIGHT_TAG = '0.8.0';
+    private const PREFLIGHT_TAG = '0.9.0';
 
     /** SHA-256 of tools/a11y/check.mjs at that tag. */
-    private const CHECKER_SHA256 = '2b814c18fb90186d96a4f05ed4fb75bec5074e3344502995e80c25a27a69286a';
+    private const CHECKER_SHA256 = '8f11379ac03cee8b52e39835639430abe1c749eeb5ffb2abb43aeaa300f1c663';
 
     /** Image default of the a11y component at that tag (digest included). */
     private const IMAGE = 'mcr.microsoft.com/playwright:v1.65.0-noble@sha256:6e3fb709361521eb27161606e6da6d2674e5e89fa16516cb37d6fdd91372273d';

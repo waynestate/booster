@@ -16,8 +16,8 @@
 // Usage:  node check.mjs <config.json>
 // Config: siteDir         folder served on a local port (relative to the
 //                         working directory); globs in pages expand in it
-//         pages           pages to check: paths relative to the site root,
-//                         or globs such as "docs/**/*.html"
+//         pages           pages to check: "" or "/" is the site root, paths
+//                         under it, or globs such as "docs/**/*.html"
 //         tags            axe-core tags, for example "wcag21aa"
 //         colorSchemes    "light", "dark" or "no-preference"
 //         widths          viewport widths in CSS pixels
@@ -91,6 +91,15 @@ function stringList(value, name) {
   return value.map((item) => item.trim());
 }
 
+/** Like stringList, but an empty string is allowed: it is the site root. */
+function pageList(value, name) {
+  if (!Array.isArray(value) || value.length === 0) fail(`${name} must be a non-empty list`);
+  for (const item of value) {
+    if (typeof item !== "string") fail(`${name} must hold strings`);
+  }
+  return value.map((item) => item.trim());
+}
+
 async function loadConfig(file) {
   if (!file) fail("usage: node check.mjs <config.json>");
   let raw;
@@ -101,7 +110,7 @@ async function loadConfig(file) {
   }
 
   const siteDir = typeof raw.siteDir === "string" && raw.siteDir.trim() !== "" ? raw.siteDir.trim() : "site";
-  const pages = stringList(raw.pages, "pages").map(normalizePage);
+  const pages = pageList(raw.pages, "pages").map(normalizePage);
   const tags = stringList(raw.tags, "tags");
   for (const tag of tags) {
     if (!/^[A-Za-z0-9._-]+$/.test(tag)) fail(`not an axe-core tag: ${tag}`);

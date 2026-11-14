@@ -1,18 +1,18 @@
 # composer ci is the contract: the checks are defined there, and this pipeline only wraps them.
 # Booster's pipeline, built from the Preflight components on this GitLab.
-# Pinned to Preflight 0.8.0. Never use ~latest.
+# Pinned to Preflight 0.9.0. Never use ~latest.
 # Booster requires PHP ^8.3, so the test matrix starts at 8.3.
 # Docker Hub images go through the GitLab Dependency Proxy to avoid the anonymous pull limit.
 include:
-  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/php-test@0.8.0
+  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/php-test@0.9.0
     inputs:
       php_versions: ["8.3", "8.4", "8.5"]
       image: "php:${PHP_VERSION}-cli-trixie"
-  # No image input: the 0.8.0 default is Composer 2.11.1, pinned by its multi-arch list digest.
-  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/composer-audit@0.8.0
+  # No image input: the 0.9.0 default is Composer 2.11.1, pinned by its multi-arch list digest.
+  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/composer-audit@0.9.0
   # The front page deploy layer (ADR-0017): PROCTOR checks deploy/ against CREED's policy, and a failure blocks.
   # Since 0.5.0 the job also keeps PROCTOR's JSON report as proctor.json in its artifact, for ROLLCALL.
-  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/proctor@0.8.0
+  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/proctor@0.9.0
     inputs:
       image: "php:8.5-cli-trixie@sha256:9236fd373d3bcda0659cf94838a744bd79791419292958963f8c6b34a0071554"
       working_dir: deploy
@@ -20,7 +20,7 @@ include:
   # Accessibility: Preflight's a11y component serves site/ and checks every page with axe-core 4.14.0, light and
   # dark, at 320 and 1280 px, plus WCAG 1.4.10 reflow, at WCAG 2.2 AA. Its Playwright image comes from
   # mcr.microsoft.com, which the Dependency Proxy does not front, so it takes no image_prefix.
-  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/a11y@0.8.0
+  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/a11y@0.9.0
     inputs:
       site_dir: site
       pages: ["**/*.html"]
