@@ -38,7 +38,7 @@ What Rector cannot do (check these by hand):
 - SESAME is on Packagist: run composer require waynestate/sesame:^0.7.5 (no extra repository needed).
 - SESAME (0.5 and later) binds each CAS sign-in to the browser that started it. The Laravel adapter passes the session itself, so no code change is needed; only an app that must accept a ticket for a login it did not start (a link from the CAS login page) sets SESAME_CAS_REQUIRE_PENDING_LOGIN=false, which reopens login CSRF.
 - MANUAL: on Laravel 13 the session stores the user as JSON, so the app's SESAME resolver must implement RefreshesUser and look the user up again (SESAME docs, guides/laravel.md, "Reading the user").
-- Log in through the pre-production host and check the session timeout and the Access ID attribute before you ship.
+- Log in through the pre-production host and check the session timeout, the Access ID attribute and Duo before you ship.
 - Check that signed-in pages and any Gate or policy checks still work: auth()->user() now comes from SESAME's guard and is reloaded every request.
 
 Official notes:
