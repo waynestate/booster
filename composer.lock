@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "5d2b327ffdedb186fb99e97476fcf0a4",
+    "content-hash": "04e1b794e38cc56c2e56b1284cf1351a",
     "packages": [
         {
             "name": "composer/semver",
@@ -2048,16 +2048,16 @@
         },
         {
             "name": "waynestate/pinstripe",
-            "version": "0.3.1",
+            "version": "0.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/pinstripe.git",
-                "reference": "7f2d774b11c12c050ca8d2b22ee03cf081fdcd22"
+                "reference": "8572c46f2dc0f627664c05ea3412ad7fedf2196c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/pinstripe/zipball/7f2d774b11c12c050ca8d2b22ee03cf081fdcd22",
-                "reference": "7f2d774b11c12c050ca8d2b22ee03cf081fdcd22",
+                "url": "https://api.github.com/repos/waynestate/pinstripe/zipball/8572c46f2dc0f627664c05ea3412ad7fedf2196c",
+                "reference": "8572c46f2dc0f627664c05ea3412ad7fedf2196c",
                 "shasum": ""
             },
             "require": {
@@ -2079,7 +2079,7 @@
             },
             "suggest": {
                 "larastan/larastan": "^3.13 (Laravel apps: include phpstan/laravel.neon)",
-                "rector/rector": "^2.8 (apps: use rector/base.php from your rector.php)"
+                "rector/rector": "^2.8 (apps: use rector/base.php from your rector.php, rector/strict-types.php to declare strict types file by file, and rector/levels.php to climb one rule level at a time)"
             },
             "bin": [
                 "bin/pinstripe-baseline"
@@ -2105,21 +2105,21 @@
                 "issues": "https://git.wayne.edu/enterprise-apps/pinstripe/-/issues",
                 "source": "https://github.com/waynestate/pinstripe"
             },
-            "time": "2026-11-10T02:31:59+00:00",
-            "published-time": "2026-11-10T02:52:13+00:00"
+            "time": "2026-11-11T12:38:31+00:00",
+            "published-time": "2026-11-11T23:28:29+00:00"
         },
         {
             "name": "waynestate/proctor",
-            "version": "0.15.0",
+            "version": "0.16.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/proctor.git",
-                "reference": "b395b2adf0db58da09b6e25c6efccb97acb67d46"
+                "reference": "324e8b260ee18dd46735f3416e4ae6183dd39b5a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/proctor/zipball/b395b2adf0db58da09b6e25c6efccb97acb67d46",
-                "reference": "b395b2adf0db58da09b6e25c6efccb97acb67d46",
+                "url": "https://api.github.com/repos/waynestate/proctor/zipball/324e8b260ee18dd46735f3416e4ae6183dd39b5a",
+                "reference": "324e8b260ee18dd46735f3416e4ae6183dd39b5a",
                 "shasum": ""
             },
             "require": {
@@ -2170,8 +2170,8 @@
                 "issues": "https://git.wayne.edu/enterprise-apps/proctor/-/issues",
                 "source": "https://github.com/waynestate/proctor"
             },
-            "time": "2026-11-10T20:33:43+00:00",
-            "published-time": "2026-11-10T20:40:52+00:00"
+            "time": "2026-11-14T20:42:29+00:00",
+            "published-time": "2026-11-14T20:43:43+00:00"
         },
         {
             "name": "webmozart/assert",
