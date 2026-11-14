@@ -465,12 +465,12 @@ final class CasMigration
         sort($found);
         foreach ($found as $absolute) {
             $original = (string) file_get_contents($absolute);
-            $new = preg_replace('/([\x27"])wayne\.cas\1/', '$1auth.sesame$1', $original);
+            $new = preg_replace('/([\x27"])wayne\.cas\1/', '$1auth.sesame$1', $original) ?? $original;
             $new = preg_replace(
                 '/\\\\(?:[A-Za-z0-9_]+\\\\)*WayneAuthenticate::class|(?<![\w\\\\])(?:[A-Za-z0-9_]+\\\\)*WayneAuthenticate::class/',
                 "'" . self::SESAME_ALIAS . "'",
                 $new,
-            );
+            ) ?? $new;
             if ($new === $original) {
                 continue;
             }
@@ -1015,7 +1015,8 @@ final class CasMigration
                 // follows, so no gap lingers.
                 $body = substr($body, 0, $lineStart) . substr($body, $cutEnd);
             } else {
-                $body = substr($body, 0, $lineStart) . $indent . 'use ' . implode(', ', $kept) . ';' . substr($body, $end);
+                $tailStart = $end === false ? strlen($body) : $end;
+                $body = substr($body, 0, $lineStart) . $indent . 'use ' . implode(', ', $kept) . ';' . substr($body, $tailStart);
             }
         }
 
