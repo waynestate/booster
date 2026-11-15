@@ -13,6 +13,37 @@ when that needs a step of yours.
 To take a new Booster, download the PHAR again (the same `curl` line as on [Install](install.md); its
 `releases/latest` link always names the newest release), or run `git pull` and `composer install` in your clone. `booster --version` prints the version you have.
 
+## 1.19.0
+
+Released 2026-11-14. The `cas-to-sesame` hop lands on SESAME's native names and sets SESAME `^0.8`. No hop was added
+or removed, no option changed and no exit code changed.
+
+### What you see
+
+- **Native names for `cas-to-sesame`.** The hop now lands on SESAME's native names instead of the deprecated
+  `Waynestate\Sesame\WayneCas` shim and writes `waynestate/sesame:^0.8` (it wrote `^0.7`): `config/sesame.php`
+  defaults to `ModelUserResolver`, the web routes run under `auth.sesame`, any `wayne.cas` alias registration is
+  removed, user models drop `WayneCasable`, and a model's `ReadOnlyAttributes` trait moves to `app/Models/Concerns`
+  (Booster writes the trait file from SESAME 0.7.5 when it is absent).
+- **Two WayneUI 2 behaviour rows.** A plan for an app on WayneUI 2 (`package:cit-web-infra/wayne-ui@2`) now lists two
+  behaviour-change rows, `wayneui-bootstrap-data-hooks` and `wayneui-nav-active-prefix`, taken from WayneUI's
+  MIGRATING guide.
+- **PROCTOR ^0.16** in Booster and its deploy layer (was `^0.15`, which does not allow 0.16): the `ci-pipelines`
+  check no longer asks for a GitHub workflow. Booster also requires Pinstripe `^0.4`.
+- **The deploy kit is Squire 0.11.1** (was 0.10.8): the release script fetches PROCTOR when `--no-dev` left it out
+  and installs the frontend from a `yarn.lock`, the HAProxy pin is current, the fallback base follows the app's PHP
+  line, and the parity scripts carry the deprecation note.
+
+### An app that an older Booster already moved
+
+An app an older Booster moved with `cas-to-sesame` keeps `waynestate/sesame:^0.7` and the
+`Waynestate\Sesame\WayneCas` shim, which SESAME 0.8.0 removed. The caret stops below 0.8, so the app stays on the 0.7
+line until its owner moves off the shim. The hop will not plan it again, because the app no longer requires
+`cit-web-infra/wayne-cas`; the move is the hop's own edits, by hand: `config/sesame.php` defaults to
+`ModelUserResolver`, the web routes run under `auth.sesame`, any `wayne.cas` alias registration goes, `WayneCasable`
+drops from the user models, and the model's `ReadOnlyAttributes` trait moves to `app/Models/Concerns`. Then
+`composer require waynestate/sesame:^0.8` and run the app's tests, as after any SESAME release.
+
 ## 1.18.0
 
 Released 2026-11-10. Housekeeping to keep pace with the stack. No hop was added or removed, no option changed and no
