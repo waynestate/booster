@@ -11,6 +11,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-11-14
+
+SESAME 0.8 and native names for cas-to-sesame, WayneUI 2 behaviour rows, Preflight 0.9.0, Squire 0.11.1 and PROCTOR 0.16.
+
 - Changed: `deploy/` requires PROCTOR `^0.16` (was `^0.15`, which does not allow 0.16), whose `ci-pipelines` check no longer asks for a GitHub workflow (D-069).
 - Changed: the `cas-to-sesame` hop sets SESAME `^0.8` (was `^0.7.5`; the hop already lands on native names, and 0.8.0 removed only the shim it moves apps off), and Booster requires PROCTOR `^0.16` and Pinstripe `^0.4`.
 - Changed: the deploy kit is Squire 0.11.1 (was 0.10.8): the release script fetches PROCTOR when `--no-dev` left it out and installs the frontend from a `yarn.lock`, the HAProxy pin is current, the fallback base follows the app's PHP line, and the parity scripts carry the deprecation note.
