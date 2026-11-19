@@ -9,6 +9,7 @@
         "data/removals.json",
         "data/versions.json",
         "docker/Dockerfile",
+        "docker/cakephp-upgrade/Dockerfile",
         "resources/policy.schema.json",
         "resources/replay/client.php",
         "resources/replay/router.php",

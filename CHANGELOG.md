@@ -4,6 +4,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Added: an internal runner for CakePHP's own upgrade tool (`cakephp/upgrade`, pinned to a commit), run in a container so its Rector never meets the app's or Booster's; the CakePHP hops use it.
 - Added: the hop data knows which PHP each CakePHP and Slim line supports (`cakephp_php`, `slim_php`), their target lines and companion package pins, for the CakePHP and Slim hops.
 
 ## [1.19.0] - 2026-11-14
