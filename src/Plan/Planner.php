@@ -7,6 +7,7 @@ namespace Waynestate\Booster\Plan;
 use DateTimeImmutable;
 use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Hop\HopRegistry;
+use Waynestate\Booster\Packaging\PharFiles;
 use Waynestate\Booster\Policy\Policy;
 use Waynestate\Booster\Policy\PolicyException;
 use Waynestate\Booster\Project\Project;
@@ -67,6 +68,43 @@ final class Planner
             if (!$this->registry->laravelSupportsPhp($fromLaravel, $fromPhp)) {
                 $warnings[] = sprintf('Laravel %s does not list PHP %s; the plan assumes the app really runs on that pair.', $fromLaravel, $fromPhp);
             }
+        }
+
+        // A CakePHP or Slim app has no framework hops yet, so its PHP hops
+        // stop where the app's framework line stops running: a hop past the
+        // line's ceiling would break the app, and Booster cannot move the
+        // framework itself to say (the framework hops come in a later slice).
+        // A line the hop data does not know stops the PHP hops entirely,
+        // naming the table's span so the user sees what Booster covers.
+        $framework = $project->framework;
+        $frameworkName = match ($framework) {
+            'cakephp' => 'CakePHP',
+            'slim' => 'Slim',
+            default => null,
+        };
+        $frameworkLine = $project->frameworkVersion;
+        $frameworkRange = null;
+        if ($framework !== null && $frameworkLine !== null) {
+            $frameworkRange = $this->registry->frameworkPhpRange($framework, $frameworkLine);
+        }
+        if ($frameworkName !== null && $frameworkRange === null) {
+            [$tableLow, $tableHigh] = $this->frameworkTableBounds($framework);
+            $warnings[] = sprintf(
+                'Booster does not know %s %s (it knows %s to %s), so it plans no PHP hop for this app; see docs/guides/framework-hops.md.',
+                $frameworkName,
+                $frameworkLine ?? 'unknown',
+                $tableLow,
+                $tableHigh,
+            );
+        } elseif ($frameworkName !== null && version_compare($fromPhp, $frameworkRange[1], '>')) {
+            $warnings[] = sprintf(
+                '%s %s does not list PHP %s (it runs on %s to %s); the plan assumes the app really runs on that pair.',
+                $frameworkName,
+                $frameworkLine,
+                $fromPhp,
+                $frameworkRange[0],
+                $frameworkRange[1],
+            );
         }
 
         $supportedPhp = $this->policy->supported('php', $today);
@@ -190,14 +228,15 @@ final class Planner
         $laravel = $fromLaravel;
         $phpunit = $fromPhpunit;
         $sesamePlanned = false;
+        $stoppedByFramework = false;
         $n = 0;
 
         if ($this->strictSessionPlanned($project, $options, $warnings)) {
-            $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::SESSION_STRICT_MODE_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+            $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::SESSION_STRICT_MODE_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit, $project);
         }
 
         if ($sesameFirstReason !== null) {
-            $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+            $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel, $phpunit, $phpunit, $project);
             $sesamePlanned = true;
             $warnings[] = sprintf(
                 'cas-to-sesame goes first: the wayne-cas repository cannot be reached (%s), so the app could not install its dependencies for the Laravel hops. The swap to SESAME runs before the other hops, so the app keeps moving and lands on SESAME.',
@@ -209,9 +248,15 @@ final class Planner
             $nextLaravel = $laravel !== null && $toLaravel !== null && $laravel !== $toLaravel ? $this->registry->nextLaravel($laravel) : null;
             $nextPhpunit = $phpunit !== null && $toPhpunit !== null && $phpunit !== $toPhpunit ? $this->registry->nextPhpunit($phpunit) : null;
             $nextPhp = $php !== $toPhp ? $this->registry->nextPhp($php) : null;
+            // A framework app's PHP hops stop at its line's ceiling (and an
+            // unknown line stops them entirely), so the next PHP is only
+            // reachable when the line runs on it.
+            $frameworkAllowsNextPhp = $nextPhp === null
+                || $framework === null
+                || ($frameworkRange !== null && $this->registry->frameworkSupportsPhp($framework, (string) $frameworkLine, $nextPhp));
 
             if ($vendoredFloor !== null && version_compare($php, $vendoredFloor, '>=')) {
-                $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::VENDORED_TO_COMPOSER_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+                $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::VENDORED_TO_COMPOSER_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit, $project);
                 $vendoredFloor = null;
                 continue;
             }
@@ -220,7 +265,7 @@ final class Planner
             // to 9 lands before the first step that targets PHP 8.0 or newer.
             if ($phpunitManualPending && (version_compare($php, '8.0', '>=') || ($nextPhp !== null && version_compare($nextPhp, '8.0', '>=')))) {
                 $hop = $this->registry->get(HopRegistry::PHPUNIT_TO_9_MANUAL_ID);
-                $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $laravel, $phpunitBeforeManual, $phpunit);
+                $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $laravel, $phpunitBeforeManual, $phpunit, $project);
                 $phpunitManualPending = false;
                 continue;
             }
@@ -235,7 +280,7 @@ final class Planner
                 && $nextLaravel === '11'
                 && version_compare($toPhp, '8.3', '>=');
             if ($sesameCrossing && version_compare($php, '8.3', '>=')) {
-                $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+                $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel, $phpunit, $phpunit, $project);
                 $sesamePlanned = true;
                 continue;
             }
@@ -243,19 +288,19 @@ final class Planner
 
             if (!$holdLaravel && $nextLaravel !== null && $this->registry->has(HopRegistry::laravelHopId((string) $laravel, $nextLaravel)) && $this->registry->laravelSupportsPhp($nextLaravel, $php) && $this->phpunitMeetsLaravelFloor($phpunit, $nextLaravel)) {
                 $hop = $this->registry->get(HopRegistry::laravelHopId((string) $laravel, $nextLaravel));
-                $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $nextLaravel, $phpunit, $phpunit);
+                $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $nextLaravel, $phpunit, $phpunit, $project);
                 $laravel = $nextLaravel;
                 continue;
             }
             if ($nextPhpunit !== null && $this->registry->has(HopRegistry::phpunitHopId($phpunit, $nextPhpunit)) && version_compare($php, $this->registry->phpunitPhp()[$nextPhpunit], '>=')) {
                 $hop = $this->registry->get(HopRegistry::phpunitHopId($phpunit, $nextPhpunit));
-                $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $laravel, $phpunit, $nextPhpunit);
+                $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $laravel, $phpunit, $nextPhpunit, $project);
                 $phpunit = $nextPhpunit;
                 continue;
             }
-            if ($nextPhp !== null && $this->registry->has(HopRegistry::phpHopId($php, $nextPhp)) && ($laravel === null || $this->registry->laravelSupportsPhp($laravel, $nextPhp))) {
+            if ($nextPhp !== null && $this->registry->has(HopRegistry::phpHopId($php, $nextPhp)) && ($laravel === null || $this->registry->laravelSupportsPhp($laravel, $nextPhp)) && $frameworkAllowsNextPhp) {
                 $hop = $this->registry->get(HopRegistry::phpHopId($php, $nextPhp));
-                $steps[] = $this->step(++$n, $hop, $php, $nextPhp, $laravel, $laravel, $phpunit, $phpunit);
+                $steps[] = $this->step(++$n, $hop, $php, $nextPhp, $laravel, $laravel, $phpunit, $phpunit, $project);
                 $php = $nextPhp;
                 continue;
             }
@@ -277,6 +322,13 @@ final class Planner
                     );
                     break;
                 }
+                if ($nextPhp !== null && !$frameworkAllowsNextPhp) {
+                    // The framework line does not run on the next PHP, and
+                    // Booster has no framework hop yet: the plan stops here
+                    // instead of throwing, with the hold warning after the loop.
+                    $stoppedByFramework = true;
+                    break;
+                }
                 throw new ToolError(sprintf(
                     'No safe next step from PHP %s, Laravel %s and PHPUnit %s toward PHP %s, Laravel %s and PHPUnit %s.',
                     $php,
@@ -288,6 +340,18 @@ final class Planner
                 ));
             }
             break;
+        }
+
+        if ($stoppedByFramework && $frameworkRange !== null) {
+            $warnings[] = sprintf(
+                '%s %s runs on PHP %s to %s, so PHP stays at %s. Booster has no %s hop yet; see docs/guides/framework-hops.md.',
+                $frameworkName,
+                $frameworkLine,
+                $frameworkRange[0],
+                $frameworkRange[1],
+                $php,
+                $frameworkName,
+            );
         }
 
         if ($vendoredFloor !== null) {
@@ -326,7 +390,7 @@ final class Planner
             );
         } else {
             foreach ($frontEndHops as $id) {
-                $steps[] = $this->step(++$n, $this->registry->get($id), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+                $steps[] = $this->step(++$n, $this->registry->get($id), $php, $php, $laravel, $laravel, $phpunit, $phpunit, $project);
             }
         }
 
@@ -335,14 +399,14 @@ final class Planner
         } elseif ($options->sesame && !$sesamePlanned && version_compare($php, '8.3', '<')) {
             $warnings[] = 'SESAME needs PHP 8.3 or newer; the swap was left out because the plan ends below that.';
         } elseif ($options->sesame && !$sesamePlanned) {
-            $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+            $steps[] = $this->step(++$n, $this->registry->get('cas-to-sesame'), $php, $php, $laravel, $laravel, $phpunit, $phpunit, $project);
         } elseif ($project->usesWayneCas && $sesameFirstReason === null) {
             $warnings[] = 'The app uses wayne-cas. Add --sesame to plan the swap to SESAME.';
         }
 
         if ($options->wayneui && $project->usesWayneUi1) {
             if ($laravel !== null && version_compare($laravel, '11', '>=')) {
-                $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::WAYNEUI_1_TO_2_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+                $steps[] = $this->step(++$n, $this->registry->get(HopRegistry::WAYNEUI_1_TO_2_ID), $php, $php, $laravel, $laravel, $phpunit, $phpunit, $project);
             } else {
                 $warnings[] = 'WayneUI 2.x needs Laravel 11 or newer; the WayneUI move was left out because the plan ends below that.';
             }
@@ -354,10 +418,10 @@ final class Planner
 
         if (!$nodeLeftOut) {
             foreach ($vueHops as $id) {
-                $steps[] = $this->step(++$n, $this->registry->get($id), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+                $steps[] = $this->step(++$n, $this->registry->get($id), $php, $php, $laravel, $laravel, $phpunit, $phpunit, $project);
             }
             foreach ($inertiaHops as $id) {
-                $steps[] = $this->step(++$n, $this->registry->get($id), $php, $php, $laravel, $laravel, $phpunit, $phpunit);
+                $steps[] = $this->step(++$n, $this->registry->get($id), $php, $php, $laravel, $laravel, $phpunit, $phpunit, $project);
             }
         }
 
@@ -365,7 +429,7 @@ final class Planner
         $selected = $options->until !== null || $options->only !== null;
         $beforeSelection = count($steps);
         $steps = $this->applyStepSelection($steps, $project, $options, $fromPhp, $fromLaravel, $phpunitBeforeManual);
-        $stopsEarly = $eolTarget || ($selected && count($steps) < $beforeSelection);
+        $stopsEarly = $eolTarget || $stoppedByFramework || ($selected && count($steps) < $beforeSelection);
         if ($selected) {
             // The cut plan ends where its last step lands, so the report and
             // the gates agree with the steps that remain.
@@ -385,7 +449,9 @@ final class Planner
             }
         }
 
-        if ($steps === []) {
+        // A plan held by the framework is not "already at the target": it
+        // stops short because Booster has no framework hop yet.
+        if ($steps === [] && !$stoppedByFramework) {
             $warnings[] = 'Nothing to do: the app is already at the target.';
         }
 
@@ -491,7 +557,7 @@ final class Planner
         $kept = [];
         foreach ($steps as $step) {
             if (!isset($skipped[$step->hop->id])) {
-                $kept[] = new PlanStep(count($kept) + 1, $step->hop, $step->phpBefore, $step->phpAfter, $step->laravelBefore, $step->laravelAfter, $step->phpunitBefore, $step->phpunitAfter, $step->gates);
+                $kept[] = new PlanStep(count($kept) + 1, $step->hop, $step->phpBefore, $step->phpAfter, $step->laravelBefore, $step->laravelAfter, $step->phpunitBefore, $step->phpunitAfter, $step->gates, $step->frameworkBefore, $step->frameworkAfter);
             }
         }
 
@@ -554,7 +620,7 @@ final class Planner
             ));
         }
 
-        return [new PlanStep(1, $step->hop, $step->phpBefore, $step->phpAfter, $step->laravelBefore, $step->laravelAfter, $step->phpunitBefore, $step->phpunitAfter, $step->gates)];
+        return [new PlanStep(1, $step->hop, $step->phpBefore, $step->phpAfter, $step->laravelBefore, $step->laravelAfter, $step->phpunitBefore, $step->phpunitAfter, $step->gates, $step->frameworkBefore, $step->frameworkAfter)];
     }
 
     /**
@@ -607,9 +673,31 @@ final class Planner
         return $ids;
     }
 
-    private function step(int $n, \Waynestate\Booster\Hop\Hop $hop, string $phpBefore, string $phpAfter, ?string $lBefore, ?string $lAfter, ?string $puBefore, ?string $puAfter): PlanStep
+    private function step(int $n, \Waynestate\Booster\Hop\Hop $hop, string $phpBefore, string $phpAfter, ?string $lBefore, ?string $lAfter, ?string $puBefore, ?string $puAfter, Project $project): PlanStep
     {
-        return new PlanStep($n, $hop, $phpBefore, $phpAfter, $lBefore, $lAfter, $puBefore, $puAfter, $hop->isManual() ? [self::GATE_MANUAL] : [self::GATE_TESTS]);
+        // No framework hops exist yet, so a CakePHP or Slim app's line is
+        // unchanged by every step: both sides carry the same line.
+        $frameworkLine = $project->framework !== null ? $project->frameworkVersion : null;
+
+        return new PlanStep($n, $hop, $phpBefore, $phpAfter, $lBefore, $lAfter, $puBefore, $puAfter, $hop->isManual() ? [self::GATE_MANUAL] : [self::GATE_TESTS], $frameworkLine, $frameworkLine);
+    }
+
+    /**
+     * The lowest and highest CakePHP or Slim line in the hop data's PHP
+     * tables, for the "Booster does not know" warning. The tables live in the
+     * same file the registry loads, resolved the same way (checkout or phar).
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function frameworkTableBounds(string $framework): array
+    {
+        $key = $framework === 'cakephp' ? 'cakephp_php' : 'slim_php';
+        $json = json_decode((string) file_get_contents(PharFiles::path('data/versions.json')), true);
+        $table = is_array($json) && isset($json[$key]) && is_array($json[$key]) ? $json[$key] : [];
+        $lines = array_map(static fn(mixed $line): string => (string) $line, array_keys($table));
+        usort($lines, static fn(string $a, string $b): int => version_compare($a, $b));
+
+        return [$lines[0], $lines[count($lines) - 1]];
     }
 
     /**

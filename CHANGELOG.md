@@ -7,6 +7,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - Added: an internal runner for CakePHP's own upgrade tool (`cakephp/upgrade`, pinned to a commit), run in a container so its Rector never meets the app's or Booster's; the CakePHP hops use it.
 - Added: the hop data knows which PHP each CakePHP and Slim line supports (`cakephp_php`, `slim_php`), their target lines and companion package pins, for the CakePHP and Slim hops.
 - Added: `detect` names a CakePHP or Slim app's framework and major.minor version (from composer.lock, else composer.json), the first step toward CakePHP and Slim hops.
+- Added: `plan` keeps a CakePHP or Slim app's PHP hops within what its framework line runs on, and says so, instead of planning a PHP the framework cannot run (the framework hops come next).
 
 ## [1.19.0] - 2026-11-14
 
