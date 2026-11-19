@@ -139,6 +139,105 @@ final class ProjectDetectorTest extends TestCase
         self::assertTrue((new ProjectDetector())->detect($dir)->toArray()['boost']);
     }
 
+    public function test_a_cakephp_app_is_named_from_the_lock(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"php":"^8.1","cakephp/cakephp":"^4.3"}}');
+        file_put_contents($dir . '/composer.lock', json_encode(['packages' => [['name' => 'cakephp/cakephp', 'version' => '4.3.11']]]));
+
+        $project = (new ProjectDetector())->detect($dir);
+
+        self::assertSame('cakephp', $project->framework);
+        self::assertSame('4.3', $project->frameworkVersion);
+        self::assertSame('cakephp', $project->toArray()['framework']);
+        self::assertSame('4.3', $project->toArray()['framework_version']);
+    }
+
+    public function test_a_slim_app_is_named_from_the_lock(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"php":"^7.4","slim/slim":"^3.12"}}');
+        file_put_contents($dir . '/composer.lock', json_encode(['packages' => [['name' => 'slim/slim', 'version' => 'v3.12.3']]]));
+
+        $project = (new ProjectDetector())->detect($dir);
+
+        self::assertSame('slim', $project->framework);
+        self::assertSame('3.12', $project->frameworkVersion);
+    }
+
+    public function test_a_framework_without_a_lock_reads_the_require_constraint(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"php":"^8.2","slim/slim":"^4.15"}}');
+
+        $project = (new ProjectDetector())->detect($dir);
+
+        self::assertSame('slim', $project->framework);
+        self::assertSame('4.15', $project->frameworkVersion);
+    }
+
+    public function test_a_non_release_lock_version_falls_back_to_the_require_constraint(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"php":"^8.3","slim/slim":"^5.4"}}');
+        file_put_contents($dir . '/composer.lock', json_encode(['packages' => [['name' => 'slim/slim', 'version' => 'dev-master']]]));
+
+        $project = (new ProjectDetector())->detect($dir);
+
+        self::assertSame('slim', $project->framework);
+        self::assertSame('5.4', $project->frameworkVersion);
+    }
+
+    public function test_cakephp_wins_when_both_frameworks_are_required(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"cakephp/cakephp":"^4.3","slim/slim":"^4.15"}}');
+        file_put_contents($dir . '/composer.lock', json_encode(['packages' => [
+            ['name' => 'cakephp/cakephp', 'version' => '4.3.11'],
+            ['name' => 'slim/slim', 'version' => '4.15.0'],
+        ]]));
+
+        $project = (new ProjectDetector())->detect($dir);
+
+        self::assertSame('cakephp', $project->framework);
+        self::assertSame('4.3', $project->frameworkVersion);
+    }
+
+    public function test_a_framework_with_no_version_at_all_keeps_the_framework(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"php":"^8.2"}}');
+        file_put_contents($dir . '/composer.lock', json_encode(['packages' => [['name' => 'slim/slim', 'version' => 'dev-master']]]));
+
+        $project = (new ProjectDetector())->detect($dir);
+
+        self::assertSame('slim', $project->framework);
+        self::assertNull($project->frameworkVersion);
+        self::assertNull($project->toArray()['framework_version']);
+    }
+
+    public function test_a_dev_only_framework_dependency_is_not_a_framework(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', '{"require":{"php":"^8.2"},"require-dev":{"slim/slim":"^4.15"}}');
+        file_put_contents($dir . '/composer.lock', json_encode(['packages-dev' => [['name' => 'slim/slim', 'version' => '4.15.0']]]));
+
+        $project = (new ProjectDetector())->detect($dir);
+
+        self::assertNull($project->framework);
+        self::assertNull($project->frameworkVersion);
+        self::assertArrayNotHasKey('framework', $project->toArray());
+        self::assertArrayNotHasKey('framework_version', $project->toArray());
+    }
+
+    public function test_an_app_without_a_framework_carries_no_framework_keys(): void
+    {
+        $array = (new ProjectDetector())->detect($this->example('raw-php'))->toArray();
+
+        self::assertArrayNotHasKey('framework', $array);
+        self::assertArrayNotHasKey('framework_version', $array);
+    }
+
     public function test_an_app_without_composer_is_raw_php_with_unknown_version(): void
     {
         $project = (new ProjectDetector())->detect($this->tempDir());
