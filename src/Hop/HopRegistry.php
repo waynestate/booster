@@ -111,6 +111,24 @@ final class HopRegistry
     /** @var array<string, array{0: string, 1: string}> */
     private readonly array $laravelPhp;
 
+    /** @var list<string> */
+    private readonly array $cakephpChain;
+
+    /** @var list<string> */
+    private readonly array $slimChain;
+
+    /** @var array<string, array{0: string, 1: string}> */
+    private readonly array $cakephpPhp;
+
+    /** @var array<string, array{0: string, 1: string}> */
+    private readonly array $slimPhp;
+
+    /** @var array<string, array<string, string>|null> */
+    private readonly array $cakephpCompanionPins;
+
+    /** @var array<string, array<string, string>|null> */
+    private readonly array $slimCompanionPins;
+
     /** @var array<string, string|null> */
     private readonly array $inertiaLaravel;
 
@@ -159,6 +177,12 @@ final class HopRegistry
         $this->phpunitPhp = self::stringTable($data, 'phpunit_php');
         $this->laravelPhpunit = self::stringTable($data, 'laravel_phpunit');
         $this->laravelPhp = self::rangeTable($data, 'laravel_php');
+        $this->cakephpChain = self::chain($data, 'cakephp');
+        $this->slimChain = self::chain($data, 'slim');
+        $this->cakephpPhp = self::rangeTable($data, 'cakephp_php');
+        $this->slimPhp = self::rangeTable($data, 'slim_php');
+        $this->cakephpCompanionPins = self::companionPinTable($data, 'cakephp_companion_pins');
+        $this->slimCompanionPins = self::companionPinTable($data, 'slim_companion_pins');
         $this->inertiaLaravel = self::nullableStringTable($data, 'inertia_laravel');
         $this->inertiaVue3 = self::nullableStringTable($data, 'inertia_vue3');
         $this->inertiaLaravelNext = self::scalar($data, 'inertia_laravel_next');
@@ -485,6 +509,65 @@ final class HopRegistry
         [$low, $high] = $this->laravelPhp[$laravel];
 
         return version_compare($php, $low, '>=') && version_compare($php, $high, '<=');
+    }
+
+    /** Whether a CakePHP or Slim line runs on $php (cakephp_php / slim_php), false for an unknown framework or line. */
+    public function frameworkSupportsPhp(string $framework, string $line, string $php): bool
+    {
+        $range = $this->frameworkPhpRange($framework, $line);
+        if ($range === null) {
+            return false;
+        }
+
+        return version_compare($php, $range[0], '>=') && version_compare($php, $range[1], '<=');
+    }
+
+    /**
+     * The [lowest, highest] PHP range a CakePHP or Slim line runs on, or null
+     * for an unknown framework or line.
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    public function frameworkPhpRange(string $framework, string $line): ?array
+    {
+        return match ($framework) {
+            'cakephp' => $this->cakephpPhp[$line] ?? null,
+            'slim' => $this->slimPhp[$line] ?? null,
+            default => null,
+        };
+    }
+
+    /**
+     * The target lines Booster offers for a CakePHP or Slim app, empty for an
+     * unknown framework.
+     *
+     * @return list<string>
+     */
+    public function frameworkTargets(string $framework): array
+    {
+        return match ($framework) {
+            'cakephp' => $this->cakephpChain,
+            'slim' => $this->slimChain,
+            default => [],
+        };
+    }
+
+    /**
+     * The companion composer constraints a CakePHP or Slim hop moving to
+     * $target raises alongside the framework package, empty for an unknown
+     * framework, line, or pins decision.
+     *
+     * @return array<string, string>
+     */
+    public function frameworkCompanionPins(string $framework, string $target): array
+    {
+        $pins = match ($framework) {
+            'cakephp' => $this->cakephpCompanionPins[$target] ?? null,
+            'slim' => $this->slimCompanionPins[$target] ?? null,
+            default => null,
+        };
+
+        return is_array($pins) ? $pins : [];
     }
 
     /** @return array<string, mixed> */

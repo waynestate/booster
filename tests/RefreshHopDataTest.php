@@ -493,4 +493,54 @@ final class RefreshHopDataTest extends TestCase
         self::assertStringContainsString('phpunit_php', $problems[0]);
         self::assertStringContainsString('11', $problems[0]);
     }
+
+    public function test_a_refresh_fills_missing_cakephp_and_slim_data_from_its_constants(): void
+    {
+        $result = (new HopDataRefresher($this->policy()))->refresh($this->oldData(), $this->feeds(), new DateTimeImmutable('2026-10-29'));
+
+        self::assertSame(HopDataRefresher::FIXED_CAKEPHP_CHAIN, $result['cakephp']);
+        self::assertSame(HopDataRefresher::FIXED_SLIM_CHAIN, $result['slim']);
+        self::assertSame(HopDataRefresher::FIXED_CAKEPHP_PHP, $result['cakephp_php']);
+        self::assertSame(HopDataRefresher::FIXED_SLIM_PHP, $result['slim_php']);
+        self::assertSame(HopDataRefresher::FIXED_CAKEPHP_COMPANION_PINS, $result['cakephp_companion_pins']);
+        self::assertSame(HopDataRefresher::FIXED_SLIM_COMPANION_PINS, $result['slim_companion_pins']);
+    }
+
+    public function test_a_refresh_keeps_on_file_cakephp_and_slim_values(): void
+    {
+        $data = $this->oldData();
+        $data['cakephp'] = ['4.6'];
+        $data['cakephp_php'] = ['4.6' => ['7.4', '8.9']];
+        $data['cakephp_companion_pins'] = ['4.6' => ['custom/package' => '^9.9']];
+
+        $result = (new HopDataRefresher($this->policy()))->refresh($data, $this->feeds(), new DateTimeImmutable('2026-10-29'));
+
+        self::assertSame(['4.6'], $result['cakephp']);
+        self::assertSame(['7.4', '8.9'], $result['cakephp_php']['4.6']);
+        self::assertSame(['custom/package' => '^9.9'], $result['cakephp_companion_pins']['4.6']);
+    }
+
+    public function test_shape_problems_flag_a_reversed_range_table_row(): void
+    {
+        $data = $this->committedData();
+        $data['cakephp_php']['4.6'] = ['8.5', '7.4'];
+
+        $problems = (new HopDataRefresher($this->policy()))->shapeProblems($data, new DateTimeImmutable('2026-10-29'));
+
+        self::assertCount(1, $problems);
+        self::assertStringContainsString('cakephp_php', $problems[0]);
+        self::assertStringContainsString('reversed', $problems[0]);
+    }
+
+    public function test_shape_problems_flag_a_chain_line_missing_from_a_range_table(): void
+    {
+        $data = $this->committedData();
+        unset($data['slim_php']['4.15']);
+
+        $problems = (new HopDataRefresher($this->policy()))->shapeProblems($data, new DateTimeImmutable('2026-10-29'));
+
+        self::assertCount(1, $problems);
+        self::assertStringContainsString('slim_php', $problems[0]);
+        self::assertStringContainsString('4.15', $problems[0]);
+    }
 }
