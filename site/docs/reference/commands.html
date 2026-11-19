@@ -295,7 +295,7 @@
 </table></div>
 <h3 id="booster-replay"><span class="docs-heading-tail"><code>booster replay</code><a class="docs-heading-link" aria-label="Link to this section" href="#booster-replay">#</a></span></h3>
 <p>The replay gate on its own: init drafts booster-replay.json, record saves how the app answers now, check fails when an answer changed.</p>
-<p>Usage: <code>booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recording RECORDING] [--php PHP] [--image IMAGE] [--out OUT] [--no-install] [--force] [--] &lt;action&gt;</code></p>
+<p>Usage: <code>booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recording RECORDING] [--php PHP] [--image IMAGE] [--out OUT] [--no-install] [--serve-changed] [--force] [--] &lt;action&gt;</code></p>
 <div class="docs-table" role="region" aria-label="Table" tabindex="0"><table>
 <thead>
 <tr>
@@ -359,6 +359,11 @@
 <tr>
 <td><code>--no-install</code></td>
 <td>Do not run composer install first; use the vendor/ the app already has.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>--serve-changed</code></td>
+<td>check only: the hop changed how the app is served (docroot, front controller, setup); compare answers anyway, as long as the requests are the same.</td>
 <td></td>
 </tr>
 <tr>

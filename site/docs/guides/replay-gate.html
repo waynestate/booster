@@ -249,6 +249,26 @@ its ID (<code>&quot;cookies&quot;: {&quot;PHPSESSID&quot;: &quot;replay-user&quo
 that. Move it to SESAME's Wayne Auth bridge first; <code>booster plan</code> names it as a stop sign.</li>
 </ul>
 <p>Keep the guest's redirect as one request either way: it is the honest answer for a visitor who is not signed in.</p>
+<h2 id="when-a-hop-changes-how-the-app-is-served">When a hop changes how the app is <span class="docs-heading-tail"><span>served</span><a class="docs-heading-link" aria-label="Link to this section" href="#when-a-hop-changes-how-the-app-is-served">#</a></span></h2>
+<p>Some hops change more than the PHP: a strangler's mount step moves the docroot or the front controller, a new
+<code>setup</code> command builds the fake data a different way. The <code>serve</code> section is part of the recording's fingerprint, so
+a plain <code>check</code> refuses to compare against such a hop:</p>
+<pre tabindex="0"><code>The recording booster-replay.recording.json was made from a different version of booster-replay.json (its requests or &quot;serve&quot; section changed since). Record again on the old PHP: booster replay record
+</code></pre>
+<p>That is right when the requests changed, and wrong when only the serving did: the answers are still comparable. For
+that case <code>check</code> takes <code>--serve-changed</code>:</p>
+<!-- docs-test: skip needs Docker, run on your own app -->
+<pre tabindex="0"><code class="language-sh">booster replay check --path=&lt;app&gt; --php=8.4 --serve-changed
+</code></pre>
+<p>With the flag, Booster compares the answers as long as the requests are the ones recorded (the requests half of the
+fingerprint); a changed request still refuses the recording, with or without the flag. The change is named where the
+result is read, in the report and under the transcript's title:</p>
+<pre tabindex="0"><code>Replay passed: all 11 answers match the baseline from PHP 7.4.
+serve: docroot public, front index.php -&gt; docroot public, front index.php, setup &quot;php replay/seed.php&quot;
+</code></pre>
+<p>Without the flag nothing changes: a changed <code>serve</code> section is refused like any other file change. A recording made
+before Booster could compare across a serve change has no requests fingerprint of its own; <code>--serve-changed</code> says so
+and asks for one new record on the current setup. The flag goes with <code>check</code> only: <code>record</code> and <code>init</code> refuse it.</p>
 <h2 id="limits-honestly">Limits, <span class="docs-heading-tail"><span>honestly</span><a class="docs-heading-link" aria-label="Link to this section" href="#limits-honestly">#</a></span></h2>
 <ul>
 <li><strong>No real Oracle, SSO or CAS.</strong> The replay never reaches a real system, by design. An app that cannot render a
@@ -271,7 +291,7 @@ queue. A follow-up request that reads the saved record back (like <code>read bac
     </main>
     <nav class="docs-pager" aria-label="Pages"><a class="docs-pager__link" href="../../docs/guides/hops.html"><span class="docs-pager__dir">Previous</span><span class="docs-pager__title">What a hop does</span></a><a class="docs-pager__link docs-pager__link--next" href="../../docs/guides/framework-hops.html"><span class="docs-pager__dir">Next</span><span class="docs-pager__title">Hand-copied libraries to Composer</span></a></nav>
   </div>
-  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#in-three-commands">In three commands</a></li><li class="docs-toc__item"><a href="#what-a-run-does-with-it">What a run does with it</a></li><li class="docs-toc__item"><a href="#the-request-file">The request file</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-is-compared">What is compared</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#normalizers">Normalizers</a></li><li class="docs-toc__item"><a href="#design">Design</a></li><li class="docs-toc__item"><a href="#drafting-the-file">Drafting the file</a></li><li class="docs-toc__item"><a href="#pages-behind-sign-in">Pages behind sign-in</a></li><li class="docs-toc__item"><a href="#limits-honestly">Limits, honestly</a></li></ul></nav>
+  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#in-three-commands">In three commands</a></li><li class="docs-toc__item"><a href="#what-a-run-does-with-it">What a run does with it</a></li><li class="docs-toc__item"><a href="#the-request-file">The request file</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-is-compared">What is compared</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#normalizers">Normalizers</a></li><li class="docs-toc__item"><a href="#design">Design</a></li><li class="docs-toc__item"><a href="#drafting-the-file">Drafting the file</a></li><li class="docs-toc__item"><a href="#pages-behind-sign-in">Pages behind sign-in</a></li><li class="docs-toc__item"><a href="#when-a-hop-changes-how-the-app-is-served">When a hop changes how the app is served</a></li><li class="docs-toc__item"><a href="#limits-honestly">Limits, honestly</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
   <span>Documents Booster <span data-docs-version>1.19.0</span></span>

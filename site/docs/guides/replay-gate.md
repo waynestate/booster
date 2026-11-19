@@ -148,6 +148,29 @@ It is a warning, not a stop: the replay still gates every hop. To make it prove 
 
 Keep the guest's redirect as one request either way: it is the honest answer for a visitor who is not signed in.
 
+## When a hop changes how the app is served [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#when-a-hop-changes-how-the-app-is-served)
+
+Some hops change more than the PHP: a strangler's mount step moves the docroot or the front controller, a new `setup` command builds the fake data a different way. The `serve` section is part of the recording's fingerprint, so a plain `check` refuses to compare against such a hop:
+
+```
+The recording booster-replay.recording.json was made from a different version of booster-replay.json (its requests or "serve" section changed since). Record again on the old PHP: booster replay record
+```
+
+That is right when the requests changed, and wrong when only the serving did: the answers are still comparable. For that case `check` takes `--serve-changed`:
+
+```sh
+booster replay check --path=<app> --php=8.4 --serve-changed
+```
+
+With the flag, Booster compares the answers as long as the requests are the ones recorded (the requests half of the fingerprint); a changed request still refuses the recording, with or without the flag. The change is named where the result is read, in the report and under the transcript's title:
+
+```
+Replay passed: all 11 answers match the baseline from PHP 7.4.
+serve: docroot public, front index.php -> docroot public, front index.php, setup "php replay/seed.php"
+```
+
+Without the flag nothing changes: a changed `serve` section is refused like any other file change. A recording made before Booster could compare across a serve change has no requests fingerprint of its own; `--serve-changed` says so and asks for one new record on the current setup. The flag goes with `check` only: `record` and `init` refuse it.
+
 ## Limits, honestly [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#limits-honestly)
 
 - **No real Oracle, SSO or CAS.** The replay never reaches a real system, by design. An app that cannot render a page without Oracle needs a fake for that page (an environment switch to SQLite, a stub repository), or that page stays out of the file. Pages behind CAS or Entra need the app's own test login (a fake user in the session, the way its tests sign in); without one, the honest request is the guest's: the redirect to sign-in.
