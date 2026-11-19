@@ -26,6 +26,9 @@ final readonly class ReplayRecording
         public string $php,
         public string $fingerprint,
         public array $answers,
+        public string $requestsFingerprint = '',
+        public string $serveFingerprint = '',
+        public string $serveSummary = '',
     ) {}
 
     public function toJson(): string
@@ -34,6 +37,9 @@ final readonly class ReplayRecording
             'format' => self::FORMAT,
             'php' => $this->php,
             'fingerprint' => $this->fingerprint,
+            'requests_fingerprint' => $this->requestsFingerprint,
+            'serve_fingerprint' => $this->serveFingerprint,
+            'serve_summary' => $this->serveSummary,
             'answers' => array_map(static fn(ReplayAnswer $a): array => $a->toArray(), $this->answers),
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n";
     }
@@ -58,16 +64,39 @@ final readonly class ReplayRecording
             is_string($data['php'] ?? null) ? $data['php'] : '?',
             is_string($data['fingerprint'] ?? null) ? $data['fingerprint'] : '',
             $answers,
+            is_string($data['requests_fingerprint'] ?? null) ? $data['requests_fingerprint'] : '',
+            is_string($data['serve_fingerprint'] ?? null) ? $data['serve_fingerprint'] : '',
+            is_string($data['serve_summary'] ?? null) ? $data['serve_summary'] : '',
         );
     }
 
     /**
      * Stops a comparison against a recording made from a different request
-     * file: the answers would line up with the wrong requests.
+     * file: the answers would line up with the wrong requests. With
+     * $serveChanged, a hop that changed how the app is served (docroot, front
+     * controller, setup) may still compare the answers, as long as the
+     * requests are the ones recorded.
      */
-    public function assertMatches(ReplayFile $file, string $recordingPath): void
+    public function assertMatches(ReplayFile $file, string $recordingPath, bool $serveChanged = false): void
     {
-        if ($this->fingerprint !== $file->fingerprint || count($this->answers) !== count($file->requests)) {
+        if (!$serveChanged) {
+            if ($this->fingerprint !== $file->fingerprint || count($this->answers) !== count($file->requests)) {
+                throw new ToolError(sprintf(
+                    'The recording %s was made from a different version of %s (its requests or "serve" section changed since). Record again on the old PHP: booster replay record',
+                    $recordingPath,
+                    basename($file->path),
+                ));
+            }
+
+            return;
+        }
+        if ($this->requestsFingerprint === '') {
+            throw new ToolError(sprintf(
+                'The recording %s was made before Booster could compare across a serve change. Record it again once on the current setup (booster replay record), then run the check with --serve-changed.',
+                $recordingPath,
+            ));
+        }
+        if ($this->requestsFingerprint !== $file->requestsFingerprint || count($this->answers) !== count($file->requests)) {
             throw new ToolError(sprintf(
                 'The recording %s was made from a different version of %s (its requests or "serve" section changed since). Record again on the old PHP: booster replay record',
                 $recordingPath,

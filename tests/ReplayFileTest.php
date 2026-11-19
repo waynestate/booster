@@ -133,6 +133,52 @@ final class ReplayFileTest extends TestCase
         self::assertNotSame($a->fingerprint, $c->fingerprint);
     }
 
+    public function test_the_combined_fingerprint_keeps_its_value_when_the_file_gains_split_fingerprints(): void
+    {
+        $file = ReplayFile::load(self::FIXTURE);
+
+        // Verified against the pre-split code (git HEAD) on the same fixture:
+        // the combined fingerprint must not move when a recording is compared.
+        self::assertSame('8b0d7b2e06a1d5de5b04753e4aa3a31cd73074bb1ffe634d75e91a1d04c28c32', $file->fingerprint);
+        self::assertSame('711cd9b6aba6d0a1b9c2c5467b5f55ec59f546a50fd3e616c7e2366741e3cc77', $file->requestsFingerprint);
+        self::assertSame('4f6575b8c2b58b38842bf2ae0122659ab9ae7ec6b3b914e0756515f649b4a691', $file->serveFingerprint);
+
+        $compare = ReplayFile::load(__DIR__ . '/fixtures/replay-app/booster-replay-compare.json');
+        self::assertSame('57ff8a1cafdd2e5330ed3dd2bc8c96e7eeb6e1286c98c290557df4a534e541c0', $compare->fingerprint);
+        self::assertSame('b6edef20f333d988dd9e2c3cf8ec376127c7e03e2ce217cda7174fe0266da585', $compare->requestsFingerprint);
+        self::assertSame('3770337f52bc6631d2c0354ee2ed99b0ecb7850bdf091d3c7b48a4320a7e1e11', $compare->serveFingerprint);
+    }
+
+    public function test_a_serve_only_change_keeps_the_requests_fingerprint(): void
+    {
+        $requests = [['name' => 'home', 'path' => '/']];
+        $before = ReplayFile::fromArray(['serve' => ['docroot' => 'public', 'front_controller' => 'index.php'], 'requests' => $requests]);
+        $after = ReplayFile::fromArray(['serve' => ['docroot' => 'web', 'front_controller' => 'index.php', 'setup' => 'php seed.php'], 'requests' => $requests]);
+
+        self::assertSame($before->requestsFingerprint, $after->requestsFingerprint);
+        self::assertNotSame($before->serveFingerprint, $after->serveFingerprint);
+        self::assertNotSame($before->fingerprint, $after->fingerprint);
+    }
+
+    public function test_a_request_only_change_keeps_the_serve_fingerprint(): void
+    {
+        $serve = ['docroot' => 'public', 'front_controller' => 'index.php'];
+        $before = ReplayFile::fromArray(['serve' => $serve, 'requests' => [['path' => '/']]]);
+        $after = ReplayFile::fromArray(['serve' => $serve, 'requests' => [['path' => '/other']]]);
+
+        self::assertSame($before->serveFingerprint, $after->serveFingerprint);
+        self::assertNotSame($before->requestsFingerprint, $after->requestsFingerprint);
+        self::assertNotSame($before->fingerprint, $after->fingerprint);
+    }
+
+    public function test_the_serve_summary_names_docroot_front_controller_and_setup(): void
+    {
+        $full = ReplayFile::fromArray(['serve' => ['docroot' => 'public', 'front_controller' => 'index.php', 'setup' => 'php seed.php'], 'requests' => [['path' => '/']]]);
+        self::assertSame('docroot public, front index.php, setup "php seed.php"', $full->serveSummary());
+        self::assertSame('docroot public, front index.php', ReplayFile::load(__DIR__ . '/fixtures/replay-app/booster-replay-compare.json')->serveSummary());
+        self::assertSame('docroot .', ReplayFile::fromArray(['requests' => [['path' => '/']]])->serveSummary());
+    }
+
     public function test_the_docroot_must_stay_inside_the_app(): void
     {
         $this->expectException(ToolError::class);

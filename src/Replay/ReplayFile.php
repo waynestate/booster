@@ -50,6 +50,8 @@ final readonly class ReplayFile
         public string $compareWhitespace = self::COMPARE_WHITESPACE_COLLAPSE,
         public array $todos = [],
         public string $fingerprint = '',
+        public string $requestsFingerprint = '',
+        public string $serveFingerprint = '',
     ) {}
 
     /**
@@ -206,10 +208,16 @@ final readonly class ReplayFile
         // What the recording depends on: the requests and how the app is
         // served. Normalizers and compare modes are left out on purpose, so a
         // person can hide a volatile value without recording again.
+        $clientRequests = array_map(static fn(ReplayRequest $r): array => $r->toClientArray(), $requests);
         $fingerprint = hash('sha256', (string) json_encode([
             'serve' => [$docroot, $front, $setup, $env, $ini, $services],
-            'requests' => array_map(static fn(ReplayRequest $r): array => $r->toClientArray(), $requests),
+            'requests' => $clientRequests,
         ]));
+        // The same two halves on their own: a hop that changes how the app is
+        // served (the strangler's mount step) can still compare the answers
+        // when the requests are the ones recorded.
+        $requestsFingerprint = hash('sha256', (string) json_encode($clientRequests));
+        $serveFingerprint = hash('sha256', (string) json_encode([$docroot, $front, $setup, $env, $ini, $services]));
 
         return new self(
             path: $path,
@@ -226,7 +234,26 @@ final readonly class ReplayFile
             compareWhitespace: $compareWhitespace,
             todos: $todos,
             fingerprint: $fingerprint,
+            requestsFingerprint: $requestsFingerprint,
+            serveFingerprint: $serveFingerprint,
         );
+    }
+
+    /**
+     * One line a person can read: how this file serves the app, for the note
+     * a check writes when a hop changed it.
+     */
+    public function serveSummary(): string
+    {
+        $summary = 'docroot ' . $this->docroot;
+        if ($this->frontController !== null) {
+            $summary .= ', front ' . $this->frontController;
+        }
+        if ($this->setup !== null) {
+            $summary .= ', setup "' . $this->setup . '"';
+        }
+
+        return $summary;
     }
 
     /**

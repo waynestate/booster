@@ -87,6 +87,63 @@ final class ReplayCommandTest extends TestCase
         self::assertStringContainsString('Record one first: booster replay record', $text);
     }
 
+    public function test_serve_changed_is_check_only(): void
+    {
+        $app = $this->fixtureCopy();
+
+        [$exit, $text] = $this->booster(['command' => 'replay', 'action' => 'record', '--path' => $app, '--file' => 'booster-replay-compare.json', '--serve-changed' => true]);
+        self::assertSame(2, $exit);
+        self::assertStringContainsString('--serve-changed only goes with check.', $text);
+
+        [$exit, $text] = $this->booster(['command' => 'replay', 'action' => 'init', '--path' => $app, '--serve-changed' => true]);
+        self::assertSame(2, $exit);
+        self::assertStringContainsString('--serve-changed only goes with check.', $text);
+    }
+
+    public function test_check_with_serve_changed_passes_across_a_serve_change_and_names_it(): void
+    {
+        $app = $this->fixtureCopy();
+        $out = $this->tempDir();
+        $answers = [[200, '{"code":"0","matches_zero":true}', self::JSON], [200, '{"code":"abc","matches_zero":true}', self::JSON]];
+
+        [$exit, $text] = $this->booster(['command' => 'replay', 'action' => 'record', '--path' => $app, '--file' => 'booster-replay-compare.json', '--out' => $out, '--no-install' => true], ReplayFake::runner([$answers]));
+        self::assertSame(0, $exit, $text);
+
+        // The recording carries the split fingerprints and how the app was served.
+        $saved = (array) json_decode((string) file_get_contents($app . '/booster-replay.recording.json'), true);
+        self::assertSame('docroot public, front index.php', $saved['serve_summary']);
+        self::assertNotEmpty($saved['requests_fingerprint']);
+        self::assertNotEmpty($saved['serve_fingerprint']);
+
+        // The hop changed how the app is served: the same requests, a new setup command.
+        $data = (array) json_decode((string) file_get_contents($app . '/booster-replay-compare.json'), true);
+        $data['serve']['setup'] = 'php seed.php';
+        file_put_contents($app . '/booster-replay-compare.json', (string) json_encode($data));
+
+        [$exit, $text] = $this->booster(['command' => 'replay', 'action' => 'check', '--path' => $app, '--file' => 'booster-replay-compare.json', '--php' => '8.4', '--out' => $out, '--no-install' => true, '--serve-changed' => true], ReplayFake::runner([$answers]));
+
+        self::assertSame(0, $exit, $text);
+        self::assertStringContainsString('Replay passed: all 2 answers match the baseline from PHP 7.4.', $text);
+        self::assertStringContainsString('serve: docroot public, front index.php -> docroot public, front index.php, setup "php seed.php"', $text);
+        self::assertStringContainsString('serve: docroot public, front index.php -> docroot public, front index.php, setup "php seed.php"', (string) file_get_contents($out . '/check-php8.4.txt'));
+    }
+
+    public function test_check_after_a_serve_change_without_the_flag_fails(): void
+    {
+        $app = $this->fixtureCopy();
+        $answers = [[200, '{"code":"0","matches_zero":true}', self::JSON], [200, '{"code":"abc","matches_zero":true}', self::JSON]];
+        $this->booster(['command' => 'replay', 'action' => 'record', '--path' => $app, '--file' => 'booster-replay-compare.json', '--out' => $this->tempDir(), '--no-install' => true], ReplayFake::runner([$answers]));
+
+        $data = (array) json_decode((string) file_get_contents($app . '/booster-replay-compare.json'), true);
+        $data['serve']['setup'] = 'php seed.php';
+        file_put_contents($app . '/booster-replay-compare.json', (string) json_encode($data));
+
+        [$exit, $text] = $this->booster(['command' => 'replay', 'action' => 'check', '--path' => $app, '--file' => 'booster-replay-compare.json', '--php' => '8.4', '--out' => $this->tempDir(), '--no-install' => true], ReplayFake::runner([$answers]));
+
+        self::assertSame(2, $exit);
+        self::assertStringContainsString('was made from a different version of booster-replay-compare.json', $text);
+    }
+
     public function test_init_drafts_a_file_with_todos_and_record_refuses_until_they_are_gone(): void
     {
         $app = $this->tempDir();

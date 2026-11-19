@@ -45,6 +45,7 @@ final class ReplayCommand extends BaseCommand
             ->addOption('image', null, InputOption::VALUE_REQUIRED, 'Serve the app in this Docker image instead of booster-target, in the same three forms as run --image.')
             ->addOption('out', null, InputOption::VALUE_REQUIRED, 'Folder for the transcripts (default: a new booster-replay-<app>-<time> folder in the system temp folder).')
             ->addOption('no-install', null, InputOption::VALUE_NONE, 'Do not run composer install first; use the vendor/ the app already has.')
+            ->addOption('serve-changed', null, InputOption::VALUE_NONE, 'check only: the hop changed how the app is served (docroot, front controller, setup); compare answers anyway, as long as the requests are the same.')
             ->addOption('force', null, InputOption::VALUE_NONE, 'init only: overwrite an existing request file.');
     }
 
@@ -58,6 +59,9 @@ final class ReplayCommand extends BaseCommand
             throw new ToolError(sprintf('Path "%s" does not exist.', $path));
         }
         $filePath = ReplayFile::locate($appPath, $this->stringOption($input, 'file'));
+        if ((bool) $input->getOption('serve-changed') && in_array($action, ['init', 'record'], true)) {
+            throw new ToolError('--serve-changed only goes with check.');
+        }
 
         return match ($action) {
             'init' => $this->init($appPath, $filePath, (bool) $input->getOption('force'), $output),
@@ -100,6 +104,7 @@ final class ReplayCommand extends BaseCommand
         $runner = $this->runner ?? new ReplayRunner(new TargetImageRunner($this->processes), $this->processes);
         $gate = new ReplayGate($runner, $file, $appPath, $outDir, GateImage::fromOption($this->stringOption($input, 'image')));
         $install = !(bool) $input->getOption('no-install');
+        $serveChanged = (bool) $input->getOption('serve-changed');
 
         if ($action === 'record') {
             $outcome = $gate->record($php, $install);
@@ -113,8 +118,8 @@ final class ReplayCommand extends BaseCommand
                 $lines[] = sprintf('Next: after a change, %s replay check --path %s --php <new version>', Invocation::program(), Invocation::pathArg($appPath));
             }
         } else {
-            $gate->useRecording(ReplayRecording::load($recordingPath), $recordingPath);
-            $outcome = $gate->check($php, 'check-php' . $php, $install);
+            $gate->useRecording(ReplayRecording::load($recordingPath), $recordingPath, $serveChanged);
+            $outcome = $gate->check($php, 'check-php' . $php, $install, $serveChanged);
             $lines = $outcome->lines;
         }
 
