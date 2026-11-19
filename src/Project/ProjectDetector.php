@@ -26,6 +26,10 @@ final class ProjectDetector
 
     private const HELMET_PACKAGE = 'waynestate/helmet';
 
+    private const CAKEPHP_PACKAGE = 'cakephp/cakephp';
+
+    private const SLIM_PACKAGE = 'slim/slim';
+
     public function detect(string $path): Project
     {
         if (!is_dir($path)) {
@@ -80,6 +84,8 @@ final class ProjectDetector
             $phpVersion = $lock['floor'];
         }
 
+        [$framework, $frameworkVersion] = $this->framework($path . '/composer.lock', $require);
+
         return new Project(
             path: $path,
             hasComposer: $composer !== [],
@@ -106,6 +112,8 @@ final class ProjectDetector
             usesWayneUi1: array_key_exists(self::WAYNE_UI_PACKAGE, $all),
             wayneAuthHits: WayneAuthScan::find($path),
             vendorMissing: self::requiresPackages($all) && !is_file($path . '/vendor/autoload.php'),
+            framework: $framework,
+            frameworkVersion: $frameworkVersion,
         );
     }
 
@@ -181,6 +189,41 @@ final class ProjectDetector
         $major = explode('.', $bound)[0];
 
         return $major === '5' ? $bound : $major;
+    }
+
+    /**
+     * The app's framework, "cakephp" or "slim", and its major.minor. Only the
+     * runtime dependencies count: composer.json's require and composer.lock's
+     * packages, never require-dev or packages-dev. When both frameworks are
+     * present, CakePHP wins. The version is the locked release ("4.3.11" to
+     * "4.3"), else the lower bound of the require constraint at two parts
+     * ("^4.3" to "4.3"); null when neither gives one, in which case the
+     * framework still stands on its own.
+     *
+     * @param array<string, mixed> $require
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    private function framework(string $lockFile, array $require): array
+    {
+        $locked = $this->lockPackages($lockFile);
+        $hasCake = array_key_exists(self::CAKEPHP_PACKAGE, $require) || isset($locked[self::CAKEPHP_PACKAGE]);
+        $hasSlim = array_key_exists(self::SLIM_PACKAGE, $require) || isset($locked[self::SLIM_PACKAGE]);
+        if (!$hasCake && !$hasSlim) {
+            return [null, null];
+        }
+
+        $name = $hasCake ? 'cakephp' : 'slim';
+        $package = $name === 'cakephp' ? self::CAKEPHP_PACKAGE : self::SLIM_PACKAGE;
+        $version = isset($locked[$package]) ? $this->releaseMajorMinor($locked[$package]) : null;
+        if ($version === null) {
+            $constraint = $require[$package] ?? null;
+            if (is_string($constraint)) {
+                $version = $this->lowerBound($constraint, 2);
+            }
+        }
+
+        return [$name, $version];
     }
 
     /**
@@ -292,6 +335,16 @@ final class ProjectDetector
     }
 
     /**
+     * A locked release as major.minor: "4.3.11" to "4.3", "v3.12.3" to "3.12".
+     * Null when the version is not a release (dev-master, 4.x-dev), so the
+     * caller falls back to the require constraint.
+     */
+    private function releaseMajorMinor(string $version): ?string
+    {
+        return $this->majorMinor(ltrim($version, 'v'));
+    }
+
+    /**
      * The exclusive ceiling a bound sets, as major.minor: "<8.1" gives "8.1",
      * and an inclusive bound gets its minor bumped ("<=8.0" gives "8.1").
      */
@@ -384,6 +437,33 @@ final class ProjectDetector
         }
 
         return false;
+    }
+
+    /**
+     * The runtime packages composer.lock pins, name to version. A missing or
+     * broken lock counts as no lock, and packages-dev never counts: only what
+     * the app runs on matters.
+     *
+     * @return array<string, string>
+     */
+    private function lockPackages(string $file): array
+    {
+        if (!is_file($file)) {
+            return [];
+        }
+        $raw = file_get_contents($file);
+        $data = $raw === false ? null : json_decode($raw, true);
+        if (!is_array($data) || !is_array($data['packages'] ?? null)) {
+            return [];
+        }
+        $locked = [];
+        foreach ($data['packages'] as $entry) {
+            if (is_array($entry) && is_string($entry['name'] ?? null) && is_string($entry['version'] ?? null)) {
+                $locked[$entry['name']] = $entry['version'];
+            }
+        }
+
+        return $locked;
     }
 
     /**

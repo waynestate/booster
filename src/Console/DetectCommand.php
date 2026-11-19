@@ -63,9 +63,16 @@ final class DetectCommand extends BaseCommand
                 // Said in words below the keys instead: it is advice, not a reading.
                 continue;
             }
+            if ($key === 'framework_version') {
+                // Printed on the framework line: one reading, two keys.
+                continue;
+            }
             $shown = is_array($value)
                 ? self::lockRangeText($value)
                 : (is_bool($value) ? ($value ? 'yes' : 'no') : (string) ($value ?? 'unknown'));
+            if ($key === 'framework') {
+                $shown .= ' ' . (string) ($project->frameworkVersion ?? 'unknown');
+            }
             $output->writeln(sprintf('%-14s %s', $key, TextWriter::clean($shown)), OutputInterface::OUTPUT_RAW);
         }
         $output->writeln('', OutputInterface::OUTPUT_RAW);
@@ -91,7 +98,7 @@ final class DetectCommand extends BaseCommand
         $lines = [
             'Nothing was changed. This is what Booster read from composer.json and package.json; "php" is the lowest PHP version',
             'composer.json allows, not what your server runs (if it is wrong, add --from-php=X.Y to plan).',
-            'Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayne_auth = the old Wayne Auth sign-in in the app\'s own code, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.',
+            'Keys: composer_json = composer.json found, framework = CakePHP or Slim and its major.minor, read from composer.lock (else composer.json), mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayne_auth = the old Wayne Auth sign-in in the app\'s own code, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.',
         ];
         $flags = [];
         if ($project->phpVersion === null) {

@@ -781,7 +781,7 @@ final class CliTest extends TestCase
         [$exit, $out] = $this->booster(['command' => 'detect', '--path' => $app]);
 
         self::assertSame(0, $exit);
-        self::assertStringContainsString('Keys: composer_json = composer.json found, mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayne_auth = the old Wayne Auth sign-in in the app\'s own code, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.', $out);
+        self::assertStringContainsString('Keys: composer_json = composer.json found, framework = CakePHP or Slim and its major.minor, read from composer.lock (else composer.json), mix_file = webpack.mix.js found, wayne_cas = the cit-web-infra/wayne-cas package, wayne_auth = the old Wayne Auth sign-in in the app\'s own code, wayneui_1 = the cit-web-infra/wayne-ui package, boost = the laravel/boost package, helmet = the waynestate/helmet package.', $out);
         self::assertLessThan(strpos($out, 'Next: '), strpos($out, 'Keys: '), 'the Keys line comes before the Next line');
     }
 

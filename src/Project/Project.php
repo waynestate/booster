@@ -12,6 +12,12 @@ namespace Waynestate\Booster\Project;
  * say; nodeMajor is the lowest major engines.node allows, null when there is
  * no package.json or no engines.node.
  *
+ * framework is 'cakephp' or 'slim' when the app's runtime dependencies
+ * (composer.json require, composer.lock packages) carry that framework, null
+ * otherwise. frameworkVersion is the framework's major.minor ("4.3"), read
+ * from the locked release or the require constraint's lower bound, null when
+ * neither gives one.
+ *
  * The lock range is the PHP span composer.lock allows: the highest lower bound
  * and the lowest upper bound across the locked packages' require.php
  * constraints, raised by a platform pin if composer.json carries one. The
@@ -48,6 +54,10 @@ final readonly class Project
         public array $wayneAuthHits = [],
         /** composer.json requires packages but vendor/autoload.php is not there, so Rector and PHPStan see less */
         public bool $vendorMissing = false,
+        /** 'cakephp' or 'slim' when the app's runtime dependencies carry that framework, null otherwise */
+        public ?string $framework = null,
+        /** the framework's major.minor ("4.3"), from the locked release or the require constraint's lower bound, null when neither says */
+        public ?string $frameworkVersion = null,
     ) {}
 
     /**
@@ -71,6 +81,13 @@ final readonly class Project
             'composer_json' => $this->hasComposer,
             'php' => $this->phpVersion,
             'laravel' => $this->laravelMajor,
+        ];
+        // Only an app that runs CakePHP or Slim carries the keys, so every other report keeps its shape.
+        if ($this->framework !== null) {
+            $array['framework'] = $this->framework;
+            $array['framework_version'] = $this->frameworkVersion;
+        }
+        $array += [
             'phpunit' => $this->phpunitMajor,
             'vue' => $this->vueMajor,
             'node' => $this->nodeMajor,

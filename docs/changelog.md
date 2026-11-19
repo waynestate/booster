@@ -11,6 +11,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Added: `detect` names a CakePHP or Slim app's framework and major.minor version (from composer.lock, else composer.json), the first step toward CakePHP and Slim hops.
+
 ## [1.19.0] - 2026-11-14
 
 SESAME 0.8 and native names for cas-to-sesame, WayneUI 2 behaviour rows, Preflight 0.9.0, Squire 0.11.1 and PROCTOR 0.16.
