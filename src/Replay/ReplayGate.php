@@ -49,9 +49,9 @@ final class ReplayGate
         return $this->recording;
     }
 
-    public function useRecording(ReplayRecording $recording, string $recordingPath): void
+    public function useRecording(ReplayRecording $recording, string $recordingPath, bool $serveChanged = false): void
     {
-        $recording->assertMatches($this->file, $recordingPath);
+        $recording->assertMatches($this->file, $recordingPath, $serveChanged);
         $this->recording = $recording;
         $this->write('baseline-php' . $recording->php . '.txt', ReplayComparison::transcript($this->file, $recording->answers, sprintf('Booster replay: baseline on PHP %s (from %s)', $recording->php, basename($recordingPath))));
     }
@@ -98,7 +98,7 @@ final class ReplayGate
             ], $name, $this->outDir, $transcript, count($this->file->requests));
         }
 
-        $this->recording = new ReplayRecording($php, $this->file->fingerprint, $run->answers);
+        $this->recording = new ReplayRecording($php, $this->file->fingerprint, $run->answers, $this->file->requestsFingerprint, $this->file->serveFingerprint, $this->file->serveSummary());
         $lines = [sprintf('Replay: recorded %d answer%s on PHP %s from %s.', count($run->answers), count($run->answers) === 1 ? '' : 's', $php, $name)];
         $redirect = self::sameRedirect($run->answers);
         if ($redirect !== null) {
@@ -115,8 +115,11 @@ final class ReplayGate
     /**
      * Replays every request on $php and compares the answers with the
      * recording. $label names the transcript (for example step-2-php-80-to-81).
+     * With $serveChanged, a hop that changed how the app is served may still
+     * pass when the answers match; the change is named in the transcript and
+     * the report.
      */
-    public function check(string $php, string $label, bool $install = false): ReplayOutcome
+    public function check(string $php, string $label, bool $install = false, bool $serveChanged = false): ReplayOutcome
     {
         $recording = $this->recording ?? throw new ToolError('There is no replay baseline to compare against: record one first.');
         $name = basename($this->file->path);
@@ -127,8 +130,15 @@ final class ReplayGate
                 ...self::indent($run->lines),
             ], $name, $this->outDir, null, count($this->file->requests));
         }
+        $serveLine = $serveChanged ? $this->serveChangeLine($recording) : null;
         $label = preg_replace('/[^A-Za-z0-9._-]+/', '-', $label) ?: 'replay';
-        $transcript = $this->write($label . '.txt', ReplayComparison::transcript($this->file, $run->answers, sprintf('Booster replay: %s on PHP %s', $label, $php)));
+        $transcriptText = ReplayComparison::transcript($this->file, $run->answers, sprintf('Booster replay: %s on PHP %s', $label, $php));
+        if ($serveLine !== null) {
+            $lines = explode("\n", $transcriptText);
+            array_splice($lines, 2, 0, [$serveLine]);
+            $transcriptText = implode("\n", $lines);
+        }
+        $transcript = $this->write($label . '.txt', $transcriptText);
         $errors = $this->writeErrors($label, $run->phpErrors);
         $differences = ReplayComparison::differences($this->file, $recording->answers, $run->answers);
         $total = count($this->file->requests);
@@ -136,6 +146,7 @@ final class ReplayGate
         if ($differences === []) {
             return new ReplayOutcome(ReplayOutcome::PASSED, $php, [
                 sprintf('Replay passed: all %d answer%s match the baseline from PHP %s.', $total, $total === 1 ? '' : 's', $recording->php),
+                ...($serveLine === null ? [] : [$serveLine]),
                 ...$errorLine,
             ], $name, $this->outDir, $transcript, $total);
         }
@@ -150,6 +161,7 @@ final class ReplayGate
 
         return new ReplayOutcome(ReplayOutcome::DIFFERS, $php, [
             sprintf('Replay failed on PHP %s: %d of %d answers differ from the baseline from PHP %s.', $php, count($differences), $total, $recording->php),
+            ...($serveLine === null ? [] : [$serveLine]),
             'First difference: ' . $first['request']->label() . ' (- baseline, + now)',
             ...self::indent($diff),
             ...($others === [] ? [] : ['Also different: request' . (count($others) === 1 ? ' ' : 's ') . implode(', ', $others) . (count($differences) > 13 ? ', ...' : '') . '.']),
@@ -157,6 +169,21 @@ final class ReplayGate
             'A value that changes on every request (a token, a time) is not a real difference: hide it with a normalizer in ' . $name . '.',
             ...$errorLine,
         ], $name, $this->outDir, $transcript, $total, count($differences));
+    }
+
+    /**
+     * The one line that names how the app is served now versus when the
+     * recording was made, or null when the serve section did not change. A
+     * recording without a serve summary predates the split fingerprints, so
+     * its side of the arrow is just "changed".
+     */
+    private function serveChangeLine(ReplayRecording $recording): ?string
+    {
+        if ($recording->serveFingerprint !== '' && $recording->serveFingerprint === $this->file->serveFingerprint) {
+            return null;
+        }
+
+        return sprintf('serve: %s -> %s', $recording->serveSummary === '' ? 'changed' : $recording->serveSummary, $this->file->serveSummary());
     }
 
     /**

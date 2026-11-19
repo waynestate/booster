@@ -152,6 +152,133 @@ final class ReplayGateTest extends TestCase
         $this->gate([])->useRecording($other, '/tmp/rec.json');
     }
 
+    /**
+     * The compare fixture with only its serve section changed (or one request's
+     * query), so the other half of the fingerprints stays put.
+     *
+     * @param array<string, mixed> $serve
+     */
+    private function compareFileWith(array $serve): ReplayFile
+    {
+        $path = __DIR__ . '/fixtures/replay-app/booster-replay-compare.json';
+        $data = (array) json_decode((string) file_get_contents($path), true);
+        $data['serve'] = $serve;
+
+        return ReplayFile::fromArray($data, $path);
+    }
+
+    public function test_a_serve_change_passes_with_the_flag_and_names_the_change_in_report_and_transcript(): void
+    {
+        $answers = [[200, '{"code":"0","matches_zero":true}', self::JSON], [200, '{"code":"abc","matches_zero":true}', self::JSON]];
+        $out = $this->tempDir();
+        $gate = $this->gate([$answers], out: $out);
+        $gate->record('7.4');
+        $recording = $gate->recording();
+        self::assertNotNull($recording);
+
+        // The hop changed how the app is served: the same requests, a new setup command.
+        $moved = $this->compareFileWith(['docroot' => 'public', 'front_controller' => 'index.php', 'setup' => 'php seed.php']);
+        $second = $this->gate([$answers], file: $moved, out: $out);
+        $second->useRecording($recording, '/tmp/rec.json', true);
+
+        $outcome = $second->check('8.0', 'step-mount', false, true);
+
+        self::assertSame(ReplayOutcome::PASSED, $outcome->status);
+        self::assertSame([
+            'Replay passed: all 2 answers match the baseline from PHP 7.4.',
+            'serve: docroot public, front index.php -> docroot public, front index.php, setup "php seed.php"',
+        ], array_slice($outcome->lines, 0, 2));
+        $transcript = (string) file_get_contents($out . '/step-mount.txt');
+        self::assertStringContainsString("Booster replay: step-mount on PHP 8.0\nRequest file: booster-replay-compare.json\nserve: docroot public, front index.php -> docroot public, front index.php, setup \"php seed.php\"\n", $transcript);
+    }
+
+    public function test_a_serve_change_without_the_flag_is_refused_like_any_other_file_change(): void
+    {
+        $answers = [[200, '{"code":"0","matches_zero":true}', self::JSON], [200, '{"code":"abc","matches_zero":true}', self::JSON]];
+        $gate = $this->gate([$answers]);
+        $gate->record('7.4');
+        $recording = $gate->recording();
+        self::assertNotNull($recording);
+
+        $moved = $this->compareFileWith(['docroot' => 'public', 'front_controller' => 'index.php', 'setup' => 'php seed.php']);
+
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('was made from a different version of booster-replay-compare.json');
+
+        $this->gate([], file: $moved)->useRecording($recording, '/tmp/rec.json');
+    }
+
+    public function test_with_the_flag_a_changed_request_still_refuses_the_recording(): void
+    {
+        $answers = [[200, '{"code":"0","matches_zero":true}', self::JSON], [200, '{"code":"abc","matches_zero":true}', self::JSON]];
+        $gate = $this->gate([$answers]);
+        $gate->record('7.4');
+        $recording = $gate->recording();
+        self::assertNotNull($recording);
+
+        $path = __DIR__ . '/fixtures/replay-app/booster-replay-compare.json';
+        $data = (array) json_decode((string) file_get_contents($path), true);
+        $data['requests'][1]['query']['code'] = 'xyz';
+        $changed = ReplayFile::fromArray($data, $path);
+
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('was made from a different version of booster-replay-compare.json');
+
+        $this->gate([], file: $changed)->useRecording($recording, '/tmp/rec.json', true);
+    }
+
+    public function test_a_recording_from_before_the_split_fingerprints_needs_a_new_record(): void
+    {
+        // The old format: no requests_fingerprint / serve_fingerprint keys.
+        $json = (string) json_encode(['format' => ReplayRecording::FORMAT, 'php' => '7.4', 'fingerprint' => $this->compareFile()->fingerprint, 'answers' => []]);
+        $path = $this->tempDir() . '/old-rec.json';
+        file_put_contents($path, $json);
+
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('was made before Booster could compare across a serve change');
+
+        $this->gate([])->useRecording(ReplayRecording::load($path), $path, true);
+    }
+
+    public function test_the_flag_says_nothing_when_the_serve_section_did_not_change(): void
+    {
+        $answers = [[200, '{"code":"0","matches_zero":true}', self::JSON], [200, '{"code":"abc","matches_zero":true}', self::JSON]];
+        $out = $this->tempDir();
+        $gate = $this->gate([$answers], out: $out);
+        $gate->record('7.4');
+        $recording = $gate->recording();
+        self::assertNotNull($recording);
+
+        $second = $this->gate([$answers], out: $out);
+        $second->useRecording($recording, '/tmp/rec.json', true);
+
+        $outcome = $second->check('8.0', 'check', false, true);
+
+        self::assertSame(ReplayOutcome::PASSED, $outcome->status);
+        self::assertEmpty(preg_grep('/^serve: /', $outcome->lines));
+        self::assertStringNotContainsString('serve: ', (string) file_get_contents($out . '/check.txt'));
+    }
+
+    public function test_a_serve_change_with_differing_answers_names_the_change_too(): void
+    {
+        $before = [[200, '{"code":"0","matches_zero":true}', self::JSON], [200, '{"code":"abc","matches_zero":true}', self::JSON]];
+        $after = [[200, '{"code":"0","matches_zero":true}', self::JSON], [200, '{"code":"abc","matches_zero":false}', self::JSON]];
+        $gate = $this->gate([$before]);
+        $gate->record('7.4');
+        $recording = $gate->recording();
+        self::assertNotNull($recording);
+
+        $moved = $this->compareFileWith(['docroot' => 'public', 'front_controller' => 'index.php', 'setup' => 'php seed.php']);
+        $second = $this->gate([$after], file: $moved);
+        $second->useRecording($recording, '/tmp/rec.json', true);
+
+        $outcome = $second->check('8.0', 'step-1', false, true);
+
+        self::assertTrue($outcome->failed());
+        self::assertSame('Replay failed on PHP 8.0: 1 of 2 answers differ from the baseline from PHP 7.4.', $outcome->lines[0]);
+        self::assertSame('serve: docroot public, front index.php -> docroot public, front index.php, setup "php seed.php"', $outcome->lines[1]);
+    }
+
     public function test_a_saved_recording_round_trips_and_checks_like_a_fresh_one(): void
     {
         $answers = [[200, '{"code":"0","matches_zero":true}', self::JSON], [200, "\xff\xfe binary", [['Content-Type', 'application/octet-stream']]]];

@@ -206,6 +206,33 @@ user the way the app's own tests would, with fake data only:
 
 Keep the guest's redirect as one request either way: it is the honest answer for a visitor who is not signed in.
 
+## When a hop changes how the app is served
+
+Some hops change more than the PHP: a strangler's mount step moves the docroot or the front controller, a new
+`setup` command builds the fake data a different way. The `serve` section is part of the recording's fingerprint, so
+a plain `check` refuses to compare against such a hop:
+
+    The recording booster-replay.recording.json was made from a different version of booster-replay.json (its requests or "serve" section changed since). Record again on the old PHP: booster replay record
+
+That is right when the requests changed, and wrong when only the serving did: the answers are still comparable. For
+that case `check` takes `--serve-changed`:
+
+<!-- docs-test: skip needs Docker, run on your own app -->
+```sh
+booster replay check --path=<app> --php=8.4 --serve-changed
+```
+
+With the flag, Booster compares the answers as long as the requests are the ones recorded (the requests half of the
+fingerprint); a changed request still refuses the recording, with or without the flag. The change is named where the
+result is read, in the report and under the transcript's title:
+
+    Replay passed: all 11 answers match the baseline from PHP 7.4.
+    serve: docroot public, front index.php -> docroot public, front index.php, setup "php replay/seed.php"
+
+Without the flag nothing changes: a changed `serve` section is refused like any other file change. A recording made
+before Booster could compare across a serve change has no requests fingerprint of its own; `--serve-changed` says so
+and asks for one new record on the current setup. The flag goes with `check` only: `record` and `init` refuse it.
+
 ## Limits, honestly
 
 - **No real Oracle, SSO or CAS.** The replay never reaches a real system, by design. An app that cannot render a

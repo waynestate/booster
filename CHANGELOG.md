@@ -7,6 +7,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - Added: an internal runner for CakePHP's own upgrade tool (`cakephp/upgrade`, pinned to a commit), run in a container so its Rector never meets the app's or Booster's; the CakePHP hops use it.
 - Added: the hop data knows which PHP each CakePHP and Slim line supports (`cakephp_php`, `slim_php`), their target lines and companion package pins, for the CakePHP and Slim hops.
 - Added: `detect` names a CakePHP or Slim app's framework and major.minor version (from composer.lock, else composer.json), the first step toward CakePHP and Slim hops.
+- Added: `booster replay check --serve-changed` compares answers across a change in how the app is served (docroot, front controller, setup), for the coming Laravel strangler hops.
 
 ## [1.19.0] - 2026-11-14
 
