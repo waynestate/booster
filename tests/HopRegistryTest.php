@@ -220,6 +220,52 @@ final class HopRegistryTest extends PhpUnitTestCase
         self::assertFalse($registry->laravelSupportsPhp('7', '8.1'));
     }
 
+    public function test_cakephp_and_slim_php_support_tables(): void
+    {
+        $registry = new HopRegistry();
+
+        self::assertTrue($registry->frameworkSupportsPhp('cakephp', '4.5', '8.3'));
+        self::assertFalse($registry->frameworkSupportsPhp('cakephp', '4.5', '8.4'));
+        self::assertTrue($registry->frameworkSupportsPhp('cakephp', '4.6', '8.5'));
+        self::assertFalse($registry->frameworkSupportsPhp('cakephp', '5.4', '8.1'));
+        self::assertTrue($registry->frameworkSupportsPhp('slim', '3.12', '7.3'));
+        self::assertFalse($registry->frameworkSupportsPhp('slim', '3.12', '7.4'));
+        self::assertTrue($registry->frameworkSupportsPhp('slim', '3.13', '8.5'));
+        self::assertFalse($registry->frameworkSupportsPhp('slim', '3.13', '8.0'));
+
+        self::assertSame(['7.4', '8.3'], $registry->frameworkPhpRange('cakephp', '4.5'));
+        self::assertSame(['8.1', '8.5'], $registry->frameworkPhpRange('slim', '3.13'));
+        self::assertNull($registry->frameworkPhpRange('cakephp', '2.10'));
+        self::assertNull($registry->frameworkPhpRange('laminas', '4.6'));
+        self::assertFalse($registry->frameworkSupportsPhp('cakephp', '2.10', '8.1'));
+        self::assertFalse($registry->frameworkSupportsPhp('laminas', '4.6', '8.1'));
+    }
+
+    public function test_cakephp_and_slim_targets_and_companion_pins(): void
+    {
+        $registry = new HopRegistry();
+
+        self::assertSame(['4.6', '5.4'], $registry->frameworkTargets('cakephp'));
+        self::assertSame(['3.13', '4.15'], $registry->frameworkTargets('slim'));
+        self::assertSame([], $registry->frameworkTargets('laminas'));
+        self::assertSame([
+            'cakephp/migrations' => '^5.0',
+            'cakephp/bake' => '^3.6',
+            'cakephp/debug_kit' => '^5.2',
+            'cakephp/plugin-installer' => '^2.0',
+            'cakephp/authentication' => '^3.3',
+            'cakephp/authorization' => '^3.5',
+            'cakephp/chronos' => '^3.3',
+        ], $registry->frameworkCompanionPins('cakephp', '5.4'));
+        self::assertSame([
+            'slim/psr7' => '^1.6',
+            'slim/http' => '^1.0',
+            'slim/twig-view' => '^3.4',
+        ], $registry->frameworkCompanionPins('slim', '4.15'));
+        self::assertSame([], $registry->frameworkCompanionPins('slim', '3.13'));
+        self::assertSame([], $registry->frameworkCompanionPins('laminas', '4.6'));
+    }
+
     public function test_neighbours(): void
     {
         $registry = new HopRegistry();

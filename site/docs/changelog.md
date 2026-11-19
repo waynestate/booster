@@ -12,6 +12,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## \[Unreleased\] [#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Added: the hop data knows which PHP each CakePHP and Slim line supports (`cakephp_php`, `slim_php`), their target lines and companion package pins, for the CakePHP and Slim hops.
+
 ## \[1.19.0\] - 2026-11-14 [#](https://booster.apps.wayne.edu/docs/changelog.html#1-19-0-2026-11-14)
 
 SESAME 0.8 and native names for cas-to-sesame, WayneUI 2 behaviour rows, Preflight 0.9.0, Squire 0.11.1 and PROCTOR 0.16.

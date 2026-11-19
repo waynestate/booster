@@ -149,6 +149,94 @@ final class HopDataRefresher
         '13' => ['pestphp/pest' => '^5.0', 'pestphp/pest-plugin-laravel' => '^5.0'],
     ];
 
+    /** CakePHP target lines; judgement, not a feed, checked by hand against Packagist and each tag's CI matrix, 2026-11-19 (research/cake-slim-php-support-1119.md in the coordination repo). */
+    public const FIXED_CAKEPHP_CHAIN = ['4.6', '5.4'];
+
+    /** Slim target lines; judgement, not a feed, checked by hand against Packagist and each tag's CI matrix, 2026-11-19 (research/cake-slim-php-support-1119.md in the coordination repo). */
+    public const FIXED_SLIM_CHAIN = ['3.13', '4.15'];
+
+    /** PHP support per CakePHP line as [lowest, highest]; judgement, not a feed, checked by hand against Packagist and each tag's CI matrix, 2026-11-19 (research/cake-slim-php-support-1119.md in the coordination repo). */
+    public const FIXED_CAKEPHP_PHP = [
+        '3.10' => ['5.6', '7.4'],
+        '4.0' => ['7.2', '7.4'],
+        '4.1' => ['7.2', '7.4'],
+        '4.2' => ['7.2', '8.0'],
+        '4.3' => ['7.2', '8.1'],
+        '4.4' => ['7.4', '8.2'],
+        '4.5' => ['7.4', '8.3'],
+        '4.6' => ['7.4', '8.5'],
+        '5.0' => ['8.1', '8.3'],
+        '5.1' => ['8.1', '8.4'],
+        '5.2' => ['8.1', '8.5'],
+        '5.3' => ['8.2', '8.5'],
+        '5.4' => ['8.2', '8.5'],
+    ];
+
+    /** PHP support per Slim line as [lowest, highest]; judgement, not a feed, checked by hand against Packagist and each tag's CI matrix, 2026-11-19 (research/cake-slim-php-support-1119.md in the coordination repo). */
+    public const FIXED_SLIM_PHP = [
+        '2.6' => ['5.3', '7.1'],
+        '3.0' => ['5.5', '7.0'],
+        '3.1' => ['5.5', '7.0'],
+        '3.2' => ['5.5', '7.0'],
+        '3.3' => ['5.5', '7.0'],
+        '3.4' => ['5.5', '7.0'],
+        '3.5' => ['5.5', '7.0'],
+        '3.6' => ['5.5', '7.0'],
+        '3.7' => ['5.5', '7.0'],
+        '3.8' => ['5.5', '7.1'],
+        '3.9' => ['5.5', '7.1'],
+        '3.10' => ['5.5', '7.2'],
+        '3.11' => ['5.5', '7.2'],
+        '3.12' => ['5.5', '7.3'],
+        '3.13' => ['8.1', '8.5'],
+        '4.0' => ['7.1', '7.3'],
+        '4.1' => ['7.1', '7.3'],
+        '4.2' => ['7.1', '7.3'],
+        '4.3' => ['7.1', '7.3'],
+        '4.4' => ['7.2', '7.4'],
+        '4.5' => ['7.2', '7.4'],
+        '4.6' => ['7.2', '7.4'],
+        '4.7' => ['7.2', '7.4'],
+        '4.8' => ['7.2', '8.0'],
+        '4.9' => ['7.3', '8.0'],
+        '4.10' => ['7.4', '8.1'],
+        '4.11' => ['7.4', '8.1'],
+        '4.12' => ['7.4', '8.2'],
+        '4.13' => ['7.4', '8.3'],
+        '4.14' => ['7.4', '8.3'],
+        '4.15' => ['7.4', '8.5'],
+    ];
+
+    /** Companion composer constraints per CakePHP target line; judgement, not a feed, checked by hand against Packagist and each tag's CI matrix, 2026-11-19 (research/cake-slim-php-support-1119.md in the coordination repo). */
+    public const FIXED_CAKEPHP_COMPANION_PINS = [
+        '4.6' => [
+            'cakephp/migrations' => '^3.7',
+            'cakephp/bake' => '^2.8',
+            'cakephp/debug_kit' => '^4.9',
+            'cakephp/authentication' => '^2.11',
+            'cakephp/authorization' => '^2.5',
+        ],
+        '5.4' => [
+            'cakephp/migrations' => '^5.0',
+            'cakephp/bake' => '^3.6',
+            'cakephp/debug_kit' => '^5.2',
+            'cakephp/plugin-installer' => '^2.0',
+            'cakephp/authentication' => '^3.3',
+            'cakephp/authorization' => '^3.5',
+            'cakephp/chronos' => '^3.3',
+        ],
+    ];
+
+    /** Companion composer constraints per Slim target line; judgement, not a feed, checked by hand against Packagist and each tag's CI matrix, 2026-11-19 (research/cake-slim-php-support-1119.md in the coordination repo). */
+    public const FIXED_SLIM_COMPANION_PINS = [
+        '3.13' => [],
+        '4.15' => [
+            'slim/psr7' => '^1.6',
+            'slim/http' => '^1.0',
+            'slim/twig-view' => '^3.4',
+        ],
+    ];
+
     public function __construct(private readonly Policy $policy) {}
 
     /**
@@ -205,6 +293,12 @@ final class HopDataRefresher
             'laravel_companion_pins' => $this->fixedCompanionPins($existing, 'laravel_companion_pins', $laravelChain, self::FIXED_LARAVEL_COMPANION_PINS),
             'typescript_companion_pins' => $this->fixedPackageMap($existing, 'typescript_companion_pins', self::FIXED_TYPESCRIPT_COMPANION_PINS),
             'phpunit_companion_pins' => $this->fixedCompanionPins($existing, 'phpunit_companion_pins', $phpunitChain, self::FIXED_PHPUNIT_COMPANION_PINS),
+            'cakephp' => $this->fixedChain($existing, 'cakephp', self::FIXED_CAKEPHP_CHAIN),
+            'slim' => $this->fixedChain($existing, 'slim', self::FIXED_SLIM_CHAIN),
+            'cakephp_php' => $this->fixedRangeTable($existing, 'cakephp_php', self::FIXED_CAKEPHP_PHP),
+            'slim_php' => $this->fixedRangeTable($existing, 'slim_php', self::FIXED_SLIM_PHP),
+            'cakephp_companion_pins' => $this->fixedCompanionPins($existing, 'cakephp_companion_pins', self::FIXED_CAKEPHP_CHAIN, self::FIXED_CAKEPHP_COMPANION_PINS),
+            'slim_companion_pins' => $this->fixedCompanionPins($existing, 'slim_companion_pins', self::FIXED_SLIM_CHAIN, self::FIXED_SLIM_COMPANION_PINS),
         ];
     }
 
@@ -265,6 +359,13 @@ final class HopDataRefresher
         $this->tableCoverage($problems, $data, 'inertia_vue3', $laravelChain);
         $this->tableCoverage($problems, $data, 'laravel_companion_pins', $laravelChain);
         $this->tableCoverage($problems, $data, 'phpunit_companion_pins', $phpunitChain);
+
+        $cakephpChain = $this->xyChainOr($data, 'cakephp', $problems);
+        $slimChain = $this->xyChainOr($data, 'slim', $problems);
+        $this->rangeTableShape($problems, $data, 'cakephp_php', $cakephpChain);
+        $this->rangeTableShape($problems, $data, 'slim_php', $slimChain);
+        $this->companionPinShape($problems, $data, 'cakephp_companion_pins', $cakephpChain);
+        $this->companionPinShape($problems, $data, 'slim_companion_pins', $slimChain);
 
         return $problems;
     }
@@ -808,6 +909,169 @@ final class HopDataRefresher
         }
 
         return $table;
+    }
+
+    /**
+     * A fixed chain no feed computes: the chain on file wins when it holds one,
+     * otherwise the seed, so a hand edit to versions.json survives a refresh.
+     *
+     * @param array<string, mixed> $existing
+     * @param list<string> $seed
+     *
+     * @return list<string>
+     */
+    private function fixedChain(array $existing, string $key, array $seed): array
+    {
+        if (!array_key_exists($key, $existing)) {
+            return $seed;
+        }
+
+        return self::chainOf($existing, $key);
+    }
+
+    /**
+     * A fixed [lowest, highest] range table no feed computes: every row on file
+     * wins, and rows missing from the file come from the seed, so a hand edit
+     * survives a refresh and a target never lands on null.
+     *
+     * @param array<string, mixed> $existing
+     * @param array<string, array{0: string, 1: string}> $seed
+     *
+     * @return array<string, array{0: string, 1: string}>
+     */
+    private function fixedRangeTable(array $existing, string $key, array $seed): array
+    {
+        $onFile = $existing[$key] ?? [];
+        if (!is_array($onFile)) {
+            throw new ToolError(sprintf('Hop data key "%s" must be a JSON object.', $key));
+        }
+
+        $table = [];
+        foreach ($onFile as $line => $range) {
+            if (!is_array($range) || count($range) !== 2 || !is_string($range[0]) || $range[0] === '' || !is_string($range[1]) || $range[1] === '') {
+                throw new ToolError(sprintf('Hop data key "%s" must map lines to [lowest, highest] PHP pairs.', $key));
+            }
+            $table[(string) $line] = [$range[0], $range[1]];
+        }
+        foreach ($seed as $line => $range) {
+            if (array_key_exists((string) $line, $table)) {
+                continue;
+            }
+            $table[(string) $line] = $range;
+        }
+
+        return $table;
+    }
+
+    /**
+     * A chain of X.Y lines, or null once a problem was reported for it.
+     *
+     * @param array<string, mixed> $data
+     * @param list<string> $problems
+     *
+     * @return list<string>|null
+     */
+    private function xyChainOr(array $data, string $key, array &$problems): ?array
+    {
+        $value = $data[$key] ?? null;
+        if (!is_array($value) || $value === [] || array_diff_key($value, array_keys($value)) !== []) {
+            $problems[] = sprintf('Hop data key "%s" must be a non-empty list of X.Y strings.', $key);
+
+            return null;
+        }
+
+        $chain = [];
+        $malformed = false;
+        foreach ($value as $line) {
+            if (!is_string($line) || preg_match('/^\d+\.\d+$/', $line) !== 1) {
+                $problems[] = sprintf('Hop data key "%s" has a malformed line %s; lines must be X.Y.', $key, is_string($line) ? $line : '(not a string)');
+                $malformed = true;
+                continue;
+            }
+            $chain[] = $line;
+        }
+
+        return $malformed ? null : $chain;
+    }
+
+    /**
+     * The shape problems in a [lowest, highest] PHP range table, plus a gap for
+     * every chain line that has no row.
+     *
+     * @param list<string> $problems
+     * @param array<string, mixed> $data
+     * @param list<string>|null $chain
+     */
+    private function rangeTableShape(array &$problems, array $data, string $key, ?array $chain): void
+    {
+        $table = $data[$key] ?? null;
+        if (!is_array($table) || $table === []) {
+            $problems[] = sprintf('Hop data key "%s" must hold a non-empty JSON object of line to [lowest, highest] PHP pair.', $key);
+
+            return;
+        }
+
+        foreach ($table as $line => $range) {
+            $line = (string) $line;
+            if (preg_match('/^\d+\.\d+$/', $line) !== 1) {
+                $problems[] = sprintf('Hop data key "%s" has a malformed line "%s"; lines must be X.Y.', $key, $line);
+                continue;
+            }
+            if (!is_array($range) || count($range) !== 2 || !is_string($range[0]) || $range[0] === '' || !is_string($range[1]) || $range[1] === '') {
+                $problems[] = sprintf('Hop data key "%s" line "%s" must hold a [lowest, highest] PHP pair of X.Y strings.', $key, $line);
+                continue;
+            }
+            if (version_compare($range[0], $range[1], '>')) {
+                $problems[] = sprintf('Hop data key "%s" line "%s" is reversed: lowest %s is above highest %s.', $key, $line, $range[0], $range[1]);
+            }
+        }
+
+        foreach ($chain ?? [] as $line) {
+            if (!array_key_exists($line, $table)) {
+                $problems[] = sprintf('Hop data key "%s" has no [lowest, highest] PHP pair for chain line "%s".', $key, $line);
+            }
+        }
+    }
+
+    /**
+     * The shape problems in a companion-pins table: an object per chain line
+     * holding package names to constraint strings (or null).
+     *
+     * @param list<string> $problems
+     * @param array<string, mixed> $data
+     * @param list<string>|null $chain
+     */
+    private function companionPinShape(array &$problems, array $data, string $key, ?array $chain): void
+    {
+        $table = $data[$key] ?? null;
+        if (!is_array($table) || $table === []) {
+            $problems[] = sprintf('Hop data key "%s" must hold a non-empty JSON object of target line to companion pins.', $key);
+
+            return;
+        }
+
+        foreach ($table as $target => $pins) {
+            $target = (string) $target;
+            if (preg_match('/^\d+\.\d+$/', $target) !== 1) {
+                $problems[] = sprintf('Hop data key "%s" has a malformed target line "%s"; target lines must be X.Y.', $key, $target);
+                continue;
+            }
+            if (!self::isPackageMap($pins)) {
+                $problems[] = sprintf('Hop data key "%s" target "%s" must hold an object of package names to constraint strings.', $key, $target);
+            }
+        }
+
+        foreach ($chain ?? [] as $target) {
+            if (!array_key_exists($target, $table)) {
+                $problems[] = sprintf('Hop data key "%s" has no companion pins for chain line "%s".', $key, $target);
+            }
+        }
+        foreach (array_keys($table) as $target) {
+            $target = (string) $target;
+            if (preg_match('/^\d+\.\d+$/', $target) === 1 && $chain !== null && !in_array($target, $chain, true)) {
+                $problems[] = sprintf('Hop data key "%s" has companion pins for "%s", which is not in its chain.', $key, $target);
+            }
+        }
     }
 
     /**
