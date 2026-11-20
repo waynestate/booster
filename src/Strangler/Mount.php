@@ -147,7 +147,7 @@ final class Mount
             $this->moveLegacy($root, $composerRoot);
 
             // 3. The baked tree goes over the root where paths are free.
-            $this->overlay($scratch, $root, '');
+            $this->overlay($scratch, $root, '', self::LEGACY . '/' . $legacyDocroot);
         } finally {
             self::removeTree($scratch);
         }
@@ -338,7 +338,13 @@ final class Mount
         return false;
     }
 
-    private function overlay(string $from, string $root, string $relative): void
+    /**
+     * Copies the baked tree over the root where paths are free. A baked file
+     * under public/ whose URL the legacy docroot also answers is skipped: the
+     * web server serves public/ before the dispatcher runs, so Sourdough's
+     * robots.txt or favicon.ico would shadow the app's and change its answer.
+     */
+    private function overlay(string $from, string $root, string $relative, string $legacyDocroot): void
     {
         foreach (scandir($from . ($relative === '' ? '' : '/' . $relative)) ?: [] as $entry) {
             if ($entry === '.' || $entry === '..' || ($relative === '' && in_array($entry, ['.git', 'vendor', 'node_modules', self::LEGACY], true))) {
@@ -355,10 +361,14 @@ final class Mount
                 if (!is_dir($target) && !mkdir($target, 0775, true) && !is_dir($target)) {
                     throw new ToolError(sprintf('Could not create %s.', $rel));
                 }
-                $this->overlay($from, $root, $rel);
+                $this->overlay($from, $root, $rel, $legacyDocroot);
                 continue;
             }
             if (in_array($rel, self::MOUNT_OWNED, true)) {
+                continue;
+            }
+            if (str_starts_with($rel, 'public/') && $rel !== 'public/.htaccess' && file_exists($root . '/' . $legacyDocroot . '/' . substr($rel, 7))) {
+                $this->notes[] = sprintf('Sourdough\'s %s was not written: %s/%s answers that URL, and a file in public/ would be served before the dispatcher runs.', $rel, $legacyDocroot, substr($rel, 7));
                 continue;
             }
             if (!file_exists($target)) {

@@ -68,6 +68,8 @@ final class StranglerMountTest extends TestCase
                     'artisan' => "#!/usr/bin/env php\n<?php\n",
                     'public/index.php' => "<?php\n// Laravel's stock front controller\n",
                     'public/.htaccess' => "RewriteEngine On\n",
+                    'public/robots.txt' => "User-agent: *\nDisallow:\n",
+                    'public/favicon.ico' => "ico",
                     'bootstrap/app.php' => "<?php\nreturn Application::configure(basePath: dirname(__DIR__))\n    ->withRouting(\n        health: '/up',\n        then: function () {\n            Route::helmetReady('/ready', []);\n        },\n    )->create();\n",
                     'routes/web.php' => "<?php\n\n// /ready, HELMET's readiness probe, is registered in bootstrap/app.php,\n// outside the web group.\n\nRoute::get('/', fn () => view('home'))->name('home');\n\nRoute::get('/dashboard', fn () => view('dashboard'))\n    ->name('dashboard');\n",
                     'pint.json' => json_encode(['preset' => 'laravel', 'exclude' => ['vendor', 'storage']], JSON_PRETTY_PRINT),
@@ -119,6 +121,11 @@ final class StranglerMountTest extends TestCase
         self::assertFileExists($dir . '/artisan');
         self::assertFileExists($dir . '/app/Models/User.php');
         self::assertFileExists($dir . '/build.sh');
+        // A baked public/ file never shadows a legacy URL (the web server serves public/ first).
+        self::assertFileDoesNotExist($dir . '/public/robots.txt');
+        self::assertContains('Sourdough\'s public/robots.txt was not written: legacy/public/robots.txt answers that URL, and a file in public/ would be served before the dispatcher runs.', $result->notes);
+        self::assertFileExists($dir . '/public/favicon.ico', 'the app has no favicon, so Laravel\'s is served');
+        self::assertFileExists($dir . '/public/.htaccess');
 
         // The dispatcher, the empty table, the install hook.
         $dispatcher = (string) file_get_contents($dir . '/public/index.php');
