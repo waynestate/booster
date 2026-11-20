@@ -111,7 +111,7 @@ final class StranglerStep
         $step0Done = $inspect->status === PartResult::ALREADY;
         if ($options->dryRun) {
             $lines = [
-                $step0Done ? 'Step 0: the legacy half already signs in through SESAME.' : 'Step 0: would move the legacy half\'s sign-in onto SESAME, then gate it on the replay as the app is served today.',
+                $step0Done ? 'Step 0: nothing to move (the legacy half signs nobody in, or already signs in through SESAME with the shared sign-out store).' : 'Step 0: would move the legacy half\'s sign-in onto SESAME, then gate it on the replay as the app is served today.',
                 ...$inspect->lines,
                 'Mount: would lay Laravel ' . HopRegistry::STRANGLER_LARAVEL . ' at the root (sourdough new --laravel), move the old Composer root unchanged to legacy/, write the dispatcher in public/index.php and an empty route table, then gate it with the replay against the untouched app (--serve-changed).',
                 ...($replayReason === null ? [] : ['Note: a real run refuses here: ' . $replayReason]),
@@ -125,7 +125,7 @@ final class StranglerStep
         $files = [];
         $messages = [];
         if ($step0Done) {
-            $messages[] = 'Step 0: the legacy half already signs in through SESAME; nothing to change.';
+            $messages[] = 'Step 0: nothing to change (the legacy half signs nobody in, or already signs in through SESAME with the shared sign-out store).';
             $messages = [...$messages, ...$inspect->lines];
         } else {
             $migrate = $this->parts->signInMigrate($path, $framework);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Strangler;
 
 use Waynestate\Booster\Packaging\PharFiles;
+use Waynestate\Booster\Refresh\HopDataRefresher;
 use Waynestate\Booster\Replay\ReplayFile;
 use Waynestate\Booster\ToolError;
 
@@ -481,6 +482,17 @@ final class Mount
             $scripts[$event] = $list;
         }
         $data['scripts'] = $scripts;
+        // One PHP runs both halves: the root never floors below the legacy app (its lock was resolved on that PHP).
+        $legacy = json_decode((string) @file_get_contents($root . '/' . self::LEGACY . '/composer.json'), true);
+        $legacyPhp = is_array($legacy) && is_string($legacy['require']['php'] ?? null) ? $legacy['require']['php'] : null;
+        $rootPhp = is_array($data['require'] ?? null) && is_string($data['require']['php'] ?? null) ? $data['require']['php'] : null;
+        $legacyFloor = $legacyPhp === null ? null : HopDataRefresher::phpFloor($legacyPhp);
+        $rootFloor = $rootPhp === null ? null : HopDataRefresher::phpFloor($rootPhp);
+        if ($legacyPhp !== null && $legacyFloor !== null && ($rootFloor === null || version_compare($legacyFloor, $rootFloor, '>'))) {
+            $data['require'] = ['php' => $legacyPhp, ...(is_array($data['require'] ?? null) ? $data['require'] : [])];
+            $data['require']['php'] = $legacyPhp;
+            $this->notes[] = sprintf('composer.json requires PHP %s, as legacy/ does (the Laravel half asked for %s): one PHP runs both halves.', $legacyPhp, $rootPhp ?? 'none');
+        }
         file_put_contents($path, self::json($data));
         $this->changed[] = 'composer.json';
         $this->notes[] = 'composer.json runs bin/install-legacy.php after every install and update, so one composer install installs both roots (--no-dev carries over).';

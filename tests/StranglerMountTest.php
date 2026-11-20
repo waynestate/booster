@@ -360,4 +360,26 @@ final class StranglerMountTest extends TestCase
         unlink($dir . '/legacy/composer.json');
         self::assertSame(0, $run(['COMPOSER_BINARY' => $dir . '/fake-composer.php']), 'no legacy/ (after the finish step) is nothing to do');
     }
+
+    public function test_the_root_never_floors_below_the_legacy_php(): void
+    {
+        // An app at the 1.20.0 end state asks for PHP 8.5; Sourdough's Laravel half asks for 8.3.
+        $dir = $this->copyFixture('slim4');
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        $composer['require']['php'] = '^8.5';
+        file_put_contents($dir . '/composer.json', json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $result = $this->mount($dir, 'slim');
+
+        self::assertTrue($result->mounted);
+        $root = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertSame('^8.5', $root['require']['php']);
+        self::assertSame('php', array_key_first($root['require']));
+        self::assertSame('^13.0', $root['require']['laravel/framework'], 'the rest of the Laravel half\'s require is kept');
+        self::assertContains('composer.json requires PHP ^8.5, as legacy/ does (the Laravel half asked for ^8.3): one PHP runs both halves.', $result->notes);
+
+        // The stock fixture floors at 7.4, below the Laravel half: the root keeps Laravel's own.
+        $plain = $this->copyFixture('slim4');
+        $this->mount($plain, 'slim');
+        self::assertSame('^8.3', json_decode((string) file_get_contents($plain . '/composer.json'), true)['require']['php']);
+    }
 }
