@@ -66,10 +66,13 @@ at the repository root. Booster reads the framework from that file and refuses a
 </code></pre>
 <p><code>--replay</code> matters here. The tests a CakePHP or Slim app ships with (often the skeleton's, or none) prove very little
 about a framework move, so the replay is the real gate for both frameworks. Run <code>booster replay init --path=../my-app</code>
-first and read the draft (see <a href="replay-gate.html">The replay gate</a>). For Slim it lists the route calls it finds, as
-written: a route inside a group shows up without the group's prefix, so add the prefix by hand and keep at least one
-request per group, which is what catches a group that lost its prefix. CakePHP routes declared with <code>connect()</code> are not
-drafted, so check the draft against <code>bin/cake routes</code> and add the pages that matter.</p>
+first and read the draft (see <a href="replay-gate.html">The replay gate</a>). For Slim it lists the route calls it finds with
+their group prefixes, including groups that call a class's static <code>addRoutes($app)</code> in another file; keep at least one
+request per group, which is what catches a group that lost its prefix. For CakePHP it serves <code>webroot/index.php</code>,
+creates the <code>tmp/</code> and <code>logs/</code> folders git does not keep, sets <code>DEBUG=false</code> and a fake salt, and drafts the routes in
+<code>config/routes.php</code> (scopes, prefixes, <code>connect()</code> and the verb routes, one request per page template for
+<code>/pages/*</code>) plus, where the file calls <code>fallbacks()</code>, one request per public controller action. Check the draft
+against <code>bin/cake routes</code>, fill in the ids, and delete the actions that change data.</p>
 <h2 id="what-a-cakephp-4-app-gets">What a CakePHP 4 app <span class="docs-heading-tail"><span>gets</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-a-cakephp-4-app-gets">#</a></span></h2>
 <p>Two hops, <code>cakephp-4-to-4.6</code> then <code>cakephp-4.6-to-5</code>, with the PHP hops between them:</p>
 <ol>
@@ -128,14 +131,27 @@ the PHP hop that lands on 7.4), then the PHP hops to 8.5. <code>--to-slim 3.13</
 <ul>
 <li><code>new \Slim\App([...])</code> becomes <code>LegacyApp::create([...])</code> over your existing Pimple container, which keeps every
 <code>$container['x']</code>, <code>$c-&gt;x</code> and <code>$c-&gt;get('x')</code> working, and <code>LegacyApp::finish($app)</code> goes in just before
-<code>$app-&gt;run()</code>. No PHP-DI rewrite. The three glue classes (<code>LegacyContainer</code>, <code>LegacyDoublePass</code>, <code>LegacyApp</code>) are
-written into a <code>Legacy</code> folder under the app's PSR-4 root, so they are your code from then on.</li>
+<code>$app-&gt;run()</code>. No PHP-DI rewrite. The five glue files (<code>LegacyContainer</code>, <code>LegacyDoublePass</code>, <code>LegacyApp</code>,
+<code>LegacyEnvironment</code>, <code>LegacyHttp</code>) are written into a <code>Legacy</code> folder under the app's PSR-4 root, so they are your
+code from then on. An app with no PSR-4 <code>autoload</code> entry (the official Slim 3 skeleton has only <code>autoload-dev</code>)
+gets a stop sign from <code>plan</code>, and the hop refuses it: add one (<code>&quot;autoload&quot;: {&quot;psr-4&quot;: {&quot;App\\&quot;: &quot;src/&quot;}}</code>), run
+<code>composer dump-autoload</code> and commit first.</li>
+<li>The container keeps Slim 3's own entries: <code>environment</code>, <code>request</code> and <code>response</code> exist when the app did not set
+them, and the <code>notFoundHandler</code>, <code>notAllowedHandler</code>, <code>errorHandler</code> and <code>phpErrorHandler</code> keys answer as they did on
+Slim 3. Without a custom handler the answer is Slim 3's own page (HTML, JSON or XML by the Accept header), a path
+with no route still runs the app's middleware, a wrong method gets a 405 with <code>Allow</code> (an <code>OPTIONS</code> request a 200),
+and unsetting a handler key lets the error through to PHP, as Slim 3 did. An app served from a sub-folder keeps its
+base path.</li>
 <li><code>finish()</code> adds what Slim 3 did by itself, from the same settings: <code>displayErrorDetails</code> goes to the error
 middleware, <code>outputBuffering</code> to the output-buffering middleware, <code>addContentLengthHeader</code> to the content-length
 middleware, <code>routerCacheFile</code> to the route cache. The routing middleware runs before your own, so the route is
 resolved before your middleware sees the request. Body parsing is added, because Slim 3 parsed JSON and XML itself.</li>
 <li>Every <code>add()</code> middleware keeps its <code>($request, $response, $next)</code> shape through the <code>LegacyDoublePass</code> adapter.
 Move each one to PSR-15 when you next touch it, and delete the adapter when nothing uses it.</li>
+<li>Slim 3 test harnesses keep working: <code>Slim\Http\Environment</code> becomes the generated <code>LegacyEnvironment</code> (with
+<code>mock()</code>), <code>Request::createFromEnvironment()</code> becomes <code>LegacyHttp::createRequest()</code>, <code>new Response()</code> becomes
+<code>LegacyHttp::createResponse()</code>, and <code>$app-&gt;process($request, $response)</code> becomes
+<code>LegacyApp::process($app, $request, $response)</code>, which finishes the app once and handles the request.</li>
 <li>Route groups: <code>function () use ($app)</code> becomes a callable that takes the group, so prefixes survive, and a route
 adder typed <code>\Slim\App</code> that a group calls is widened to take the group too.</li>
 <li><code>$request-&gt;getAttribute('route')</code> becomes <code>RouteContext::fromRequest($request)-&gt;getRoute()</code>.</li>
@@ -145,24 +161,35 @@ are) moves onto <code>slim/http</code>, whose decorators keep <code>withJson()</
 (<code>use Slim\Http\Request;</code> becomes <code>use Slim\Http\ServerRequest as Request;</code>, so the bare name keeps working), and
 <code>Slim\Http\Response</code> keeps its name. Comments and strings are never touched. This covers <code>src</code>, <code>app</code>, <code>routes</code>,
 <code>config</code>, <code>tests</code>, <code>public</code> and the bootstrap file.</li>
+<li>Controllers typed with Slim 3's <code>Slim\Container</code> get the generated <code>LegacyContainer</code> instead (an import keeps its
+bare name through an alias), and container-interop's <code>Interop\Container\ContainerInterface</code>, which Slim 4 no
+longer installs, becomes PSR-11's <code>Psr\Container\ContainerInterface</code>. <code>LegacyApp::create()</code> also takes a container
+the app built first.</li>
+<li>When the app lists Twig-View or Twig, Twig 1 and 2's underscore class names (<code>Twig_Environment</code>,
+<code>Twig_SimpleFilter</code>, <code>\Twig_Extension</code>), which Twig 3 removed, become the namespaced classes, and
+<code>new Slim\Views\Twig($path, $settings)</code> becomes Twig-View 3's <code>Slim\Views\Twig::create($path, $settings)</code>. The
+name map is Rector's own Twig set, read from the Rector Booster ships.</li>
 <li>The glue is written in PHP 7.4 syntax, because the hop runs on PHP 7.4.</li>
 <li><code>composer.json</code> gets <code>slim/slim ^4.15</code>, <code>pimple/pimple ^3</code> and <code>slim/psr7 ^1.6</code> (the line that still installs on
-PHP 7.4), <code>slim/http ^1.3</code> when the app names <code>Slim\Http\Request</code>, <code>Response</code> or <code>Environment</code>, plus
-<code>slim/twig-view ^3.4</code> and <code>twig/twig ^3.8</code> when the app already lists them.</li>
+PHP 7.4), <code>slim/http ^1.3</code> (always: the container's request and response are its decorators, so <code>withJson()</code>,
+<code>write()</code>, <code>getParam()</code> and <code>isPost()</code> keep working however the route is typed), plus
+<code>slim/twig-view ^3.4</code>, <code>twig/twig ^3.8</code> and <code>dflydev/fig-cookies ^3.0</code> when the app already lists them
+(fig-cookies 2 needs PHP below 8, so the PHP 8.0 hop could not install it).</li>
+<li>Twig below 2.8 (1.x below 1.39) allows PHP 7.4 but trims the whitespace before every <code>{{</code> there, so the PHP 7.4
+hop updates it inside the app's constraints; the replay caught it on a real app.</li>
 </ul>
 <p><strong>What Booster does not do (the MANUAL list).</strong> Each run prints these as <code>MANUAL:</code> lines, with the file and line:</p>
 <ul>
-<li>Route exceptions now reach Slim's error middleware before your own PHP error or exception handler. Register your
-handler with the error middleware if you want the old page and logging. This line is always printed.</li>
-<li>The <code>errorHandler</code>, <code>phpErrorHandler</code>, <code>notFoundHandler</code> and <code>notAllowedHandler</code> container keys (Slim 4 never reads
-them), settings Slim 4 has no equivalent for, and <code>$settings-&gt;get('k')</code>, now a plain array read.</li>
+<li><code>$settings-&gt;get('k')</code>, now a plain array read.</li>
 <li><code>pathFor()</code>, <code>urlFor()</code> and <code>relativePathFor()</code> calls (build the URL with the route parser), and Twig templates that
 call <code>path_for(</code> or <code>base_url(</code> (Twig-View 3 has <code>url_for</code>).</li>
-<li><code>getAttribute('routeInfo')</code>, <code>subRequest()</code>, <code>setArgument()</code> calls to check, the container's <code>router</code>, <code>request</code>,
-<code>response</code> and <code>environment</code> entries, and code in outer middleware that reads the route before routing ran.</li>
-<li><code>Slim\Http\Environment</code> (Slim 3 test harnesses build requests with <code>Environment::mock()</code>), one line per file with
-its line numbers, the <code>tests</code> folder included: build test requests with <code>Slim\Psr7\Factory\ServerRequestFactory</code> or
-<code>Slim\Http\Factory\DecoratedServerRequestFactory</code> instead.</li>
+<li><code>getAttribute('routeInfo')</code>, <code>subRequest()</code>, <code>setArgument()</code> calls to check, the container's <code>router</code> entry, and
+code in outer middleware that reads the route before routing ran.</li>
+<li>A Twig underscore class name Rector's map does not know, and <code>Slim\Container</code> imported in a group <code>use</code>
+statement (import the generated <code>LegacyContainer</code> by hand).</li>
+<li><code>Slim\Http\Environment</code> imported in a group <code>use</code> statement (import the generated <code>LegacyEnvironment</code> by hand), and
+Slim 3's <code>Headers</code>, <code>Body</code>, <code>RequestBody</code>, <code>Stream</code>, <code>UploadedFile</code> and <code>Cookies</code> classes or <code>new Request(...)</code>, which
+have no Slim 4 form: one line per file with its line numbers, the <code>tests</code> folder included.</li>
 <li>A group callable that uses <code>$this</code>, or calls <code>$app</code> without <code>use ($app)</code>, a route adder typed <code>\Slim\App</code> that was
 not widened, and middleware added by its container name.</li>
 <li><code>LegacyApp::finish($app)</code> where Booster could not place it, and a glue file that already exists and differs from the
@@ -170,7 +197,8 @@ one the hop writes.</li>
 </ul>
 <h2 id="what-has-no-hop-yet">What has no hop <span class="docs-heading-tail"><span>yet</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-has-no-hop-yet">#</a></span></h2>
 <p>CakePHP 3 and Slim 2 (and anything older): <code>booster plan</code> says Booster has no hop for them yet and keeps PHP where the
-framework still runs, instead of planning a break. Moving a CakePHP or Slim app to Laravel is coming next; nothing in
+framework still runs, instead of planning a break. A Slim 4 app below 4.15 is held the same way: <code>slim-3-to-4</code> moves
+Slim 3 only, so the plan says to move Slim to 4.15 by hand. Moving a CakePHP or Slim app to Laravel is coming next; nothing in
 this release does it.</p>
 <p>See also: <a href="hops.html">What a hop does</a>, <a href="replay-gate.html">The replay gate</a>, and every hop's notes in
 <a href="../reference/hops.html">Hops</a>.</p>

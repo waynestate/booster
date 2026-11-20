@@ -93,7 +93,7 @@ Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today 
 
 The replay gate on its own: init drafts booster-replay.json, record saves how the app answers now, check fails when an answer changed.
 
-Usage: `booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recording RECORDING] [--php PHP] [--image IMAGE] [--out OUT] [--no-install] [--serve-changed] [--force] [--] <action>`
+Usage: `booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recording RECORDING] [--php PHP] [--image IMAGE] [--out OUT] [--no-install] [--allow-failing-baseline] [--serve-changed] [--force] [--] <action>`
 
 | Argument | Required | Meaning |
 | --- | --- | --- |
@@ -109,6 +109,7 @@ Usage: `booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recordin
 | `--image=VALUE` | Serve the app in this Docker image instead of booster-target, in the same three forms as run --image. |  |
 | `--out=VALUE` | Folder for the transcripts (default: a new booster-replay-- folder in the system temp folder). |  |
 | `--no-install` | Do not run composer install first; use the vendor/ the app already has. |  |
+| `--allow-failing-baseline` | record only: keep a baseline whose every answer is an error (a PHP fatal, a 5xx, one error page for every path), with a warning; by default such a baseline is refused. |  |
 | `--serve-changed` | check only: the hop changed how the app is served (docroot, front controller, setup); compare answers anyway, as long as the requests are the same. |  |
 | `--force` | init only: overwrite an existing request file. |  |
 | `--silent` | Do not output any message |  |
@@ -185,7 +186,7 @@ Usage: `booster scan [--path PATH] [--php PHP] [--removals] [--format FORMAT] [-
 | `--no-ansi` | Negate the "--ansi" option |  |
 | `-n`, `--no-interaction` | Do not ask any interactive question |  |
 
-A real `booster run` (not `--dry-run`) also writes a slim machine-readable hop record, `booster-hop.json`, at the app root, overwriting any earlier one; dry runs write nothing. Its keys, in order:
+A real `booster run` (not `--dry-run`) also writes a slim machine-readable hop record, `booster-hop.json`, at the app root, overwriting any earlier one; dry runs write nothing, and neither does a run refused before its first hop (a red baseline or replay baseline), so the record of a stopped hop survives for the next run's re-gate. Its keys, in order:
 
 - `tool`: always `booster`.
 - `version`: the Booster version that ran.

@@ -64,7 +64,7 @@ the image instead of reusing a stale one. The image carries the extension set Ci
 ldap, soap, zip, gd, pdo_mysql, mysqli, bcmath, pcntl, exif, redis, imagick and oci8. The first build downloads
 Oracle Instant Client for oci8, so it takes a few minutes; later hops reuse the image. Pass <code>--image</code> to run the
 gate in your own image instead (below). A red gate stops the run and leaves the changes in place so you can read
-them (<code>git checkout .</code> undoes them). With <code>--replay</code>, the gate also replays the requests recorded before the
+them (<code>git checkout .</code> in the app folder undoes them, with every earlier step of the run). With <code>--replay</code>, the gate also replays the requests recorded before the
 first hop and fails on a changed answer: see <a href="replay-gate.html">The replay gate</a>. To check the image itself,
 <code>scripts/check-target-image.sh</code> (or its Windows twin <code>check-target-image.ps1</code>, PowerShell 7.3 or later) builds it for each PHP version and
 verifies its extension list, that Composer runs and, on the archived Debian releases, that apt can verify the
@@ -104,9 +104,13 @@ gate then retries once. If the retry still fails, the run stops with the unblock
 report, and the entry stays in <code>composer.json</code>.</p>
 <p>The unblock is temporary by name, and Booster enforces that. When a gated step passes, Booster re-reads
 <code>config.policy.advisories.ignore</code> and reports every entry whose reason carries its own prefix (<code>Booster temporary unblock</code>; older runs wrote <code>BOOSTER temporary unblock</code>, which it still recognizes). A step that is not the plan's
-last one applies with a warning; the plan's last step fails until the entry is out of <code>composer.json</code>, so the
-final target never ships with the unblock still in place. Removing the entry is the app's job once it is off the
-blocked versions.</p>
+last one applies with a warning. On the plan's last step, an unblock an earlier step needed is tried once more:
+Booster drops it and runs the step's gate (and the replay) again with <code>composer update -W</code> for those packages, which
+on the new PHP can often move past the blocked releases (Twig, unblocked on PHP 7.4, moves to a fixed 3.x on 8.5).
+If that passes and nothing had to be unblocked again, the entry is gone and the step applies; otherwise
+<code>composer.json</code> and <code>composer.lock</code> go back and the step fails until the entry is out, so the final target never
+ships with the unblock still in place. An unblock the last step itself needed is not retried. The refusal can be the
+root's own requirement or one a locked package carries (<code>slim/twig-view 2.4.0 requires twig/twig ...</code>).</p>
 <p>The <code>--image</code> value names the image the baseline and every gate run in, and it takes three shapes:</p>
 <ul>
 <li>One name, used for the baseline and every gate: <code>--image myapp/gate:8.4</code>.</li>

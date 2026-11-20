@@ -20,7 +20,7 @@ Record the answers first: booster replay init --path=<app> drafts booster-replay
 Step 1 (php-74-to-80) is the hop most likely to change an answer: loose comparisons of numbers and strings, and warnings that now throw.
 ```
 
-The last line shows only when the plan has the PHP 8.0 hop, and the second one asks for just `--replay` when `booster-replay.json` is already there. The JSON report carries the same nudge as `replay_suggestion`. It is advice, never a failure: the exit code is the same with or without it.
+The last line shows only when the plan has a hop marked for extra review, one line per such hop with its own reason: the PHP 8.0 hop as above, the CakePHP 5 and Slim 4 hops as framework majors (sign-in, routes, middleware). The second line asks for just `--replay` when `booster-replay.json` is already there. The JSON report carries the same nudge as `replay_suggestion`. It is advice, never a failure: the exit code is the same with or without it.
 
 ## In three commands [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#in-three-commands)
 
@@ -102,7 +102,7 @@ A normalizer rewrites the volatile parts of an answer before it is compared and 
 
 | Name | Hides |
 | --- | --- |
-| `csrf` | CSRF tokens in hidden form fields and meta tags (`_token`, `csrf_token`, `authenticity_token` and friends) |
+| `csrf` | CSRF tokens in hidden form fields and meta tags (`_token`, `authenticity_token`, and any field whose name holds `csrf` or `xsrf`, such as `csrf_token`, `CSRF_KEY` or slim/csrf's `csrf_name` and `csrf_value`) |
 | `session-id` | session ids in links, forms and scripts (`PHPSESSID=...`, `laravel_session=...`) |
 | `timestamps` | dates with a time of day, and Unix times from 2020 to 2033 |
 | `asset-hash` | content hashes in built asset names (`app.3f9a1c2b.js`, Vite's `app-L1fqnEWe.js`, `app.js?id=3f9a1c`) |
@@ -127,8 +127,11 @@ Anything else is an object: `{"name": "request id", "pattern": "req-[0-9a-f]{12}
 `booster replay init` writes a first draft and never overwrites one. It looks, in order, for:
 
 1. `php artisan route:list --json`, when the app is Laravel and `vendor/` is installed (otherwise the `Route::` calls in `routes/`);
-2. Slim-style route calls (`$app->get('/batches/:id', ...)`), the kind a legacy Slim 1 app has in its `index.php`;
-3. PHP entry points under the docroot, skipping include folders, with a POST draft for each page that reads `$_POST`.
+2. a CakePHP app's `config/routes.php`: its scopes, prefixes, `connect()` and verb routes, one request per page template behind `/pages/*`, and one per public controller action where the file calls `fallbacks()` (served from `webroot/index.php`, with `DEBUG=false`, a fake salt and a setup that creates `tmp/` and `logs/`);
+3. Slim-style route calls (`$app->get('/batches/:id', ...)`, `$group->get(...)`), each with the prefix of every group around it, also through a group that calls a class's static `addRoutes($app)`;
+4. PHP entry points under the docroot, skipping include folders, with a POST draft for each page that reads `$_POST`.
+
+A `phpinfo()` page is never drafted: it answers differently on every PHP, so every hop would fail on it.
 
 Every GET without parameters becomes a request, plus one unknown path (an honest 404 is an answer too). Every path parameter, form and setup command gets a `todo`, because Booster cannot know which note id exists or what a valid form looks like. Fill those in, delete the `todo` lines, and record.
 
@@ -147,6 +150,19 @@ It is a warning, not a stop: the replay still gates every hop. To make it prove 
 - **An app on Wayne Auth** cannot sign in at all in the replay: the old service checks its cookie, and nothing fakes that. Move it to SESAME's Wayne Auth bridge first; `booster plan` names it as a stop sign.
 
 Keep the guest's redirect as one request either way: it is the honest answer for a visitor who is not signed in.
+
+## A baseline of errors [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#a-baseline-of-errors)
+
+A baseline where every answer is an error proves nothing either: the same fatal answers the same way on every PHP, so every hop would "pass". That happens more often than it sounds, for example when the app needs a folder that git does not keep (`var/logs`, `tmp`) or a config file the checkout lacks. Booster refuses such a baseline and stops the run before the first hop:
+
+```
+Replay baseline on PHP 7.2 is not usable: all 5 recorded answers are errors, before any change. A replay of it would only prove the app fails the same way after each hop.
+  01 pages: GET / answered 200 with a PHP error: Fatal error: Uncaught Exception: Required '/app/var/logs/' is not a directory in /app/config/init.php:41
+```
+
+An answer counts as an error when its body shows a PHP fatal or parse error (an app that turns `display_errors` on answers its fatals with a 200), or when it is a 5xx the request file does not `expect`. Two or more answers that are the same 4xx page, byte for byte, count too, unless the file expects each of those statuses. Make the app answer on fake data first (the `setup` command can create the folders it needs), or pass `--allow-failing-baseline` (to `run`, or to `replay record`) to record the errors anyway, with a warning.
+
+When only some answers are errors, or PHP's log shows a fatal error while the baseline was served, Booster records the baseline and warns, naming the requests, so you can tell a page that replays an error from one that works.
 
 ## When a hop changes how the app is served [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#when-a-hop-changes-how-the-app-is-served)
 

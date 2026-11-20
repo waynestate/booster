@@ -55,8 +55,9 @@ Laravel's stock examples) and the run has no <code>--replay</code>, <code>booste
 Record the answers first: booster replay init --path=&lt;app&gt; drafts booster-replay.json from the routes; fill in its todo items, then run again with --replay.
 Step 1 (php-74-to-80) is the hop most likely to change an answer: loose comparisons of numbers and strings, and warnings that now throw.
 </code></pre>
-<p>The last line shows only when the plan has the PHP 8.0 hop, and the second one asks for just <code>--replay</code> when
-<code>booster-replay.json</code> is already there. The JSON report carries the same nudge as <code>replay_suggestion</code>. It is advice,
+<p>The last line shows only when the plan has a hop marked for extra review, one line per such hop with its own reason:
+the PHP 8.0 hop as above, the CakePHP 5 and Slim 4 hops as framework majors (sign-in, routes, middleware). The second
+line asks for just <code>--replay</code> when <code>booster-replay.json</code> is already there. The JSON report carries the same nudge as <code>replay_suggestion</code>. It is advice,
 never a failure: the exit code is the same with or without it.</p>
 <h2 id="in-three-commands">In three <span class="docs-heading-tail"><span>commands</span><a class="docs-heading-link" aria-label="Link to this section" href="#in-three-commands">#</a></span></h2>
 <!-- docs-test: skip needs Docker, run on your own app -->
@@ -166,7 +167,7 @@ difference. <code>&quot;compare&quot;: {&quot;whitespace&quot;: &quot;exact&quot
 <tbody>
 <tr>
 <td><code>csrf</code></td>
-<td>CSRF tokens in hidden form fields and meta tags (<code>_token</code>, <code>csrf_token</code>, <code>authenticity_token</code> and friends)</td>
+<td>CSRF tokens in hidden form fields and meta tags (<code>_token</code>, <code>authenticity_token</code>, and any field whose name holds <code>csrf</code> or <code>xsrf</code>, such as <code>csrf_token</code>, <code>CSRF_KEY</code> or slim/csrf's <code>csrf_name</code> and <code>csrf_value</code>)</td>
 </tr>
 <tr>
 <td><code>session-id</code></td>
@@ -224,9 +225,14 @@ good); Booster's scratch files live in a temp folder it mounts and removes. <cod
 <ol>
 <li><code>php artisan route:list --json</code>, when the app is Laravel and <code>vendor/</code> is installed (otherwise the <code>Route::</code>
 calls in <code>routes/</code>);</li>
-<li>Slim-style route calls (<code>$app-&gt;get('/batches/:id', ...)</code>), the kind a legacy Slim 1 app has in its <code>index.php</code>;</li>
+<li>a CakePHP app's <code>config/routes.php</code>: its scopes, prefixes, <code>connect()</code> and verb routes, one request per page
+template behind <code>/pages/*</code>, and one per public controller action where the file calls <code>fallbacks()</code> (served from
+<code>webroot/index.php</code>, with <code>DEBUG=false</code>, a fake salt and a setup that creates <code>tmp/</code> and <code>logs/</code>);</li>
+<li>Slim-style route calls (<code>$app-&gt;get('/batches/:id', ...)</code>, <code>$group-&gt;get(...)</code>), each with the prefix of every group
+around it, also through a group that calls a class's static <code>addRoutes($app)</code>;</li>
 <li>PHP entry points under the docroot, skipping include folders, with a POST draft for each page that reads <code>$_POST</code>.</li>
 </ol>
+<p>A <code>phpinfo()</code> page is never drafted: it answers differently on every PHP, so every hop would fail on it.</p>
 <p>Every GET without parameters becomes a request, plus one unknown path (an honest 404 is an answer too). Every path
 parameter, form and setup command gets a <code>todo</code>, because Booster cannot know which note id exists or what a valid
 form looks like. Fill those in, delete the <code>todo</code> lines, and record.</p>
@@ -249,6 +255,21 @@ its ID (<code>&quot;cookies&quot;: {&quot;PHPSESSID&quot;: &quot;replay-user&quo
 that. Move it to SESAME's Wayne Auth bridge first; <code>booster plan</code> names it as a stop sign.</li>
 </ul>
 <p>Keep the guest's redirect as one request either way: it is the honest answer for a visitor who is not signed in.</p>
+<h2 id="a-baseline-of-errors">A baseline of <span class="docs-heading-tail"><span>errors</span><a class="docs-heading-link" aria-label="Link to this section" href="#a-baseline-of-errors">#</a></span></h2>
+<p>A baseline where every answer is an error proves nothing either: the same fatal answers the same way on every PHP,
+so every hop would &quot;pass&quot;. That happens more often than it sounds, for example when the app needs a folder that git
+does not keep (<code>var/logs</code>, <code>tmp</code>) or a config file the checkout lacks. Booster refuses such a baseline and stops the
+run before the first hop:</p>
+<pre tabindex="0"><code>Replay baseline on PHP 7.2 is not usable: all 5 recorded answers are errors, before any change. A replay of it would only prove the app fails the same way after each hop.
+  01 pages: GET / answered 200 with a PHP error: Fatal error: Uncaught Exception: Required '/app/var/logs/' is not a directory in /app/config/init.php:41
+</code></pre>
+<p>An answer counts as an error when its body shows a PHP fatal or parse error (an app that turns <code>display_errors</code> on
+answers its fatals with a 200), or when it is a 5xx the request file does not <code>expect</code>. Two or more answers that are
+the same 4xx page, byte for byte, count too, unless the file expects each of those statuses. Make the app answer on
+fake data first (the <code>setup</code> command can create the folders it needs), or pass <code>--allow-failing-baseline</code> (to <code>run</code>,
+or to <code>replay record</code>) to record the errors anyway, with a warning.</p>
+<p>When only some answers are errors, or PHP's log shows a fatal error while the baseline was served, Booster records
+the baseline and warns, naming the requests, so you can tell a page that replays an error from one that works.</p>
 <h2 id="when-a-hop-changes-how-the-app-is-served">When a hop changes how the app is <span class="docs-heading-tail"><span>served</span><a class="docs-heading-link" aria-label="Link to this section" href="#when-a-hop-changes-how-the-app-is-served">#</a></span></h2>
 <p>Some hops change more than the PHP: a strangler's mount step moves the docroot or the front controller, a new
 <code>setup</code> command builds the fake data a different way. The <code>serve</code> section is part of the recording's fingerprint, so
@@ -291,7 +312,7 @@ queue. A follow-up request that reads the saved record back (like <code>read bac
     </main>
     <nav class="docs-pager" aria-label="Pages"><a class="docs-pager__link" href="../../docs/guides/hops.html"><span class="docs-pager__dir">Previous</span><span class="docs-pager__title">What a hop does</span></a><a class="docs-pager__link docs-pager__link--next" href="../../docs/guides/framework-hops.html"><span class="docs-pager__dir">Next</span><span class="docs-pager__title">Hand-copied libraries to Composer</span></a></nav>
   </div>
-  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#in-three-commands">In three commands</a></li><li class="docs-toc__item"><a href="#what-a-run-does-with-it">What a run does with it</a></li><li class="docs-toc__item"><a href="#the-request-file">The request file</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-is-compared">What is compared</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#normalizers">Normalizers</a></li><li class="docs-toc__item"><a href="#design">Design</a></li><li class="docs-toc__item"><a href="#drafting-the-file">Drafting the file</a></li><li class="docs-toc__item"><a href="#pages-behind-sign-in">Pages behind sign-in</a></li><li class="docs-toc__item"><a href="#when-a-hop-changes-how-the-app-is-served">When a hop changes how the app is served</a></li><li class="docs-toc__item"><a href="#limits-honestly">Limits, honestly</a></li></ul></nav>
+  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#in-three-commands">In three commands</a></li><li class="docs-toc__item"><a href="#what-a-run-does-with-it">What a run does with it</a></li><li class="docs-toc__item"><a href="#the-request-file">The request file</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-is-compared">What is compared</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#normalizers">Normalizers</a></li><li class="docs-toc__item"><a href="#design">Design</a></li><li class="docs-toc__item"><a href="#drafting-the-file">Drafting the file</a></li><li class="docs-toc__item"><a href="#pages-behind-sign-in">Pages behind sign-in</a></li><li class="docs-toc__item"><a href="#a-baseline-of-errors">A baseline of errors</a></li><li class="docs-toc__item"><a href="#when-a-hop-changes-how-the-app-is-served">When a hop changes how the app is served</a></li><li class="docs-toc__item"><a href="#limits-honestly">Limits, honestly</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
   <span>Documents Booster <span data-docs-version>1.19.0</span></span>

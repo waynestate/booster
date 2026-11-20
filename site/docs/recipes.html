@@ -182,7 +182,9 @@ before each call (Laravel apps are skipped); see <a href="guides/strict-sessions
 <code>plan</code>. PHP 5.6 never checked that service's TLS certificate; PHP 7 and later do, and it has expired, so sign-in breaks
 on the first PHP hop off 5.6. Ship the move to SESAME's Wayne Auth bridge (it needs PHP 8.3) in the same release as the
 PHP hops, and deploy no hop off 5.6 before it:
-<a rel="noopener" href="https://sesame.apps.wayne.edu/docs/guides/moving-off-wayne-auth.html">Moving off Wayne Auth</a>.</p>
+<a rel="noopener" href="https://sesame.apps.wayne.edu/docs/guides/moving-off-wayne-auth.html">Moving off Wayne Auth</a>. An app already on PHP 7
+or later gets the stop sign worded for it: its PHP already checks the certificate, so the sign-in fails there unless the
+app turned the check off, and the move ships with the next hop.</p>
 <h2 id="13-plan-for-a-future-date-or-a-different-policy">13. Plan for a future date, or a different <span class="docs-heading-tail"><span>policy</span><a class="docs-heading-link" aria-label="Link to this section" href="#13-plan-for-a-future-date-or-a-different-policy">#</a></span></h2>
 <!-- docs-test: skip run on your own app -->
 <pre tabindex="0"><code>booster plan --path=../my-app --today=2027-06-01
@@ -191,7 +193,7 @@ booster plan --path=../my-app --policy=/path/to/policy.json
 <p>The default target is &quot;the newest the policy supports on the plan's date&quot;. <code>--today</code> pins the date (format <code>YYYY-MM-DD</code>), so a plan is repeatable and you can see what a later date would ask of you. <code>--policy</code>, or the <code>BOOSTER_POLICY</code> environment variable, points at a different CREED <code>policy.json</code>; the default is the copy in the <code>waynestate/creed</code> package.</p>
 <p>Not for: a real run on a faked date. Dates are for planning; run on the real one.</p>
 <h2 id="14-after-a-stop">14. After a <span class="docs-heading-tail"><span>stop</span><a class="docs-heading-link" aria-label="Link to this section" href="#14-after-a-stop">#</a></span></h2>
-<p>A run stops at the first hop that fails (a red gate, a hop over the file cap, a Composer error) and reports the rest as &quot;not run&quot;. The report names the hop, the phase (Composer or tests), and the last lines of output. The failed hop's changes stay in place so you can read them; <code>git checkout .</code> undoes them.</p>
+<p>A run stops at the first hop that fails (a red gate, a hop over the file cap, a Composer error) and reports the rest as &quot;not run&quot;. The report names the hop, the phase (Composer or tests), and the last lines of output. The failed hop's changes stay in place so you can read them. The report's &quot;Undo with:&quot; line (<code>git checkout .</code>, plus <code>git clean</code> for files the run created, with paths relative to the app folder) runs inside the app folder and undoes everything the run changed, the steps that passed included, because Booster commits nothing between steps; commit after each passed step to keep them.</p>
 <p>The usual loop:</p>
 <ol>
 <li>Read the report for the failing hop.</li>
@@ -205,7 +207,7 @@ booster plan --path=../my-app --policy=/path/to/policy.json
 <li>when the hop is back in the plan with nothing to edit, its step runs the gate (the build first when it has one, then the tests on its PHP, against the lock you committed) instead of &quot;nothing to do, so the gate was skipped&quot;. Green stays <code>NOTHING-TO-DO</code> with a <code>Re-gate:</code> line; red fails the step.</li>
 </ul>
 <p>A dry run and <code>--skip-gate</code> never re-gate. The record of a rerun whose re-gate went red keeps the hop's name (<code>regate</code> in <code>booster-hop.json</code>), so the run after it re-gates again.</p>
-<p>If you would rather throw the failed hop away, <code>git checkout .</code>, fix the cause, and run again. To get the hop's edits and keep working in the same tree, pass <code>--allow-dirty</code>.</p>
+<p>If you would rather throw the run away, <code>git checkout .</code> (it takes back every step of the run, not only the failed one), fix the cause, and run again. To get the hop's edits and keep working in the same tree, pass <code>--allow-dirty</code>.</p>
 <p>If you keep a stopped PHP hop's edits, the app has already moved: that hop raised <code>php</code> in <code>composer.json</code>. So run again without <code>--from-php</code> (or with the PHP the stopped hop landed on), not with the PHP you started from. Booster then starts where the app is, and the baseline on that PHP checks the stopped hop's work before the next hop. A rerun from the old PHP cannot install, and Booster says so: its baseline names the <code>php</code> constraint and the rerun to type. When the baseline's install fails because a locked package refuses that PHP, it names the <code>composer update -W</code> to run instead.</p>
 <p>An AI coding tool working from the playbooks <code>booster init</code> writes follows the same loop, with a cap: it works from the real output and the files it names, fixes one cause per try, never loosens a test or adds <code>--skip-gate</code>, and after 3 tries at one failure it stops and hands the hop back to you with the last output.</p>
 <p>Not for: re-running again and again hoping for a different answer. Booster is deterministic; the gate will be just as red.</p>
