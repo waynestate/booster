@@ -10,6 +10,7 @@ use Waynestate\Booster\Plan\PlanStep;
 use Waynestate\Booster\Run\GateReport;
 use Waynestate\Booster\Run\RunOptions;
 use Waynestate\Booster\Run\StepResult;
+use Waynestate\Booster\Strangler\AddsComposerPackages;
 use Waynestate\Booster\Strangler\Ledger;
 use Waynestate\Booster\Strangler\MoveResult;
 use Waynestate\Booster\Strangler\Unit;
@@ -40,6 +41,7 @@ final class StranglerStep
      * @param Closure(): (list<array{methods: list<string>, uri: string}>|string) $routeList   Laravel's route:list, or why it could not be read
      * @param Closure(): string                                            $now         the time stamp the ledger records
      * @param Closure(): (list<\Waynestate\Booster\Replay\ReplayAnswer>|null) $baselineAnswers the answers this run recorded before the first step, or null
+     * @param Closure(list<string>): ?string                              $composerUpdate runs composer update -W with these packages on the Laravel root; null when it passed, else Composer's first error line
      */
     public function __construct(
         private readonly StranglerParts $parts,
@@ -49,6 +51,7 @@ final class StranglerStep
         private readonly Closure $routeList,
         private readonly Closure $now,
         private readonly ?Closure $baselineAnswers = null,
+        private readonly ?Closure $composerUpdate = null,
     ) {}
 
     /**
@@ -256,6 +259,8 @@ final class StranglerStep
 
         $moved = [];
         $files = [];
+        $composerFailure = null;
+        // The unit source gives the units in move order already: never re-sort them.
         foreach ($candidates as $unit) {
             if (count($moved) >= $budget) {
                 break;
@@ -268,8 +273,10 @@ final class StranglerStep
                 $moved[] = $unit;
                 continue;
             }
+            $mover = null;
             try {
-                $result = $this->parts->mover($framework)->move($unit, $path);
+                $mover = $this->parts->mover($framework);
+                $result = $mover->move($unit, $path);
             } catch (ToolError $e) {
                 $result = new MoveResult(false, [], [['file' => $unit->sourceFile, 'line' => $unit->sourceLine, 'reason' => $e->getMessage()]], []);
             }
@@ -284,6 +291,18 @@ final class StranglerStep
                 continue;
             }
             $files = [...$files, ...$result->changedFiles];
+            $adds = $mover instanceof AddsComposerPackages && in_array('composer.json', $result->changedFiles, true) ? $mover->composerAdds() : [];
+            if ($adds !== []) {
+                // The moved code needs a package on the Laravel root: install it before the gate.
+                $packages = array_keys($adds);
+                $error = $this->composerUpdate === null ? 'this build has no Composer runner for the strangler' : ($this->composerUpdate)($packages);
+                if ($error !== null) {
+                    $composerFailure = ['unit' => $unit, 'packages' => $packages, 'error' => $error];
+                    break;
+                }
+                $files[] = 'composer.lock';
+                $messages[] = sprintf('composer update -W %s on the Laravel root for %s.', implode(' ', $packages), $unit->id);
+            }
             $this->parts->routeAdd($path, $unit);
             $files[] = StranglerFinish::ROUTE_TABLE;
             $moved[] = $unit;
@@ -294,6 +313,27 @@ final class StranglerStep
             $ids = array_map(static fn(Unit $u): string => $u->id, $moved);
 
             return $this->result($step, StepResult::PREVIEWED, [], [...$messages, $ids === [] ? 'Would move nothing.' : 'Would move, in this order: ' . implode(', ', $ids) . '. Each run is gated by the replay with the moved units answering from Laravel.'], $report->withNext($next . ' --moves ' . max(1, count($ids))));
+        }
+
+        if ($composerFailure !== null) {
+            $failedUnit = $composerFailure['unit'];
+            $reason = sprintf('composer update -W %s failed on the Laravel root: %s', implode(' ', $composerFailure['packages']), $composerFailure['error']);
+            $ledger->mark($failedUnit->id, Ledger::FAILED);
+            $report->fail($failedUnit->id, $reason);
+            // The units this run moved before it never reached the gate.
+            foreach ($moved as $unit) {
+                $ledger->mark($unit->id, Ledger::FAILED);
+                $report->fail($unit->id, sprintf('not gated: the run stopped at the composer update for %s', $failedUnit->id));
+            }
+            $ledger->save($path);
+            $report->ledger($ledger, $units);
+
+            return $this->result($step, StepResult::GATE_FAILED, self::unique([...$files, Ledger::FILE]), [
+                ...$messages,
+                sprintf('%s moved, but %s', $failedUnit->id, $reason),
+                sprintf('The run stopped before the gate. %s marked failed in %s with the changes in place; fix composer.json and retry with --route, or undo this run (git checkout -- . && git clean -fd).', implode(', ', [$failedUnit->id, ...array_map(static fn(Unit $u): string => $u->id, $moved)]) . ($moved === [] ? ' is' : ' are'), Ledger::FILE),
+                ...$report->refusalLines(),
+            ], $report);
         }
 
         if ($moved === []) {

@@ -22,6 +22,8 @@ use Waynestate\Booster\Run\Strangler\StranglerParts;
 use Waynestate\Booster\Run\Strangler\StranglerStep;
 use Waynestate\Booster\Run\Strangler\StranglerStopSigns;
 use Waynestate\Booster\Run\Strangler\UnwiredStranglerParts;
+use Waynestate\Booster\Run\HopExecutor;
+use Waynestate\Booster\Strangler\AddsComposerPackages;
 use Waynestate\Booster\Strangler\Ledger;
 use Waynestate\Booster\Strangler\MoveResult;
 use Waynestate\Booster\Strangler\Mover;
@@ -438,6 +440,64 @@ final class StranglerEngineTest extends TestCase
         self::assertSame(Ledger::HAND, $ledger->state('FORM /articles/add'));
     }
 
+    public function test_units_move_in_the_unit_source_order_never_re_sorted(): void
+    {
+        [$step, $dir] = $this->mounted('slim', ['GET /b', 'GET /a']);
+        // The unit source already put this write first; the engine must not re-sort by kind, order or id.
+        $parts = new FakeStranglerParts([self::unit('GET /b', 'route', 'write'), self::unit('GET /a', 'route', 'stateless')]);
+
+        $this->step($parts)->run($step, $dir, $this->replayOptions(), '4.15', '4', 'NEXT');
+
+        self::assertSame(['GET /b'], $parts->moved);
+    }
+
+    public function test_a_move_that_adds_packages_updates_them_on_the_laravel_root_before_the_gate(): void
+    {
+        [$step, $dir] = $this->mounted('slim', ['GET /a']);
+        $parts = new FakeStranglerParts([self::unit('GET /a')]);
+        $parts->adds = ['slim/psr7' => '^1.7', 'php-di/php-di' => '^7.0'];
+        $gates = [];
+
+        $result = $this->step($parts, gates: $gates)->run($step, $dir, $this->replayOptions(), '4.15', '4', 'NEXT');
+
+        self::assertSame(StepResult::APPLIED, $result->status, implode("\n", $result->messages));
+        self::assertSame(['composer:slim/psr7 php-di/php-di', 'mounted'], $gates);
+        self::assertContains('composer.lock', array_column($result->files, 'file'));
+        self::assertStringContainsString('composer update -W slim/psr7 php-di/php-di on the Laravel root for GET /a.', implode("\n", $result->messages));
+    }
+
+    public function test_a_failed_composer_update_marks_the_unit_failed_and_never_gates(): void
+    {
+        [$step, $dir] = $this->mounted('slim', ['GET /a']);
+        $parts = new FakeStranglerParts([self::unit('GET /a')]);
+        $parts->adds = ['slim/psr7' => '^9.0'];
+        $gates = [];
+        $error = 'Problem 1: Root composer.json requires slim/psr7 ^9.0, it is satisfiable by nothing.';
+
+        $result = $this->step($parts, gates: $gates, composerError: $error)->run($step, $dir, $this->replayOptions(), '4.15', '4', 'NEXT');
+
+        self::assertSame(StepResult::GATE_FAILED, $result->status);
+        self::assertSame(['composer:slim/psr7'], $gates, 'no gate after a failed update');
+        self::assertSame([], $parts->routes, 'the route table never sends the unit to Laravel');
+        $ledger = Ledger::load($dir);
+        self::assertNotNull($ledger);
+        self::assertSame(Ledger::FAILED, $ledger->state('GET /a'));
+        self::assertSame('GET /a', $result->strangler['failed'][0]['unit'] ?? null);
+        self::assertStringContainsString($error, $result->strangler['failed'][0]['reason'] ?? '');
+        self::assertStringContainsString('composer update -W slim/psr7 failed on the Laravel root: Problem 1:', implode("\n", $result->messages));
+    }
+
+    public function test_the_composer_error_line_is_the_reason_under_problem_one(): void
+    {
+        $output = ['Loading composer repositories with package information', 'Your requirements could not be resolved to an installable set of packages.', '', '  Problem 1', '    - Root composer.json requires slim/psr7 ^9.0, it is satisfiable by nothing.'];
+
+        self::assertSame('Problem 1: Root composer.json requires slim/psr7 ^9.0, it is satisfiable by nothing.', HopExecutor::composerErrorLine($output));
+        self::assertSame('Your requirements could not be resolved to an installable set of packages.', HopExecutor::composerErrorLine(array_slice($output, 0, 3)));
+        self::assertSame('[RuntimeException] Failed to execute git clone', HopExecutor::composerErrorLine(['Updating dependencies', '[RuntimeException] Failed to execute git clone']));
+        self::assertSame('Killed', HopExecutor::composerErrorLine(['', 'Killed']));
+        self::assertNull(HopExecutor::composerErrorLine([]));
+    }
+
     // Section 6: finish.
 
     public function test_finish_is_refused_while_units_are_left(): void
@@ -505,7 +565,7 @@ final class StranglerEngineTest extends TestCase
         $result = $this->step(new FakeStranglerParts([self::unit('GET /a')]))->run($step, $dir, $this->replayOptions(), '4.15', '4', 'NEXT');
 
         $data = $result->toArray();
-        self::assertSame(['phase', 'framework', 'status', 'step0', 'moved', 'left', 'counts', 'refusals', 'stop_signs', 'manual', 'next'], array_keys($data['strangler']));
+        self::assertSame(['phase', 'framework', 'status', 'step0', 'moved', 'left', 'counts', 'refusals', 'failed', 'stop_signs', 'manual', 'next'], array_keys($data['strangler']));
         self::assertArrayNotHasKey('strangler', (new StepResult(1, 'php-84-to-85', StepResult::APPLIED, [], []))->toArray());
     }
 
@@ -630,7 +690,7 @@ final class StranglerEngineTest extends TestCase
      * @param list<string>                                         $gates  the gates the step ran, in order
      * @param list<array{methods: list<string>, uri: string}>|string $routes what route:list prints
      */
-    private function step(StranglerParts $parts, bool $legacyPasses = true, bool $mountedPasses = true, bool $dirty = false, ?array &$gates = null, array|string $routes = [], ?array &$signInChanges = null): StranglerStep
+    private function step(StranglerParts $parts, bool $legacyPasses = true, bool $mountedPasses = true, bool $dirty = false, ?array &$gates = null, array|string $routes = [], ?array &$signInChanges = null, ?string $composerError = null): StranglerStep
     {
         $gates = [];
         $log = &$gates;
@@ -653,6 +713,12 @@ final class StranglerEngineTest extends TestCase
             static fn(): bool => $dirty,
             static fn(): array|string => $routes,
             static fn(): string => '2026-11-20T19:00:00-05:00',
+            null,
+            static function (array $packages) use ($composerError, &$log): ?string {
+                $log[] = 'composer:' . implode(' ', $packages);
+
+                return $composerError;
+            },
         );
     }
 
@@ -666,8 +732,16 @@ final class StranglerEngineTest extends TestCase
 }
 
 /** The other lanes' parts, as a double: records its calls, moves what it is told to. */
-final class FakeStranglerParts implements StranglerParts, UnitSource, Mover
+final class FakeStranglerParts implements StranglerParts, UnitSource, Mover, AddsComposerPackages
 {
+    /** @var array<string, string> what the next move adds to the Laravel root's composer.json */
+    public array $adds = [];
+
+    public function composerAdds(): array
+    {
+        return $this->adds;
+    }
+
     /** @var list<string> */
     public array $calls = [];
 
@@ -762,6 +836,8 @@ final class FakeStranglerParts implements StranglerParts, UnitSource, Mover
         }
         $this->moved[] = $unit->id;
 
-        return new MoveResult(true, ['app/Http/Controllers/Moved.php', 'routes/web.php'], [], ['MANUAL: check the moved view.']);
+        $files = ['app/Http/Controllers/Moved.php', 'routes/web.php', ...($this->adds === [] ? [] : ['composer.json'])];
+
+        return new MoveResult(true, $files, [], ['MANUAL: check the moved view.']);
     }
 }

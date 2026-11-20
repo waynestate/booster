@@ -28,6 +28,9 @@ final class StranglerReport
     /** @var list<array{unit: string, file: string, line: int, reason: string}> */
     public array $refusals = [];
 
+    /** @var list<array{unit: string, reason: string}> units that moved but failed before the gate (a composer update) */
+    public array $failed = [];
+
     /** @var list<string> */
     public array $stopSigns = [];
 
@@ -63,6 +66,11 @@ final class StranglerReport
                 $this->manual[$group][] = $line;
             }
         }
+    }
+
+    public function fail(string $unit, string $reason): void
+    {
+        $this->failed[] = ['unit' => $unit, 'reason' => $reason];
     }
 
     public function refuse(string $unit, string $file, int $line, string $reason): void
@@ -174,6 +182,7 @@ final class StranglerReport
             'left' => ['count' => count($this->left), 'units' => $this->left],
             'counts' => $this->counts,
             'refusals' => $this->refusals,
+            'failed' => $this->failed,
             'stop_signs' => $this->stopSigns,
             'manual' => $manual === [] ? new \stdClass() : $manual,
             'next' => $this->next,

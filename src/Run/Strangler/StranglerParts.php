@@ -16,7 +16,8 @@ use Waynestate\Booster\Strangler\UnitSource;
  *  - REPLAY: ReplayFile::usableForStrangler(appRoot, answers, file): ?string
  *  - SIGNIN: SignInStep::inspect() and ::migrate(), called twice: Step 0
  *    before the mount, then the Laravel half's wiring right after it; and
- *    the finish step's move of /login to Laravel
+ *    SignInStep::finish(appRoot, framework): SignInResult, the finish
+ *    step's move of /login to Laravel (signInFinish)
  *  - MOUNT:  Mount::run() and RouteTable::load()->add/remove/has/save
  *  - SLIM and CAKE: a UnitSource and a Mover per framework
  *

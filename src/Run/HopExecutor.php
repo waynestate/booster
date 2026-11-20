@@ -1999,6 +1999,7 @@ final class HopExecutor
             fn(): array|string => $this->laravelRouteList($path, $step->phpAfter ?? '', $options),
             static fn(): string => (new \DateTimeImmutable('now'))->format(DATE_ATOM),
             fn(): ?array => $this->replayGate?->recording()?->answers,
+            fn(array $packages): ?string => $this->stranglerComposerUpdate($path, $step->phpAfter ?? '', $options, $packages),
         );
 
         return $strangler->run($step, $path, $options, $plan->project->frameworkVersion, $newestMajor, $next);
@@ -2081,6 +2082,47 @@ final class HopExecutor
         }
 
         return $routes;
+    }
+
+    /**
+     * composer update -W for the packages a strangler move added to the
+     * Laravel root, in the gate image with the Composer cache, before the
+     * gate. Returns null when it passed, else Composer's first error line.
+     *
+     * @param list<string> $packages
+     */
+    private function stranglerComposerUpdate(string $path, string $php, RunOptions $options, array $packages): ?string
+    {
+        $outcome = TargetImageRunner::gateOutcome($this->gate->run($path, $php, 'true', null, $options->gateImage, $packages, $options->testEnv));
+        if ($outcome->successful()) {
+            return null;
+        }
+
+        return self::composerErrorLine($outcome->output) ?? sprintf('composer exited %d with no output.', $outcome->exitCode);
+    }
+
+    /**
+     * The first line of Composer output that says what went wrong: a
+     * Problem line, an error, or a requirement it could not meet.
+     *
+     * @param list<string> $output
+     */
+    public static function composerErrorLine(array $output): ?string
+    {
+        $lines = array_values(array_filter(array_map('trim', $output), static fn(string $line): bool => $line !== ''));
+        // "Problem 1" says nothing by itself; the line under it is the reason, and it beats the generic lines.
+        foreach ($lines as $i => $line) {
+            if (preg_match('/^Problem \d+$/', $line) === 1 && isset($lines[$i + 1])) {
+                return $line . ': ' . ltrim($lines[$i + 1], '- ');
+            }
+        }
+        foreach ($lines as $line) {
+            if (preg_match('/(\berror\b|Your requirements could not be resolved|could not be found|requires .+ but|\[[A-Za-z\\\\]*Exception\])/i', $line) === 1) {
+                return $line;
+            }
+        }
+
+        return $lines[0] ?? null;
     }
 
     /** Whether the app's working copy has uncommitted changes; a folder git cannot read counts as dirty. */
