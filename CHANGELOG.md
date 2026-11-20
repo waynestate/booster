@@ -4,6 +4,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Fixed: the CakePHP 5 sign-in move keeps the guest actions AuthComponent allowed: `allow()` becomes the additive `addUnauthenticatedActions()` (not `allowUnauthenticated()`, which replaces the list; one name goes in an array, none is `disableIdentityCheck()`) (CAKE-10), and the old `loginAction` is named there in its controller, since the plugin asks for a sign-in on the sign-in page itself and a fleet app's /auth/login redirected to itself (CAKE-11).
 - Fixed: the CakePHP 5 step names `Cake\Error\Renderer\WebExceptionRenderer` where config/app.php named the removed `Cake\Error\ExceptionRenderer`; on 5 every error page, a 404 included, had become an empty 200 (CAKE-9).
 - Fixed: the CakePHP 5 step moves friendsofcake/bootstrap-ui (^5.1), friendsofcake/cakephp-csvview (^5.0) and cakephp/cakephp-codesniffer (^5.2) when the app has them; their CakePHP 4 majors stopped composer update on a fleet app (CAKE-8).
 - Fixed: the replay gate no longer fails the CakePHP 5 step on markup CakePHP's own helpers print differently on 5: a new `cakephp` normalizer preset (the extra rel="shortcut icon" link CakePHP 4's meta('icon') printed) is switched on from that step, and the step report says so (CAKE-7).

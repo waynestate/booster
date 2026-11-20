@@ -677,7 +677,7 @@ final class CakeUpgradeMigrationTest extends TestCase
         $controller = (string) file_get_contents($app . '/src/Controller/AppController.php');
         self::assertStringNotContainsString('$this->Auth->', $controller);
         self::assertStringContainsString("\$this->loadComponent('Authentication.Authentication');", $controller);
-        self::assertStringContainsString("\$this->Authentication->allowUnauthenticated(['display']);", $controller);
+        self::assertStringContainsString("\$this->Authentication->addUnauthenticatedActions(['display']);", $controller);
         self::assertStringContainsString("return \$this->Authentication->getIdentity()?->get('ROLE');", $controller);
         self::assertStringContainsString('$this->Authentication->setIdentity($profile);', $controller);
         self::assertContains('Moved 3 AuthComponent calls to the Authentication plugin.', $result->changes);
@@ -704,6 +704,23 @@ final class CakeUpgradeMigrationTest extends TestCase
         self::assertArrayNotHasKey('cakephp/authorization', self::composerJson($app)['require']);
         self::assertContains('cakephp/authentication', $result->packages);
         self::assertContains('Required cakephp/authentication ^3.0 for the Authentication plugin.', $result->changes);
+    }
+
+    // CAKE-11: AuthComponent let guests reach the loginAction; on 5 a fleet app's sign-in page redirected to itself.
+    public function test_the_login_action_stays_open_to_guests(): void
+    {
+        $authController = "<?php\nnamespace App\\Controller;\n\nclass AuthController extends AppController\n{\n    public function initialize(): void\n    {\n        parent::initialize();\n    }\n\n    public function login()\n    {\n        return \$this->redirect('https://sso.example.invalid/');\n    }\n}\n";
+        $app = $this->authApp(false, ['src/Controller/AuthController.php' => $authController]);
+
+        $result = $this->engine($this->docker())->migrate($app, false, '8.3', self::hop5());
+
+        $code = (string) file_get_contents($app . '/src/Controller/AuthController.php');
+        self::assertStringContainsString("        parent::initialize();\n        // AuthComponent let guests reach its loginAction; the Authentication plugin needs it named.\n        \$this->Authentication->addUnauthenticatedActions(['login']);\n    }", $code);
+        self::assertContains('Opened login() to guests in src/Controller/AuthController.php, as AuthComponent did for its loginAction.', $result->changes);
+        self::assertNull(self::lineStartingWith($result->manual, "MANUAL: the loginAction's controller"));
+
+        $missing = $this->engine($this->docker())->migrate($this->authApp(), false, '8.3', self::hop5());
+        self::assertNotNull(self::lineStartingWith($missing->manual, "MANUAL: the loginAction's controller (src/Controller/AuthController.php) was not found"));
     }
 
     public function test_no_auth_means_no_authentication_plugin_or_scaffold(): void

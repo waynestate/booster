@@ -71,10 +71,13 @@ notice before the 5 step. A deprecation on 4.6 is CakePHP 5 knocking politely; o
 you; it does not fix them for you.
 
 **The sign-in move.** The 5 step moves the like-for-like AuthComponent calls (`$this->Auth->user('x')` reads the
-identity, `setUser()` becomes `setIdentity()`, `logout()` and `allow()` keep their names on `$this->Authentication`),
-swaps `loadComponent('Auth')` for `loadComponent('Authentication.Authentication')`, requires
-`cakephp/authentication ^3.0`, and wires `src/Application.php`: the provider interface, the plugin, the middleware
-after routing, and a service with the Session authenticator whose guests go to the old `loginAction`.
+identity, `setUser()` becomes `setIdentity()`, `logout()` keeps its name on `$this->Authentication`, `allow()` becomes
+`addUnauthenticatedActions()`), swaps `loadComponent('Auth')` for `loadComponent('Authentication.Authentication')`,
+requires `cakephp/authentication ^3.0`, and wires `src/Application.php`: the provider interface, the plugin, the
+middleware after routing, and a service with the Session authenticator whose guests go to the old `loginAction`.
+AuthComponent never asked for a sign-in on its own `loginAction`; the plugin does, so the page would redirect to
+itself. Booster names that action in `addUnauthenticatedActions()` at the end of its controller's `initialize()` (or
+adds an `initialize()`), and says MANUAL when the `loginAction` is not a plain controller and action array.
 
 **The skeleton's own files.** The 5 step also makes the CakePHP 5 skeleton's moves no upgrade rule makes:
 `config/bootstrap.php` loads CakePHP's global functions (`require CAKE . 'functions.php';`, without which `env()` is
@@ -102,7 +105,9 @@ where there is one:
   CAS, an SSO cookie or an LTI launch, `authorize`, `loginRedirect`, `logoutRedirect`, `authError`; `loginAction` is
   carried over as the redirect). Also an `'Auth'` entry with config in a `$components` list, any other
   `$this->Auth->...()` call, what the action does with `logout()`'s return value (now the redirect URL or null), and
-  `allow()` calls that passed one name or none, since `allowUnauthenticated()` takes an array.
+  `allow()` calls that passed a variable (it could hold one name or null, every action). `allow()` added to the
+  actions guests may reach, so it becomes `addUnauthenticatedActions()`, never `allowUnauthenticated()`, which
+  replaces the list; one name goes in an array, and `allow()` with nothing is `disableIdentityCheck()`.
 - `src/Application.php` that Booster could not wire: no such file or class, one that already provides an
   authentication service (check that it loads the Session authenticator), no `bootstrap()` or `middleware()`, no
   routing middleware, or no `loginAction` found (the redirect is the placeholder `/login`).

@@ -10,7 +10,7 @@ final class CakeAuthRewriterTest extends TestCase
 {
     private const LOGOUT_NOTE = 'MANUAL: $this->Authentication->logout() returns the redirect URL or null (AuthComponent returned its logoutRedirect); check what the action does with it.';
 
-    private const ALLOW_NOTE = "MANUAL: allowUnauthenticated() takes an array of action names, and AuthComponent's allow() also took one name or none (every action); check each converted call.";
+    private const ALLOW_NOTE = "MANUAL: addUnauthenticatedActions() takes an array of action names, and AuthComponent's allow() also took one name or null (every action); check each converted call.";
 
     public function test_user_with_a_plain_key(): void
     {
@@ -107,7 +107,8 @@ final class CakeAuthRewriterTest extends TestCase
         $this->assertSame([self::LOGOUT_NOTE], $result['manual']);
     }
 
-    public function test_allow_becomes_allow_unauthenticated(): void
+    // CAKE-10: allow() added to the list; allowUnauthenticated() replaces it, so a later call dropped the earlier names.
+    public function test_allow_adds_unauthenticated_actions_like_auth_component(): void
     {
         $result = (new AuthRewriter())->rewriteCalls(self::php(
             '$this->Auth->allow([\'index\', \'view\']);',
@@ -115,16 +116,69 @@ final class CakeAuthRewriterTest extends TestCase
         ));
 
         $this->assertSame(self::php(
-            '$this->Authentication->allowUnauthenticated([\'index\', \'view\']);',
-            '$this->Authentication->allowUnauthenticated(array(\'display\'));',
+            '$this->Authentication->addUnauthenticatedActions([\'index\', \'view\']);',
+            '$this->Authentication->addUnauthenticatedActions(array(\'display\'));',
         ), $result['code']);
         $this->assertSame(['Rewrote 2 $this->Auth->allow() calls to the Authentication plugin.'], $result['changes']);
         $this->assertSame([], $result['manual']);
 
-        $single = (new AuthRewriter())->rewriteCalls(self::php('$this->Auth->allow(\'login\');'));
+        $single = (new AuthRewriter())->rewriteCalls(self::php('$this->Auth->allow(\'login\');', '$this->Auth->allow();', '$this->Auth->allow( /* all */ );'));
+        $this->assertSame(self::php(
+            '$this->Authentication->addUnauthenticatedActions([\'login\']);',
+            '$this->Authentication->disableIdentityCheck();',
+            '$this->Authentication->disableIdentityCheck();',
+        ), $single['code']);
+        $this->assertSame([], $single['manual']);
 
-        $this->assertSame(self::php('$this->Authentication->allowUnauthenticated(\'login\');'), $single['code']);
-        $this->assertSame([self::ALLOW_NOTE], $single['manual']);
+        $variable = (new AuthRewriter())->rewriteCalls(self::php('$this->Auth->allow($open);'));
+        $this->assertSame(self::php('$this->Authentication->addUnauthenticatedActions((array) $open);'), $variable['code']);
+        $this->assertSame([self::ALLOW_NOTE], $variable['manual']);
+    }
+
+    // CAKE-11: attendance's /auth/login redirected to /auth/login on 5.
+    public function test_login_target_reads_only_plain_controller_and_action_arrays(): void
+    {
+        $rewriter = new AuthRewriter();
+        self::assertSame(['controller' => 'Auth', 'action' => 'login'], $rewriter->loginTarget("[\n    'controller' => 'Auth',\n    'action' => 'login'\n]"));
+        self::assertSame(['controller' => 'UserAccounts', 'action' => 'signIn'], $rewriter->loginTarget("array('controller' => 'user_accounts', 'action' => 'signIn', 'plugin' => false, 'prefix' => null)"));
+        self::assertNull($rewriter->loginTarget("'/users/login'"));
+        self::assertNull($rewriter->loginTarget("['controller' => 'Users', 'action' => 'login', 'plugin' => 'CakeDC/Users']"));
+        self::assertNull($rewriter->loginTarget("['controller' => \$name, 'action' => 'login']"));
+        self::assertNull($rewriter->loginTarget("['controller' => 'Users']"));
+    }
+
+    public function test_open_login_action_adds_the_action_after_the_parent_initialize(): void
+    {
+        $controller = "<?php\nclass AuthController extends AppController\n{\n    public function initialize(): void\n    {\n        parent::initialize();\n        \$this->x = 1;\n    }\n\n    public function login() {}\n}\n";
+        $result = (new AuthRewriter())->openLoginAction($controller, 'login');
+
+        self::assertTrue($result['changed']);
+        self::assertNull($result['manual']);
+        self::assertStringContainsString("        \$this->x = 1;\n        // AuthComponent let guests reach its loginAction; the Authentication plugin needs it named.\n        \$this->Authentication->addUnauthenticatedActions(['login']);\n    }\n\n    public function login()", $result['code']);
+        self::assertFalse((new AuthRewriter())->openLoginAction($result['code'], 'login')['changed'], 'run twice, added once');
+
+        $crlf = (new AuthRewriter())->openLoginAction(str_replace("\n", "\r\n", $controller), 'login');
+        self::assertStringContainsString("addUnauthenticatedActions(['login']);\r\n    }", $crlf['code']);
+    }
+
+    public function test_open_login_action_adds_an_initialize_or_names_a_manual_step(): void
+    {
+        $bare = "<?php\nnamespace App\\Controller;\n\nclass UsersController extends AppController\n{\n    public function login() {}\n}\n";
+        $result = (new AuthRewriter())->openLoginAction($bare, 'login');
+        self::assertTrue($result['changed']);
+        self::assertStringContainsString("{\n    public function initialize(): void\n    {\n        parent::initialize();\n        // AuthComponent let guests reach its loginAction; the Authentication plugin needs it named.\n        \$this->Authentication->addUnauthenticatedActions(['login']);\n    }\n\n    public function login() {}", $result['code']);
+
+        $open = "<?php\nclass UsersController extends AppController\n{\n    public function initialize(): void\n    {\n        parent::initialize();\n        \$this->Authentication->addUnauthenticatedActions(['register', 'login']);\n    }\n}\n";
+        self::assertSame(['code' => $open, 'changed' => false, 'manual' => null], (new AuthRewriter())->openLoginAction($open, 'login'));
+
+        $noParent = "<?php\nclass UsersController extends AppController\n{\n    public function initialize(): void\n    {\n        \$this->loadComponent('Flash');\n    }\n}\n";
+        $manual = (new AuthRewriter())->openLoginAction($noParent, 'login');
+        self::assertFalse($manual['changed']);
+        self::assertStringStartsWith('MANUAL: AuthComponent let guests reach its loginAction (login)', (string) $manual['manual']);
+
+        $other = (new AuthRewriter())->openLoginAction("<?php\nclass UsersController extends Controller\n{\n}\n", 'login');
+        self::assertFalse($other['changed']);
+        self::assertNotNull($other['manual']);
     }
 
     public function test_unknown_auth_member_is_left_and_listed(): void
@@ -191,7 +245,7 @@ final class CakeAuthRewriterTest extends TestCase
         $second = $rewriter->rewriteCalls($first['code']);
 
         $this->assertSame(self::php(
-            '$this->Authentication->allowUnauthenticated([\'display\']);',
+            '$this->Authentication->addUnauthenticatedActions([\'display\']);',
             '$this->Authentication->setIdentity($profile);',
             '$role = $this->Authentication->getIdentity()?->get(\'ROLE\');',
             '$admin = \Cake\Utility\Hash::get($this->Authentication->getIdentity()?->getOriginalData() ?? [], \'ROLES.admin\');',

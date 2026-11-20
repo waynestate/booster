@@ -292,6 +292,9 @@ final class CakeUpgradeMigration implements FrameworkEngine
             $changes[] = sprintf("Replaced loadComponent('Auth') with loadComponent('Authentication.Authentication') in %s.", $file);
         }
         $changes = [...$changes, ...$propertyChanges];
+        [$opened, $loginManual] = $this->openLoginAction($copy, $loginAction);
+        $changes = [...$changes, ...$opened];
+        $manual = [...$manual, ...$loginManual];
 
         $application = $copy . '/src/Application.php';
         if (is_file($application)) {
@@ -307,6 +310,35 @@ final class CakeUpgradeMigration implements FrameworkEngine
         }
 
         return [true, $changes, array_values(array_unique($manual))];
+    }
+
+    /**
+     * Opens the old loginAction to guests in its controller (CAKE-11):
+     * AuthComponent never asked for a sign-in on its own login page, the
+     * Authentication plugin does, and the page then redirects to itself.
+     *
+     * @return array{0: list<string>, 1: list<string>} the changes, the MANUAL lines
+     */
+    private function openLoginAction(string $copy, ?string $loginAction): array
+    {
+        if ($loginAction === null || trim($loginAction) === '') {
+            return [[], []];
+        }
+        $target = $this->auth->loginTarget($loginAction);
+        if ($target === null) {
+            return [[], ["MANUAL: AuthComponent let guests reach its loginAction without signing in, and the Authentication plugin does not; name the sign-in action in addUnauthenticatedActions() in its controller."]];
+        }
+        $file = 'src/Controller/' . $target['controller'] . 'Controller.php';
+        if (!is_file($copy . '/' . $file)) {
+            return [[], [sprintf("MANUAL: the loginAction's controller (%s) was not found; add \$this->Authentication->addUnauthenticatedActions(['%s']) to it by hand, or guests cannot reach the sign-in page.", $file, $target['action'])]];
+        }
+        $result = $this->auth->openLoginAction(self::read($copy . '/' . $file), $target['action']);
+        if (!$result['changed']) {
+            return [[], $result['manual'] === null ? [] : [$result['manual'] . ' (' . $file . ')']];
+        }
+        self::write($copy . '/' . $file, $result['code']);
+
+        return [[sprintf("Opened %s() to guests in %s, as AuthComponent did for its loginAction.", $target['action'], $file)], []];
     }
 
     /**
