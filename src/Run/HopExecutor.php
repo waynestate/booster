@@ -3408,15 +3408,21 @@ final class HopExecutor
      * untracked files (--allow-dirty) stay out of the clean list. A directory
      * untracked at start keeps its single "dir/" entry when it gains files, so
      * it stays out too: name nothing you cannot prove this run created.
+     *
+     * Booster commits nothing between steps, so the line undoes the whole run,
+     * passed steps included, and it says so (proof runs, 2026-11-20). The clean
+     * paths are relative to the app folder, so they are right for an app that
+     * sits below its git root too.
      */
     private function undoHint(string $path): string
     {
+        $whole = 'This undoes everything this run changed, including earlier steps; commit after each passed step to keep them.';
         $created = array_values(array_diff($this->untrackedPaths($path), $this->startingUntracked));
         if ($created === []) {
-            return 'Undo with: git checkout . (inside the app).';
+            return 'Undo with: git checkout . (inside the app). ' . $whole;
         }
 
-        return 'Undo with: git checkout . && git clean -fd -- ' . implode(' ', $created) . ' (inside the app).';
+        return 'Undo with: git checkout . && git clean -fd -- ' . implode(' ', $created) . ' (inside the app). Run it in the app folder (the paths are relative to it). ' . $whole;
     }
 
     /**
@@ -3530,18 +3536,68 @@ final class HopExecutor
         return $hash === false ? null : $hash;
     }
 
-    /** @return list<string> the app's untracked paths from one git status */
+    /**
+     * The app's untracked paths from one git status, relative to the app
+     * folder. Porcelain prints paths from the git root, so for an app in a
+     * subfolder of its repository the folder's own prefix is stripped, and a
+     * path outside the app gets one "../" per level.
+     *
+     * @return list<string>
+     */
     private function untrackedPaths(string $path): array
     {
         $status = $this->processes->run(['git', '-C', $path, 'status', '--porcelain'], null, [], 60);
+        $prefix = self::appPrefixInRepo($path);
         $paths = [];
         foreach (explode("\n", trim($status->stdout)) as $line) {
             if (str_starts_with($line, '?? ') && strlen($line) > 3) {
-                $paths[] = trim(substr($line, 3), '"');
+                $paths[] = self::relativeToApp(trim(substr($line, 3), '"'), $prefix);
             }
         }
 
         return $paths;
+    }
+
+    /**
+     * The app folder's path inside its git repository with a trailing slash
+     * ("src/"), or '' when the app is the repository root or no .git (a
+     * folder, or the file a worktree or submodule has) sits above it.
+     */
+    private static function appPrefixInRepo(string $path): string
+    {
+        $app = realpath($path);
+        if ($app === false) {
+            return '';
+        }
+        $app = str_replace('\\', '/', $app);
+        $dir = $app;
+        while (!file_exists($dir . '/.git')) {
+            $parent = dirname($dir);
+            if ($parent === $dir) {
+                return '';
+            }
+            $dir = $parent;
+        }
+        if ($dir === $app) {
+            return '';
+        }
+
+        return ltrim(substr($app, strlen(rtrim($dir, '/'))), '/') . '/';
+    }
+
+    /** A porcelain path (from the git root) as seen from the app folder whose prefix is $prefix. */
+    private static function relativeToApp(string $repoPath, string $prefix): string
+    {
+        if ($prefix === '') {
+            return $repoPath;
+        }
+        if (str_starts_with($repoPath, $prefix)) {
+            $inside = substr($repoPath, strlen($prefix));
+
+            return $inside === '' ? './' : $inside;
+        }
+
+        return str_repeat('../', substr_count($prefix, '/')) . $repoPath;
     }
 
     private function assertCleanGitTree(string $path): void

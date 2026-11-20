@@ -144,7 +144,8 @@ the PHP hop that lands on 7.4), then the PHP hops to 8.5. `--to-slim 3.13` is re
 ## What has no hop yet
 
 CakePHP 3 and Slim 2 (and anything older): `booster plan` says Booster has no hop for them yet and keeps PHP where the
-framework still runs, instead of planning a break. Moving a CakePHP or Slim app to Laravel is coming next; nothing in
+framework still runs, instead of planning a break. A Slim 4 app below 4.15 is held the same way: `slim-3-to-4` moves
+Slim 3 only, so the plan says to move Slim to 4.15 by hand. Moving a CakePHP or Slim app to Laravel is coming next; nothing in
 this release does it.
 
 See also: [What a hop does](hops.md), [The replay gate](replay-gate.md), and every hop's notes in
