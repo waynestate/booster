@@ -44,9 +44,10 @@ final class Planner
     ];
 
     /**
-     * Framework hops that go first, at the app's current PHP, or not at all:
-     * every CakePHP 4.x line already runs on a PHP 4.6 runs on, so an app
-     * below that floor moves PHP before Booster plans the hop.
+     * Framework hops that go at the app's current PHP and never pull PHP past
+     * the current line's ceiling: every CakePHP 4.x line already runs on a
+     * PHP 4.6 runs on, so an app below that floor (4.3 on PHP 7.3) moves PHP
+     * up to it inside its own line first, and the hop follows right after.
      */
     private const FRAMEWORK_HOPS_AT_CURRENT_PHP = [HopRegistry::CAKEPHP_4_TO_46_ID];
 
@@ -842,8 +843,10 @@ final class Planner
      * never planned (--skip). A hop is left out, once and with a warning,
      * when the plan cannot reach a PHP its target line runs on: the target
      * PHP is below the line's floor, the app's PHP is above its ceiling, or,
-     * for a hop that only ever runs at the app's current PHP, the app is
-     * below the floor today.
+     * for a hop that runs at the app's current PHP, the app is below the
+     * floor today and the PHP hops cannot reach it inside the current line's
+     * range. When they can, the hop is deferred: the loop plans it right
+     * after the PHP hop that lands on the floor.
      *
      * @param list<string>        $skip
      * @param array<string, true> $leftOut
@@ -860,7 +863,18 @@ final class Planner
             return null;
         }
         $name = $framework === 'cakephp' ? 'CakePHP' : 'Slim';
-        if (version_compare($php, $range[1], '>') || (in_array($hop->id, self::FRAMEWORK_HOPS_AT_CURRENT_PHP, true) && version_compare($php, $range[0], '<'))) {
+        // An app below the floor of a hop that runs at the current PHP waits
+        // for it (the loop holds the hop until PHP gets there) when the PHP
+        // hops can reach that floor without leaving the current line's range,
+        // and the target PHP is at or above it.
+        $atCurrentPhp = in_array($hop->id, self::FRAMEWORK_HOPS_AT_CURRENT_PHP, true);
+        $lineRange = $this->registry->frameworkPhpRange($framework, $line);
+        $deferred = $atCurrentPhp
+            && version_compare($php, $range[0], '<')
+            && version_compare($toPhp, $range[0], '>=')
+            && $lineRange !== null
+            && version_compare($range[0], $lineRange[1], '<=');
+        if (version_compare($php, $range[1], '>') || ($atCurrentPhp && !$deferred && version_compare($php, $range[0], '<'))) {
             $leftOut[$hop->id] = true;
             $warnings[] = sprintf('%s %s does not run on PHP %s; move PHP first.', $name, $hop->to, $php);
 

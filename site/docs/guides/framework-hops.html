@@ -220,7 +220,7 @@ in the next release; until then <code>booster run</code> reports the step as hav
 <td><code>cakephp-4-to-4.6</code></td>
 <td>CakePHP 4.0 to 4.5</td>
 <td>4.6</td>
-<td>first, on the PHP the app runs today, when 4.6 runs on it (7.4 or newer)</td>
+<td>first, on the PHP the app runs today, when 4.6 runs on it (7.4 or newer); below 7.4, right after the PHP hop that lands on 7.4</td>
 </tr>
 <tr>
 <td><code>cakephp-4.6-to-5</code></td>
@@ -237,7 +237,8 @@ in the next release; until then <code>booster run</code> reports the step as hav
 </tbody>
 </table></div>
 <p>A CakePHP 4.3 app on PHP 8.1 therefore plans <code>cakephp-4-to-4.6</code>, <code>php-81-to-82</code>, <code>cakephp-4.6-to-5</code>, then the PHP hops
-to 8.5 on CakePHP 5.4. <code>--to-cakephp 4</code> stops on 4.6 and says to plan the 5 step soon. A target PHP below 8.2 leaves
+to 8.5 on CakePHP 5.4. The same app on PHP 7.3 plans <code>php-73-to-74</code> first, then <code>cakephp-4-to-4.6</code>, then the same
+course; only a target PHP below 7.4 leaves the 4.6 step out. <code>--to-cakephp 4</code> stops on 4.6 and says to plan the 5 step soon. A target PHP below 8.2 leaves
 the CakePHP 5 step out with a warning, <code>--skip cakephp-4.6-to-5</code> leaves it out too, and the PHP hops then stay within
 what 4.6 runs on. <code>--to-slim 3.13</code> is refused: Booster moves Slim 3 apps to Slim 4.15. CakePHP 3 and Slim 2 have no hop, so
 their PHP hops stop at the line's ceiling and the plan says Booster has no hop for them yet.</p>

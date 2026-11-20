@@ -4,6 +4,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Fixed: the plan for a CakePHP 4 app on PHP below 7.4 now plans the 4.6 step, deferred to right after PHP reaches 7.4 (it used to drop it and stop at PHP 8.1).
 - Added: the plan inserts the CakePHP and Slim framework hops (cakephp-4-to-4.6, cakephp-4.6-to-5, slim-3-to-4) between the PHP hops; their engines land next.
 - Changed: framework hops name their engine (a small interface behind HopKind::Framework), the groundwork for the CakePHP and Slim hops; no behaviour change.
 - Added: the building blocks for moving a Slim 3 app's bootstrap to Slim 4 (a legacy container, a double-pass middleware adapter and the app factory glue), for the coming Slim hop.

@@ -12,8 +12,13 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## \[Unreleased\] [#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Fixed: the plan for a CakePHP 4 app on PHP below 7.4 now plans the 4.6 step, deferred to right after PHP reaches 7.4 (it used to drop it and stop at PHP 8.1).
 - Added: the plan inserts the CakePHP and Slim framework hops (cakephp-4-to-4.6, cakephp-4.6-to-5, slim-3-to-4) between the PHP hops; their engines land next.
 - Changed: framework hops name their engine (a small interface behind HopKind::Framework), the groundwork for the CakePHP and Slim hops; no behaviour change.
+- Added: the building blocks for moving a Slim 3 app's bootstrap to Slim 4 (a legacy container, a double-pass middleware adapter and the app factory glue), for the coming Slim hop.
+- Added: the building block that wires a CakePHP app's `src/Application.php` for the Authentication plugin (the provider interface, the plugin, the middleware after routing, and a Session-only service whose guests go to the old login action), for the coming CakePHP 5 hop.
+- Added: the building block for moving a CakePHP 4 app's AuthComponent calls to the Authentication plugin (for the coming CakePHP 5 hop).
+- Added: the building block that rewrites Slim 3 routes for Slim 4: an app's route groups, middleware registration and route lookups (for the coming Slim hop).
 - Added: `--to-cakephp` and `--to-slim` plan options pick the target framework line (a major such as `5` resolves to that line's newest release, `5.4`); the resolved line rides on the plan as `framework_target` in JSON.
 - Added: an internal runner for CakePHP's own upgrade tool (`cakephp/upgrade`, pinned to a commit), run in a container so its Rector never meets the app's or Booster's; the CakePHP hops use it.
 - Added: the hop data knows which PHP each CakePHP and Slim line supports (`cakephp_php`, `slim_php`), their target lines and companion package pins, for the CakePHP and Slim hops.
