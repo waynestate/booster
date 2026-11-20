@@ -73,8 +73,10 @@ A **unit** is one route, or one form (its GET and its POST move together). The l
 order: stateless pages first, then pages, then writes, then the ones that need sign-in.
 
 `--moves N` moves the next N units still in legacy (1 by default); `--route "<id>"` moves just that one, and is also
-how you retry a failed unit. Booster writes the Laravel route and controller, adds the unit to the route table, and
-runs the gate with the moved units answering from Laravel: the syntax check over both halves, the old app's own tests
+how to retry a failed unit. Booster writes the Laravel route and controller, adds the unit to the route table, and
+(when the move added a package to the Laravel half's `composer.json`) runs `composer update -W` for it in the gate
+image; a failed update marks the unit `failed` with Composer's first error line and the run stops before the gate.
+Then it runs the gate with the moved units answering from Laravel: the syntax check over both halves, the old app's own tests
 from inside `legacy/`, then the replay. A green run marks the units `laravel`. A red one marks them `failed`, leaves
 the changes in place, and says how to undo them. A failed unit waits for a person: the next `--moves` run skips it.
 
