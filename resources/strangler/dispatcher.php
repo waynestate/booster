@@ -162,6 +162,8 @@ $booster_route = (static function (): array {
                 $type .= '; charset=UTF-8';
             }
         } else {
+            // PHP would append default_charset to a text/ type; Apache sends none.
+            ini_set('default_charset', '');
             $mimeTypes = @file_get_contents('/etc/mime.types');
             if (is_string($mimeTypes) && $ext !== '') {
                 // "type ext ext ...", one type per line; the extension is a whole token.
