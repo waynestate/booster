@@ -332,18 +332,21 @@ final class SlimMover implements Mover
         }
         $src = $sources[$route->file];
         [$from, $to] = $this->closureRange($src, $route);
-        [$closure] = $copier->rewrite($src, $route->file, $from, $to);
+        [$closure, $refs] = $copier->rewrite($src, $route->file, $from, $to);
+        foreach ($refs as $ref) {
+            $copier->copyClass($ref);
+        }
         $name = self::className($route);
         $class = SlimCodeCopier::NAMESPACE . 'Closures\\' . $name;
         $strict = str_contains($src->code, 'strict_types=1') ? "\ndeclare(strict_types=1);\n" : '';
         $imports = $copier->importLines($src, $closure);
-        $body = preg_replace('/^/m', '        ', 'return ' . $closure . ';') ?? '';
+        $body = '        return ' . self::reindent($closure, '        ') . ';';
         $code = "<?php\n" . $strict . "\nnamespace " . rtrim(SlimCodeCopier::NAMESPACE, '\\') . "\\Closures;\n\n"
             . ($imports === '' ? '' : $imports . "\n\n")
             . "/**\n * The Slim closure from legacy/" . $route->file . ':' . $route->handlerLine . ", moved by Booster's strangler.\n"
             . " * SlimAdapter binds it to the legacy container, as Slim did.\n */\n"
             . 'final class ' . $name . " extends \\App\\Http\\Controllers\\Legacy\\Support\\LegacyClosure\n{\n"
-            . "    public function handler(): \\Closure\n    {\n" . ltrim($body) . "\n    }\n}\n";
+            . "    public function handler(): \\Closure\n    {\n" . $body . "\n    }\n}\n";
         $copier->write(SlimCodeCopier::targetFile($class), $code);
 
         return 'closure:' . $class;
@@ -409,7 +412,10 @@ final class SlimMover implements Mover
 
                 continue;
             }
-            [$code] = $copier->rewrite($src, $file, 0, count($src->t) - 1);
+            [$code, $refs] = $copier->rewrite($src, $file, 0, count($src->t) - 1);
+            foreach ($refs as $ref) {
+                $copier->copyClass($ref);
+            }
             $target = 'container/' . str_replace('/', '-', $file);
             $copier->write(SlimCodeCopier::DIR . $target, $code);
             $files[] = $target;
@@ -497,7 +503,7 @@ final class SlimMover implements Mover
     /**
      * Add the packages the copied code needs to the root composer.json.
      *
-     * @param array{container: string, error_handler: ?string, emitter: ?string} $front
+     * @param array{container: string, error_middleware: bool, error_handler: ?string, emitter: ?string} $front
      * @param list<string> $manual
      */
     private function requirePackages(string $appRoot, SlimCodeCopier $copier, array $front, array &$manual): bool
@@ -505,7 +511,7 @@ final class SlimMover implements Mover
         $legacy = SlimCodeCopier::json($appRoot . '/legacy/composer.json');
         $needed = $copier->requirements();
         foreach (['slim/psr7', 'slim/http', 'slim/slim'] as $package) {
-            if (isset($legacy['require'][$package]) && ($package !== 'slim/slim' || $front['error_handler'] !== null || $front['emitter'] !== null || isset($needed[$package]))) {
+            if (isset($legacy['require'][$package]) && ($package !== 'slim/slim' || $front['error_middleware'] || $front['error_handler'] !== null || $front['emitter'] !== null || isset($needed[$package]))) {
                 $needed[$package] = (string) $legacy['require'][$package];
             }
         }
@@ -545,24 +551,78 @@ final class SlimMover implements Mover
 
                 continue;
             }
+            // The next major is allowed too: the legacy major can conflict
+            // with Laravel's own (PHP-DI 6 needs serializable-closure 1,
+            // Laravel 13 has 2), and the copied code is the legacy code.
+            if (preg_match('/^\^(\d+)(?:\.\d+)*$/', trim($constraint), $major) === 1) {
+                $constraint .= ' || ^' . ((int) $major[1] + 1) . '.0';
+            }
             $root['require'][$package] = $constraint;
             $this->composerAdds[$package] = $constraint;
+            $manual[] = 'composer.json now requires ' . $package . ' ' . $constraint . ' for the moved code (' . (isset($legacyVersions[$package]) ? 'legacy runs ' . $legacyVersions[$package] : 'legacy has no composer.lock entry for it') . '); check the version composer installed in the root';
             $changed = true;
         }
         if (!$changed) {
             return false;
         }
-        if (($root['config']['sort-packages'] ?? false) === true && is_array($root['require'])) {
-            uksort($root['require'], static function (string $a, string $b): int {
+        $json = (string) file_get_contents($rootFile);
+        $edited = self::withRequires($json, (array) $root['require'], ($root['config']['sort-packages'] ?? false) === true);
+        file_put_contents($rootFile, $edited ?? json_encode($root, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+
+        return true;
+    }
+
+    /**
+     * The composer.json text with its "require" object rewritten to $require
+     * and nothing else touched, or null when the object cannot be found.
+     *
+     * @param array<string, mixed> $require
+     */
+    public static function withRequires(string $json, array $require, bool $sort): ?string
+    {
+        if (preg_match('/("require"\s*:\s*\{)([^{}]*)(\})/', $json, $m, PREG_OFFSET_CAPTURE) !== 1) {
+            return null;
+        }
+        $indent = preg_match('/\n([ \t]+)"/', $m[2][0], $i) === 1 ? $i[1] : '        ';
+        $outer = substr($indent, 0, (int) (strlen($indent) / 2));
+        if ($sort) {
+            uksort($require, static function (string $a, string $b): int {
                 $pa = $a === 'php' || str_starts_with($a, 'ext-') ? 0 : 1;
                 $pb = $b === 'php' || str_starts_with($b, 'ext-') ? 0 : 1;
 
                 return [$pa, $a] <=> [$pb, $b];
             });
         }
-        file_put_contents($rootFile, json_encode($root, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+        $lines = [];
+        foreach ($require as $package => $constraint) {
+            $lines[] = $indent . json_encode((string) $package, JSON_UNESCAPED_SLASHES) . ': ' . json_encode((string) $constraint, JSON_UNESCAPED_SLASHES);
+        }
+        $block = $m[1][0] . "\n" . implode(",\n", $lines) . "\n" . $outer . $m[3][0];
 
-        return true;
+        return substr($json, 0, $m[0][1]) . $block . substr($json, $m[0][1] + strlen($m[0][0]));
+    }
+
+    /** Re-indent a code fragment: strip the indent its later lines share, then add $indent. */
+    private static function reindent(string $code, string $indent): string
+    {
+        $lines = explode("\n", $code);
+        $common = null;
+        foreach (array_slice($lines, 1) as $line) {
+            if (trim($line) === '') {
+                continue;
+            }
+            $lead = strlen($line) - strlen(ltrim($line, ' '));
+            $common = $common === null ? $lead : min($common, $lead);
+        }
+        $common ??= 0;
+        $strip = $common;
+        foreach ($lines as $n => $line) {
+            if ($n > 0 && trim($line) !== '') {
+                $lines[$n] = $indent . substr($line, min($strip, strlen($line) - strlen(ltrim($line, ' '))));
+            }
+        }
+
+        return implode("\n", $lines);
     }
 
     /** Add LegacyServiceProvider to bootstrap/providers.php (Laravel 11 and later); true when it changed. */
@@ -632,7 +692,7 @@ final class SlimMover implements Mover
         return 0;
     }
 
-    /** @return list<list<string>> */
+    /** @return list<array<string>> */
     private static function allMatches(string $regex, string $code): array
     {
         preg_match_all($regex, $code, $m, PREG_SET_ORDER);

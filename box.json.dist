@@ -27,6 +27,12 @@
         "resources/strangler/dispatcher.php",
         "resources/strangler/install-legacy.php",
         "resources/strangler/public.htaccess",
+        "resources/strangler/slim/CapturingEmitter.php",
+        "resources/strangler/slim/LegacyClosure.php",
+        "resources/strangler/slim/LegacyContainer.php",
+        "resources/strangler/slim/LegacyResponse.php",
+        "resources/strangler/slim/LegacyServiceProvider.php",
+        "resources/strangler/slim/SlimAdapter.php",
         "vendor/bin/phpcs",
         "vendor/bin/phpstan",
         "vendor/waynestate/creed/policy/policy.json"

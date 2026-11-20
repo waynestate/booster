@@ -20,10 +20,41 @@ final class LegacyResponse extends Response
 
     private bool $hadType = false;
 
+    /** @var list<string> */
+    private array $cacheControl = [];
+
     public function keepContentType(): void
     {
         $this->hadType = $this->headers->has('Content-Type');
         $this->legacyType = $this->headers->get('Content-Type');
+    }
+
+    /**
+     * Symfony rewrites Cache-Control into one sorted line and adds "private";
+     * this sends the lines the legacy handler (or its emitter) set, as they were.
+     *
+     * @param list<string> $lines
+     */
+    public function keepCacheControl(array $lines): void
+    {
+        $this->cacheControl = $lines;
+    }
+
+    public function sendHeaders(?int $statusCode = null): static
+    {
+        if (headers_sent()) {
+            return $this;
+        }
+        parent::sendHeaders($statusCode);
+        if ($this->cacheControl === []) {
+            // Symfony's default "no-cache, private"; the legacy app sent none.
+            header_remove('Cache-Control');
+        }
+        foreach ($this->cacheControl as $n => $line) {
+            header('Cache-Control: ' . $line, $n === 0);
+        }
+
+        return $this;
     }
 
     public function prepare(Request $request): static

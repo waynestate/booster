@@ -172,7 +172,11 @@ final class SlimSource
         return $args;
     }
 
-    /** The first and last significant token of a range, or null when it is empty. */
+    /**
+     * The first and last significant token of a range, or null when it is empty.
+     *
+     * @return array{int, int}|null
+     */
     public function trimRange(int $from, int $to): ?array
     {
         while ($from <= $to && in_array($this->t[$from][0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {

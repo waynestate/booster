@@ -249,6 +249,7 @@ final class SlimAdapter
             }
         }
         $out->keepContentType();
+        $out->keepCacheControl(array_values($psr->getHeader('Cache-Control')));
 
         return $out;
     }

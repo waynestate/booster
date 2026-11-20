@@ -342,7 +342,11 @@ final class SlimCodeCopier
         return $this->pending[$relative] ?? null;
     }
 
-    /** Write every staged file; returns the app-relative paths written. */
+    /**
+     * Write every staged file; returns the app-relative paths written.
+     *
+     * @return list<string>
+     */
     public function flush(): array
     {
         foreach ($this->pending as $relative => $code) {
