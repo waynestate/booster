@@ -60,6 +60,15 @@ final class HopRegistry
     /** The framework hop that moves hand-copied Doctrine, Smarty and Slim 1 out of vendor/ and onto Composer. */
     public const VENDORED_TO_COMPOSER_ID = 'vendored-to-composer';
 
+    /** The CakePHP hop from any 4.x line below 4.6 to 4.6, the last 4.x release. */
+    public const CAKEPHP_4_TO_46_ID = 'cakephp-4-to-4.6';
+
+    /** The CakePHP hop from 4.6 to 5.4. */
+    public const CAKEPHP_46_TO_5_ID = 'cakephp-4.6-to-5';
+
+    /** The Slim hop from any 3.x line to 4.15. */
+    public const SLIM_3_TO_4_ID = 'slim-3-to-4';
+
     /** The hop that turns on strict session IDs before each session_start() in a raw PHP app. */
     public const SESSION_STRICT_MODE_ID = 'session-strict-mode';
 
@@ -203,6 +212,9 @@ final class HopRegistry
         $this->add($this->sesameHop());
         $this->add($this->wayneUi1To2Hop());
         $this->add($this->vendoredToComposerHop());
+        $this->add($this->cakephp4To46Hop());
+        $this->add($this->cakephp46To5Hop());
+        $this->add($this->slim3To4Hop());
         $this->add($this->sessionStrictModeHop());
         $this->add($this->nodePinHop());
         $this->add($this->mixToViteHop());
@@ -1010,6 +1022,90 @@ final class HopRegistry
                 'https://www.slimframework.com/docs/v4/',
             ],
             engine: EngineId::Vendored,
+        );
+    }
+
+    /**
+     * CakePHP 4.x to 4.6, the last 4.x release. 4.6 flags every deprecation
+     * the jump to 5 removes, so it is the stop before 5. The rule set names
+     * are cakephp/upgrade's, run by the CakeUpgrade engine (CakeUpgradeRunner),
+     * not Booster's Rector.
+     */
+    private function cakephp4To46Hop(): Hop
+    {
+        return new Hop(
+            id: self::CAKEPHP_4_TO_46_ID,
+            kind: HopKind::Framework,
+            from: '4',
+            to: '4.6',
+            summary: 'Move a CakePHP 4 app to the last 4.x release (4.6) with CakePHP\'s own upgrade rules, so every deprecation is flagged before the jump to 5.',
+            rectorSets: ['cakephp41', 'cakephp42', 'cakephp43', 'cakephp44', 'cakephp45', 'migrations45'],
+            composerSet: ['cakephp/cakephp' => '^4.6'],
+            composerSetIfPresent: $this->frameworkCompanionPins('cakephp', '4.6'),
+            notes: [
+                'Run your tests with error_reporting(E_ALL) on 4.6 and fix every deprecation before the CakePHP 5 step.',
+                'The Oracle plugin cakedc/cakephp-oracle-driver has no CakePHP 5 release; the CakePHP 5 step swaps it (see the guide).',
+            ],
+            links: [
+                'https://book.cakephp.org/4/en/appendices/4-6-migration-guide.html',
+            ],
+            engine: EngineId::CakeUpgrade,
+        );
+    }
+
+    /**
+     * CakePHP 4.6 to 5.4, through cakephp/upgrade's 5.x rule sets. The
+     * planner puts it at the first PHP 5.4 runs on (8.2).
+     */
+    private function cakephp46To5Hop(): Hop
+    {
+        return new Hop(
+            id: self::CAKEPHP_46_TO_5_ID,
+            kind: HopKind::Framework,
+            from: '4.6',
+            to: '5.4',
+            summary: 'Move a CakePHP 4.6 app to CakePHP 5.4 with CakePHP\'s own upgrade rules: AuthComponent moves to the Authentication plugin and .ctp templates become .php.',
+            rectorSets: ['cakephp50', 'cakephp51', 'cakephp52', 'cakephp53', 'cakephp54', 'chronos3', 'migrations50'],
+            composerSet: ['cakephp/cakephp' => '^5.4'],
+            composerSetIfPresent: $this->frameworkCompanionPins('cakephp', '5.4'),
+            notes: [
+                'AuthComponent moves to the Authentication plugin like for like: the same login form, the same session, the same user lookup.',
+                'MANUAL: isAuthorized(), the authorize setting, loginRedirect, logoutRedirect and custom authenticators stay as they are; move them to the Authorization and Authentication plugins by hand.',
+                'Templates (.ctp) are renamed to .php under templates/.',
+                'App bugs the move exposes are reported, never fixed: the hop moves the framework, not the app\'s own logic.',
+            ],
+            links: [
+                'https://book.cakephp.org/5/en/appendices/5-0-migration-guide.html',
+            ],
+            extraReview: true,
+            engine: EngineId::CakeUpgrade,
+        );
+    }
+
+    /**
+     * Slim 3 to 4.15. Slim ships no upgrade rules, so the SlimUpgrade engine
+     * does the move; the planner puts it at the first PHP 4.15 runs on (7.4).
+     */
+    private function slim3To4Hop(): Hop
+    {
+        return new Hop(
+            id: self::SLIM_3_TO_4_ID,
+            kind: HopKind::Framework,
+            from: '3',
+            to: '4.15',
+            summary: 'Move a Slim 3 app to Slim 4.15: the app factory, PSR-7 through slim/psr7, Slim\'s ErrorMiddleware, and a double-pass adapter so the app\'s middleware keeps working.',
+            composerSet: ['slim/slim' => '^4.15'],
+            composerSetIfPresent: $this->frameworkCompanionPins('slim', '4.15'),
+            notes: [
+                'Route exceptions now reach Slim\'s ErrorMiddleware before the app\'s own PHP error handler; check what an error page looks like.',
+                'The app\'s double-pass middleware keeps working through a copied-in double-pass adapter; move each one to PSR-15 when you next touch it.',
+                'MANUAL: pathFor() calls are reported, not rewritten; Slim 4 builds URLs with RouteParser::urlFor().',
+            ],
+            links: [
+                'https://www.slimframework.com/docs/v4/start/upgrade.html',
+            ],
+            extraReview: true,
+            engine: EngineId::SlimUpgrade,
         );
     }
 
