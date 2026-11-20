@@ -4,6 +4,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Fixed: `plan` now shows a stop sign up front when a Slim 3 app has no PSR-4 `autoload` entry for the Slim 4 glue (the official Slim 3 skeleton has only `autoload-dev`); before, only `run` refused it, at the Slim step.
 - Fixed: a replay baseline where every answer is an error (a PHP fatal or parse error in the body, even under a 200; a 5xx the request file does not expect; or one identical 4xx page for every request) now stops the run before the first hop instead of "passing" after every hop; `--allow-failing-baseline` (on `run`, and on `replay record`) records it anyway with a warning. A baseline with only some error answers, or a fatal in PHP's log, gets a warning that names them.
 - Fixed: the Slim 3 to 4 hop runs on PHP 7.4 (slim/psr7 ^1.6, glue files in PHP 7.4 syntax) and moves apps typed with Slim 3's request and response classes onto slim/http.
 - Fixed: the undo hint after a failed step says it undoes the whole run and gives paths relative to the app folder; the Slim 4 message no longer claims Booster has no Slim hop.

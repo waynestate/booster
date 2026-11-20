@@ -108,7 +108,9 @@ the PHP hop that lands on 7.4), then the PHP hops to 8.5. `--to-slim 3.13` is re
 - `new \Slim\App([...])` becomes `LegacyApp::create([...])` over your existing Pimple container, which keeps every
   `$container['x']`, `$c->x` and `$c->get('x')` working, and `LegacyApp::finish($app)` goes in just before
   `$app->run()`. No PHP-DI rewrite. The three glue classes (`LegacyContainer`, `LegacyDoublePass`, `LegacyApp`) are
-  written into a `Legacy` folder under the app's PSR-4 root, so they are your code from then on.
+  written into a `Legacy` folder under the app's PSR-4 root, so they are your code from then on. An app with no
+  PSR-4 `autoload` entry (the official Slim 3 skeleton has only `autoload-dev`) gets a stop sign from `plan`, and the
+  hop refuses it: add one (`"autoload": {"psr-4": {"App\\": "src/"}}`), run `composer dump-autoload` and commit first.
 - `finish()` adds what Slim 3 did by itself, from the same settings: `displayErrorDetails` goes to the error
   middleware, `outputBuffering` to the output-buffering middleware, `addContentLengthHeader` to the content-length
   middleware, `routerCacheFile` to the route cache. The routing middleware runs before your own, so the route is

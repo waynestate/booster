@@ -14,6 +14,7 @@ use Waynestate\Booster\Policy\PolicyException;
 use Waynestate\Booster\Project\Project;
 use Waynestate\Booster\Refresh\HopDataRefresher;
 use Waynestate\Booster\Run\StrictSession;
+use Waynestate\Booster\Run\Slim\SlimUpgradeMigration;
 use Waynestate\Booster\Run\VendoredMigration;
 use Waynestate\Booster\Scan\VendoredLibraries;
 use Waynestate\Booster\Scan\WayneAuthScan;
@@ -596,6 +597,19 @@ final class Planner
         foreach ($steps as $step) {
             if ($step->hop->id === HopRegistry::laravelHopId('8', '9') && !$project->hasHelmet) {
                 $warnings[] = 'HELMET sets trusted proxies, security headers and session defaults for WSU apps: composer require waynestate/helmet';
+                break;
+            }
+        }
+
+        // The Slim hop writes its glue under the app's PSR-4 autoload entry
+        // and refuses an app with none (the official Slim 3 skeleton has
+        // only autoload-dev): say so here, not first at run time (bug 1).
+        foreach ($steps as $step) {
+            if ($step->hop->id === HopRegistry::SLIM_3_TO_4_ID) {
+                $composer = is_file($project->path . '/composer.json') ? json_decode((string) file_get_contents($project->path . '/composer.json'), true) : null;
+                if (is_array($composer) && SlimUpgradeMigration::psr4Root($composer) === null) {
+                    $warnings[] = 'Stop sign: ' . SlimUpgradeMigration::NO_PSR4 . ' The ' . HopRegistry::SLIM_3_TO_4_ID . ' step will stop there. Add one to composer.json first (for example "autoload": {"psr-4": {"App\\\\": "src/"}}), run composer dump-autoload and commit.';
+                }
                 break;
             }
         }

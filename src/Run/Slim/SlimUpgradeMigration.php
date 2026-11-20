@@ -292,7 +292,7 @@ final class SlimUpgradeMigration implements FrameworkEngine
      *
      * @return array{string, string}|null the glue namespace and its folder, relative to the app
      */
-    private static function psr4Root(array $composer): ?array
+    public static function psr4Root(array $composer): ?array
     {
         $map = $composer['autoload']['psr-4'] ?? null;
         if (!is_array($map) || $map === []) {
