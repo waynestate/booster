@@ -34,7 +34,7 @@ abstract class BaseCommand extends Command
 
     public const EXIT_TOOL_ERROR = 2;
 
-    /** @var array<string, 'value'|'flag'|'list'> the options planFlags() carries, in addAppOptions() order */
+    /** @var array<string, 'value'|'flag'|'list'|'optional'> the options planFlags() carries, in addAppOptions() order */
     private const PLAN_FLAGS = [
         'policy' => 'value',
         'today' => 'value',
@@ -42,7 +42,7 @@ abstract class BaseCommand extends Command
         'from-php' => 'value',
         'to-php' => 'value',
         'from-laravel' => 'value',
-        'to-laravel' => 'value',
+        'to-laravel' => 'optional',
         'to-phpunit' => 'value',
         'to-cakephp' => 'value',
         'to-slim' => 'value',
@@ -101,7 +101,7 @@ abstract class BaseCommand extends Command
             ->addOption('from-php', null, InputOption::VALUE_REQUIRED, 'The PHP version the app runs on (major.minor).')
             ->addOption('to-php', null, InputOption::VALUE_REQUIRED, 'Target PHP version (default: the newest the policy supports).')
             ->addOption('from-laravel', null, InputOption::VALUE_REQUIRED, 'The Laravel major the app runs on.')
-            ->addOption('to-laravel', null, InputOption::VALUE_REQUIRED, 'Target Laravel major (default: the newest the policy supports).')
+            ->addOption('to-laravel', null, InputOption::VALUE_OPTIONAL, 'Target Laravel major (default: the newest the policy supports). Bare --to-laravel on a CakePHP or Slim app opts in to the move onto Laravel (cakephp-to-laravel, slim-to-laravel), planned last.', false)
             ->addOption('to-phpunit', null, InputOption::VALUE_REQUIRED, 'Target PHPUnit major (default: the newest that runs on the target PHP).')
             ->addOption('to-cakephp', null, InputOption::VALUE_REQUIRED, 'Target CakePHP line (default: the newest Booster supports, 5.4).')
             ->addOption('to-slim', null, InputOption::VALUE_REQUIRED, 'Target Slim line (default: the newest Booster supports, 4.15).')
@@ -180,6 +180,8 @@ abstract class BaseCommand extends Command
             only: $this->stringOption($input, 'only'),
             vendored: (bool) $input->getOption('vendored'),
             strictSession: (bool) $input->getOption('strict-session'),
+            // A bare --to-laravel (no major) is the strangler opt-in; absent is false.
+            strangler: $input->hasOption('to-laravel') && $input->getOption('to-laravel') === null,
         );
 
         $casReachability = new WayneCasReachability($this->processes);
@@ -207,6 +209,11 @@ abstract class BaseCommand extends Command
                 if ($value === true) {
                     $flags[] = '--' . $name;
                 }
+                continue;
+            }
+            if ($kind === 'optional' && $value === null) {
+                // Typed bare (--to-laravel): the strangler opt-in.
+                $flags[] = '--' . $name;
                 continue;
             }
             foreach ($kind === 'list' ? (is_array($value) ? $value : []) : [$value] as $one) {

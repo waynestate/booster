@@ -17,6 +17,7 @@ final readonly class PlanOptions
      * @param ?string     $only             hop id to plan and run alone; never set together with $until
      * @param bool        $vendored         plan the move of hand-copied libraries under vendor/ onto Composer
      * @param bool        $strictSession    plan the hop that turns on strict session IDs before each session_start()
+     * @param bool        $strangler        plan the CakePHP or Slim move onto Laravel (--to-laravel on a CakePHP 5 or Slim 4 app), placed last
      */
     public function __construct(
         public ?string $fromPhp = null,
@@ -35,5 +36,6 @@ final readonly class PlanOptions
         public bool $strictSession = false,
         public ?string $toCakephp = null,
         public ?string $toSlim = null,
+        public bool $strangler = false,
     ) {}
 }

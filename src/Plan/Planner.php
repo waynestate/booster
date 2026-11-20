@@ -13,11 +13,13 @@ use Waynestate\Booster\Policy\Policy;
 use Waynestate\Booster\Policy\PolicyException;
 use Waynestate\Booster\Project\Project;
 use Waynestate\Booster\Refresh\HopDataRefresher;
+use Waynestate\Booster\Run\Strangler\StranglerStopSigns;
 use Waynestate\Booster\Run\StrictSession;
 use Waynestate\Booster\Run\Slim\SlimUpgradeMigration;
 use Waynestate\Booster\Run\VendoredMigration;
 use Waynestate\Booster\Scan\VendoredLibraries;
 use Waynestate\Booster\Scan\WayneAuthScan;
+use Waynestate\Booster\Strangler\Ledger;
 use Waynestate\Booster\ToolError;
 use Waynestate\Creed\State;
 
@@ -73,6 +75,14 @@ final class Planner
 
     public function plan(Project $project, PlanOptions $options, DateTimeImmutable $today): Plan
     {
+        // A strangler in progress owns the app until its finish step: the
+        // root is Laravel now and the old app sits in legacy/, so the plan is
+        // the strangler step alone (design section 1).
+        $ledger = Ledger::load($project->path);
+        if ($ledger !== null) {
+            return $this->stranglerInProgress($project, $ledger, $options, $today);
+        }
+
         $warnings = [];
 
         $fromPhp = $options->fromPhp ?? $project->phpVersion;
@@ -616,6 +626,13 @@ final class Planner
             }
         }
 
+        // The move onto Laravel goes last: after the in-family hop lands on
+        // the latest major and the PHP hops reach the target (section 6).
+        $stranglerHop = $this->stranglerToPlan($project, $options, $framework, $line, $php, $warnings);
+        if ($stranglerHop !== null) {
+            $steps[] = $this->step(++$n, $stranglerHop, $php, $php, $laravel, HopRegistry::STRANGLER_LARAVEL, $phpunit, $phpunit, $line);
+        }
+
         $steps = $this->withoutSkipped($steps, $options->skip);
         $selected = $options->until !== null || $options->only !== null;
         $beforeSelection = count($steps);
@@ -677,6 +694,101 @@ final class Planner
         // block, so they travel on the plan without a warning entry of their
         // own.
         return new Plan($project, $today->format('Y-m-d'), $this->policy->origin(), $toPhp, $toLaravel, $toPhpunit, $steps, $warnings, $packageChecks, $stopsEarly, $vendoredLibraries, $fromPhp, $frameworkTarget);
+    }
+
+    /**
+     * The strangler hop to put last, or null with the warning that explains
+     * the no. Opt-in with --to-laravel (or --only/--until naming the hop):
+     * never in the default plan, because staying on the latest CakePHP or
+     * Slim is the other supported future (D-119). It needs the latest major
+     * where the plan ends, PHP 8.3 or newer there (SESAME and Laravel need
+     * it), and an app that is not an LTI tool (SESAME has no LTI driver yet).
+     * A bare --to-laravel on a Laravel app means its newest major, as before.
+     *
+     * @param list<string> $warnings
+     */
+    private function stranglerToPlan(Project $project, PlanOptions $options, ?string $framework, ?string $line, string $php, array &$warnings): ?Hop
+    {
+        $named = HopRegistry::stranglerFramework((string) ($options->only ?? $options->until ?? ''));
+        if (!$options->strangler && $named === null) {
+            return null;
+        }
+        $id = HopRegistry::stranglerId($framework);
+        if ($id === null) {
+            if (!$project->type->isLaravel()) {
+                $warnings[] = 'Asked for the move onto Laravel (--to-laravel), but this is not a CakePHP or Slim app; skipped. Booster moves CakePHP 5 and Slim 4 apps onto Laravel.';
+            }
+
+            return null;
+        }
+        if (in_array($id, $options->skip, true) || !$this->registry->has($id)) {
+            return null;
+        }
+        $name = $framework === 'cakephp' ? 'CakePHP' : 'Slim';
+        $targets = $this->registry->frameworkTargets((string) $framework);
+        $newestMajor = $targets === [] ? null : explode('.', $targets[count($targets) - 1])[0];
+        if ($line === null || $newestMajor === null || explode('.', $line)[0] !== $newestMajor) {
+            $warnings[] = sprintf(
+                'The move onto Laravel (%s) starts from %s %s, and this plan ends on %s %s: finish the %s %s move first; see docs/guides/cakephp-and-slim-to-laravel.md.',
+                $id,
+                $name,
+                $newestMajor ?? '?',
+                $name,
+                $line ?? 'an unknown line',
+                $name,
+                $newestMajor ?? '?',
+            );
+
+            return null;
+        }
+        if (version_compare($php, StranglerStopSigns::PHP_FLOOR, '<')) {
+            $warnings[] = sprintf('The move onto Laravel (%s) needs PHP %s or newer (SESAME and Laravel %s do), and this plan ends on PHP %s; it was left out. Raise --to-php.', $id, StranglerStopSigns::PHP_FLOOR, HopRegistry::STRANGLER_LARAVEL, $php);
+
+            return null;
+        }
+        $lti = StranglerStopSigns::ltiPackage($project->path);
+        if ($lti !== null) {
+            $warnings[] = sprintf('No strangler yet for LTI apps (this app requires %s): SESAME has no LTI driver, so the Laravel half could not sign people in. See docs/guides/cakephp-and-slim-to-laravel.md.', $lti);
+
+            return null;
+        }
+
+        return $this->registry->get($id);
+    }
+
+    /**
+     * The plan for an app whose strangler is in progress (booster-strangler.json
+     * at the root): the strangler step alone, on the PHP the root declares.
+     * Every other hop waits for the finish step, and the warning says why and
+     * how to patch the old app meanwhile.
+     */
+    private function stranglerInProgress(Project $project, Ledger $ledger, PlanOptions $options, DateTimeImmutable $today): Plan
+    {
+        $id = (string) HopRegistry::stranglerId($ledger->framework);
+        $php = $options->fromPhp ?? $project->phpVersion;
+        if ($php === null) {
+            throw new ToolError('composer.json has no usable "php" constraint. Pass --from-php=<major.minor>.');
+        }
+        $php = $this->normalisePhp($php, $options->fromPhp !== null ? '--from-php' : 'composer.json');
+        $counts = $ledger->counts();
+        $moved = $counts[Ledger::LARAVEL] + $counts[Ledger::HAND];
+        $warnings = [sprintf(
+            'A move onto Laravel is in progress (%s: %d of %d unit%s on Laravel). Every other hop waits until `--finish`; to patch the old app meanwhile, run Booster on it alone with --path=<app>/legacy.',
+            Ledger::FILE,
+            $moved,
+            count($ledger->units()),
+            count($ledger->units()) === 1 ? '' : 's',
+        )];
+        $steps = [];
+        if (in_array($id, $options->skip, true)) {
+            $warnings[] = sprintf('%s was skipped, so the plan is empty while the move is in progress.', $id);
+        } else {
+            $laravel = $project->laravelMajor;
+            $steps[] = $this->step(1, $this->registry->get($id), $php, $php, $laravel, $laravel, $project->phpunitMajor, $project->phpunitMajor, null);
+            $steps = $this->applyStepSelection($steps, $project, $options, $php, $laravel, $project->phpunitMajor);
+        }
+
+        return new Plan($project, $today->format('Y-m-d'), $this->policy->origin(), $php, $project->laravelMajor, $project->phpunitMajor, $steps, $warnings, [], true, [], $php, null);
     }
 
     /**
