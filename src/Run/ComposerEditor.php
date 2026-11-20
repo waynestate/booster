@@ -228,6 +228,67 @@ final class ComposerEditor
     }
 
     /**
+     * Removes Booster's temporary unblock entries from composer.json (the
+     * rules whose reason carries one of its prefixes), leaving every rule the
+     * app wrote itself. An emptied package entry, and then an emptied ignore
+     * map, policy and config, go too. Returns the packages whose entries were
+     * removed; composer.json is not rewritten when there were none.
+     *
+     * @return list<string>
+     */
+    public function dropTemporaryUnblocks(string $appPath): array
+    {
+        $file = rtrim($appPath, '/\\') . '/composer.json';
+        $raw = is_file($file) ? file_get_contents($file) : false;
+        $data = $raw === false ? null : json_decode($raw, true);
+        $ignore = is_array($data) ? ($data['config']['policy']['advisories']['ignore'] ?? null) : null;
+        if (!is_array($ignore)) {
+            return [];
+        }
+        $ours = static fn(mixed $rule): bool => is_array($rule) && is_string($rule['reason'] ?? null)
+            && (str_starts_with($rule['reason'], self::UNBLOCK_REASON_PREFIX) || str_starts_with($rule['reason'], self::LEGACY_UNBLOCK_REASON_PREFIX));
+        $dropped = [];
+        foreach ($ignore as $package => $rules) {
+            if (!is_array($rules) || $rules === []) {
+                continue;
+            }
+            $list = array_is_list($rules) ? $rules : [$rules];
+            $kept = array_values(array_filter($list, static fn(mixed $rule): bool => !$ours($rule)));
+            if (count($kept) === count($list)) {
+                continue;
+            }
+            $dropped[] = (string) $package;
+            if ($kept === []) {
+                unset($ignore[$package]);
+            } else {
+                $ignore[$package] = $kept;
+            }
+        }
+        if ($dropped === []) {
+            return [];
+        }
+        $data['config']['policy']['advisories']['ignore'] = $ignore;
+        foreach ([['config', 'policy', 'advisories', 'ignore'], ['config', 'policy', 'advisories'], ['config', 'policy'], ['config']] as $keys) {
+            $leaf = array_pop($keys);
+            $parent = &$data;
+            foreach ($keys as $key) {
+                $parent = &$parent[$key];
+            }
+            if (is_array($parent) && ($parent[$leaf] ?? null) === []) {
+                unset($parent[$leaf]);
+            }
+            unset($parent);
+        }
+
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        if (file_put_contents($file, $json . "\n") === false) {
+            throw new ToolError(sprintf('Could not write "%s".', $file));
+        }
+
+        return $dropped;
+    }
+
+    /**
      * @param array<mixed> $data
      *
      * @return list<string>

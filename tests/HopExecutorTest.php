@@ -2973,11 +2973,11 @@ PHP,
         self::assertArrayHasKey('laravel/framework', $composer['config']['policy']['advisories']['ignore']);
     }
 
-    public function test_the_final_step_fails_while_a_booster_unblock_remains(): void
+    public function test_the_final_step_clears_an_unblock_an_earlier_step_left(): void
     {
         $dir = $this->copyExample('laravel-blade');
         [$dir, $plan] = $this->laravelPlan($dir);
-        // An earlier run left its unblock behind; this run adds nothing new.
+        // An earlier step (or run) needed the unblock on an older PHP.
         (new ComposerEditor())->advisoryUnblock($dir, 'laravel/framework', '^13.0', ['PKSA-2026-0001']);
 
         $dockerRuns = 0;
@@ -2999,18 +2999,64 @@ PHP,
         $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
         $report = $executor->execute($plan, new RunOptions());
 
-        // Baseline and the gate: the gate is green, but the plan's last step
-        // fails while the unblock remains in composer.json.
-        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
-        self::assertSame(2, $dockerRuns);
+        // Baseline, the gate, then the gate again without the unblock and
+        // with composer update -W for the unblocked package: it passes, so
+        // the final target lands without the entry.
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        self::assertSame(3, $dockerRuns);
+        $runs = $this->dockerRuns($fake);
+        self::assertStringContainsString('composer update -W --no-interaction --no-progress laravel/framework', $runs[2]['command'][count($runs[2]['command']) - 1]);
         $all = implode("\n", $report->results[0]->messages);
-        self::assertStringContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.", $all);
-        self::assertStringContainsString('Gate passed: tests are green on PHP 8.3.', $all);
-        // Nothing was added by this run: only the standing finding is reported.
-        self::assertStringNotContainsString('Composer refused tagged', $all);
-        self::assertStringNotContainsString('Added a temporary advisory unblock to composer.json', $all);
+        self::assertStringContainsString("Removed Booster's temporary advisory unblock for laravel/framework: composer update -W laravel/framework moved the lock to laravel/framework ", $all);
+        self::assertStringNotContainsString("composer.json still has Booster's temporary advisory unblock", $all);
+        self::assertSame([], (new ComposerEditor())->temporaryUnblocks($dir));
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertArrayNotHasKey('policy', $composer['config'] ?? []);
     }
 
+    public function test_the_final_step_fails_while_a_booster_unblock_is_still_needed(): void
+    {
+        $dir = $this->copyExample('laravel-blade');
+        [$dir, $plan] = $this->laravelPlan($dir);
+        (new ComposerEditor())->advisoryUnblock($dir, 'laravel/framework', '^13.0', ['PKSA-2026-0001']);
+
+        $dockerRuns = 0;
+        $fake = new FakeProcessRunner(static function (array $command) use ($dir, &$dockerRuns): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                $dockerRuns++;
+                if ($dockerRuns === 3) {
+                    // Without the unblock Composer refuses the releases again,
+                    // here through a package that requires them (the Twig shape).
+                    return new ProcessResult(4, "  - laravel/ui v4.6.1 requires laravel/framework ^13.0 -> found laravel/framework[v13.0.0] but these were not loaded, because they are affected by security advisories (\"PKSA-2026-0001\").\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4", '');
+                }
+
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [['file' => $dir . '/app/Models/Post.php', 'diff' => 'd']], 'errors' => []]), '');
+        });
+        $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
+        $report = $executor->execute($plan, new RunOptions());
+
+        // The try re-adds the unblock, so composer.json goes back as it was
+        // and the plan's last step fails while the unblock remains.
+        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
+        self::assertSame(4, $dockerRuns);
+        // composer.json is put back: the one rule from before, not a second one.
+        $rules = json_decode((string) file_get_contents($dir . '/composer.json'), true)['config']['policy']['advisories']['ignore']['laravel/framework'] ?? [];
+        self::assertCount(1, $rules);
+        self::assertSame('^13.0', $rules[0]['constraint']);
+        $all = implode("\n", $report->results[0]->messages);
+        self::assertStringContainsString('Tried composer update -W laravel/framework without the unblock on PHP 8.3; it still needs it', $all);
+        self::assertStringContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.", $all);
+        self::assertStringContainsString('Gate passed: tests are green on PHP 8.3.', $all);
+    }
     public function test_a_non_final_step_only_warns_about_the_unblock(): void
     {
         [$dir, $plan] = $this->laravelPlanWithTail($this->copyExample('laravel-blade'));
@@ -3044,9 +3090,10 @@ PHP,
         $report = $executor->execute($plan, new RunOptions());
 
         // The Laravel hop is not last: it applies with a warning. The tail hop
-        // is last, and the unblock is still in composer.json, so it fails.
-        self::assertSame([StepResult::APPLIED, StepResult::GATE_FAILED], $this->statuses($report));
-        self::assertSame(4, $dockerRuns);
+        // is last: it drops the unblock an earlier step needed and runs its
+        // gate again, which passes, so the final target lands without it.
+        self::assertSame([StepResult::APPLIED, StepResult::APPLIED], $this->statuses($report));
+        self::assertSame(5, $dockerRuns);
         $first = implode("\n", $report->results[0]->messages);
         self::assertStringContainsString('Composer refused tagged laravel/framework ^13.0 for known security advisories; Booster added a temporary, scoped unblock (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.', $first);
         self::assertStringContainsString('Added a temporary advisory unblock to composer.json', $first);
@@ -3055,7 +3102,8 @@ PHP,
         self::assertStringNotContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore). Remove it before release", $first);
         self::assertStringContainsString('Gate passed: tests are green on PHP 8.3.', $first);
         $second = implode("\n", $report->results[1]->messages);
-        self::assertStringContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.", $second);
+        self::assertStringContainsString("Removed Booster's temporary advisory unblock for laravel/framework: composer update -W laravel/framework moved the lock to laravel/framework ", $second);
+        self::assertStringNotContainsString("composer.json still has Booster's temporary advisory unblock", $second);
     }
 
     public function test_a_stopped_early_plan_only_warns_about_a_remaining_unblock(): void
@@ -3098,7 +3146,7 @@ PHP,
         self::assertStringNotContainsString('Added a temporary advisory unblock to composer.json', $all);
 
         // The same plan without the early stop climbs to the final target,
-        // and its last step fails while the unblock remains.
+        // where the unblock is dropped and the gate runs again without it.
         $dir = $this->copyExample('laravel-blade');
         [$dir, $plan] = $this->laravelPlan($dir);
         (new ComposerEditor())->advisoryUnblock($dir, 'laravel/framework', '^13.0', ['PKSA-2026-0001']);
@@ -3123,10 +3171,10 @@ PHP,
         $executor = new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake);
         $report = $executor->execute($plan, new RunOptions());
 
-        self::assertSame([StepResult::GATE_FAILED], $this->statuses($report));
-        self::assertSame(2, $dockerRuns);
+        self::assertSame([StepResult::APPLIED], $this->statuses($report));
+        self::assertSame(3, $dockerRuns);
         $all = implode("\n", $report->results[0]->messages);
-        self::assertStringContainsString("composer.json still has Booster's temporary advisory unblock for laravel/framework (config.policy.advisories.ignore). Remove it before release; Booster fails the final target while it is there.", $all);
+        self::assertStringContainsString("Removed Booster's temporary advisory unblock for laravel/framework", $all);
         self::assertStringContainsString('Gate passed: tests are green on PHP 8.3.', $all);
     }
 }

@@ -4,6 +4,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Fixed: the advisory unblock also answers a refusal through a package that requires the blocked one (Twig under slim/twig-view), and the final target drops an unblock an earlier step needed when composer update -W for that package passes the gate without it, instead of failing on the leftover entry (bug S6, testeval).
 - Fixed: a PHP hop also updates a locked release that allows the new PHP but misbehaves on it: Twig below 2.8 (1.x below 1.39) trims the whitespace before every {{ on PHP 7.4, which the replay caught on a real app (bug S5, testeval).
 - Fixed: the replay's csrf preset hides any hidden field whose name holds csrf or xsrf (an app's own CSRF_KEY, slim/csrf's csrf_name and csrf_value), not only the common names, so a fresh token per request is no longer a replay mismatch.
 - Fixed: a replay baseline where every answer is an error (a PHP fatal or parse error in the body, even under a 200; a 5xx the request file does not expect; or one identical 4xx page for every request) now stops the run before the first hop instead of "passing" after every hop; `--allow-failing-baseline` (on `run`, and on `replay record`) records it anyway with a warning. A baseline with only some error answers, or a fatal in PHP's log, gets a warning that names them.
