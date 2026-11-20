@@ -8,7 +8,7 @@ generator: Squire agent-ready
 
 # Strict session IDs for raw PHP apps [#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#strict-session-ids-for-raw-php-apps)
 
-This page covers `session-strict-mode`: which apps it is for, the line it adds, what counts as already covered, and what makes it refuse. Before this: [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html). Next: [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html).
+This page covers `session-strict-mode`: which apps it is for, the line it adds, what counts as already covered, and what makes it refuse. Before this: [CakePHP and Slim apps to PHP 8.5](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html). Next: [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html).
 
 PHP ships with `session.use_strict_mode` off. With it off, PHP takes any session ID a browser sends, even one the server never handed out, and starts a session under it. That is the door session fixation walks through: someone plants an ID on a victim, waits for the victim to sign in, and then rides the same session. With strict mode on, PHP throws an unknown ID away and issues a fresh one. `session.use_only_cookies` (on by default) keeps the ID out of URLs.
 

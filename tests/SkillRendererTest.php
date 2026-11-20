@@ -96,6 +96,36 @@ final class SkillRendererTest extends TestCase
         self::assertStringContainsString('Run `last-error` and `read-log-entries` after the build and the tests.', $files['booster-node-pin-24/SKILL.md']);
     }
 
+    public function test_the_cakephp_and_slim_playbooks_call_the_replay_the_real_gate(): void
+    {
+        $files = $this->files();
+        $framework = "This is a framework move, not a PHP hop: the app's own tests rarely cover what it changes, so the replay is the real gate.";
+
+        foreach (['booster-cakephp-4-to-4.6/SKILL.md', 'booster-cakephp-4.6-to-5/SKILL.md', 'booster-slim-3-to-4/SKILL.md'] as $path) {
+            self::assertStringContainsString($framework, $files[$path], $path);
+            self::assertStringNotContainsString('riskiest PHP hop', $files[$path], $path);
+            self::assertStringNotContainsString('Doctrine ORM 2.20, Smarty 4 or Slim 4', $files[$path], $path);
+            self::assertStringContainsString("Check these by hand:\n", $files[$path], $path);
+        }
+
+        $five = $files['booster-cakephp-4.6-to-5/SKILL.md'];
+        self::assertStringContainsString('Use `search-docs` for the CakePHP 5 migration guide and check it against every file Booster changed.', $five);
+        self::assertStringContainsString('Use `list-routes` to pick one signed-in page per controller that used AuthComponent', $five);
+        self::assertStringContainsString('Use `search-docs` for the CakePHP 4.6 migration guide', $files['booster-cakephp-4-to-4.6/SKILL.md']);
+        self::assertStringNotContainsString('AuthComponent, and check', $files['booster-cakephp-4-to-4.6/SKILL.md']);
+        self::assertStringContainsString('Use `search-docs` for the Slim 4 upgrade guide and check it against every file Booster changed.', $files['booster-slim-3-to-4/SKILL.md']);
+    }
+
+    public function test_the_vendored_playbook_keeps_its_prompts(): void
+    {
+        $text = $this->files()['booster-vendored-to-composer/SKILL.md'];
+
+        self::assertStringContainsString('Use `search-docs` for the Doctrine ORM 2.20, Smarty 4 or Slim 4 docs, whichever the hop moved, and check them against every file Booster changed.', $text);
+        self::assertStringContainsString('Use `list-routes` (or the app\'s own route list) to pick the pages the replay file should hit.', $text);
+        self::assertStringContainsString('Run `last-error` and `read-log-entries` after the replay.', $text);
+        self::assertStringNotContainsString('This is a framework move', $text);
+    }
+
     public function test_every_hop_playbook_says_what_to_do_when_a_gate_fails(): void
     {
         $registry = new HopRegistry();

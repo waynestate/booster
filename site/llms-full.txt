@@ -369,6 +369,7 @@ Options shared by `plan` and `run`:
 | `--goal` | Shorthand such as `php-74-to-84` (sets `--from-php` and `--to-php`) |
 | `--from-php`, `--from-laravel` | Say what the app runs on when the manifest does not |
 | `--to-php`, `--to-laravel`, `--to-phpunit` | The target. Default: the newest version the policy supports today (PHPUnit: the newest that runs on the target PHP) |
+| `--to-cakephp`, `--to-slim` | The framework line for a CakePHP or Slim app (default: the newest Booster supports, CakePHP 5.4 or Slim 4.15; `--to-cakephp 4` stops on 4.6). [The guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/cakephp-and-slim.md) |
 | `--sesame` | Include the `wayne-cas` to SESAME swap |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move |
 | `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of `vendor/` and onto Composer ([the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/framework-hops.md)) |
@@ -718,6 +719,21 @@ the copies and puts `--vendored` on its Next line. Run it with `--replay`; the r
 hop (the PHP hops before it run the syntax check), then check every step. The recipes, the stop signs and the bridge
 are in [the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/framework-hops.md).
 
+#### CakePHP and Slim apps
+
+CakePHP and Slim are being phased out at WSU (D-124): these hops keep existing apps supported; new apps start on raw PHP or Laravel (Sourdough or WELD).
+
+A CakePHP 4 or Slim 3 app gets framework hops between its PHP hops, and `--to-cakephp` and `--to-slim` pick the line
+(the newest by default). `cakephp-4-to-4.6` is planned first, once the app is on PHP 7.4 or newer; it runs CakePHP's own
+upgrade rules in a container and requires CakePHP 4.6, and leaves the deprecations to fix with `E_ALL` as MANUAL.
+`cakephp-4.6-to-5` is planned at PHP 8.2; it runs the 5.x rules, renames `.ctp` templates, moves AuthComponent to
+the Authentication plugin like for like and swaps the Oracle driver, and leaves `isAuthorized()`, custom
+authenticators, RequestHandler and the mutable date classes as MANUAL. `slim-3-to-4` is planned at PHP 7.4; it moves
+the app to Slim 4.15 over its own Pimple container with generated glue, keeps double-pass middleware through an
+adapter and route group prefixes through the group callable, and leaves the old error handlers, `pathFor()` and Twig
+`path_for` as MANUAL. Run them with `--replay` and `--to-php 8.5`; the commands and the full MANUAL lists are in
+[the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/cakephp-and-slim.md).
+
 #### Strict session IDs for raw PHP apps
 
 PHP ships with `session.use_strict_mode` off, so it accepts a session ID the server never issued, which is how session
@@ -924,7 +940,13 @@ Doctrine 2, Smarty 3 or Slim 1 into its root `vendor/`, at the first PHP every C
 Slim, 7.1 without): deletes the hand copies, writes `composer.json` for `doctrine/orm ^2.20`, `smarty/smarty ^4.5` and
 `slim/slim ^4.15`, points the app's `require` lines at `vendor/autoload.php`, and keeps a Slim 1 app's routes running on
 Slim 4 through `slim1-bridge.php`; anything it cannot rewrite exactly is a stop sign that leaves it out, and the
-replay waits for it ([the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/framework-hops.md)). `session-strict-mode` (planned with
+replay waits for it ([the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/framework-hops.md)). `cakephp-4-to-4.6` (planned for a CakePHP 4.0 to 4.5
+app, first once the app is on PHP 7.4 or newer): runs CakePHP's own 4.x upgrade rules in a container and requires
+`cakephp/cakephp ^4.6`; deprecations stay MANUAL. `cakephp-4.6-to-5` (planned at PHP 8.2): runs the 5.x rules, renames
+`.ctp` templates, moves AuthComponent to the Authentication plugin and swaps the Oracle driver; `isAuthorized()` and
+custom authenticators stay MANUAL. `slim-3-to-4` (planned at PHP 7.4): moves a Slim 3 app to Slim 4.15 over its own
+Pimple container; the old error handlers and `pathFor()` stay MANUAL ([the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/cakephp-and-slim.md)).
+`session-strict-mode` (planned with
 `--strict-session` for a raw PHP app that calls `session_start()` without strict session IDs, first, on the PHP the
 app runs today; never for Laravel): adds one guarded `ini_set()` line for `session.use_strict_mode` and
 `session.use_only_cookies` before each call, skips what is already covered, and refuses on a stop sign
@@ -1182,7 +1204,7 @@ Inside one dose
    ### The gate
    Before the first hop your tests run once on the app's current PHP as the baseline; a red one stops the run unless you pass `--allow-failing-baseline`. An app with no tests of its own gets a built-in syntax check (php -l on every PHP file outside vendor/ and node_modules/) instead, and the report says so: it proves the code loads on the new PHP, not that it works. After each hop they run inside `booster-target:<php>`, built from `docker/Dockerfile` on the PHP the hop moves to. On Laravel and PHPUnit hops the gate refreshes `composer.lock` for the package the hop moved, so the lock lands on the new major version; if Packagist's security advisories block those releases, whether the install fails outright or Composer quietly locks a branch version where the hop asked for a tag, the gate writes a scoped temporary ignore, retries once, and tells you what it did. The plan's last step then fails until that entry is out of `composer.json`, so the upgrade never finishes with the unblock still in place. After the last hop PROCTOR checks the upgraded app against CREED's policy, blocking only on findings the upgrade introduced. If a red baseline names a missing Mix or Vite manifest, build the front-end assets first. A failure stops the run and leaves the changes for you to read. `git checkout .` undoes them. Fix the cause, commit, and run again: the stopped hop's gate runs again first (its build too, for a front-end hop), so it is neither redone nor skipped.
 
-Not every hop is Rector. `node-pin-24` pins Node 26 in `package.json`, writes `.nvmrc` and proves the front end still builds there; `mix-to-vite` converts a simple `webpack.mix.js` and moves the build to Vite; `vite-major` pins `vite` and the plugin packages in `package.json` to the hop data's versions. The Vue 2 to 3 move is staged: `vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod`, with the `vue-2-to-3` playbook standing in for all three. Rector doesn't read Vue, so a person works those steps. `inertia-2-to-3` pins `inertiajs/inertia-laravel` and `@inertiajs/vue3` at 3 and hands its breaking changes over as manual lines. The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.
+Not every hop is Rector. `node-pin-24` pins Node 26 in `package.json`, writes `.nvmrc` and proves the front end still builds there; `mix-to-vite` converts a simple `webpack.mix.js` and moves the build to Vite; `vite-major` pins `vite` and the plugin packages in `package.json` to the hop data's versions. The Vue 2 to 3 move is staged: `vue-26-to-27`, `vue-27-to-compat` and `vue-compat-codemod`, with the `vue-2-to-3` playbook standing in for all three. Rector doesn't read Vue, so a person works those steps. `inertia-2-to-3` pins `inertiajs/inertia-laravel` and `@inertiajs/vue3` at 3 and hands its breaking changes over as manual lines. CakePHP and Slim apps get framework hops between their PHP hops: `cakephp-4-to-4.6` and `cakephp-4.6-to-5` run CakePHP's own upgrade rules and move AuthComponent to the Authentication plugin, and `slim-3-to-4` moves a Slim 3 app to Slim 4.15 over its own container. The replay is their real gate, and what stays for a person is printed as MANUAL lines ([the guide](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html)). The plan also flags PHP 7.4 to 8.0 as the hop that needs the most review.
 
 The commands
 
@@ -1537,13 +1559,18 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### \[Unreleased\] [#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Added: a guide for CakePHP and Slim apps (docs/guides/cakephp-and-slim.md): the commands, what each hop does and the MANUAL list.
+- Changed: the CakePHP and Slim playbooks (`booster init`) say the hop is a framework move with the replay as the real gate, and their Boost prompts point at the CakePHP and Slim upgrade guides (plus an Authentication plugin check on the CakePHP 5 step) instead of the Doctrine, Smarty and Slim 4 docs.
 - Fixed: the plan for a CakePHP 4 app on PHP below 7.4 now plans the 4.6 step, deferred to right after PHP reaches 7.4 (it used to drop it and stop at PHP 8.1).
 - Added: the plan inserts the CakePHP and Slim framework hops (cakephp-4-to-4.6, cakephp-4.6-to-5, slim-3-to-4) between the PHP hops; their engines land next.
+- Added: the CakePHP 5 hop moves AuthComponent calls and src/Application.php to the Authentication plugin like for like, and swaps the cakedc Oracle driver for the CakePHP 5 one.
+- Added: the CakeUpgrade engine runs CakePHP's own upgrade rules in a container over a copy of the app, applies the result and the Composer pins, and lists what only a person can do (CakePHP hops).
 - Changed: framework hops name their engine (a small interface behind HopKind::Framework), the groundwork for the CakePHP and Slim hops; no behaviour change.
 - Added: the building blocks for moving a Slim 3 app's bootstrap to Slim 4 (a legacy container, a double-pass middleware adapter and the app factory glue), for the coming Slim hop.
 - Added: the building block that wires a CakePHP app's `src/Application.php` for the Authentication plugin (the provider interface, the plugin, the middleware after routing, and a Session-only service whose guests go to the old login action), for the coming CakePHP 5 hop.
 - Added: the building block for moving a CakePHP 4 app's AuthComponent calls to the Authentication plugin (for the coming CakePHP 5 hop).
 - Added: the building block that rewrites Slim 3 routes for Slim 4: an app's route groups, middleware registration and route lookups (for the coming Slim hop).
+- Added: the SlimUpgrade engine moves a Slim 3 app's bootstrap, routes and middleware to Slim 4 over its own Pimple container, writes the glue classes into the app, applies the Composer pins and lists what only a person can do (Slim hop).
 - Added: `--to-cakephp` and `--to-slim` plan options pick the target framework line (a major such as `5` resolves to that line's newest release, `5.4`); the resolved line rides on the plan as `framework_target` in JSON.
 - Added: an internal runner for CakePHP's own upgrade tool (`cakephp/upgrade`, pinned to a commit), run in a container so its Rector never meets the app's or Booster's; the CakePHP hops use it.
 - Added: the hop data knows which PHP each CakePHP and Slim line supports (`cakephp_php`, `slim_php`), their target lines and companion package pins, for the CakePHP and Slim hops.
@@ -2180,6 +2207,86 @@ Only confirmed changes ship, each with its source link, and at most three `alway
 
 ---
 
+Source: https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html
+
+## CakePHP and Slim apps to PHP 8.5 [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html#cakephp-and-slim-apps-to-php-8-5)
+
+This page covers the three framework hops for CakePHP and Slim apps: the commands, what each hop changes, and the MANUAL list each one prints. Before this: [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html). Next: [Strict session IDs for raw PHP apps](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html).
+
+Booster 1.20 takes a CakePHP 4 app to CakePHP 5.4 and a Slim 3 app to Slim 4.15, and moves PHP to 8.5 around those steps. The frameworks hold PHP back: CakePHP 4.5 stops at PHP 8.3 and Slim 3.12 at 7.3, so the PHP hops wait for the framework hop that lets them go on. PHP 8.6 is out; Booster's 8.6 hops follow once CakePHP and Slim support it.
+
+CakePHP and Slim are being phased out at WSU (D-124): these hops keep existing apps supported; new apps start on raw PHP or Laravel (Sourdough or WELD).
+
+```
+composer global require waynestate/booster:^1.20
+booster detect --path=../my-app
+booster plan   --path=../my-app --to-php 8.5
+booster run    --path=../my-app --replay --to-php 8.5
+```
+
+`detect` names the framework and its major.minor (`framework cakephp 4.5` or `framework slim 3.12`), read from `composer.lock`. `plan` puts the framework hops between the PHP hops, and `run` applies them one at a time, each gated by the app's tests and the replay. Pass `--to-php 8.5` to both: it keeps the plan and the run on the same target. `--to-cakephp` and `--to-slim` pick the framework line (the newest by default; `--to-cakephp 4` stops on 4.6).
+
+**Point Booster at the folder with `composer.json`.** Plenty of Slim apps keep it under `src/`, next to the code, not at the repository root. Booster reads the framework from that file and refuses a hop without it, so give it that folder:
+
+```
+booster plan --path=../my-app/src --to-php 8.5
+```
+
+`--replay` matters here. The tests a CakePHP or Slim app ships with (often the skeleton's, or none) prove very little about a framework move, so the replay is the real gate for both frameworks. Run `booster replay init --path=../my-app` first and read the draft (see [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html)). For Slim it lists the route calls it finds, as written: a route inside a group shows up without the group's prefix, so add the prefix by hand and keep at least one request per group, which is what catches a group that lost its prefix. CakePHP routes declared with `connect()` are not drafted, so check the draft against `bin/cake routes` and add the pages that matter.
+
+### What a CakePHP 4 app gets [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html#what-a-cakephp-4-app-gets)
+
+Two hops, `cakephp-4-to-4.6` then `cakephp-4.6-to-5`, with the PHP hops between them:
+
+1. `cakephp-4-to-4.6` runs CakePHP's own upgrade rules for 4.1 through 4.5 (`cakephp/upgrade`, in a container, over a copy of the app, so a rule set that fails halfway leaves the app as it was), then requires `cakephp/cakephp ^4.6` and the matching versions of the CakePHP plugins the app already lists. It goes first, on the PHP the app runs today, when that is 7.4 or newer; an app below 7.4 gets the PHP hops to 7.4 first, then this one.
+2. PHP moves to 8.2, the first PHP CakePHP 5.4 runs on.
+3. `cakephp-4.6-to-5` runs the 5.0 through 5.4 rules (with Chronos 3 and Migrations), renames `.ctp` templates to `.php` under `templates/` and moves the locales, moves AuthComponent to the Authentication plugin, swaps the Oracle driver if the app has it, and requires CakePHP 5.4 with the plugins that match.
+4. PHP moves on to 8.5.
+
+A CakePHP 4.3 app on PHP 8.1 therefore plans `cakephp-4-to-4.6`, `php-81-to-82`, `cakephp-4.6-to-5`, then `php-82-to-83`, `php-83-to-84` and `php-84-to-85`. The same app on PHP 7.3 plans `php-73-to-74` first, then `cakephp-4-to-4.6`, then the same course. Stop on 4.6 with `--to-cakephp 4`: it still runs on PHP 8.5, but 4.x is end of life, so treat it as a rest stop, not a home. A target PHP below 8.2 leaves the CakePHP 5 step out with a warning, `--skip cakephp-4.6-to-5` leaves it out too, and the PHP hops then stay within what 4.6 runs on.
+
+**Fix deprecations first.** Run your tests with `error_reporting(E_ALL)` on CakePHP 4.6 and fix every deprecation notice before the 5 step. A deprecation on 4.6 is CakePHP 5 knocking politely; on 5 it stops knocking. Booster tells you; it does not fix them for you.
+
+**The sign-in move.** The 5 step moves the like-for-like AuthComponent calls (`$this->Auth->user('x')` reads the identity, `setUser()` becomes `setIdentity()`, `logout()` and `allow()` keep their names on `$this->Authentication`), swaps `loadComponent('Auth')` for `loadComponent('Authentication.Authentication')`, requires `cakephp/authentication ^3.0`, and wires `src/Application.php`: the provider interface, the plugin, the middleware after routing, and a service with the Session authenticator whose guests go to the old `loginAction`.
+
+**What Booster does not do (the MANUAL list).** Each run prints these as `MANUAL:` lines, with the file and the count where there is one:
+
+- On the 4.6 step: the reminder to fix every deprecation with `E_ALL` before the 5 step.
+- On both steps: `View::loadHelper()` calls the rules could not type (it is `addHelper()` since 4.5).
+- Sign-in that is not a plain session: `isAuthorized()` (move it to Authorization plugin policies or plain controller code), and any Auth config the plugin has no like-for-like for (`authenticate` with a custom authenticator such as CAS, an SSO cookie or an LTI launch, `authorize`, `loginRedirect`, `logoutRedirect`, `authError`; `loginAction` is carried over as the redirect). Also an `'Auth'` entry with config in a `$components` list, any other `$this->Auth->...()` call, what the action does with `logout()`'s return value (now the redirect URL or null), and `allow()` calls that passed one name or none, since `allowUnauthenticated()` takes an array.
+- `src/Application.php` that Booster could not wire: no such file or class, one that already provides an authentication service (check that it loads the Session authenticator), no `bootstrap()` or `middleware()`, no routing middleware, or no `loginAction` found (the redirect is the placeholder `/login`).
+- Code no rule moves: `RequestHandlerComponent` (declare `viewClasses()` instead), `->withType()` calls, `Cake\Mailer\Email` (use `Mailer`), `Cake\I18n\Time` and the mutable `Cake\I18n\Date` (use `DateTime` or the immutable `Date`, and check code that changed a date in place), and any `.ctp` template left over.
+- `cakedc/cakephp-oracle-driver` has no CakePHP 5 release. The 5 step swaps it for `ioigoume/cakephp5-oracle-driver` and renames its namespace; check that it covers the Oracle calls your app makes.
+- App bugs the move exposes are reported, never fixed: the hop moves the framework, not the app's own logic.
+
+### What a Slim 3 app gets [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html#what-a-slim-3-app-gets)
+
+One hop, `slim-3-to-4`, at the lowest PHP Slim 4.15 runs on (7.4: first when the app is already there, else right after the PHP hop that lands on 7.4), then the PHP hops to 8.5. `--to-slim 3.13` is refused: Booster moves Slim 3 apps to Slim 4.15.
+
+- `new \Slim\App([...])` becomes `LegacyApp::create([...])` over your existing Pimple container, which keeps every `$container['x']`, `$c->x` and `$c->get('x')` working, and `LegacyApp::finish($app)` goes in just before `$app->run()`. No PHP-DI rewrite. The three glue classes (`LegacyContainer`, `LegacyDoublePass`, `LegacyApp`) are written into a `Legacy` folder under the app's PSR-4 root, so they are your code from then on.
+- `finish()` adds what Slim 3 did by itself, from the same settings: `displayErrorDetails` goes to the error middleware, `outputBuffering` to the output-buffering middleware, `addContentLengthHeader` to the content-length middleware, `routerCacheFile` to the route cache. The routing middleware runs before your own, so the route is resolved before your middleware sees the request. Body parsing is added, because Slim 3 parsed JSON and XML itself.
+- Every `add()` middleware keeps its `($request, $response, $next)` shape through the `LegacyDoublePass` adapter. Move each one to PSR-15 when you next touch it, and delete the adapter when nothing uses it.
+- Route groups: `function () use ($app)` becomes a callable that takes the group, so prefixes survive, and a route adder typed `\Slim\App` that a group calls is widened to take the group too.
+- `$request->getAttribute('route')` becomes `RouteContext::fromRequest($request)->getRoute()`.
+- `composer.json` gets `slim/slim ^4.15`, `pimple/pimple ^3` and `slim/psr7 ^1.7`, plus `slim/twig-view ^3.4` and `twig/twig ^3.8` when the app already lists them.
+
+**What Booster does not do (the MANUAL list).** Each run prints these as `MANUAL:` lines, with the file and line:
+
+- Route exceptions now reach Slim's error middleware before your own PHP error or exception handler. Register your handler with the error middleware if you want the old page and logging. This line is always printed.
+- The `errorHandler`, `phpErrorHandler`, `notFoundHandler` and `notAllowedHandler` container keys (Slim 4 never reads them), settings Slim 4 has no equivalent for, and `$settings->get('k')`, now a plain array read.
+- `pathFor()`, `urlFor()` and `relativePathFor()` calls (build the URL with the route parser), and Twig templates that call `path_for(` or `base_url(` (Twig-View 3 has `url_for`).
+- `getAttribute('routeInfo')`, `subRequest()`, `setArgument()` calls to check, `Slim\Http\Environment`, the container's `router`, `request`, `response` and `environment` entries, and code in outer middleware that reads the route before routing ran.
+- A group callable that uses `$this`, or calls `$app` without `use ($app)`, a route adder typed `\Slim\App` that was not widened, and middleware added by its container name.
+- `LegacyApp::finish($app)` where Booster could not place it, and a glue file that already exists and differs from the one the hop writes.
+
+### What has no hop yet [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html#what-has-no-hop-yet)
+
+CakePHP 3 and Slim 2 (and anything older): `booster plan` says Booster has no hop for them yet and keeps PHP where the framework still runs, instead of planning a break. Moving a CakePHP or Slim app to Laravel is coming next; nothing in this release does it.
+
+See also: [What a hop does](https://booster.apps.wayne.edu/docs/guides/hops.html), [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html), and every hop's notes in [Hops](https://booster.apps.wayne.edu/docs/reference/hops.html).
+
+---
+
 Source: https://booster.apps.wayne.edu/docs/guides/citadel.html
 
 ## Deploying on Citadel [#](https://booster.apps.wayne.edu/docs/guides/citadel.html#deploying-on-citadel)
@@ -2253,7 +2360,7 @@ Source: https://booster.apps.wayne.edu/docs/guides/framework-hops.html
 
 ## Hand-copied libraries to Composer [#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#hand-copied-libraries-to-composer)
 
-This page covers the first framework hop, `vendored-to-composer`: what it moves, what it writes, what makes it refuse, and how the replay gate proves the app still answers the same. Before this: [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html). Next: [Strict session IDs for raw PHP apps](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html).
+This page covers the first framework hop, `vendored-to-composer`: what it moves, what it writes, what makes it refuse, and how the replay gate proves the app still answers the same. Before this: [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html). Next: [CakePHP and Slim apps to PHP 8.5](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html).
 
 Some apps never met Composer. In 2012 a real WSU app copied Doctrine 2.2, Smarty 3.1 and Slim 1.6 straight into `vendor/`, loaded them with `require` lines, and ran happily until PHP moved on. The PHP hops cannot help it: Booster never edits a library's files, and a 2012 copy of Doctrine crashes on PHP 7.4 before the app's own code runs. So this hop moves the app instead. The hand copies leave, `composer.json` asks for the maintained release of the same library, and the lines that loaded the copies load Composer's autoloader. Every other hop lifts the engine; this one finally gets the parts from a dealer instead of the junkyard.
 
@@ -2358,7 +2465,9 @@ A real app's replay found two Doctrine changes no test asked about: `DISTINCT(al
 
 ### CakePHP and Slim apps [#](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#cakephp-and-slim-apps)
 
-An app built on CakePHP or Slim (which `booster detect` names, with its major.minor) gets framework hops between its PHP hops. The plan moves the framework to the line you pick with `--to-cakephp` or `--to-slim` (the newest by default), and every PHP hop stays on a PHP that the framework line under it runs on. The engines that do the work land in the next release; until then `booster run` reports the step as having no engine registered and changes nothing.
+CakePHP and Slim are being phased out at WSU (D-124): these hops keep existing apps supported; new apps start on raw PHP or Laravel (Sourdough or WELD).
+
+An app built on CakePHP or Slim (which `booster detect` names, with its major.minor) gets framework hops between its PHP hops, and every PHP hop stays on a PHP that the framework line under it runs on. `--to-cakephp` and `--to-slim` pick the line (the newest by default).
 
 | Hop | From | To | Where the plan puts it |
 | --- | --- | --- | --- |
@@ -2366,7 +2475,7 @@ An app built on CakePHP or Slim (which `booster detect` names, with its major.mi
 | `cakephp-4.6-to-5` | CakePHP 4.6 | 5.4 | at the first PHP 5.4 runs on (8.2), after the PHP hops that get there |
 | `slim-3-to-4` | Slim 3 | 4.15 | at the first PHP 4.15 runs on (7.4), after the PHP hops that get there |
 
-A CakePHP 4.3 app on PHP 8.1 therefore plans `cakephp-4-to-4.6`, `php-81-to-82`, `cakephp-4.6-to-5`, then the PHP hops to 8.5 on CakePHP 5.4. The same app on PHP 7.3 plans `php-73-to-74` first, then `cakephp-4-to-4.6`, then the same course; only a target PHP below 7.4 leaves the 4.6 step out. `--to-cakephp 4` stops on 4.6 and says to plan the 5 step soon. A target PHP below 8.2 leaves the CakePHP 5 step out with a warning, `--skip cakephp-4.6-to-5` leaves it out too, and the PHP hops then stay within what 4.6 runs on. `--to-slim 3.13` is refused: Booster moves Slim 3 apps to Slim 4.15. CakePHP 3 and Slim 2 have no hop, so their PHP hops stop at the line's ceiling and the plan says Booster has no hop for them yet.
+See also: [CakePHP and Slim apps to PHP 8.5](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html), with the commands, what each hop changes, the MANUAL lists, and why `--replay` is the real gate for these apps.
 
 ---
 
@@ -2911,7 +3020,7 @@ Source: https://booster.apps.wayne.edu/docs/guides/strict-sessions.html
 
 ## Strict session IDs for raw PHP apps [#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#strict-session-ids-for-raw-php-apps)
 
-This page covers `session-strict-mode`: which apps it is for, the line it adds, what counts as already covered, and what makes it refuse. Before this: [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html). Next: [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html).
+This page covers `session-strict-mode`: which apps it is for, the line it adds, what counts as already covered, and what makes it refuse. Before this: [CakePHP and Slim apps to PHP 8.5](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html). Next: [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html).
 
 PHP ships with `session.use_strict_mode` off. With it off, PHP takes any session ID a browser sends, even one the server never handed out, and starts a session under it. That is the door session fixation walks through: someone plants an ID on a victim, waits for the victim to sign in, and then rides the same session. With strict mode on, PHP throws an unknown ID away and issues a fresh one. `session.use_only_cookies` (on by default) keeps the ID out of URLs.
 
@@ -3088,6 +3197,7 @@ Every route, per OS, is on [Install](https://booster.apps.wayne.edu/docs/install
 - [What a hop does](https://booster.apps.wayne.edu/docs/guides/hops.html)
 - [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html)
 - [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html)
+- [CakePHP and Slim apps](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html)
 - [Strict session IDs](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html)
 - [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html)
 - [Deploying on Citadel](https://booster.apps.wayne.edu/docs/guides/citadel.html)
@@ -3393,6 +3503,7 @@ booster run --path=../my-app --skip-gate
 - **Your own image:** `--image` takes one image name, a `{php}` template, or a map such as `8.1=foo:1,8.2=bar:2`; the image needs `php` and `composer` on `PATH`, and must cover every PHP in the plan.
 - **Hand-copied libraries and real tests:** with `--vendored`, the PHP hops before `vendored-to-composer` run the syntax check instead of your tests, because the 2012 copies may not run on the new PHP; your tests run on the baseline and on every step from the move on. See [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html#why-the-replay-and-the-tests-wait).
 - **Few tests, but pages that must not change:** `--replay` records how the app answers a list of requests before the first hop and fails any hop that changes an answer. `booster replay init --path=../my-app` drafts the request file. See [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html).
+- **A CakePHP 4 or Slim 3 app:** `booster run --path=../my-app --replay --to-php 8.5` plans and runs the framework hops (`cakephp-4-to-4.6`, `cakephp-4.6-to-5`, `slim-3-to-4`) between the PHP hops. The tests these apps ship rarely cover a framework move, so draft the replay first (`booster replay init`) and let it be the gate. See [CakePHP and Slim apps to PHP 8.5](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html).
 - **Skip the gate:** `--skip-gate` skips the baseline, the per-hop tests and the PROCTOR check.
 
 Not for: `--skip-gate` on a real upgrade. The gate is how you learn which hop broke the app. Use it only when Docker truly cannot run, and then run the tests yourself after each hop.

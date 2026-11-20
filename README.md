@@ -383,6 +383,7 @@ Options shared by `plan` and `run`:
 | `--goal` | Shorthand such as `php-74-to-84` (sets `--from-php` and `--to-php`) |
 | `--from-php`, `--from-laravel` | Say what the app runs on when the manifest does not |
 | `--to-php`, `--to-laravel`, `--to-phpunit` | The target. Default: the newest version the policy supports today (PHPUnit: the newest that runs on the target PHP) |
+| `--to-cakephp`, `--to-slim` | The framework line for a CakePHP or Slim app (default: the newest Booster supports, CakePHP 5.4 or Slim 4.15; `--to-cakephp 4` stops on 4.6). [The guide](docs/guides/cakephp-and-slim.md) |
 | `--sesame` | Include the `wayne-cas` to SESAME swap |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move |
 | `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of `vendor/` and onto Composer ([the guide](docs/guides/framework-hops.md)) |
@@ -734,6 +735,21 @@ the copies and puts `--vendored` on its Next line. Run it with `--replay`; the r
 hop (the PHP hops before it run the syntax check), then check every step. The recipes, the stop signs and the bridge
 are in [the guide](docs/guides/framework-hops.md).
 
+### CakePHP and Slim apps
+
+CakePHP and Slim are being phased out at WSU (D-124): these hops keep existing apps supported; new apps start on raw PHP or Laravel (Sourdough or WELD).
+
+A CakePHP 4 or Slim 3 app gets framework hops between its PHP hops, and `--to-cakephp` and `--to-slim` pick the line
+(the newest by default). `cakephp-4-to-4.6` is planned first, once the app is on PHP 7.4 or newer; it runs CakePHP's own
+upgrade rules in a container and requires CakePHP 4.6, and leaves the deprecations to fix with `E_ALL` as MANUAL.
+`cakephp-4.6-to-5` is planned at PHP 8.2; it runs the 5.x rules, renames `.ctp` templates, moves AuthComponent to
+the Authentication plugin like for like and swaps the Oracle driver, and leaves `isAuthorized()`, custom
+authenticators, RequestHandler and the mutable date classes as MANUAL. `slim-3-to-4` is planned at PHP 7.4; it moves
+the app to Slim 4.15 over its own Pimple container with generated glue, keeps double-pass middleware through an
+adapter and route group prefixes through the group callable, and leaves the old error handlers, `pathFor()` and Twig
+`path_for` as MANUAL. Run them with `--replay` and `--to-php 8.5`; the commands and the full MANUAL lists are in
+[the guide](docs/guides/cakephp-and-slim.md).
+
 ### Strict session IDs for raw PHP apps
 
 PHP ships with `session.use_strict_mode` off, so it accepts a session ID the server never issued, which is how session
@@ -940,7 +956,13 @@ Doctrine 2, Smarty 3 or Slim 1 into its root `vendor/`, at the first PHP every C
 Slim, 7.1 without): deletes the hand copies, writes `composer.json` for `doctrine/orm ^2.20`, `smarty/smarty ^4.5` and
 `slim/slim ^4.15`, points the app's `require` lines at `vendor/autoload.php`, and keeps a Slim 1 app's routes running on
 Slim 4 through `slim1-bridge.php`; anything it cannot rewrite exactly is a stop sign that leaves it out, and the
-replay waits for it ([the guide](docs/guides/framework-hops.md)). `session-strict-mode` (planned with
+replay waits for it ([the guide](docs/guides/framework-hops.md)). `cakephp-4-to-4.6` (planned for a CakePHP 4.0 to 4.5
+app, first once the app is on PHP 7.4 or newer): runs CakePHP's own 4.x upgrade rules in a container and requires
+`cakephp/cakephp ^4.6`; deprecations stay MANUAL. `cakephp-4.6-to-5` (planned at PHP 8.2): runs the 5.x rules, renames
+`.ctp` templates, moves AuthComponent to the Authentication plugin and swaps the Oracle driver; `isAuthorized()` and
+custom authenticators stay MANUAL. `slim-3-to-4` (planned at PHP 7.4): moves a Slim 3 app to Slim 4.15 over its own
+Pimple container; the old error handlers and `pathFor()` stay MANUAL ([the guide](docs/guides/cakephp-and-slim.md)).
+`session-strict-mode` (planned with
 `--strict-session` for a raw PHP app that calls `session_start()` without strict session IDs, first, on the PHP the
 app runs today; never for Laravel): adds one guarded `ini_set()` line for `session.use_strict_mode` and
 `session.use_only_cookies` before each call, skips what is already covered, and refuses on a stop sign

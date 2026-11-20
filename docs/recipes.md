@@ -183,6 +183,7 @@ booster run --path=../my-app --skip-gate
 - **Your own image:** `--image` takes one image name, a `{php}` template, or a map such as `8.1=foo:1,8.2=bar:2`; the image needs `php` and `composer` on `PATH`, and must cover every PHP in the plan.
 - **Hand-copied libraries and real tests:** with `--vendored`, the PHP hops before `vendored-to-composer` run the syntax check instead of your tests, because the 2012 copies may not run on the new PHP; your tests run on the baseline and on every step from the move on. See [Hand-copied libraries to Composer](guides/framework-hops.md#why-the-replay-and-the-tests-wait).
 - **Few tests, but pages that must not change:** `--replay` records how the app answers a list of requests before the first hop and fails any hop that changes an answer. `booster replay init --path=../my-app` drafts the request file. See [The replay gate](guides/replay-gate.md).
+- **A CakePHP 4 or Slim 3 app:** `booster run --path=../my-app --replay --to-php 8.5` plans and runs the framework hops (`cakephp-4-to-4.6`, `cakephp-4.6-to-5`, `slim-3-to-4`) between the PHP hops. The tests these apps ship rarely cover a framework move, so draft the replay first (`booster replay init`) and let it be the gate. See [CakePHP and Slim apps to PHP 8.5](guides/cakephp-and-slim.md).
 - **Skip the gate:** `--skip-gate` skips the baseline, the per-hop tests and the PROCTOR check.
 
 Not for: `--skip-gate` on a real upgrade. The gate is how you learn which hop broke the app. Use it only when Docker truly cannot run, and then run the tests yourself after each hop.

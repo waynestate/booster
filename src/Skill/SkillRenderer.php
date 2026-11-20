@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Skill;
 
+use Waynestate\Booster\Hop\EngineId;
 use Waynestate\Booster\Hop\Hop;
 use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Hop\HopRegistry;
@@ -84,6 +85,12 @@ final class SkillRenderer
             $links .= '- ' . $link . "\n";
         }
         $review = $hop->extraReview ? "This is the riskiest PHP hop. Ask for extra tests, or a replay file (`booster replay init`, then `booster run --replay`), before you apply it.\n\n" : '';
+        $frameworkMove = self::isFrameworkMove($hop);
+        if ($frameworkMove) {
+            // A CakePHP or Slim hop moves the framework under the app, and the
+            // tests such apps ship rarely ask what it changes: the replay does.
+            $review = "This is a framework move, not a PHP hop: the app's own tests rarely cover what it changes, so the replay is the real gate. Draft a replay file (`booster replay init`), read it, then `booster run --replay`. Read this hop's notes below before you apply it.\n\n";
+        }
         $how = $hop->isManual()
             ? "Booster has no automatic change for this hop. Follow the official guide below, then run the tests.\n"
             : "1. `booster run --path=<app> --dry-run` and read every diff.\n2. `booster run --path=<app>` applies the plan and stops at the first failing gate.\n3. If a hop is over the review threshold (200 files), read its per-rule summary, then apply it with `--max-changes=N`. Use `--skip` to leave a rule out.\n";
@@ -91,6 +98,9 @@ final class SkillRenderer
         if ($hop->kind === HopKind::Session) {
             // No Rector here: Booster edits the files itself, and the flag is opt-in.
             $how = "1. `booster plan --path=<app> --strict-session` and read every stop sign it names. Booster never guesses past one.\n2. `booster run --path=<app> --strict-session --dry-run` and read every diff.\n3. `booster run --path=<app> --strict-session` applies the plan and stops at the first failing gate.\n";
+            $checks = 'Check these by hand:';
+        }
+        if ($frameworkMove) {
             $checks = 'Check these by hand:';
         }
         $failure = $this->failureSection($hop);
@@ -194,11 +204,7 @@ final class SkillRenderer
                 'Use `browser-logs` after a page load to catch the Vue warnings the console prints.',
                 'Run `last-error` and `read-log-entries` after the tests.',
             ],
-            HopKind::Framework => [
-                'Use `search-docs` for the Doctrine ORM 2.20, Smarty 4 or Slim 4 docs, whichever the hop moved, and check them against every file Booster changed.',
-                'Use `list-routes` (or the app\'s own route list) to pick the pages the replay file should hit.',
-                'Run `last-error` and `read-log-entries` after the replay.',
-            ],
+            HopKind::Framework => $this->frameworkPrompts($hop),
             HopKind::Node => [
                 "Use `search-docs` for the Vite front-end docs and check the app's build config against them.",
                 'Use `browser-logs` after a page load to catch front-end errors the change might surface.',
@@ -219,5 +225,55 @@ final class SkillRenderer
         $lines[] = "Boost is read-only help. Booster's gate stays the authority: never skip a gate because Boost says so.";
 
         return implode("\n", $lines) . "\n\n";
+    }
+
+    /** A CakePHP or Slim hop: a framework hop whose engine moves the framework itself (vendored-to-composer is not one). */
+    private static function isFrameworkMove(Hop $hop): bool
+    {
+        return $hop->kind === HopKind::Framework
+            && ($hop->engine === EngineId::CakeUpgrade || $hop->engine === EngineId::SlimUpgrade);
+    }
+
+    /**
+     * The Boost prompts for a framework hop, by the engine that runs it: the
+     * CakePHP hops point at CakePHP's migration guide (and, on the 5 step, the
+     * Authentication plugin), the Slim hop at Slim 4's upgrade guide, and the
+     * vendored move keeps its Doctrine, Smarty and Slim 4 prompts.
+     *
+     * @return list<string>
+     */
+    private function frameworkPrompts(Hop $hop): array
+    {
+        $routes = 'Use `list-routes` (or the app\'s own route list) to pick the pages the replay file should hit.';
+        $logs = 'Run `last-error` and `read-log-entries` after the replay.';
+
+        if ($hop->engine === EngineId::CakeUpgrade) {
+            $major = explode('.', $hop->to)[0];
+            $guide = $major === '4' ? 'CakePHP ' . $hop->to : 'CakePHP ' . $major;
+            $prompts = [
+                sprintf('Use `search-docs` for the %s migration guide and check it against every file Booster changed.', $guide),
+                $routes,
+            ];
+            if ($major !== '4') {
+                $prompts[] = 'Use `list-routes` to pick one signed-in page per controller that used AuthComponent, and check that the Authentication plugin still sends a guest to sign in and lets a signed-in user through.';
+            }
+            $prompts[] = $logs;
+
+            return $prompts;
+        }
+
+        if ($hop->engine === EngineId::SlimUpgrade) {
+            return [
+                'Use `search-docs` for the Slim 4 upgrade guide and check it against every file Booster changed.',
+                $routes,
+                $logs,
+            ];
+        }
+
+        return [
+            'Use `search-docs` for the Doctrine ORM 2.20, Smarty 4 or Slim 4 docs, whichever the hop moved, and check them against every file Booster changed.',
+            $routes,
+            $logs,
+        ];
     }
 }

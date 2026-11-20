@@ -7,7 +7,7 @@ description: The vendored-to-composer hop moves an app's hand-copied Doctrine 2,
 
 This page covers the first framework hop, `vendored-to-composer`: what it moves, what it writes, what makes it refuse,
 and how the replay gate proves the app still answers the same. Before this: [The replay gate](replay-gate.md). Next:
-[Strict session IDs for raw PHP apps](strict-sessions.md).
+[CakePHP and Slim apps to PHP 8.5](cakephp-and-slim.md).
 
 Some apps never met Composer. In 2012 a real WSU app copied Doctrine 2.2, Smarty 3.1 and Slim 1.6 straight into
 `vendor/`, loaded them with `require` lines, and ran happily until PHP moved on. The PHP hops cannot help it: Booster
@@ -164,10 +164,11 @@ lines, so you know where to look when the replay says an answer changed.
 
 ## CakePHP and Slim apps
 
+CakePHP and Slim are being phased out at WSU (D-124): these hops keep existing apps supported; new apps start on raw PHP or Laravel (Sourdough or WELD).
+
 An app built on CakePHP or Slim (which `booster detect` names, with its major.minor) gets framework hops between its
-PHP hops. The plan moves the framework to the line you pick with `--to-cakephp` or `--to-slim` (the newest by
-default), and every PHP hop stays on a PHP that the framework line under it runs on. The engines that do the work land
-in the next release; until then `booster run` reports the step as having no engine registered and changes nothing.
+PHP hops, and every PHP hop stays on a PHP that the framework line under it runs on. `--to-cakephp` and `--to-slim`
+pick the line (the newest by default).
 
 | Hop | From | To | Where the plan puts it |
 | --- | --- | --- | --- |
@@ -175,9 +176,5 @@ in the next release; until then `booster run` reports the step as having no engi
 | `cakephp-4.6-to-5` | CakePHP 4.6 | 5.4 | at the first PHP 5.4 runs on (8.2), after the PHP hops that get there |
 | `slim-3-to-4` | Slim 3 | 4.15 | at the first PHP 4.15 runs on (7.4), after the PHP hops that get there |
 
-A CakePHP 4.3 app on PHP 8.1 therefore plans `cakephp-4-to-4.6`, `php-81-to-82`, `cakephp-4.6-to-5`, then the PHP hops
-to 8.5 on CakePHP 5.4. The same app on PHP 7.3 plans `php-73-to-74` first, then `cakephp-4-to-4.6`, then the same
-course; only a target PHP below 7.4 leaves the 4.6 step out. `--to-cakephp 4` stops on 4.6 and says to plan the 5 step soon. A target PHP below 8.2 leaves
-the CakePHP 5 step out with a warning, `--skip cakephp-4.6-to-5` leaves it out too, and the PHP hops then stay within
-what 4.6 runs on. `--to-slim 3.13` is refused: Booster moves Slim 3 apps to Slim 4.15. CakePHP 3 and Slim 2 have no hop, so
-their PHP hops stop at the line's ceiling and the plan says Booster has no hop for them yet.
+See also: [CakePHP and Slim apps to PHP 8.5](cakephp-and-slim.md), with the commands, what each hop changes, the
+MANUAL lists, and why `--replay` is the real gate for these apps.

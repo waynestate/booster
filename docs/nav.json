@@ -54,6 +54,10 @@
           "path": "guides/framework-hops"
         },
         {
+          "title": "CakePHP and Slim apps",
+          "path": "guides/cakephp-and-slim"
+        },
+        {
           "title": "Strict session IDs",
           "path": "guides/strict-sessions"
         },

@@ -6,7 +6,7 @@ description: The session-strict-mode hop turns on session.use_strict_mode and se
 # Strict session IDs for raw PHP apps
 
 This page covers `session-strict-mode`: which apps it is for, the line it adds, what counts as already covered, and
-what makes it refuse. Before this: [Hand-copied libraries to Composer](framework-hops.md). Next:
+what makes it refuse. Before this: [CakePHP and Slim apps to PHP 8.5](cakephp-and-slim.md). Next:
 [Laravel hops and vendor/](laravel-and-vendor.md).
 
 PHP ships with `session.use_strict_mode` off. With it off, PHP takes any session ID a browser sends, even one the

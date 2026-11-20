@@ -4,6 +4,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Added: a guide for CakePHP and Slim apps (docs/guides/cakephp-and-slim.md): the commands, what each hop does and the MANUAL list.
+- Changed: the CakePHP and Slim playbooks (`booster init`) say the hop is a framework move with the replay as the real gate, and their Boost prompts point at the CakePHP and Slim upgrade guides (plus an Authentication plugin check on the CakePHP 5 step) instead of the Doctrine, Smarty and Slim 4 docs.
 - Fixed: the plan for a CakePHP 4 app on PHP below 7.4 now plans the 4.6 step, deferred to right after PHP reaches 7.4 (it used to drop it and stop at PHP 8.1).
 - Added: the plan inserts the CakePHP and Slim framework hops (cakephp-4-to-4.6, cakephp-4.6-to-5, slim-3-to-4) between the PHP hops; their engines land next.
 - Added: the CakePHP 5 hop moves AuthComponent calls and src/Application.php to the Authentication plugin like for like, and swaps the cakedc Oracle driver for the CakePHP 5 one.
