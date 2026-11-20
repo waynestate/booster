@@ -297,6 +297,13 @@ when the baseline answered a redirect, the answer now is a redirect to sign-in, 
 changed; the report lists each one (`02 requests: GET /auth/login: Location <old> -> <CAS login>`). Every other
 request is compared as always, and a new cookie on a listed path is still a difference.
 
+On an app with its own sign-in form, Step 0 turns that form page's 200 into a redirect to CAS. On a listed path
+that is accepted too when every header line but status, content type and `Location` stayed the same (the form's
+body goes with it). The requests later in that sequence that posted the form (the next request when it sends CSRF,
+or a POST to the form's path or a listed path) are reported as `sign-in moved to SESAME` instead of failing: the
+replay signs in through the fake driver now (`compare.silent_sign_in`). The signed-in pages after them are compared
+as always.
+
 ### Which half answered
 
 While a replay runs, the container sets `BOOSTER_REPLAY=1`, and the mounted app's dispatcher answers every request
@@ -322,6 +329,9 @@ A PHP upgrade rarely changes a cookie's flags or a security header; moving a pag
 It also hides which framework's CSRF field a form carries: CakePHP's `_csrfToken`, slim/csrf's pair and Laravel's
 `_token` all compare as one hidden CSRF field, and the `csrf-token` and `csrfToken` meta tags as one meta tag. A form
 that loses its CSRF field still differs, and so does any field of the form's own.
+
+And it treats the mount's legacy root and the old app root as one path in bodies: an error page that prints
+`/app/legacy/src/...` after the mount compares equal to the baseline's `/app/src/...` (also JSON-escaped).
 
 ### Signed-in sequences
 

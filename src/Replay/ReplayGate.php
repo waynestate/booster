@@ -178,8 +178,12 @@ final class ReplayGate
      * changes on purpose (the strangler's Step 0 moving the legacy half onto
      * SESAME, SignInResult->replayChanges): a difference there is accepted
      * when the baseline answered a redirect and the answer now is a redirect
-     * to sign-in, and nothing but the Location changed. Each accepted one is
-     * named in the report; every other request is compared as always.
+     * to sign-in, and nothing but the Location changed, or when the baseline
+     * answered 200 (a form sign-in page) and nothing but status, content
+     * type, Location and body changed. After such a form page, the requests
+     * of its sequence that posted the form are reported as "sign-in moved to
+     * SESAME" instead of failing. Each accepted one is named in the report;
+     * every other request is compared as always.
      *
      * @param list<string> $signInChanges request paths, as the request file writes them (or with their query)
      */
@@ -248,9 +252,19 @@ final class ReplayGate
     /**
      * Splits the differences into the ones that stay and the sign-in
      * hand-offs this step changed on purpose (see check()). A listed request
-     * is accepted only when the baseline answered a 3xx, the answer now is a
-     * redirect to sign-in, and the two views are the same once the Location
-     * line is left out.
+     * is accepted when the answer now is a redirect to sign-in and either
+     * the baseline answered a 3xx and the two views are the same once the
+     * Location line is left out, or the baseline answered 200 (the app's own
+     * sign-in form) and every header line but status, content type and
+     * Location is the same (the body goes with the form).
+     *
+     * Once a sign-in form has moved, the requests later in its sequence that
+     * posted that form are accepted too and reported as "sign-in moved to
+     * SESAME": the replay signs in through the fake driver instead
+     * (compare.silent_sign_in). A request posted that form when it is the
+     * next request of the sequence and sends CSRF, or posts to the form's
+     * path or a listed path. Every other later request (the signed-in pages)
+     * is compared as always.
      *
      * @param list<array{request: ReplayRequest, diff: list<string>}> $differences
      * @param list<ReplayAnswer>                                       $baseline
@@ -265,23 +279,65 @@ final class ReplayGate
             return [$differences, []];
         }
         $index = [];
+        $next = [];
+        $last = [];
         foreach ($this->file->requests as $i => $request) {
             $index[$request->number] = $i;
+            if (isset($last[$request->sequence])) {
+                $next[$last[$request->sequence]] = $request->number;
+            }
+            $last[$request->sequence] = $request->number;
         }
-        $withoutLocation = fn(ReplayAnswer $a): array => array_values(array_filter(ReplayComparison::view($a, $this->file), static fn(string $l): bool => !str_starts_with($l, 'location: ')));
+        // The view without the lines named by $drop, and without the body
+        // when $headersOnly.
+        $without = function (ReplayAnswer $a, array $drop, bool $headersOnly = false): array {
+            $lines = [];
+            foreach (ReplayComparison::view($a, $this->file) as $line) {
+                if ($headersOnly && $line === '--- body') {
+                    break;
+                }
+                foreach ($drop as $prefix) {
+                    if (str_starts_with($line, $prefix)) {
+                        continue 2;
+                    }
+                }
+                $lines[] = $line;
+            }
+
+            return $lines;
+        };
+        $clean = static fn(?string $l): string => (string) preg_replace('/[\x00-\x1F\x7F]/', '', str_replace(ReplayComparison::APP_ORIGIN, '<app>', (string) $l));
+        $listedPath = static fn(ReplayRequest $r): bool => in_array($r->path, $paths, true) || in_array($r->target(), $paths, true);
+        $formLines = ['status: ', 'content-type: ', 'location: '];
         $kept = [];
         $accepted = [];
+        // sequence => the form page that moved to SESAME (its request)
+        $forms = [];
         foreach ($differences as $difference) {
             $request = $difference['request'];
             $i = $index[$request->number] ?? null;
             $before = $i === null ? null : ($baseline[$i] ?? null);
             $after = $i === null ? null : ($replay[$i] ?? null);
-            $listed = in_array($request->path, $paths, true) || in_array($request->target(), $paths, true);
-            if ($listed && $before !== null && $after !== null && $before->status >= 300 && $before->status <= 399
-                && self::isSignInRedirect($after) && $withoutLocation($before) === $withoutLocation($after)) {
-                $clean = static fn(?string $l): string => (string) preg_replace('/[\x00-\x1F\x7F]/', '', str_replace(ReplayComparison::APP_ORIGIN, '<app>', (string) $l));
-                $accepted[] = sprintf('%s: Location %s -> %s', $request->label(), $clean($before->header('Location')), $clean($after->header('Location')));
+            if ($before === null || $after === null || $before->status === 0 || $after->status === 0) {
+                $kept[] = $difference;
                 continue;
+            }
+            $form = $forms[$request->sequence] ?? null;
+            if ($form !== null && $request->number > $form->number && !in_array($request->method, ['GET', 'HEAD', 'OPTIONS'], true)
+                && ((($next[$form->number] ?? null) === $request->number && $request->csrf) || $request->path === $form->path || $listedPath($request))) {
+                $accepted[] = sprintf('%s: sign-in moved to SESAME (it posted the form from %02d; the replay signs in through the fake driver instead), answered %d, baseline %d', $request->label(), $form->number, $after->status, $before->status);
+                continue;
+            }
+            if ($listedPath($request) && self::isSignInRedirect($after)) {
+                if ($before->status >= 300 && $before->status <= 399 && $without($before, ['location: ']) === $without($after, ['location: '])) {
+                    $accepted[] = sprintf('%s: Location %s -> %s', $request->label(), $clean($before->header('Location')), $clean($after->header('Location')));
+                    continue;
+                }
+                if ($before->status === 200 && $without($before, $formLines, true) === $without($after, $formLines, true)) {
+                    $accepted[] = sprintf('%s: the sign-in form (200) now redirects to sign-in, %d Location %s', $request->label(), $after->status, $clean($after->header('Location')));
+                    $forms[$request->sequence] ??= $request;
+                    continue;
+                }
             }
             $kept[] = $difference;
         }

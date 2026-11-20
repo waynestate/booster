@@ -287,7 +287,7 @@ final class ReplayComparison
             }
         }
         if ($file->isStrangler()) {
-            $body = (new ReplayNormalizer('strangler', ReplayNormalizer::STRANGLER_CSRF))->apply($body);
+            $body = (new ReplayNormalizer('strangler', [...ReplayNormalizer::STRANGLER_CSRF, ...ReplayNormalizer::STRANGLER_PATHS]))->apply($body);
         }
         if ($file->compareJson === ReplayFile::COMPARE_JSON_VALUE) {
             $trimmed = trim($body);

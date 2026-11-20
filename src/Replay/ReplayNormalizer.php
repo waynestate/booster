@@ -111,6 +111,19 @@ final readonly class ReplayNormalizer
     ];
 
     /**
+     * The strangler's mount moves the old app root into legacy/, so an error
+     * page that prints a file path says /app/legacy/src/... where the
+     * baseline said /app/src/... (the replay serves the app from /app). In
+     * bodies the legacy root and the old root count as the same path, written
+     * plainly or JSON-escaped.
+     *
+     * @var list<array{string, string}>
+     */
+    public const STRANGLER_PATHS = [
+        ['~(?<![\w.\-/\\\\])(\\\\?/)app(\\\\?/)legacy(?![\w\-]|\.\w)~', '$1app'],
+    ];
+
+    /**
      * @param list<array{string, string}> $rules pattern and replacement pairs, applied in order
      */
     public function __construct(

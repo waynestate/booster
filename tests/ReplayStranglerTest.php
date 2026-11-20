@@ -238,6 +238,82 @@ final class ReplayStranglerTest extends TestCase
         self::assertSame(ReplayOutcome::DIFFERS, $unlisted->status, 'a path the step did not list is compared as always');
     }
 
+    public function test_step_0_may_turn_a_form_sign_in_page_into_a_cas_redirect_and_reports_the_form_post_moved(): void
+    {
+        $file = ReplayFile::fromArray(['sequences' => [
+            ['name' => 'guest', 'requests' => [['path' => '/']]],
+            ['name' => 'staff', 'requests' => [['path' => '/users/login'], ['method' => 'POST', 'path' => '/users/login', 'csrf' => true, 'form' => ['username' => 'fake']], ['path' => '/articles']]],
+        ]]);
+        $session = ['Set-Cookie', 'CAKEPHP=a; path=/; HttpOnly'];
+        $baseline = [[200, 'home'], [200, '<form method="post"><input name="username"></form>', [self::HTML, $session]], [302, '', [['Location', '/articles'], $session]], [200, 'list']];
+        $cas = ['Location', 'https://cas.replay.invalid/cas/login?service=http%3A%2F%2F127.0.0.1%3A8765%2Fusers%2Flogin'];
+        $moved = [[200, 'home'], [302, '', [$cas, $session]], [302, '', [$cas, $session]], [200, 'list']];
+        $cookie = [[200, 'home'], [302, '', [$cas]], [302, '', [$cas, $session]], [200, 'list']];
+        $lost = [[200, 'home'], [302, '', [$cas, $session]], [405, 'no', [$session]], [302, '', [$cas]]];
+        $gate = $this->gate([$baseline, $moved, $cookie, $lost, $moved], $file);
+        $gate->record('8.5');
+
+        $passed = $gate->check('8.5', 'step-0', signInChanges: ['/users/login']);
+        self::assertSame(ReplayOutcome::PASSED, $passed->status, implode("\n", $passed->lines));
+        self::assertSame('Replay passed: 2 of 4 answers match the baseline from PHP 8.5, and 2 changed only where this step moves the sign-in on purpose:', $passed->lines[0]);
+        self::assertSame('  02 staff: GET /users/login: the sign-in form (200) now redirects to sign-in, 302 Location https://cas.replay.invalid/cas/login?service=http%3A%2F%2F127.0.0.1%3A8765%2Fusers%2Flogin', $passed->lines[1]);
+        self::assertSame('  03 staff: POST /users/login: sign-in moved to SESAME (it posted the form from 02; the replay signs in through the fake driver instead), answered 302, baseline 302', $passed->lines[2]);
+
+        $other = $gate->check('8.5', 'step-0b', signInChanges: ['/users/login']);
+        self::assertSame(ReplayOutcome::DIFFERS, $other->status, 'a form page that also lost its cookie changed more than the sign-in');
+        self::assertStringContainsString('1 of 4 answers differ', $other->lines[0]);
+        self::assertContains('  03 staff: POST /users/login: Location /articles -> https://cas.replay.invalid/cas/login?service=http%3A%2F%2F127.0.0.1%3A8765%2Fusers%2Flogin', $other->lines, 'its POST still is a listed redirect hand-off');
+        self::assertStringContainsString('First difference: 02 staff: GET /users/login', implode("\n", $other->lines));
+
+        $signedOut = $gate->check('8.5', 'step-0c', signInChanges: ['/users/login']);
+        self::assertSame(ReplayOutcome::DIFFERS, $signedOut->status, 'a signed-in page after the moved form is compared as always');
+        self::assertStringContainsString('1 of 4 answers differ', $signedOut->lines[0]);
+        self::assertStringContainsString('First difference: 04 staff: GET /articles', implode("\n", $signedOut->lines));
+        self::assertStringContainsString('sign-in moved to SESAME', implode("\n", $signedOut->lines));
+
+        $unlisted = $gate->check('8.5', 'step-0d', signInChanges: ['/auth/login']);
+        self::assertSame(ReplayOutcome::DIFFERS, $unlisted->status, 'a form page the step did not list is compared as always');
+        self::assertStringContainsString('2 of 4 answers differ', $unlisted->lines[0]);
+    }
+
+    public function test_only_requests_that_posted_the_moved_form_are_reported_moved(): void
+    {
+        $file = ReplayFile::fromArray(['sequences' => [
+            ['name' => 'staff', 'requests' => [['path' => '/login'], ['method' => 'POST', 'path' => '/articles', 'form' => ['title' => 'x']], ['method' => 'POST', 'path' => '/login', 'form' => ['user' => 'fake']]]],
+            ['name' => 'other', 'requests' => [['method' => 'POST', 'path' => '/login', 'form' => ['user' => 'fake']]]],
+        ]]);
+        $baseline = [[200, 'form'], [302, '', [['Location', '/articles/1']]], [302, '', [['Location', '/']]], [302, '', [['Location', '/']]]];
+        $cas = [['Location', 'https://cas.replay.invalid/cas/login']];
+        $replay = [[302, '', $cas], [403, 'no'], [405, 'no'], [405, 'no']];
+        $gate = $this->gate([$baseline, $replay], $file);
+        $gate->record('8.5');
+
+        $outcome = $gate->check('8.5', 'step-0', signInChanges: ['/login']);
+        $text = implode("\n", $outcome->lines);
+
+        self::assertSame(ReplayOutcome::DIFFERS, $outcome->status);
+        self::assertStringContainsString('2 of 4 answers differ', $outcome->lines[0]);
+        self::assertStringContainsString('First difference: 02 staff: POST /articles', $text, 'a POST that sends no CSRF and goes elsewhere did not post the form');
+        self::assertStringContainsString('  03 staff: POST /login: sign-in moved to SESAME (it posted the form from 01;', $text);
+        self::assertStringContainsString('Also different: request 04.', $text, 'another sequence never loaded the form');
+    }
+
+    // The mount's legacy root (9.2)
+
+    public function test_the_strangler_preset_treats_the_legacy_root_and_the_old_root_as_one_path_in_bodies(): void
+    {
+        $strangler = $this->file(['preset' => 'strangler']);
+        $before = 'Error in /app/src/Controller/ArticlesController.php line 12 {"file":"\/app\/src\/Model.php"} root /app.';
+        $after = 'Error in /app/legacy/src/Controller/ArticlesController.php line 12 {"file":"\/app\/legacy\/src\/Model.php"} root /app/legacy.';
+
+        self::assertSame(ReplayComparison::view(self::answer($before), $strangler), ReplayComparison::view(self::answer($after), $strangler));
+        self::assertNotSame(ReplayComparison::view(self::answer($before), $this->file()), ReplayComparison::view(self::answer($after), $this->file()), 'the default preset keeps paths as they are');
+        foreach (['/srv/app/legacy/x.php', '/app/legacy-notes/x.php', '/app/legacy_old/x.php'] as $path) {
+            self::assertContains($path, ReplayComparison::view(self::answer($path), $strangler), $path . ' stays as it is');
+        }
+    }
+
+
     public function test_sign_in_redirects_are_told_from_other_redirects(): void
     {
         foreach (['/_laravel/login', '/users/login?redirect=%2F', '/auth/login', 'https://cas.example.edu/cas/login?service=x', '/sign-in', '/login'] as $to) {
