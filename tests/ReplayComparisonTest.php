@@ -102,6 +102,17 @@ final class ReplayComparisonTest extends TestCase
         self::assertSame('<input name="title" value="Keep me">', $csrf->apply('<input name="title" value="Keep me">'));
     }
 
+    public function test_the_csrf_preset_hides_tokens_in_fields_an_app_named_itself(): void
+    {
+        $csrf = ReplayNormalizer::preset('csrf');
+
+        // A Slim 3 app's own field (bug S-csrf, testeval) and slim/csrf's pair.
+        self::assertSame("<input type='hidden' name='CSRF_KEY' value='<CSRF>'>", $csrf->apply("<input type='hidden' name='CSRF_KEY' value='5f2a9c'>"));
+        self::assertSame('<input name="csrf_name" value="<CSRF>"><input name="csrf_value" value="<CSRF>">', $csrf->apply('<input name="csrf_name" value="csrf61e"><input name="csrf_value" value="9a8b">'));
+        self::assertSame('<input value="<CSRF>" name="XSRF-TOKEN">', $csrf->apply('<input value="q1" name="XSRF-TOKEN">'));
+        self::assertSame('<input name="description" value="Keep me">', $csrf->apply('<input name="description" value="Keep me">'));
+    }
+
     public function test_the_other_presets_replace_only_their_values(): void
     {
         self::assertSame('<a href="/x?PHPSESSID=<SESSION>">', ReplayNormalizer::preset('session-id')->apply('<a href="/x?PHPSESSID=8f14e45fceea167a">'));

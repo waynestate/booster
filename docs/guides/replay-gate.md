@@ -133,7 +133,7 @@ A normalizer rewrites the volatile parts of an answer before it is compared and 
 
 | Name | Hides |
 |---|---|
-| `csrf` | CSRF tokens in hidden form fields and meta tags (`_token`, `csrf_token`, `authenticity_token` and friends) |
+| `csrf` | CSRF tokens in hidden form fields and meta tags (`_token`, `authenticity_token`, and any field whose name holds `csrf` or `xsrf`, such as `csrf_token`, `CSRF_KEY` or slim/csrf's `csrf_name` and `csrf_value`) |
 | `session-id` | session ids in links, forms and scripts (`PHPSESSID=...`, `laravel_session=...`) |
 | `timestamps` | dates with a time of day, and Unix times from 2020 to 2033 |
 | `asset-hash` | content hashes in built asset names (`app.3f9a1c2b.js`, Vite's `app-L1fqnEWe.js`, `app.js?id=3f9a1c`) |

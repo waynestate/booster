@@ -4,6 +4,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Fixed: the replay's csrf preset hides any hidden field whose name holds csrf or xsrf (an app's own CSRF_KEY, slim/csrf's csrf_name and csrf_value), not only the common names, so a fresh token per request is no longer a replay mismatch.
 - Fixed: the Slim 3 to 4 hop runs on PHP 7.4 (slim/psr7 ^1.6, glue files in PHP 7.4 syntax) and moves apps typed with Slim 3's request and response classes onto slim/http.
 - Fixed: the undo hint after a failed step says it undoes the whole run and gives paths relative to the app folder; the Slim 4 message no longer claims Booster has no Slim hop.
 - Fixed: the cakephp/upgrade image now includes the intl extension CakePHP requires; every CakePHP hop stopped at start without it.
