@@ -42,6 +42,8 @@ Two hops, `cakephp-4-to-4.6` then `cakephp-4.6-to-5`, with the PHP hops between 
 
 A CakePHP 4.3 app on PHP 8.1 therefore plans `cakephp-4-to-4.6`, `php-81-to-82`, `cakephp-4.6-to-5`, then `php-82-to-83`, `php-83-to-84` and `php-84-to-85`. The same app on PHP 7.3 plans `php-73-to-74` first, then `cakephp-4-to-4.6`, then the same course. Stop on 4.6 with `--to-cakephp 4`: it still runs on PHP 8.5, but 4.x is end of life, so treat it as a rest stop, not a home. A target PHP below 8.2 leaves the CakePHP 5 step out with a warning, `--skip cakephp-4.6-to-5` leaves it out too, and the PHP hops then stay within what 4.6 runs on.
 
+**Install first for a dry run.** The rules read the app's own `vendor/` (mounted read-only), so run `composer install` in the app before a `--dry-run`; a real run's baseline does it for you.
+
 **Fix deprecations first.** Run your tests with `error_reporting(E_ALL)` on CakePHP 4.6 and fix every deprecation notice before the 5 step. A deprecation on 4.6 is CakePHP 5 knocking politely; on 5 it stops knocking. Booster tells you; it does not fix them for you.
 
 **The sign-in move.** The 5 step moves the like-for-like AuthComponent calls (`$this->Auth->user('x')` reads the identity, `setUser()` becomes `setIdentity()`, `logout()` and `allow()` keep their names on `$this->Authentication`), swaps `loadComponent('Auth')` for `loadComponent('Authentication.Authentication')`, requires `cakephp/authentication ^3.0`, and wires `src/Application.php`: the provider interface, the plugin, the middleware after routing, and a service with the Session authenticator whose guests go to the old `loginAction`.
@@ -49,6 +51,7 @@ A CakePHP 4.3 app on PHP 8.1 therefore plans `cakephp-4-to-4.6`, `php-81-to-82`,
 **What Booster does not do (the MANUAL list).** Each run prints these as `MANUAL:` lines, with the file and the count where there is one:
 
 - On the 4.6 step: the reminder to fix every deprecation with `E_ALL` before the 5 step.
+- On the 4.6 step: the `Cake\Network\Socket` properties CakePHP 4.3 turned into methods (`connected` is `isConnected()`, `encrypted` is `isEncrypted()`, `lastError` is `lastError()`). The upstream rule for them needs a Rector class that no longer exists, so Booster leaves them to you; search your code for them.
 - On both steps: `View::loadHelper()` calls the rules could not type (it is `addHelper()` since 4.5).
 - Sign-in that is not a plain session: `isAuthorized()` (move it to Authorization plugin policies or plain controller code), and any Auth config the plugin has no like-for-like for (`authenticate` with a custom authenticator such as CAS, an SSO cookie or an LTI launch, `authorize`, `loginRedirect`, `logoutRedirect`, `authError`; `loginAction` is carried over as the redirect). Also an `'Auth'` entry with config in a `$components` list, any other `$this->Auth->...()` call, what the action does with `logout()`'s return value (now the redirect URL or null), and `allow()` calls that passed one name or none, since `allowUnauthenticated()` takes an array.
 - `src/Application.php` that Booster could not wire: no such file or class, one that already provides an authentication service (check that it loads the Session authenticator), no `bootstrap()` or `middleware()`, no routing middleware, or no `loginAction` found (the redirect is the placeholder `/login`).

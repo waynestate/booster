@@ -24,6 +24,9 @@ final class CakeUpgradeRunner
      */
     public const UPGRADE_REF = '804ce4739f28e9d7fc1f6092e4dfb9a69f683819';
 
+    /** Where the app's own vendor/ is mounted, read-only, for Rector's autoloader. */
+    public const VENDOR_MOUNT = '/app/vendor';
+
     /** Where the opt-in Composer cache (BOOSTER_COMPOSER_CACHE) is mounted: the tool's own downloads, not the app's. */
     public const COMPOSER_CACHE_MOUNT = '/tmp/composer-cache';
 
@@ -98,9 +101,15 @@ final class CakeUpgradeRunner
      * The argument array for `docker run` that applies one ruleset to a
      * folder of the app, exposed so tests can assert on it.
      *
+     * Rector needs the app's autoloader to know its classes (and without one
+     * cakephp/upgrade exits 1 before running a rule), so the app's own
+     * vendor/ is mounted read-only over /app/vendor and named with
+     * --autoload. Rector only writes the path it is given (/app/<subdir>,
+     * never vendor), and the read-only mount makes sure of it.
+     *
      * @return list<string>
      */
-    public function rectorCommand(string $appPath, string $ruleSet, string $subdir): array
+    public function rectorCommand(string $appPath, string $ruleSet, string $subdir, string $vendorPath): array
     {
         if (preg_match('/^[a-z0-9_-]+$/', $ruleSet) !== 1) {
             throw new InvalidArgumentException(sprintf('The rule set "%s" is not a valid cakephp/upgrade ruleset name (letters, digits, dashes and underscores only).', $ruleSet));
@@ -112,9 +121,10 @@ final class CakeUpgradeRunner
         return [
             $this->docker, 'run', '--rm',
             '-v', rtrim($appPath, '/\\') . ':/app',
+            '-v', rtrim($vendorPath, '/\\') . ':' . self::VENDOR_MOUNT . ':ro',
             ...$this->cacheMountArgs(),
             self::imageTag(),
-            'bin/cake', 'upgrade', 'rector', '--rules', $ruleSet, '/app/' . $subdir,
+            'bin/cake', 'upgrade', 'rector', '--rules', $ruleSet, '--autoload', self::VENDOR_MOUNT . '/autoload.php', '/app/' . $subdir,
         ];
     }
 

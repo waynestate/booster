@@ -49,6 +49,12 @@ final class CakeUpgradeMigration implements FrameworkEngine
     /** Never copied at the app root: CakePHP's runtime folders. */
     private const SKIP_AT_ROOT = ['tmp', 'logs'];
 
+    /** The 4.6 step's line for the cakephp43 Socket rules the image drops (docker/cakephp-upgrade/Dockerfile). */
+    public const SOCKET_HINT = 'MANUAL: CakePHP 4.3 renamed some Socket properties and Booster does not rewrite them; search your code for Cake\Network\Socket property uses ($socket->connected is isConnected(), ->encrypted is isEncrypted(), ->lastError is lastError()).';
+
+    /** The stop sign for an app with no installed vendor/ (a dry run before any composer install, say). */
+    public const NO_VENDOR = "The CakePHP rule sets need the app's vendor/ folder; run composer install in the app first.";
+
     /** How much of a failed tool run the refusal quotes. */
     private const TAIL_LINES = 15;
 
@@ -110,6 +116,10 @@ final class CakeUpgradeMigration implements FrameworkEngine
         if (!is_dir($appPath . '/src')) {
             $refusals[] = 'There is no src/ directory, so the app does not have the CakePHP layout the upgrade rules expect.';
         }
+        // Rector loads the app's classes through its autoloader; without one cakephp/upgrade runs no rule.
+        if (!is_file($appPath . '/vendor/autoload.php')) {
+            $refusals[] = self::NO_VENDOR;
+        }
         if ($hop->rectorSets === []) {
             $refusals[] = sprintf('The %s hop names no cakephp/upgrade rule sets, so there is nothing to run.', $hop->id);
         }
@@ -130,11 +140,16 @@ final class CakeUpgradeMigration implements FrameworkEngine
         }
 
         $subdirs = array_values(array_filter(self::SUBDIRS, static fn(string $dir): bool => is_dir($copy . '/' . $dir)));
+        // The mount point for the app's read-only vendor/, made here so Docker does not make it as root.
+        @mkdir($copy . '/vendor', 0775, true);
         foreach ($hop->rectorSets as $set) {
             foreach ($subdirs as $subdir) {
-                $result = $this->runner->run($this->runner->rectorCommand($copy, $set, $subdir));
+                $result = $this->runner->run($this->runner->rectorCommand($copy, $set, $subdir, $appPath . '/vendor'));
                 if (!$result->successful()) {
                     return self::refuse(self::failure(sprintf('The cakephp/upgrade rule set %s failed on %s/', $set, $subdir), $result));
+                }
+                if (self::printedError($result)) {
+                    return self::refuse(self::failure(sprintf('The cakephp/upgrade rule set %s printed an error on %s/', $set, $subdir), $result));
                 }
             }
             $changes[] = sprintf('Ran %s on %s.', $set, implode(', ', $subdirs));
@@ -446,6 +461,8 @@ final class CakeUpgradeMigration implements FrameworkEngine
             $manual[] = $helpers;
         }
         if (!$five) {
+            // The image drops cakephp43's Socket rules (Rector 2 removed the rule they need), so a person does these.
+            $manual[] = self::SOCKET_HINT;
             $manual[] = 'MANUAL: run the tests with E_ALL on CakePHP 4.6 and fix every deprecation before the 5 step.';
         }
 
@@ -620,6 +637,21 @@ final class CakeUpgradeMigration implements FrameworkEngine
         $tail = implode("\n", array_slice($lines, -self::TAIL_LINES));
 
         return sprintf("%s (exit %d), so nothing in the app changed. The last lines of its output:\n%s", $what, $result->exitCode, $tail);
+    }
+
+    /**
+     * cakephp/upgrade runs Rector as a child process and says "Rector applied
+     * successfully" with exit 0 even when Rector could not load the rule set
+     * (a missing config file, a Rector class that no longer exists). Rector's
+     * error block, a PHP fatal or the tool's own "Could not ..." line means
+     * the set never ran, so it is a failure, not a quiet success.
+     */
+    private static function printedError(ProcessResult $result): bool
+    {
+        return preg_match(
+            '/^\s*\[ERROR\]|^(PHP )?Fatal error:|^Could not (run|create) rector/mi',
+            $result->stdout . "\n" . $result->stderr,
+        ) === 1;
     }
 
     private static function refuse(string $reason): VendoredMigrationResult

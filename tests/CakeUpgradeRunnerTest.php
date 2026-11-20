@@ -22,11 +22,11 @@ final class CakeUpgradeRunnerTest extends TestCase
         $fake = new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '', ''));
         $runner = new CakeUpgradeRunner($fake);
 
-        $result = $runner->run($runner->rectorCommand('/srv/my app', 'cakephp45', 'src'));
+        $result = $runner->run($runner->rectorCommand('/srv/my app', 'cakephp45', 'src', '/srv/my app/vendor'));
 
         self::assertTrue($result->successful());
         self::assertSame(
-            ['docker', 'run', '--rm', '-v', '/srv/my app:/app', CakeUpgradeRunner::imageTag(), 'bin/cake', 'upgrade', 'rector', '--rules', 'cakephp45', '/app/src'],
+            ['docker', 'run', '--rm', '-v', '/srv/my app:/app', '-v', '/srv/my app/vendor:/app/vendor:ro', CakeUpgradeRunner::imageTag(), 'bin/cake', 'upgrade', 'rector', '--rules', 'cakephp45', '--autoload', '/app/vendor/autoload.php', '/app/src'],
             $fake->calls[0]['command'],
         );
         self::assertNull($fake->calls[0]['cwd']);
@@ -35,9 +35,10 @@ final class CakeUpgradeRunnerTest extends TestCase
     public function test_a_trailing_slash_on_the_app_path_is_dropped(): void
     {
         $command = (new CakeUpgradeRunner(new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '', ''))))
-            ->rectorCommand('/srv/my app/', 'cakephp45', 'src');
+            ->rectorCommand('/srv/my app/', 'cakephp45', 'src', '/srv/my app/vendor/');
 
         self::assertSame('/srv/my app:/app', $command[4]);
+        self::assertSame('/srv/my app/vendor:/app/vendor:ro', $command[6]);
     }
 
     /**
@@ -47,7 +48,7 @@ final class CakeUpgradeRunnerTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         (new CakeUpgradeRunner(new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '', ''))))
-            ->rectorCommand('/srv/app', $ruleSet, 'src');
+            ->rectorCommand('/srv/app', $ruleSet, 'src', '/srv/app/vendor');
     }
 
     /**
@@ -69,7 +70,7 @@ final class CakeUpgradeRunnerTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         (new CakeUpgradeRunner(new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '', ''))))
-            ->rectorCommand('/srv/app', 'cakephp45', $subdir);
+            ->rectorCommand('/srv/app', 'cakephp45', $subdir, '/srv/app/vendor');
     }
 
     /**
@@ -154,10 +155,10 @@ final class CakeUpgradeRunnerTest extends TestCase
     {
         $cache = CacheMount::parse(CacheMount::COMPOSER, 'stack-composer-cache');
         $command = (new CakeUpgradeRunner(new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '', '')), composerCache: $cache))
-            ->rectorCommand('/srv/app', 'cakephp45', 'src');
+            ->rectorCommand('/srv/app', 'cakephp45', 'src', '/srv/app/vendor');
 
         self::assertSame(
-            ['docker', 'run', '--rm', '-v', '/srv/app:/app', '-v', 'stack-composer-cache:/tmp/composer-cache', '-e', 'COMPOSER_CACHE_DIR=/tmp/composer-cache', CakeUpgradeRunner::imageTag(), 'bin/cake', 'upgrade', 'rector', '--rules', 'cakephp45', '/app/src'],
+            ['docker', 'run', '--rm', '-v', '/srv/app:/app', '-v', '/srv/app/vendor:/app/vendor:ro', '-v', 'stack-composer-cache:/tmp/composer-cache', '-e', 'COMPOSER_CACHE_DIR=/tmp/composer-cache', CakeUpgradeRunner::imageTag(), 'bin/cake', 'upgrade', 'rector', '--rules', 'cakephp45', '--autoload', '/app/vendor/autoload.php', '/app/src'],
             $command,
         );
     }
@@ -169,5 +170,31 @@ final class CakeUpgradeRunnerTest extends TestCase
 
         self::assertNotContains('-e', $command);
         self::assertNotContains('COMPOSER_CACHE_DIR=/tmp/composer-cache', $command);
+    }
+
+    public function test_cakephp_upgrade_dockerfile_installs_intl(): void
+    {
+        // CakePHP's upgrade tool dies at start without intl, and the composer base image lacks it.
+        $dockerfile = (string) file_get_contents($this->dockerDir() . '/Dockerfile');
+
+        self::assertStringContainsString('docker-php-ext-install intl', $dockerfile);
+        self::assertStringContainsString('icu-libs', $dockerfile);
+    }
+
+    public function test_cakephp_upgrade_dockerfile_points_the_cakephp41_rule_set_at_defaults(): void
+    {
+        // Upstream's cakephp41 set imports a default-rector.php that does not exist, so Rector never loads it.
+        $dockerfile = (string) file_get_contents($this->dockerDir() . '/Dockerfile');
+
+        self::assertStringContainsString("sed -i 's#/default-rector\\.php#/defaults.php#' /upgrade/config/rector/cakephp41.php", $dockerfile);
+    }
+
+    public function test_cakephp_upgrade_dockerfile_drops_only_the_socket_block_from_cakephp43(): void
+    {
+        // Rector 2 removed PropertyFetchToMethodCall; the rest of cakephp43 (fetchTable() and all) stays.
+        $dockerfile = (string) file_get_contents($this->dockerDir() . '/Dockerfile');
+
+        self::assertStringContainsString("sed -i '/ruleWithConfiguration(PropertyFetchToMethodCallRector::class/,/^    \\]);\$/d' /upgrade/config/rector/sets/cakephp43.php", $dockerfile);
+        self::assertStringContainsString('php -l /upgrade/config/rector/sets/cakephp43.php', $dockerfile);
     }
 }

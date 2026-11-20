@@ -98,6 +98,7 @@ final class CakeUpgradeMigrationTest extends TestCase
             'tests/TestCase/ApplicationTest.php' => "<?php\nnamespace App\\Test\\TestCase;\n\nclass ApplicationTest {}\n",
             'config/app.php' => "<?php\nreturn [];\n",
             'vendor/cakephp/cakephp/VERSION.txt' => "4.5.0\n",
+            'vendor/autoload.php' => "<?php\n// the installed app's autoloader\n",
             'tmp/cache/models/x' => 'cached',
         ];
         foreach (array_replace($defaults, $files) as $file => $contents) {
@@ -412,6 +413,66 @@ final class CakeUpgradeMigrationTest extends TestCase
         self::assertSame([], self::callsFor(self::rectorCalls($fake), 'cakephp44'), 'nothing runs after the failure');
     }
 
+    public function test_vendor_is_mounted_read_only_when_present(): void
+    {
+        $app = $this->cakeApp();
+        $fake = $this->docker();
+
+        $this->engine($fake)->migrate($app, true, '8.3', self::hop46());
+
+        $rector = array_values(array_filter($fake->calls, static fn(array $call): bool => in_array('rector', $call['command'], true)));
+        self::assertNotSame([], $rector);
+        foreach ($rector as $call) {
+            $command = $call['command'];
+            // The copy at /app, then the app's own vendor/ over /app/vendor, read-only, and named as the autoloader.
+            self::assertSame($app . '/vendor:/app/vendor:ro', $command[(int) array_search('-v', $command, true) + 3]);
+            self::assertSame('/app/vendor/autoload.php', $command[(int) array_search('--autoload', $command, true) + 1]);
+            self::assertStringStartsNotWith($app . ':', $command[(int) array_search('-v', $command, true) + 1], 'Rector writes the copy, never the app');
+        }
+    }
+
+    public function test_missing_vendor_is_a_stop_sign(): void
+    {
+        $app = $this->cakeApp(['vendor/autoload.php' => null]);
+        $before = self::snapshot($app);
+        $fake = $this->docker();
+
+        $result = $this->engine($fake)->migrate($app, true, '8.3', self::hop46());
+
+        self::assertSame([CakeUpgradeMigration::NO_VENDOR], $result->refusals);
+        self::assertSame("The CakePHP rule sets need the app's vendor/ folder; run composer install in the app first.", CakeUpgradeMigration::NO_VENDOR);
+        self::assertSame([], $fake->calls, 'no container runs');
+        self::assertSame($before, self::snapshot($app), 'nothing changed');
+    }
+
+    public function test_a_rule_set_that_prints_an_error_with_exit_0_refuses(): void
+    {
+        // What cakephp/upgrade really prints when Rector cannot load a set: the error, then a success line, exit 0.
+        $app = $this->cakeApp();
+        $before = self::snapshot($app);
+        $output = " [ERROR] The path \"/upgrade/config/rector/default-rector.php\" does not exist.\n\nRector applied successfully";
+        $fake = $this->docker(static fn(string $copy, string $set): ?ProcessResult => $set === 'cakephp41' ? new ProcessResult(0, $output, '') : null);
+
+        $result = $this->engine($fake)->migrate($app, false, '8.3', self::hop46());
+
+        self::assertTrue($result->refused());
+        self::assertStringStartsWith('The cakephp/upgrade rule set cakephp41 printed an error on src/ (exit 0), so nothing in the app changed.', $result->refusals[0]);
+        self::assertStringContainsString('default-rector.php', $result->refusals[0]);
+        self::assertSame($before, self::snapshot($app));
+        self::assertSame([], self::callsFor(self::rectorCalls($fake), 'cakephp42'), 'nothing runs after the error');
+    }
+
+    public function test_a_clean_rector_run_that_mentions_errors_in_a_diff_is_not_a_failure(): void
+    {
+        // A diff line that happens to say "[ERROR]" is indented code, not Rector's error block at the line start.
+        $output = "1 file with changes\n-    \$log = '[ERROR] disk full';\n+    \$log = '[ERROR] disk full!';\n [OK] Rector is done!\nRector applied successfully";
+        $fake = $this->docker(static fn(): ProcessResult => new ProcessResult(0, $output, ''));
+
+        $result = $this->engine($fake)->migrate($this->cakeApp(), true, '8.3', self::hop46());
+
+        self::assertFalse($result->refused());
+    }
+
     /**
      * @param list<array{0: string, 1: string}> $calls
      *
@@ -482,6 +543,7 @@ final class CakeUpgradeMigrationTest extends TestCase
 
         self::assertContains(self::E_ALL_HINT, $result->manual);
         self::assertSame(self::E_ALL_HINT, $result->manual[count($result->manual) - 1]);
+        self::assertContains(CakeUpgradeMigration::SOCKET_HINT, $result->manual, 'the Socket rules the image drops are a person\'s job');
         self::assertNull(self::lineStartingWith($result->manual, 'MANUAL: AuthComponent'), 'the CakePHP 5 removals wait for the 5 hop');
         self::assertStringContainsString('src/View/AppView.php (1)', (string) self::lineStartingWith($result->manual, 'MANUAL: View::loadHelper()'));
     }
