@@ -1,0 +1,8 @@
+{
+    "name": "fixture/cake-notes",
+    "require": {
+        "php": ">=8.3",
+        "cakephp/cakephp": "^5.0",
+        "cakephp/authentication": "^3.0"
+    }
+}
