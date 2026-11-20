@@ -695,7 +695,7 @@ final class CliTest extends TestCase
 
         [, $json] = $this->booster(['command' => 'hops', '--format' => 'json']);
         $hops = json_decode($json, true)['hops'];
-        self::assertCount(42, $hops);
+        self::assertCount(44, $hops);
         $byId = [];
         foreach ($hops as $hop) {
             $byId[$hop['id']] = $hop;

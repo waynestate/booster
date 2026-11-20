@@ -103,6 +103,18 @@ final class SkillRenderer
         if ($frameworkMove) {
             $checks = 'Check these by hand:';
         }
+        if ($hop->kind === HopKind::Strangler) {
+            // One hop, many runs: the ledger (booster-strangler.json) carries the state between them.
+            $review = "This is the move onto Laravel (the strangler), not an upgrade: Laravel goes at the app root, the old app moves unchanged to legacy/, and units move over one run at a time. The replay is required, and it is the gate for every run. Read the guide (docs/guides/cakephp-and-slim-to-laravel.md) and this hop's notes before run 1.
+
+";
+            $how = "1. `booster plan --path=<app> --to-laravel` and read every stop sign. The app must be on the framework's latest major, on PHP 8.3 or newer, committed, and have a filled-in replay file.
+2. Run 1: `booster run --path=<app> --only {$hop->id} --replay`. It does Step 0 (sign-in on SESAME), then the mount, then stops. Review, commit, deploy the mount with the Citadel public directory change.
+3. Later runs: `booster run --path=<app> --only {$hop->id} --replay --moves 1` moves the next unit in move order (stateless, page, write, signin). Commit after every green run. `--route \"<id>\"` moves one unit; `--hand --route \"<id>\"` flips a unit a person ported, once `route:list` shows it.
+4. When no unit is left: `booster run --path=<app> --only {$hop->id} --replay --finish` deletes legacy/, puts back the stock public/index.php and moves /login to Laravel.
+";
+            $checks = 'Check these by hand (the report groups its MANUAL lines the same way: sign-in, mount, route moves, finish):';
+        }
         $failure = $this->failureSection($hop);
         $boost = $this->boostSection($hop);
 
@@ -158,6 +170,16 @@ final class SkillRenderer
                 '3. Commit the fix on its own, then run `booster run --path=<app>` again. Booster plans from the versions the app is on now, so finished hops are not repeated.',
                 '4. ' . $stop,
             ];
+        if ($hop->kind === HopKind::Strangler) {
+            $lines = [
+                "When a gate fails, the run stops and leaves its changes in place; the units it moved are marked failed in booster-strangler.json:",
+                '',
+                '1. Read the report: the replay answer that changed (the transcript names the request) or the syntax or legacy test output. Work from that exact output, the files it names, their tests and the notes below, not from a summary of them.',
+                '2. Fix one cause in the moved unit, then retry just that unit with `--route "<id>"`. A mount or finish that failed: undo it (`git checkout -- . && git clean -fd`) and run again once the cause is fixed.',
+                '3. A unit Booster refused (the report gives file:line) is ported by a person, then flipped with `--hand --route "<id>"`.',
+                '4. ' . $stop,
+            ];
+        }
         $lines[] = '';
         $lines[] = 'Never delete, skip or loosen a test to turn a gate green, and never add `--skip-gate`, `--allow-failing-baseline` or `--skip` unless the person asks for it.';
 
@@ -212,6 +234,13 @@ final class SkillRenderer
             ],
             // Boost is a Laravel package, and this hop never runs on a Laravel app.
             HopKind::Session => [],
+            // After the mount the root is a Laravel app, so Boost can read the half that grows.
+            HopKind::Strangler => [
+                'Use `list-routes` after each run and check that every unit the ledger marks laravel or hand is there, with the name the legacy route had.',
+                "Use `search-docs` for the Laravel 13 docs on the feature a refused unit uses before you port it by hand.",
+                'Use `get-config` to check the SESAME settings (SESAME_ROUTES, SESAME_CAS_SERVICE_URL) the Laravel half signs in with.',
+                'Run `last-error` and `read-log-entries` after the replay.',
+            ],
         };
         if ($prompts === []) {
             return '';

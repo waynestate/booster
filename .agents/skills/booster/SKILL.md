@@ -54,6 +54,8 @@ Playbooks:
 - `booster-cakephp-4.6-to-5`: Move a CakePHP 4.6 app to CakePHP 5.4 with CakePHP's own upgrade rules: AuthComponent moves to the Authentication plugin and .ctp templates become .php.
 - `booster-slim-3-to-4`: Move a Slim 3 app to Slim 4.15: the app factory, PSR-7 through slim/psr7, Slim's ErrorMiddleware, and a double-pass adapter so the app's middleware keeps working.
 - `booster-session-strict-mode`: Turn on strict session IDs in a raw PHP app: set session.use_strict_mode and session.use_only_cookies before each session_start() call.
+- `booster-cakephp-to-laravel`: Move a CakePHP 5 app onto Laravel 13 one unit at a time: sign-in on SESAME first, then Laravel at the root with the old app in legacy/, then routes and forms move run by run, each one gated by the replay.
+- `booster-slim-to-laravel`: Move a Slim 4 app onto Laravel 13 one unit at a time: sign-in on SESAME first, then Laravel at the root with the old app in legacy/, then routes and forms move run by run, each one gated by the replay.
 - `booster-node-pin-24`: Pin the app to Node 26: set engines.node in package.json and write .nvmrc.
 - `booster-mix-to-vite`: Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only).
 - `booster-vite-major`: Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions.

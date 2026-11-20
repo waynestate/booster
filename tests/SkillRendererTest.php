@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Tests;
 
+use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Skill\SkillRenderer;
 
@@ -157,6 +158,12 @@ final class SkillRendererTest extends TestCase
                 self::assertStringContainsString('When a gate fails (for this hop, the tests you run after your change):', $text, $path);
                 self::assertStringContainsString("2. Fix one cause, then run the tests again.\n3. " . $stop, $text, $path);
                 self::assertStringNotContainsString('Finished hops are not repeated', $text, $path);
+            } elseif ($hop->kind === HopKind::Strangler) {
+                // One hop, many runs: a failed unit is retried with --route, not by re-running the plan.
+                self::assertStringContainsString('the units it moved are marked failed in booster-strangler.json', $text, $path);
+                self::assertStringContainsString('retry just that unit with `--route "<id>"`', $text, $path);
+                self::assertStringContainsString("
+4. " . $stop, $text, $path);
             } else {
                 $automaticSeen = true;
                 self::assertStringContainsString("When a gate fails, the run stops and leaves this hop's changes in place:", $text, $path);

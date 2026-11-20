@@ -57,7 +57,8 @@ final readonly class Hop
      * files through its own migration engine, so it is not a playbook either,
      * and nor is a framework hop, which moves hand-copied libraries through
      * its own engine too, or the session hop, whose engine writes the strict
-     * session settings.
+     * session settings, or a strangler hop, which moves the app onto Laravel
+     * through Booster's strangler engine.
      */
     public function isManual(): bool
     {
@@ -65,6 +66,7 @@ final readonly class Hop
             && $this->kind !== HopKind::WayneUi
             && $this->kind !== HopKind::Framework
             && $this->kind !== HopKind::Session
+            && $this->kind !== HopKind::Strangler
             && $this->rectorSets === []
             && $this->classRenames === []
             && $this->npmSet === [];

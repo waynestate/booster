@@ -15,4 +15,5 @@ enum HopKind: string
     case Node = 'node';
     case Framework = 'framework';
     case Session = 'session';
+    case Strangler = 'strangler';
 }

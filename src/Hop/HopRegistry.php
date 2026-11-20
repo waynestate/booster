@@ -75,6 +75,18 @@ final class HopRegistry
     /** The hop that turns on strict session IDs before each session_start() in a raw PHP app. */
     public const SESSION_STRICT_MODE_ID = 'session-strict-mode';
 
+    /** The strangler that moves a CakePHP 5 app onto Laravel one unit at a time (design section 6). */
+    public const CAKEPHP_TO_LARAVEL_ID = 'cakephp-to-laravel';
+
+    /** The strangler that moves a Slim 4 app onto Laravel one unit at a time (design section 6). */
+    public const SLIM_TO_LARAVEL_ID = 'slim-to-laravel';
+
+    /**
+     * The Laravel major a strangler lands on: the one the pinned Sourdough
+     * bakes with `sourdough new --laravel`. Raise it with the Sourdough pin.
+     */
+    public const STRANGLER_LARAVEL = '13';
+
     /** The lowest Laravel major whose upgrade guide ships Vite as the front-end tool. */
     public const VITE_LARAVEL_FLOOR = '9';
 
@@ -219,6 +231,8 @@ final class HopRegistry
         $this->add($this->cakephp46To5Hop());
         $this->add($this->slim3To4Hop());
         $this->add($this->sessionStrictModeHop());
+        $this->add($this->stranglerHop('cakephp'));
+        $this->add($this->stranglerHop('slim'));
         $this->add($this->nodePinHop());
         $this->add($this->mixToViteHop());
         $this->add($this->viteMajorHop());
@@ -1141,6 +1155,64 @@ final class HopRegistry
                 'https://www.php.net/manual/en/session.configuration.php#ini.session.use-strict-mode',
                 'https://www.php.net/manual/en/features.session.security.management.php',
             ],
+        );
+    }
+
+    /** The strangler hop id for a CakePHP or Slim app, or null for any other framework. */
+    public static function stranglerId(?string $framework): ?string
+    {
+        return match ($framework) {
+            'cakephp' => self::CAKEPHP_TO_LARAVEL_ID,
+            'slim' => self::SLIM_TO_LARAVEL_ID,
+            default => null,
+        };
+    }
+
+    /** The framework a strangler hop moves ("cakephp" or "slim"), or null when $id is not a strangler. */
+    public static function stranglerFramework(string $id): ?string
+    {
+        return match ($id) {
+            self::CAKEPHP_TO_LARAVEL_ID => 'cakephp',
+            self::SLIM_TO_LARAVEL_ID => 'slim',
+            default => null,
+        };
+    }
+
+    /**
+     * The two strangler faces (design section 6): a CakePHP 5 or Slim 4 app
+     * moves onto Laravel one unit at a time, across many runs. The engine
+     * (HopExecutor's strangler branch, with the ledger in
+     * booster-strangler.json) does the work; this is the hop's face in plans
+     * and listings. Opt-in with --to-laravel and planned last.
+     */
+    private function stranglerHop(string $framework): Hop
+    {
+        $cake = $framework === 'cakephp';
+        $name = $cake ? 'CakePHP' : 'Slim';
+        $major = $cake ? '5' : '4';
+
+        return new Hop(
+            id: $cake ? self::CAKEPHP_TO_LARAVEL_ID : self::SLIM_TO_LARAVEL_ID,
+            kind: HopKind::Strangler,
+            from: $framework . '-' . $major,
+            to: 'laravel-' . self::STRANGLER_LARAVEL,
+            summary: sprintf('Move a %s %s app onto Laravel %s one unit at a time: sign-in on SESAME first, then Laravel at the root with the old app in legacy/, then routes and forms move run by run, each one gated by the replay.', $name, $major, self::STRANGLER_LARAVEL),
+            notes: [
+                sprintf('Opt in with --to-laravel. The planner puts the hop last, once the app is on %s %s and the plan reaches PHP 8.3 or newer.', $name, $major),
+                'Run 1 does Step 0 (the legacy half signs in through SESAME) and the mount (Laravel at the root, the old Composer root moved unchanged to legacy/, the dispatcher in public/index.php), then stops. Each later run moves --moves N units (default 1), or one --route "<id>".',
+                'The replay is required: no usable booster-replay.json, no strangler. The mount is checked against the untouched app with --serve-changed; later runs compare dispatcher against dispatcher.',
+                'A unit Booster cannot move is refused with file and line. Port it by hand, then run --hand --route "<id>": Booster checks route:list, flips the route table and gates.',
+                'The ledger, booster-strangler.json at the app root, is the state. Booster never commits: each run is one reviewable diff. A failed gate leaves the unit marked failed with the changes in place.',
+                'When every unit has moved, --finish deletes legacy/ and the route table, puts back the stock public/index.php and moves /login to Laravel.',
+                'Stop signs (nothing changes): not on the latest major, PHP under 8.3, a dirty tree, legacy/ or a Laravel app already at the root, no usable replay, an LTI app.',
+                'MANUAL: the Citadel public directory becomes public (one dashboard change, deployed together with the mount), and dashboard config files move with their paths into legacy/.',
+            ],
+            links: [
+                'https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html',
+                'https://laravel.com/docs/' . self::STRANGLER_LARAVEL . '.x',
+                'https://martinfowler.com/bliki/StranglerFigApplication.html',
+            ],
+            extraReview: true,
         );
     }
 
