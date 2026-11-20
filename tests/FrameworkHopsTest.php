@@ -78,6 +78,10 @@ final class FrameworkHopsTest extends TestCase
         // CakePHP 5.4 tests need PHPUnit 11.5 or later (CAKE-2).
         self::assertSame([...$registry->frameworkCompanionPins('cakephp', '5.4'), 'phpunit/phpunit' => HopRegistry::CAKEPHP_5_PHPUNIT], $to5->composerSetIfPresent);
         self::assertSame('^3.3', $to5->composerSetIfPresent['cakephp/authentication']);
+        // CAKE-8: attendance's plugins locked at their CakePHP 4 majors stopped composer update -W.
+        self::assertSame('^5.1', $to5->composerSetIfPresent['friendsofcake/bootstrap-ui']);
+        self::assertSame('^5.0', $to5->composerSetIfPresent['friendsofcake/cakephp-csvview']);
+        self::assertSame('^5.2', $to5->composerSetIfPresent['cakephp/cakephp-codesniffer']);
 
         $slim = $registry->get(HopRegistry::SLIM_3_TO_4_ID);
         self::assertSame(['slim/slim' => '^4.15'], $slim->composerSet);
