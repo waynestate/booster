@@ -12,6 +12,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## \[Unreleased\] [#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Changed: framework hops name their engine (a small interface behind HopKind::Framework), the groundwork for the CakePHP and Slim hops; no behaviour change.
+- Added: `--to-cakephp` and `--to-slim` plan options pick the target framework line (a major such as `5` resolves to that line's newest release, `5.4`); the resolved line rides on the plan as `framework_target` in JSON.
 - Added: an internal runner for CakePHP's own upgrade tool (`cakephp/upgrade`, pinned to a commit), run in a container so its Rector never meets the app's or Booster's; the CakePHP hops use it.
 - Added: the hop data knows which PHP each CakePHP and Slim line supports (`cakephp_php`, `slim_php`), their target lines and companion package pins, for the CakePHP and Slim hops.
 - Added: `detect` names a CakePHP or Slim app's framework and major.minor version (from composer.lock, else composer.json), the first step toward CakePHP and Slim hops.
