@@ -77,6 +77,9 @@ after routing, and a service with the Session authenticator whose guests go to t
 where there is one:
 
 - On the 4.6 step: the reminder to fix every deprecation with `E_ALL` before the 5 step.
+- On the 4.6 step: the `Cake\Network\Socket` properties CakePHP 4.3 turned into methods (`connected` is
+  `isConnected()`, `encrypted` is `isEncrypted()`, `lastError` is `lastError()`). The upstream rule for them needs a
+  Rector class that no longer exists, so Booster leaves them to you; search your code for them.
 - On both steps: `View::loadHelper()` calls the rules could not type (it is `addHelper()` since 4.5).
 - Sign-in that is not a plain session: `isAuthorized()` (move it to Authorization plugin policies or plain controller
   code), and any Auth config the plugin has no like-for-like for (`authenticate` with a custom authenticator such as

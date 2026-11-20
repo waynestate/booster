@@ -510,6 +510,7 @@ final class CakeUpgradeMigrationTest extends TestCase
 
         self::assertContains(self::E_ALL_HINT, $result->manual);
         self::assertSame(self::E_ALL_HINT, $result->manual[count($result->manual) - 1]);
+        self::assertContains(CakeUpgradeMigration::SOCKET_HINT, $result->manual, 'the Socket rules the image drops are a person\'s job');
         self::assertNull(self::lineStartingWith($result->manual, 'MANUAL: AuthComponent'), 'the CakePHP 5 removals wait for the 5 hop');
         self::assertStringContainsString('src/View/AppView.php (1)', (string) self::lineStartingWith($result->manual, 'MANUAL: View::loadHelper()'));
     }

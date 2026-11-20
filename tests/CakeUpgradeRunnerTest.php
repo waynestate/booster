@@ -187,4 +187,13 @@ final class CakeUpgradeRunnerTest extends TestCase
 
         self::assertStringContainsString("sed -i 's#/default-rector\\.php#/defaults.php#' /upgrade/config/rector/cakephp41.php", $dockerfile);
     }
+
+    public function test_cakephp_upgrade_dockerfile_drops_only_the_socket_block_from_cakephp43(): void
+    {
+        // Rector 2 removed PropertyFetchToMethodCall; the rest of cakephp43 (fetchTable() and all) stays.
+        $dockerfile = (string) file_get_contents($this->dockerDir() . '/Dockerfile');
+
+        self::assertStringContainsString("sed -i '/ruleWithConfiguration(PropertyFetchToMethodCallRector::class/,/^    \\]);\$/d' /upgrade/config/rector/sets/cakephp43.php", $dockerfile);
+        self::assertStringContainsString('php -l /upgrade/config/rector/sets/cakephp43.php', $dockerfile);
+    }
 }

@@ -16,9 +16,16 @@ RUN apk add --no-cache icu-libs \
 RUN git clone https://github.com/cakephp/upgrade.git /upgrade \
  && git -C /upgrade checkout "${UPGRADE_REF}" \
  && composer install -d /upgrade --no-dev --no-interaction --no-progress --prefer-dist
-# At the pinned ref the cakephp41 rule set imports default-rector.php, a file
-# the tool no longer has; every other set imports defaults.php. Point it there
-# (a no-op once upstream fixes it) so the set loads instead of being skipped.
-RUN sed -i 's#/default-rector\.php#/defaults.php#' /upgrade/config/rector/cakephp41.php
+# Two rule sets do not load at the pinned ref. cakephp41 imports
+# default-rector.php, a file the tool no longer has; every other set imports
+# defaults.php, so point it there. cakephp43 configures Rector's
+# PropertyFetchToMethodCall, which Rector 2 removed; drop that one block (the
+# three Cake\Network\Socket properties connected, encrypted and lastError, a
+# MANUAL line in Booster) and keep the rest of the set, fetchTable() included.
+# Both edits are no-ops once upstream fixes them; php -l stops the build if
+# the cut ever leaves broken PHP. (Socket to them, gently.)
+RUN sed -i 's#/default-rector\.php#/defaults.php#' /upgrade/config/rector/cakephp41.php \
+ && sed -i '/ruleWithConfiguration(PropertyFetchToMethodCallRector::class/,/^    \]);$/d' /upgrade/config/rector/sets/cakephp43.php \
+ && php -l /upgrade/config/rector/sets/cakephp43.php
 WORKDIR /upgrade
 ENTRYPOINT []

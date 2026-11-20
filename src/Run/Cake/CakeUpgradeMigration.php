@@ -49,6 +49,9 @@ final class CakeUpgradeMigration implements FrameworkEngine
     /** Never copied at the app root: CakePHP's runtime folders. */
     private const SKIP_AT_ROOT = ['tmp', 'logs'];
 
+    /** The 4.6 step's line for the cakephp43 Socket rules the image drops (docker/cakephp-upgrade/Dockerfile). */
+    public const SOCKET_HINT = 'MANUAL: CakePHP 4.3 renamed some Socket properties and Booster does not rewrite them; search your code for Cake\Network\Socket property uses ($socket->connected is isConnected(), ->encrypted is isEncrypted(), ->lastError is lastError()).';
+
     /** How much of a failed tool run the refusal quotes. */
     private const TAIL_LINES = 15;
 
@@ -449,6 +452,8 @@ final class CakeUpgradeMigration implements FrameworkEngine
             $manual[] = $helpers;
         }
         if (!$five) {
+            // The image drops cakephp43's Socket rules (Rector 2 removed the rule they need), so a person does these.
+            $manual[] = self::SOCKET_HINT;
             $manual[] = 'MANUAL: run the tests with E_ALL on CakePHP 4.6 and fix every deprecation before the 5 step.';
         }
 
