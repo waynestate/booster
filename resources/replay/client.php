@@ -274,6 +274,35 @@ function booster_replay_local_target($location)
     return null;
 }
 
+// Whether a redirect leads back to the page asked for: the same path and the
+// same query pairs in any order (Laravel's intended URL is Symfony's
+// normalized one, with its parameters sorted and re-encoded).
+function booster_replay_same_target($a, $b)
+{
+    $pa = explode('?', $a, 2);
+    $pb = explode('?', $b, 2);
+    if (rawurldecode($pa[0]) !== rawurldecode($pb[0])) {
+        return false;
+    }
+    $qa = array();
+    $qb = array();
+    foreach (array(array(isset($pa[1]) ? $pa[1] : '', 'qa'), array(isset($pb[1]) ? $pb[1] : '', 'qb')) as $side) {
+        $pairs = array();
+        foreach ($side[0] === '' ? array() : explode('&', $side[0]) as $pair) {
+            if ($pair !== '') {
+                $pairs[] = urldecode($pair);
+            }
+        }
+        sort($pairs, SORT_STRING);
+        if ($side[1] === 'qa') {
+            $qa = $pairs;
+        } else {
+            $qb = $pairs;
+        }
+    }
+    return $qa === $qb;
+}
+
 function booster_replay_is_silent($target, $prefixes)
 {
     $path = parse_url($target, PHP_URL_PATH);
@@ -357,7 +386,7 @@ foreach ($plan['sequences'] as $sequence) {
                     break;
                 }
                 $isSilent = booster_replay_is_silent($next, $silent);
-                if (!$isSilent && ($hop === 0 || $next !== $target)) {
+                if (!$isSilent && ($hop === 0 || !booster_replay_same_target($next, $target))) {
                     break;
                 }
                 $actions[] = 'sign-in: followed ' . $answer['status'] . ' to ' . $request['method'] . ' ' . $next;

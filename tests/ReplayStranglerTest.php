@@ -328,7 +328,13 @@ final class ReplayStranglerTest extends TestCase
                 }
             } elseif ($path === '/_laravel/login') {
                 setcookie('lsess', 'in', 0, '/');
-                header('Location: http://127.0.0.1:' . $_SERVER['SERVER_PORT'] . '/secret', true, 302);
+                header('Location: http://127.0.0.1:' . $_SERVER['SERVER_PORT'] . (isset($_GET['back']) ? $_GET['back'] : '/secret'), true, 302);
+            } elseif ($path === '/list') {
+                if (!isset($_COOKIE['lsess'])) {
+                    header('Location: /_laravel/login?back=' . rawurlencode('/list?a=2&b=x%20y'), true, 302);
+                } else {
+                    echo 'list ' . $_SERVER['QUERY_STRING'];
+                }
             } elseif ($path === '/elsewhere') {
                 header('Location: /other', true, 302);
             }
@@ -340,11 +346,12 @@ final class ReplayStranglerTest extends TestCase
                 ['name' => 'json', 'requests' => [['path' => '/meta'], ['method' => 'POST', 'path' => '/api', 'json' => ['a' => 1], 'csrf' => true]]],
                 ['name' => 'plain', 'requests' => [['path' => '/plain'], ['method' => 'POST', 'path' => '/save', 'form' => ['title' => 'Hi'], 'csrf' => true]]],
                 ['name' => 'signin', 'requests' => [['path' => '/secret'], ['path' => '/elsewhere'], ['path' => '/secret']]],
+                ['name' => 'sorted', 'requests' => [['path' => '/list', 'query' => 'b=x+y&a=2']]],
             ],
         ]);
         $answers = $this->runClient($app, $file);
 
-        self::assertCount(9, $answers);
+        self::assertCount(10, $answers);
         $saved = json_decode($answers[1]->body, true);
         self::assertSame(['title' => 'Hi', '_csrfToken' => 'tok&1', '_Token' => ['fields' => 'f1']], $saved['post'], 'the stale token was replaced, the entity decoded');
         self::assertSame(['csrf: sent _csrfToken, _Token[fields] from the previous answer'], $answers[1]->actions);
@@ -365,6 +372,8 @@ final class ReplayStranglerTest extends TestCase
         self::assertSame([], $answers[7]->actions);
         self::assertSame('the secret page', $answers[8]->body, 'the sequence keeps the Laravel half\'s session');
         self::assertSame([], $answers[8]->actions);
+        self::assertSame('list a=2&b=x%20y', $answers[9]->body, 'the way back may sort and re-encode the query');
+        self::assertCount(2, $answers[9]->actions);
     }
 
     /**
