@@ -43,11 +43,9 @@ final class TwigNameRewriter
     private array $tokens = [];
 
     /**
-     * @param array<string, string>|null $map lower-case underscore name to namespaced class; Rector's when null
+     * @param array<string, string>|null $nameMap lower-case underscore name to namespaced class; Rector's when null
      */
-    public function __construct(private readonly ?array $nameMap = null)
-    {
-    }
+    public function __construct(private readonly ?array $nameMap = null) {}
 
     /**
      * Rector's underscore-to-namespace map for Twig, lower-case keys; empty

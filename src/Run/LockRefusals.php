@@ -31,7 +31,7 @@ final class LockRefusals
      * Releases that allow a PHP they misbehave on: package, the first PHP
      * they break on, the fixed release per major, and what goes wrong.
      *
-     * @var array<string, array{string, array<string, string>, string}>
+     * @var array<string, array{string, array<int, string>, string}>
      */
     private const BROKEN = [
         'twig/twig' => ['7.4', ['1' => '1.39.0', '2' => '2.8.0'], 'its lexer trims the whitespace before every {{ on PHP 7.4 and later'],
