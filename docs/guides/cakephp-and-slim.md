@@ -100,7 +100,8 @@ note, every test green. The replay switches on the `cakephp` normalizer from the
 `rel="shortcut icon"` link CakePHP 4's `meta('icon')` printed.
 
 **What Booster does not do (the MANUAL list).** Each run prints these as `MANUAL:` lines, with the file and the count
-where there is one:
+where there is one. The scan reads code, not `//` or `/* */` comments, so code the app commented out is not a step;
+doc blocks still count (an `@property` that names `AuthComponent` is a stale type to update):
 
 - On the 4.6 step: the reminder to fix every deprecation with `E_ALL` before the 5 step.
 - On the 4.6 step: the `Cake\Network\Socket` properties CakePHP 4.3 turned into methods (`connected` is

@@ -4,6 +4,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Fixed: the CakePHP 5 MANUAL scan reads code, not `//` or `/* */` comments: a fleet app got two MANUAL lines for `$this->Auth` calls it had commented out, and Booster's own comments next to its moves tripped it; doc blocks still count (CAKE-13).
 - Fixed: on CakePHP 5 a guest is sent to sign in the way AuthComponent sent them, so the replay sees the same answer: a full URL, `?redirect=` except for the home page, the app's `authError` flashed first (AuthComponent's default message when none was set, nothing for `false`), and AuthenticationMiddleware after CSRF protection so the CSRF cookie still reaches the redirect; `loginAction` and `authError` no longer print "dropped" MANUAL lines (CAKE-12).
 - Fixed: the CakePHP 5 sign-in move keeps the guest actions AuthComponent allowed: `allow()` becomes the additive `addUnauthenticatedActions()` (not `allowUnauthenticated()`, which replaces the list; one name goes in an array, none is `disableIdentityCheck()`) (CAKE-10), and the old `loginAction` is named there in its controller, since the plugin asks for a sign-in on the sign-in page itself and a fleet app's /auth/login redirected to itself (CAKE-11).
 - Fixed: the CakePHP 5 step names `Cake\Error\Renderer\WebExceptionRenderer` where config/app.php named the removed `Cake\Error\ExceptionRenderer`; on 5 every error page, a 404 included, had become an empty 200 (CAKE-9).

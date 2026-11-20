@@ -725,6 +725,19 @@ final class CakeUpgradeMigrationTest extends TestCase
         self::assertNotNull(self::lineStartingWith($missing->manual, "MANUAL: the loginAction's controller (src/Controller/AuthController.php) was not found"));
     }
 
+    // CAKE-13: a fleet app got MANUAL lines for $this->Auth calls that lived only in commented-out code.
+    public function test_commented_out_auth_code_is_not_a_manual_step(): void
+    {
+        $dashboard = "<?php\nnamespace App\\Controller;\n\nclass DashboardController extends AppController\n{\n    public function index()\n    {\n        // if (array_key_exists('admin', \$this->Auth->User('ROLES'))) {\n        /* \$this->loadComponent('Auth'); uses AuthComponent */\n    }\n}\n";
+        $app = $this->authApp(false, ['src/Controller/DashboardController.php' => $dashboard]);
+
+        $result = $this->engine($this->docker())->migrate($app, false, '8.3', self::hop5());
+
+        self::assertNull(self::lineStartingWith($result->manual, 'MANUAL: AuthComponent is removed'), implode("\n", $result->manual));
+        self::assertNull(self::lineStartingWith($result->manual, 'MANUAL: the $this->Auth calls go'), implode("\n", $result->manual));
+        self::assertStringContainsString("// if (array_key_exists('admin', \$this->Auth->User('ROLES'))) {", (string) file_get_contents($app . '/src/Controller/DashboardController.php'), 'comments are left as written');
+    }
+
     public function test_no_auth_means_no_authentication_plugin_or_scaffold(): void
     {
         $component = "<?php\nnamespace App\\Controller\\Component;\n\nuse Cake\\Controller\\Component;\n\nclass DataComponent extends Component\n{\n    public \$components = ['Flash'];\n}\n";
