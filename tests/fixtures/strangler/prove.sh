@@ -189,7 +189,8 @@ PHP
   # /_laravel/up is Laravel's in the mounted app and a 404 before: compare the rest.
   if diff <(grep -v '^/_laravel/up ' "$work/apache-before.txt") <(grep -v '^/_laravel/up ' "$work/apache-mounted.txt"); then
     grep -q '^/_laravel/up 200 ' "$work/apache-mounted.txt" || { echo "FAIL: Apache: /_laravel/up did not answer 200 in the mounted app"; exit 1; }
-    grep -v '^/_laravel/up ' "$work/apache-mounted-halves.txt" | grep -qv 'half=legacy' && { echo "FAIL: Apache: a legacy path went to Laravel ($work/apache-mounted-halves.txt)"; exit 1; }
+    grep -v '^/_laravel/up ' "$work/apache-mounted-halves.txt" | grep -q 'half=laravel' && { echo "FAIL: Apache: a legacy path went to Laravel ($work/apache-mounted-halves.txt)"; exit 1; }
+    # half=- is Apache answering by itself (an encoded slash is a 404 there), before and after alike.
     apache_line="Apache answered all $(grep -vc '^/_laravel/up ' "$work/apache-mounted.txt") GET paths the same before and after the mount"
     echo "$apache_line"
   else
