@@ -177,8 +177,14 @@ request does, and `check` says so.
 
 1. `php artisan route:list --json`, when the app is Laravel and `vendor/` is installed (otherwise the `Route::`
    calls in `routes/`);
-2. Slim-style route calls (`$app->get('/batches/:id', ...)`), the kind a legacy Slim 1 app has in its `index.php`;
-3. PHP entry points under the docroot, skipping include folders, with a POST draft for each page that reads `$_POST`.
+2. a CakePHP app's `config/routes.php`: its scopes, prefixes, `connect()` and verb routes, one request per page
+   template behind `/pages/*`, and one per public controller action where the file calls `fallbacks()` (served from
+   `webroot/index.php`, with `DEBUG=false`, a fake salt and a setup that creates `tmp/` and `logs/`);
+3. Slim-style route calls (`$app->get('/batches/:id', ...)`, `$group->get(...)`), each with the prefix of every group
+   around it, also through a group that calls a class's static `addRoutes($app)`;
+4. PHP entry points under the docroot, skipping include folders, with a POST draft for each page that reads `$_POST`.
+
+A `phpinfo()` page is never drafted: it answers differently on every PHP, so every hop would fail on it.
 
 Every GET without parameters becomes a request, plus one unknown path (an honest 404 is an answer too). Every path
 parameter, form and setup command gets a `todo`, because Booster cannot know which note id exists or what a valid

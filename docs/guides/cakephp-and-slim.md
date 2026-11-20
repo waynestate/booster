@@ -38,10 +38,13 @@ booster plan --path=../my-app/src --to-php 8.5
 
 `--replay` matters here. The tests a CakePHP or Slim app ships with (often the skeleton's, or none) prove very little
 about a framework move, so the replay is the real gate for both frameworks. Run `booster replay init --path=../my-app`
-first and read the draft (see [The replay gate](replay-gate.md)). For Slim it lists the route calls it finds, as
-written: a route inside a group shows up without the group's prefix, so add the prefix by hand and keep at least one
-request per group, which is what catches a group that lost its prefix. CakePHP routes declared with `connect()` are not
-drafted, so check the draft against `bin/cake routes` and add the pages that matter.
+first and read the draft (see [The replay gate](replay-gate.md)). For Slim it lists the route calls it finds with
+their group prefixes, including groups that call a class's static `addRoutes($app)` in another file; keep at least one
+request per group, which is what catches a group that lost its prefix. For CakePHP it serves `webroot/index.php`,
+creates the `tmp/` and `logs/` folders git does not keep, sets `DEBUG=false` and a fake salt, and drafts the routes in
+`config/routes.php` (scopes, prefixes, `connect()` and the verb routes, one request per page template for
+`/pages/*`) plus, where the file calls `fallbacks()`, one request per public controller action. Check the draft
+against `bin/cake routes`, fill in the ids, and delete the actions that change data.
 
 ## What a CakePHP 4 app gets
 
