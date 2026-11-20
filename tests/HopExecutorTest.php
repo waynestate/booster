@@ -946,6 +946,39 @@ final class HopExecutorTest extends TestCase
         self::assertStringNotContainsString('git clean', $messages);
     }
 
+    public function test_undo_hint_says_it_undoes_the_whole_run(): void
+    {
+        // Booster commits nothing between steps, so git checkout . takes back
+        // the passed steps too (proof runs, 2026-11-20). The line says so.
+        foreach (['', "?? config/sesame.php\n"] as $status) {
+            $report = $this->execute($this->fake(gitStatusStart: '', gitStatus: $status, gateExit: 1), new RunOptions());
+            $messages = implode(' ', $report->results[0]->messages);
+
+            self::assertStringContainsString('(inside the app). ', $messages);
+            self::assertStringContainsString('This undoes everything this run changed, including earlier steps; commit after each passed step to keep them.', $messages);
+        }
+    }
+
+    public function test_undo_hint_paths_are_relative_to_the_app_folder(): void
+    {
+        // The app sits in src/ of a temp git repo (its .git marks the root;
+        // the fake answers git). Porcelain prints paths from the git root, so
+        // src/ is stripped and a path outside the app climbs out with ../.
+        $repo = $this->tempDir();
+        mkdir($repo . '/.git');
+        $app = $repo . '/src';
+        mkdir($app);
+        $this->copyTree($this->example('raw-php'), $app);
+        $fake = $this->fake(gitStatusStart: '', gitStatus: "?? src/config/sesame.php\n?? src/generated/\n?? notes-outside.txt\n", gateExit: 1);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan((new ProjectDetector())->detect($app), new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        $report = (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))->execute($plan, new RunOptions());
+        $messages = implode(' ', $report->results[0]->messages);
+
+        self::assertSame(['gate-failed', 'not-run'], $this->statuses($report));
+        self::assertStringContainsString('Undo with: git checkout . && git clean -fd -- config/sesame.php generated/ ../notes-outside.txt (inside the app). Run it in the app folder (the paths are relative to it).', $messages);
+        self::assertStringNotContainsString('src/config', $messages);
+    }
+
     public function test_rector_errors_stop_the_run_without_applying(): void
     {
         $fake = $this->fake(rectorErrors: ['Parse error in x.php']);

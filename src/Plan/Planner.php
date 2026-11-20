@@ -465,7 +465,26 @@ final class Planner
             // until that hop runs; only a line with no hop at all (CakePHP 3,
             // Slim 2) is one Booster cannot move yet.
             $held = $framework !== null && $line !== null && $frameworkTarget !== null ? $this->frameworkHopFor($framework, $line, $frameworkTarget) : null;
-            $warnings[] = $held !== null
+            // A Slim 4 line below the target has a hop in the registry (the
+            // slim-3-to-4 one), it just does not start from Slim 4, so "no
+            // Slim hop" would be untrue: say the minor move is by hand.
+            $slimFourMinor = $held === null && $framework === 'slim' && $line !== null && explode('.', $line)[0] === '4'
+                && $this->registry->has(HopRegistry::SLIM_3_TO_4_ID)
+                && version_compare($line, $this->registry->get(HopRegistry::SLIM_3_TO_4_ID)->to, '<');
+            $warnings[] = $slimFourMinor
+                ? sprintf(
+                    '%s %s runs on PHP %s to %s, so PHP stays at %s. Booster\'s %s hop moves Slim 3 only; there is no hop from Slim %s to %s, so move Slim to %s by hand; see docs/guides/framework-hops.md.',
+                    $frameworkName,
+                    $line,
+                    $frameworkRange[0],
+                    $frameworkRange[1],
+                    $php,
+                    HopRegistry::SLIM_3_TO_4_ID,
+                    $line,
+                    $this->registry->get(HopRegistry::SLIM_3_TO_4_ID)->to,
+                    $this->registry->get(HopRegistry::SLIM_3_TO_4_ID)->to,
+                )
+                : ($held !== null
                 ? sprintf(
                     '%s %s runs on PHP %s to %s, so PHP stays at %s until the %s hop runs; see docs/guides/framework-hops.md.',
                     $frameworkName,
@@ -483,7 +502,7 @@ final class Planner
                     $frameworkRange[1],
                     $php,
                     $frameworkName,
-                );
+                ));
         }
 
         if ($vendoredFloor !== null) {

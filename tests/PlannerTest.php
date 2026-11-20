@@ -1445,6 +1445,20 @@ final class PlannerTest extends TestCase
         self::assertContains('CakePHP 3.10 runs on PHP 5.6 to 7.4, so PHP stays at 7.4. Booster has no CakePHP hop yet; see docs/guides/framework-hops.md.', $plan->warnings);
     }
 
+    public function test_a_slim_4_minor_says_the_move_to_4_15_is_by_hand(): void
+    {
+        // The slim-3-to-4 hop exists, so "Booster has no Slim hop yet" was
+        // untrue for a Slim 4 app below 4.15 (proof run, 2026-11-20).
+        $plan = $this->frameworkPlan('slim', '4.10', '8.1', '8.5');
+
+        self::assertSame([], $this->ids($plan));
+        self::assertTrue($plan->stopsEarly);
+        self::assertContains("Slim 4.10 runs on PHP 7.4 to 8.1, so PHP stays at 8.1. Booster's slim-3-to-4 hop moves Slim 3 only; there is no hop from Slim 4.10 to 4.15, so move Slim to 4.15 by hand; see docs/guides/framework-hops.md.", $plan->warnings);
+        foreach ($plan->warnings as $warning) {
+            self::assertStringNotContainsString('no Slim hop', $warning);
+        }
+    }
+
     public function test_framework_hold_warning_is_gone_when_a_hop_exists(): void
     {
         // On main before the framework hops, CakePHP 4.5 on 8.1 held at 8.3
