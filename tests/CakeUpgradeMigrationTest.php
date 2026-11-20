@@ -501,4 +501,233 @@ final class CakeUpgradeMigrationTest extends TestCase
         }
         self::assertDirectoryExists($app . '/src');
     }
+
+    private const AUTH_CONTROLLER = <<<'PHP'
+        <?php
+        declare(strict_types=1);
+
+        namespace App\Controller;
+
+        use Cake\Controller\Controller;
+
+        class AppController extends Controller
+        {
+            public function initialize(): void
+            {
+                parent::initialize();
+                $this->loadComponent('Flash');
+                $this->loadComponent('Auth', [
+                    'loginAction' => ['controller' => 'Auth', 'action' => 'login'],
+                    'authError' => '',
+                ]);
+                $this->Auth->allow(['display']);
+            }
+
+            protected function role(): ?string
+            {
+                return $this->Auth->User('ROLE');
+            }
+
+            protected function signIn(array $profile): void
+            {
+                $this->Auth->setUser($profile);
+            }
+        }
+
+        PHP;
+
+    private const APPLICATION = <<<'PHP'
+        <?php
+        declare(strict_types=1);
+
+        namespace App;
+
+        use Cake\Core\Configure;
+        use Cake\Http\BaseApplication;
+        use Cake\Http\Middleware\BodyParserMiddleware;
+        use Cake\Http\MiddlewareQueue;
+        use Cake\Routing\Middleware\RoutingMiddleware;
+
+        class Application extends BaseApplication
+        {
+            public function bootstrap(): void
+            {
+                parent::bootstrap();
+                $this->addPlugin(\CakeDC\OracleDriver\Plugin::class, ['bootstrap' => true]);
+            }
+
+            public function middleware(MiddlewareQueue $middlewareQueue): MiddlewareQueue
+            {
+                $middlewareQueue
+                    ->add(new RoutingMiddleware($this))
+                    ->add(new BodyParserMiddleware());
+
+                return $middlewareQueue;
+            }
+        }
+
+        PHP;
+
+    private const ORACLE_MANUAL = 'MANUAL: check that the Oracle driver for CakePHP 5 covers the Oracle calls the app makes.';
+
+    /**
+     * An app that signs people in through AuthComponent, with an
+     * Application class, optionally on the cakedc Oracle driver.
+     *
+     * @param array<string, string|null> $files
+     */
+    private function authApp(bool $oracle = false, array $files = []): string
+    {
+        $require = ['php' => '>=8.1', 'cakephp/cakephp' => '^4.5'];
+        if ($oracle) {
+            $require['cakedc/cakephp-oracle-driver'] = '^5.0';
+        }
+
+        return $this->cakeApp(array_replace([
+            'composer.json' => json_encode(['name' => 'acme/app', 'require' => $require], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n",
+            'src/Controller/AppController.php' => self::AUTH_CONTROLLER,
+            'src/Application.php' => self::APPLICATION,
+            'config/app.php' => "<?php\nreturn ['Datasources' => ['default' => ['className' => 'CakeDC\\OracleDriver\\Database\\OracleConnection', 'driver' => \\CakeDC\\OracleDriver\\Database\\Driver\\OracleOCI::class]]];\n",
+        ], $files));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function composerJson(string $app): array
+    {
+        $json = json_decode((string) file_get_contents($app . '/composer.json'), true);
+        self::assertIsArray($json);
+
+        return $json;
+    }
+
+    public function test_auth_component_calls_are_moved_for_the_5_hop(): void
+    {
+        $app = $this->authApp();
+
+        $result = $this->engine($this->docker())->migrate($app, false, '8.3', self::hop5());
+
+        self::assertFalse($result->refused(), implode("\n", $result->refusals));
+        $controller = (string) file_get_contents($app . '/src/Controller/AppController.php');
+        self::assertStringNotContainsString('$this->Auth->', $controller);
+        self::assertStringContainsString("\$this->loadComponent('Authentication.Authentication');", $controller);
+        self::assertStringContainsString("\$this->Authentication->allowUnauthenticated(['display']);", $controller);
+        self::assertStringContainsString("return \$this->Authentication->getIdentity()?->get('ROLE');", $controller);
+        self::assertStringContainsString('$this->Authentication->setIdentity($profile);', $controller);
+        self::assertContains('Moved 3 AuthComponent calls to the Authentication plugin.', $result->changes);
+        self::assertContains("Replaced loadComponent('Auth') with loadComponent('Authentication.Authentication') in src/Controller/AppController.php.", $result->changes);
+        self::assertContains("MANUAL: Auth config 'authError' dropped: the Authentication plugin has no counterpart; flash a message on the login action if the app wants one.", $result->manual);
+        self::assertSame(array_values(array_unique($result->manual)), $result->manual, 'each MANUAL line once');
+        self::assertNull(self::lineStartingWith($result->manual, 'MANUAL: AuthComponent is removed'), 'nothing left for a person once the calls moved');
+        self::assertContains('src/Controller/AppController.php', array_column($result->files, 'file'));
+    }
+
+    public function test_application_php_is_scaffolded_when_auth_was_used(): void
+    {
+        $app = $this->authApp();
+
+        $result = $this->engine($this->docker())->migrate($app, false, '8.3', self::hop5());
+
+        $application = (string) file_get_contents($app . '/src/Application.php');
+        self::assertStringContainsString('class Application extends BaseApplication implements AuthenticationServiceProviderInterface', $application);
+        self::assertStringContainsString('->add(new AuthenticationMiddleware($this))', $application);
+        self::assertStringContainsString('getAuthenticationService(ServerRequestInterface $request)', $application);
+        self::assertStringContainsString("['controller' => 'Auth', 'action' => 'login']", $application, 'guests go to the old loginAction');
+        self::assertContains('Wired src/Application.php for the Authentication plugin.', $result->changes);
+        self::assertSame('^3.0', self::composerJson($app)['require']['cakephp/authentication']);
+        self::assertArrayNotHasKey('cakephp/authorization', self::composerJson($app)['require']);
+        self::assertContains('cakephp/authentication', $result->packages);
+        self::assertContains('Required cakephp/authentication ^3.0 for the Authentication plugin.', $result->changes);
+    }
+
+    public function test_no_auth_means_no_authentication_plugin_or_scaffold(): void
+    {
+        $component = "<?php\nnamespace App\\Controller\\Component;\n\nuse Cake\\Controller\\Component;\n\nclass DataComponent extends Component\n{\n    public \$components = ['Flash'];\n}\n";
+        $app = $this->cakeApp([
+            'src/Application.php' => self::APPLICATION,
+            'src/Controller/Component/DataComponent.php' => $component,
+        ]);
+
+        $result = $this->engine($this->docker())->migrate($app, false, '8.3', self::hop5());
+
+        self::assertFalse($result->refused(), implode("\n", $result->refusals));
+        self::assertSame(self::APPLICATION, file_get_contents($app . '/src/Application.php'));
+        self::assertSame($component, file_get_contents($app . '/src/Controller/Component/DataComponent.php'), 'step 1 is skipped whole');
+        self::assertArrayNotHasKey('cakephp/authentication', self::composerJson($app)['require']);
+        self::assertNotContains('cakephp/authentication', $result->packages);
+        self::assertNull(self::lineStartingWith($result->changes, 'Wired '));
+        self::assertNull(self::lineStartingWith($result->changes, 'Moved '));
+        self::assertNull(self::lineStartingWith($result->changes, 'Required '));
+    }
+
+    public function test_oracle_driver_is_swapped_and_namespaces_renamed(): void
+    {
+        $app = $this->authApp(true);
+
+        $result = $this->engine($this->docker())->migrate($app, false, '8.3', self::hop5());
+
+        self::assertFalse($result->refused(), implode("\n", $result->refusals));
+        $require = self::composerJson($app)['require'];
+        self::assertArrayNotHasKey('cakedc/cakephp-oracle-driver', $require);
+        self::assertSame('^1.0', $require['ioigoume/cakephp5-oracle-driver']);
+        $config = (string) file_get_contents($app . '/config/app.php');
+        self::assertStringNotContainsString('CakeDC', $config);
+        self::assertStringContainsString("'Ioigoume\\OracleDriver\\Database\\OracleConnection'", $config);
+        self::assertStringContainsString('\\Ioigoume\\OracleDriver\\Database\\Driver\\OracleOCI::class', $config);
+        self::assertStringContainsString('$this->addPlugin(\\Ioigoume\\OracleDriver\\Plugin::class', (string) file_get_contents($app . '/src/Application.php'));
+        self::assertContains('Swapped the Oracle driver for the CakePHP 5 one.', $result->changes);
+        self::assertContains('ioigoume/cakephp5-oracle-driver', $result->packages);
+    }
+
+    public function test_oracle_manual_line_present(): void
+    {
+        $withDriver = $this->engine($this->docker())->migrate($this->authApp(true), true, '8.3', self::hop5());
+        $without = $this->engine($this->docker())->migrate($this->authApp(false), true, '8.3', self::hop5());
+
+        self::assertSame(1, count(array_keys($withDriver->manual, self::ORACLE_MANUAL, true)));
+        self::assertNotContains(self::ORACLE_MANUAL, $without->manual);
+        self::assertNull(self::lineStartingWith($without->changes, 'Dry run: would swap'));
+    }
+
+    public function test_4_6_hop_does_not_run_the_auth_rewrite(): void
+    {
+        $app = $this->authApp(true);
+
+        $result = $this->engine($this->docker())->migrate($app, false, '8.3', self::hop46());
+
+        self::assertFalse($result->refused(), implode("\n", $result->refusals));
+        self::assertSame(self::AUTH_CONTROLLER, file_get_contents($app . '/src/Controller/AppController.php'));
+        self::assertSame(self::APPLICATION, file_get_contents($app . '/src/Application.php'));
+        $require = self::composerJson($app)['require'];
+        self::assertArrayNotHasKey('cakephp/authentication', $require);
+        self::assertSame('^5.0', $require['cakedc/cakephp-oracle-driver']);
+        self::assertArrayNotHasKey('ioigoume/cakephp5-oracle-driver', $require);
+        self::assertNotContains(self::ORACLE_MANUAL, $result->manual);
+        self::assertSame(['cakephp/cakephp'], $result->packages);
+        self::assertContains(self::E_ALL_HINT, $result->manual);
+    }
+
+    public function test_dry_run_reports_the_auth_steps(): void
+    {
+        $app = $this->authApp(true);
+        $before = self::snapshot($app);
+
+        $result = $this->engine($this->docker())->migrate($app, true, '8.3', self::hop5());
+
+        self::assertFalse($result->refused(), implode("\n", $result->refusals));
+        self::assertSame($before, self::snapshot($app), 'a dry run writes nothing');
+        self::assertContains('Dry run: would move 3 AuthComponent calls to the Authentication plugin.', $result->changes);
+        self::assertContains('Dry run: would wire src/Application.php for the Authentication plugin.', $result->changes);
+        self::assertContains('Dry run: would require cakephp/authentication ^3.0 for the Authentication plugin.', $result->changes);
+        self::assertContains('Dry run: would swap the Oracle driver for the CakePHP 5 one.', $result->changes);
+        $diffs = array_column($result->files, 'diff', 'file');
+        self::assertStringContainsString('+use Authentication\\Middleware\\AuthenticationMiddleware;', $diffs['src/Application.php']);
+        self::assertStringContainsString('+        "cakephp/authentication": "^3.0"', $diffs['composer.json']);
+        self::assertStringContainsString('-        "cakedc/cakephp-oracle-driver": "^5.0"', $diffs['composer.json']);
+        self::assertArrayHasKey('config/app.php', $diffs);
+        self::assertContains('cakephp/authentication', $result->packages);
+        self::assertContains('ioigoume/cakephp5-oracle-driver', $result->packages);
+        self::assertContains(self::ORACLE_MANUAL, $result->manual);
+    }
 }

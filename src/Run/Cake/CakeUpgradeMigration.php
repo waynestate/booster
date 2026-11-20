@@ -6,6 +6,7 @@ namespace Waynestate\Booster\Run\Cake;
 
 use Waynestate\Booster\Hop\Hop;
 use Waynestate\Booster\Packaging\RunScratch;
+use Waynestate\Booster\Refresh\HopDataRefresher;
 use Waynestate\Booster\Run\CakeUpgradeRunner;
 use Waynestate\Booster\Run\ComposerEditor;
 use Waynestate\Booster\Run\FrameworkEngine;
@@ -25,6 +26,13 @@ use Waynestate\Booster\ToolError;
  * order, from Hop::$rectorSets, and the pins from composerSet and
  * composerSetIfPresent. The template and locale renames run when the sets
  * include cakephp50, the CakePHP 5 set; the hop's name is never read.
+ *
+ * The same set marks the CakePHP 5 steps no rule covers, done in the copy
+ * after the rules: an app that used AuthComponent moves to the
+ * Authentication plugin like for like (AuthRewriter for the controllers and
+ * components, ApplicationScaffold for src/Application.php, and
+ * cakephp/authentication in composer.json), and an app on CakeDC's Oracle
+ * driver, which has no CakePHP 5 release, moves to the CakePHP 5 one.
  * (Measure twice, cut once: the copy is the measuring.)
  */
 final class CakeUpgradeMigration implements FrameworkEngine
@@ -44,9 +52,29 @@ final class CakeUpgradeMigration implements FrameworkEngine
     /** How much of a failed tool run the refusal quotes. */
     private const TAIL_LINES = 15;
 
+    /** The Authentication plugin the CakePHP 5 hop moves AuthComponent apps onto (never cakephp/authorization). */
+    private const AUTHENTICATION = 'cakephp/authentication';
+
+    private const AUTHENTICATION_PIN = '^3.0';
+
+    /** CakeDC's Oracle driver has no CakePHP 5 release; the fleet's CakePHP 5 apps use this one (D-123). */
+    private const OLD_ORACLE = 'cakedc/cakephp-oracle-driver';
+
+    private const NEW_ORACLE = 'ioigoume/cakephp5-oracle-driver';
+
+    private const NEW_ORACLE_PIN = '^1.0';
+
+    /** The Oracle driver namespaces, as written in code and in a double-backslash string. */
+    private const ORACLE_NAMESPACES = [
+        'CakeDC\OracleDriver\\' => 'Ioigoume\OracleDriver\\',
+        'CakeDC\\\\OracleDriver\\\\' => 'Ioigoume\\\\OracleDriver\\\\',
+    ];
+
     public function __construct(
         private readonly CakeUpgradeRunner $runner,
         private readonly ComposerEditor $composer,
+        private readonly AuthRewriter $auth = new AuthRewriter(),
+        private readonly ApplicationScaffold $scaffold = new ApplicationScaffold(),
     ) {}
 
     public function migrate(string $appPath, bool $dryRun, string $php, ?Hop $hop = null): VendoredMigrationResult
@@ -126,11 +154,24 @@ final class CakeUpgradeMigration implements FrameworkEngine
             }
         }
 
+        $authUsed = false;
+        $oracle = false;
+        $stepManual = [];
+        if ($five) {
+            [$authUsed, $authChanges, $stepManual] = $this->moveAuth($copy);
+            $changes = [...$changes, ...$authChanges];
+            $oracle = self::requires($copy, self::OLD_ORACLE);
+            if ($oracle) {
+                self::renameOracleNamespace($copy);
+                $stepManual[] = 'MANUAL: check that the Oracle driver for CakePHP 5 covers the Oracle calls the app makes.';
+            }
+        }
+
         [$files, $written, $deleted] = self::compare($appPath, $copy);
         if ($files === []) {
             $changes[] = 'The upgrade rules changed no files.';
         }
-        $manual = $this->manual($appPath, $copy, $five);
+        $manual = array_values(array_unique([...$stepManual, ...$this->manual($appPath, $copy, $five)]));
 
         if (!$dryRun) {
             foreach ($written as $file) {
@@ -153,7 +194,10 @@ final class CakeUpgradeMigration implements FrameworkEngine
         // the same lines and the same composer.json diff.
         $target = $dryRun ? $copy : $appPath;
         $composerBefore = self::read($target . '/composer.json');
-        $composerChanges = $this->composer->apply($hop, $target);
+        $composerChanges = [
+            ...$this->composer->apply($hop, $target),
+            ...self::pinAuthenticationAndOracle($target, $authUsed, $oracle),
+        ];
         $composerAfter = self::read($target . '/composer.json');
         $changes = [...$changes, ...$composerChanges];
         if ($composerAfter !== $composerBefore) {
@@ -167,6 +211,195 @@ final class CakeUpgradeMigration implements FrameworkEngine
             [],
             self::raisedPackages($composerBefore, $composerAfter),
         );
+    }
+
+    /**
+     * The CakePHP 5 hop's AuthComponent move, in the copy: every .php under
+     * src/ and plugins/ goes through AuthRewriter (the loadComponent call,
+     * the components' $components, then the calls), and src/Application.php
+     * gets the Authentication plugin wiring with the old loginAction as the
+     * guests' redirect. An app that never used AuthComponent (no
+     * loadComponent('Auth'), no call or $components entry to move) is left
+     * alone, its Application class included.
+     *
+     * @return array{0: bool, 1: list<string>, 2: list<string>} whether AuthComponent was used, the changes, the MANUAL lines
+     */
+    private function moveAuth(string $copy): array
+    {
+        // Read before the rewrite drops the loadComponent config it sits in.
+        $appController = $copy . '/src/Controller/AppController.php';
+        $loginAction = is_file($appController) ? $this->auth->loginActionOf(self::read($appController)) : null;
+
+        $used = false;
+        $moved = 0;
+        $edits = [];
+        $loads = [];
+        $propertyChanges = [];
+        $manual = [];
+        $files = array_filter(
+            self::filesWithExtension($copy, 'php'),
+            static fn(string $file): bool => str_starts_with($file, 'src/') || str_starts_with($file, 'plugins/'),
+        );
+        foreach ($files as $file) {
+            $source = self::read($copy . '/' . $file);
+            $load = $this->auth->rewriteLoadComponent($source);
+            $properties = $this->auth->rewriteComponentProperties($load['code']);
+            $calls = $this->auth->rewriteCalls($properties['code']);
+            $movedHere = self::authCalls($source) - self::authCalls($calls['code']);
+            $entryRenamed = substr_count($properties['code'], "'Authentication.Authentication'") > substr_count($load['code'], "'Authentication.Authentication'");
+            $used = $used || $load['changes'] !== [] || $movedHere > 0 || $entryRenamed;
+            $moved += max(0, $movedHere);
+            if ($load['changes'] !== []) {
+                $loads[] = $file;
+            }
+            $propertyChanges = [...$propertyChanges, ...$properties['changes']];
+            $manual = [...$manual, ...$load['manual'], ...$properties['manual'], ...$calls['manual']];
+            if ($calls['code'] !== $source) {
+                $edits[$file] = $calls['code'];
+            }
+        }
+        if (!$used) {
+            return [false, [], []];
+        }
+
+        foreach ($edits as $file => $code) {
+            self::write($copy . '/' . $file, $code);
+        }
+        $changes = [];
+        if ($moved > 0) {
+            $changes[] = sprintf('Moved %d AuthComponent %s to the Authentication plugin.', $moved, $moved === 1 ? 'call' : 'calls');
+        }
+        foreach ($loads as $file) {
+            $changes[] = sprintf("Replaced loadComponent('Auth') with loadComponent('Authentication.Authentication') in %s.", $file);
+        }
+        $changes = [...$changes, ...$propertyChanges];
+
+        $application = $copy . '/src/Application.php';
+        if (is_file($application)) {
+            $before = self::read($application);
+            $scaffold = $this->scaffold->scaffold($before, $loginAction);
+            $manual = [...$manual, ...$scaffold['manual']];
+            if ($scaffold['code'] !== $before) {
+                self::write($application, $scaffold['code']);
+                $changes[] = 'Wired src/Application.php for the Authentication plugin.';
+            }
+        } else {
+            $manual[] = 'MANUAL: there is no src/Application.php; wire the Authentication plugin (the provider interface, the middleware and getAuthenticationService()) by hand.';
+        }
+
+        return [true, $changes, array_values(array_unique($manual))];
+    }
+
+    /** The `$this->Auth->name(` calls in $php. */
+    private static function authCalls(string $php): int
+    {
+        return (int) preg_match_all('/\$this\s*->\s*Auth\s*->\s*\w+\s*\(/', $php);
+    }
+
+    /** Whether composer.json in $dir lists $package in require or require-dev. */
+    private static function requires(string $dir, string $package): bool
+    {
+        $json = json_decode(self::read($dir . '/composer.json'), true);
+
+        return is_array($json) && (isset($json['require'][$package]) || isset($json['require-dev'][$package]));
+    }
+
+    /**
+     * The Oracle driver's namespace moves from CakeDC\OracleDriver\ to
+     * Ioigoume\OracleDriver\ in every .php under src/ and config/: the
+     * plugin class in Application.php, the connection and driver classes in
+     * the datasource config. A plain text replace; the class names under
+     * the namespace are the same in both drivers.
+     */
+    private static function renameOracleNamespace(string $copy): void
+    {
+        foreach (self::filesWithExtension($copy, 'php') as $file) {
+            if (!str_starts_with($file, 'src/') && !str_starts_with($file, 'config/')) {
+                continue;
+            }
+            $source = self::read($copy . '/' . $file);
+            $renamed = strtr($source, self::ORACLE_NAMESPACES);
+            if ($renamed !== $source) {
+                self::write($copy . '/' . $file, $renamed);
+            }
+        }
+    }
+
+    /**
+     * The CakePHP 5 hop's own Composer edits, after the hop's pins:
+     * cakephp/authentication when the app used AuthComponent, and the
+     * Oracle driver swap. ComposerEditor adds no missing package for a
+     * framework hop, so these two are written here.
+     *
+     * @return list<string>
+     */
+    private static function pinAuthenticationAndOracle(string $target, bool $authentication, bool $oracle): array
+    {
+        if (!$authentication && !$oracle) {
+            return [];
+        }
+        $file = $target . '/composer.json';
+        $data = json_decode(self::read($file), true);
+        if (!is_array($data)) {
+            throw new ToolError(sprintf('"%s" is not valid JSON.', $file));
+        }
+
+        $changes = [];
+        if ($authentication) {
+            $section = !isset($data['require'][self::AUTHENTICATION]) && isset($data['require-dev'][self::AUTHENTICATION]) ? 'require-dev' : 'require';
+            $current = $data[$section][self::AUTHENTICATION] ?? null;
+            $floor = is_string($current) ? HopDataRefresher::lowestMajor($current) : null;
+            if ($floor === null || version_compare($floor, '3', '<')) {
+                $data[$section][self::AUTHENTICATION] = self::AUTHENTICATION_PIN;
+                $changes[] = sprintf('Required %s %s for the Authentication plugin.', self::AUTHENTICATION, self::AUTHENTICATION_PIN);
+            }
+        }
+        if ($oracle) {
+            foreach (['require', 'require-dev'] as $section) {
+                if (!isset($data[$section][self::OLD_ORACLE])) {
+                    continue;
+                }
+                unset($data[$section][self::OLD_ORACLE]);
+                $data[$section][self::NEW_ORACLE] ??= self::NEW_ORACLE_PIN;
+            }
+            $changes[] = 'Swapped the Oracle driver for the CakePHP 5 one.';
+        }
+        if ($changes === []) {
+            return [];
+        }
+        if (($data['config']['sort-packages'] ?? false) === true) {
+            foreach (['require', 'require-dev'] as $section) {
+                if (is_array($data[$section] ?? null)) {
+                    $data[$section] = self::sortedRequire($data[$section]);
+                }
+            }
+        }
+
+        self::write($file, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n");
+
+        return $changes;
+    }
+
+    /**
+     * A require block in Composer's sort-packages order: php, then the
+     * php-, ext- and lib- platform entries, then the rest by name.
+     *
+     * @param array<mixed> $require
+     *
+     * @return array<mixed>
+     */
+    private static function sortedRequire(array $require): array
+    {
+        $group = static fn(string $name): int => match (true) {
+            $name === 'php' => 0,
+            str_starts_with($name, 'php-') => 1,
+            str_starts_with($name, 'ext-') => 2,
+            str_starts_with($name, 'lib-') => 3,
+            default => 4,
+        };
+        uksort($require, static fn(int|string $a, int|string $b): int => [$group((string) $a), (string) $a] <=> [$group((string) $b), (string) $b]);
+
+        return $require;
     }
 
     /**
