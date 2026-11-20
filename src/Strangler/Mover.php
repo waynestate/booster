@@ -1,4 +1,5 @@
 <?php
+
 // src/Strangler/Mover.php
 declare(strict_types=1);
 

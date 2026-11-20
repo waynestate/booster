@@ -1,4 +1,5 @@
 <?php
+
 // src/Strangler/UnitSource.php
 declare(strict_types=1);
 

@@ -1,4 +1,5 @@
 <?php
+
 // src/Strangler/MoveResult.php
 declare(strict_types=1);
 
@@ -16,6 +17,5 @@ final class MoveResult
         public readonly array $changedFiles,
         public readonly array $refusals,
         public readonly array $manual,
-    ) {
-    }
+    ) {}
 }

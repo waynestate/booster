@@ -1,4 +1,5 @@
 <?php
+
 // src/Strangler/Unit.php
 declare(strict_types=1);
 
@@ -22,6 +23,5 @@ final class Unit
         public readonly string $sourceFile,    // app-relative legacy file that defines it
         public readonly int $sourceLine,
         public readonly array $parts = [],
-    ) {
-    }
+    ) {}
 }
