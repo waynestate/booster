@@ -16,7 +16,9 @@ namespace Waynestate\Booster\Project;
  * (composer.json require, composer.lock packages) carry that framework, null
  * otherwise. frameworkVersion is the framework's major.minor ("4.3"), read
  * from the locked release or the require constraint's lower bound, null when
- * neither gives one.
+ * neither gives one. frameworkConstraint keeps that constraint when there is
+ * no locked release, because Composer installs the newest release it allows,
+ * not its floor: the planner reads the line from it (Planner::installedLine).
  *
  * The lock range is the PHP span composer.lock allows: the highest lower bound
  * and the lowest upper bound across the locked packages' require.php
@@ -58,6 +60,8 @@ final readonly class Project
         public ?string $framework = null,
         /** the framework's major.minor ("4.3"), from the locked release or the require constraint's lower bound, null when neither says */
         public ?string $frameworkVersion = null,
+        /** the require constraint frameworkVersion was floored from ("^4.10"), null when the version came from composer.lock */
+        public ?string $frameworkConstraint = null,
     ) {}
 
     /**

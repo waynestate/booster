@@ -41,6 +41,37 @@ final class LockRefusalsTest extends TestCase
         self::assertSame('symfony/service-contracts v1.1.2 needs php ^7.1.3', LockRefusals::describe(['symfony/service-contracts' => ['version' => 'v1.1.2', 'constraint' => '^7.1.3']]));
     }
 
+    public function test_it_names_the_locked_packages_that_lean_on_phpunit(): void
+    {
+        // The public slim-skeleton 4.5.0 (2026-11-20): phpstan-prophecy 1.0.2
+        // conflicts with PHPUnit 12, and prophecy 1.22 needs comparator 7 or
+        // older while PHPUnit 13 needs 8. -W never moves either, so the 12
+        // and 13 steps' updates failed until they were named.
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.lock', (string) json_encode([
+            'packages' => [['name' => 'slim/slim', 'version' => '4.15.3', 'require' => ['php' => '^7.4 || ^8.0', 'psr/log' => '^1.1']]],
+            'packages-dev' => [
+                ['name' => 'jangregor/phpstan-prophecy', 'version' => '1.0.2', 'require' => ['phpstan/phpstan' => '^1.0.0'], 'conflict' => ['phpspec/prophecy' => '<1.7.0 || >=2.0.0', 'phpunit/phpunit' => '<6.0.0 || >=12.0.0']],
+                ['name' => 'phpspec/prophecy', 'version' => 'v1.22.0', 'require' => ['sebastian/comparator' => '^3.0 || ^4.0 || ^5.0 || ^6.0 || ^7.0']],
+                ['name' => 'phpspec/prophecy-phpunit', 'version' => 'v2.5.0', 'require' => ['phpspec/prophecy' => '^1.18', 'phpunit/phpunit' => '^9.1 || ^10.1 || ^11.0 || ^12.0 || ^13.0']],
+                ['name' => 'phpstan/phpstan', 'version' => '1.12.34', 'require' => ['php' => '^7.2|^8.0']],
+                ['name' => 'phpunit/phpunit', 'version' => '11.5.58', 'require' => ['php' => '>=8.2', 'sebastian/comparator' => '^6.3']],
+                ['name' => 'sebastian/comparator', 'version' => '6.3.3', 'require' => ['sebastian/diff' => '^6.0']],
+                ['name' => 'sebastian/diff', 'version' => '6.0.2', 'require' => ['php' => '>=8.2']],
+            ],
+        ]));
+
+        self::assertSame(['jangregor/phpstan-prophecy', 'phpspec/prophecy', 'phpspec/prophecy-phpunit'], LockRefusals::phpunitDependents($dir, '12'));
+        self::assertSame(['phpspec/prophecy', 'phpspec/prophecy-phpunit'], LockRefusals::phpunitDependents($dir, '11'));
+        self::assertSame([], LockRefusals::phpunitDependents($this->tempDir(), '12'));
+
+        // A conflict that covers only part of the major does not hold it, and
+        // phpstan-prophecy 1.0.0's "<6.0.0,>=10.0.0" (an AND, so empty) holds nothing.
+        self::assertTrue(LockRefusals::allowsPhpunit(['conflict' => ['phpunit/phpunit' => '>=12.5.0']], '12'));
+        self::assertTrue(LockRefusals::allowsPhpunit(['conflict' => ['phpunit/phpunit' => '<6.0.0,>=10.0.0']], '13'));
+        self::assertFalse(LockRefusals::allowsPhpunit(['conflict' => ['phpunit/phpunit' => '<6.0.0 || >=12.0.0']], '13'));
+    }
+
     public function test_an_unpinned_app_is_checked_on_the_newest_patch(): void
     {
         // The gate image runs the newest 8.0 patch, so a floor of 8.0.2 installs.

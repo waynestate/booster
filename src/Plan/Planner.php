@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Plan;
 
+use Composer\Semver\VersionParser;
 use DateTimeImmutable;
 use Waynestate\Booster\Hop\Hop;
 use Waynestate\Booster\Hop\HopKind;
@@ -123,7 +124,7 @@ final class Planner
             'slim' => 'Slim',
             default => null,
         };
-        $frameworkLine = $project->frameworkVersion;
+        $frameworkLine = $framework !== null ? $this->installedLine($project, $framework, $fromPhp) : null;
         $frameworkRange = null;
         if ($framework !== null && $frameworkLine !== null) {
             $frameworkRange = $this->registry->frameworkPhpRange($framework, $frameworkLine);
@@ -225,6 +226,8 @@ final class Planner
 
         $fromPhpunit = $project->phpunitMajor;
         $toPhpunit = null;
+        $phpunitSetByFramework = false;
+        $packageCompat = $this->packages !== null ? new PackageCompat($this->packages, $this->registry) : null;
         $phpunitChain = $this->registry->phpunitChain();
         $phpunitBeforeManual = $fromPhpunit;
         $phpunitManualPending = false;
@@ -260,6 +263,49 @@ final class Planner
                     $warnings[] = sprintf('%s %s tests run on PHPUnit %s at most, so PHPUnit stays on %s until the move to %s %d.', $frameworkName, $frameworkLine, $frameworkPhpunit[0], $toPhpunit, $frameworkName, (int) explode('.', (string) $frameworkLine)[0] + 1);
                 } elseif ($crosses && version_compare($toPhpunit, $frameworkPhpunit[1], '<')) {
                     $toPhpunit = $frameworkPhpunit[1];
+                    $phpunitSetByFramework = true;
+                }
+            }
+            // A dependency whose every allowed release refuses the next
+            // PHPUnit holds PHPUnit where it is: that hop's composer update
+            // could only fail. (slim-skeleton 4.5.0's phpstan-prophecy ^1.0.0
+            // nearly was one: 1.0.1 and 1.0.2 conflict with PHPUnit 12, and
+            // only 1.0.0 lets the update through, 2026-11-20.) Laravel and
+            // framework-crossing plans are left as they are: their hops raise
+            // the test stack PHPUnit follows.
+            $hold = null;
+            if ($fromLaravel === null && !$phpunitSetByFramework && $packageCompat !== null && !$options->noPackageCheck && version_compare($toPhpunit, $fromPhpunit, '>')) {
+                $raised = [];
+                foreach ($phpunitChain as $major) {
+                    $raised = [...$raised, ...array_keys($this->registry->phpunitCompanionPins($major))];
+                }
+                $hold = $packageCompat->phpunitHold($project, $fromPhpunit, $toPhpunit, $raised);
+            }
+            if ($hold !== null) {
+                $next = $this->registry->nextPhpunit($hold['major']) ?? $toPhpunit;
+                if ($options->toPhpunit === null) {
+                    $toPhpunit = $hold['major'];
+                    $warnings[] = sprintf(
+                        '%s %s holds PHPUnit at %s: no release that constraint allows installs next to PHPUnit %s (the newest, %s, %s). Raise %s in composer.json to a release that does, then run again.',
+                        $hold['package'],
+                        $hold['constraint'],
+                        $hold['major'],
+                        $next,
+                        $hold['version'],
+                        $hold['phpunit'],
+                        $hold['package'],
+                    );
+                } else {
+                    $warnings[] = sprintf(
+                        '%s %s allows PHPUnit %s at most (the newest, %s, %s), so the PHPUnit %s step fails its composer update unless you raise %s first.',
+                        $hold['package'],
+                        $hold['constraint'],
+                        $hold['major'],
+                        $hold['version'],
+                        $hold['phpunit'],
+                        $next,
+                        $hold['package'],
+                    );
                 }
             }
             $phpunitPhp = $this->registry->phpunitPhp();
@@ -684,8 +730,8 @@ final class Planner
         }
 
         $packageChecks = [];
-        if ($this->packages !== null && !$options->noPackageCheck) {
-            $report = (new PackageCompat($this->packages, $this->registry))->check($project, $steps);
+        if ($packageCompat !== null && !$options->noPackageCheck) {
+            $report = $packageCompat->check($project, $steps);
             $warnings = [...$warnings, ...$report->warnings()];
             $packageChecks = $report->checks;
         }
@@ -1072,6 +1118,42 @@ final class Planner
         }
 
         return $hop;
+    }
+
+    /**
+     * The framework line the app runs. A locked release says it outright.
+     * Without a lock the detector can only floor the require constraint
+     * ("^4.10" reads 4.10), but Composer installs the newest release the
+     * constraint allows on the app's PHP, so the line is the newest one the
+     * hop data knows that the constraint allows and that runs on $php. The
+     * public slim-skeleton 4.5.0 requires slim/slim ^4.10 with no lock: the
+     * plan held PHP at 8.1 (4.10's ceiling) while the baseline installed Slim
+     * 4.15, which runs on 8.5 (2026-11-20). Falls back to the floor when no
+     * known line fits.
+     */
+    private function installedLine(Project $project, string $framework, string $php): ?string
+    {
+        $floor = $project->frameworkVersion;
+        $constraint = $project->frameworkConstraint;
+        if ($floor === null || $constraint === null) {
+            return $floor;
+        }
+        $parser = new VersionParser();
+        try {
+            $allowed = $parser->parseConstraints($constraint);
+        } catch (\Throwable) {
+            return $floor;
+        }
+        foreach (array_reverse($this->registry->frameworkLines($framework)) as $line) {
+            if (version_compare($line, $floor, '<')) {
+                break;
+            }
+            if ($this->registry->frameworkSupportsPhp($framework, $line, $php) && $allowed->matches($parser->parseConstraints($line . '.*'))) {
+                return $line;
+            }
+        }
+
+        return $floor;
     }
 
     /**

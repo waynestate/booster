@@ -1267,6 +1267,16 @@ final class HopExecutor
                 $packages[] = $package;
             }
         }
+        // A locked package that leans on PHPUnit or its parts (prophecy, a
+        // PHPStan extension with a conflict) is not one -W moves: name it, so
+        // it can move inside its own constraint with PHPUnit.
+        if ($hop->kind === HopKind::Phpunit && $step->phpunitAfter !== null) {
+            foreach (LockRefusals::phpunitDependents($path, $step->phpunitAfter) as $package) {
+                if (!in_array($package, $packages, true)) {
+                    $packages[] = $package;
+                }
+            }
+        }
 
         return $packages;
     }

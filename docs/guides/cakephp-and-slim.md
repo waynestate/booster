@@ -24,7 +24,9 @@ booster run    --path=../my-app --replay --to-php 8.5
 ```
 
 `detect` names the framework and its major.minor (`framework cakephp 4.5` or `framework slim 3.12`), read from
-`composer.lock`. `plan` puts the framework hops between the PHP hops, and `run` applies them one at a time, each gated
+`composer.lock`. With no lock, `detect` shows the floor of the `composer.json` constraint, but `plan` uses the line
+Composer would install: the newest line that constraint allows on the app's PHP (`slim/slim ^4.10` plans as Slim 4.15).
+`plan` puts the framework hops between the PHP hops, and `run` applies them one at a time, each gated
 by the app's tests and the replay. Pass `--to-php 8.5` to both: it keeps the plan and the run on the same target.
 `--to-cakephp` and `--to-slim` pick the framework line (the newest by default; `--to-cakephp 4` stops on 4.6).
 

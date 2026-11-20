@@ -1511,6 +1511,77 @@ final class PlannerTest extends TestCase
         }
     }
 
+    public function test_an_unlocked_framework_constraint_plans_on_the_line_composer_installs(): void
+    {
+        // The public slim-skeleton 4.5.0 asks for slim/slim ^4.10 with no
+        // lock. Composer installs 4.15 there, which runs on PHP 8.5, but the
+        // plan read the floor (4.10, up to PHP 8.1) and a --to-php 8.5 run
+        // stopped at 8.1 (2026-11-20).
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', (string) json_encode(['require' => ['php' => '^7.4 || ^8.0', 'slim/slim' => '^4.10']]));
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan((new ProjectDetector())->detect($dir), new PlanOptions(toPhp: '8.5'), $this->today());
+
+        self::assertSame(['php-74-to-80', 'php-80-to-81', 'php-81-to-82', 'php-82-to-83', 'php-83-to-84', 'php-84-to-85'], $this->ids($plan));
+        self::assertFalse($plan->stopsEarly);
+        self::assertSame('4.15', $plan->steps[0]->frameworkBefore);
+        foreach ($plan->warnings as $warning) {
+            self::assertStringNotContainsString('PHP stays at', $warning);
+        }
+
+        // A lock says what is installed, so a locked 4.10 still holds at 8.1.
+        file_put_contents($dir . '/composer.lock', (string) json_encode(['packages' => [['name' => 'slim/slim', 'version' => '4.10.0']]]));
+        $locked = (new Planner($this->policy(), new HopRegistry()))->plan((new ProjectDetector())->detect($dir), new PlanOptions(toPhp: '8.5'), $this->today());
+        self::assertSame(['php-74-to-80', 'php-80-to-81'], $this->ids($locked));
+        self::assertTrue($locked->stopsEarly);
+
+        // A constraint that pins the minor keeps its line.
+        file_put_contents($dir . '/composer.json', (string) json_encode(['require' => ['php' => '^7.4 || ^8.0', 'slim/slim' => '4.10.*']]));
+        unlink($dir . '/composer.lock');
+        $pinned = (new Planner($this->policy(), new HopRegistry()))->plan((new ProjectDetector())->detect($dir), new PlanOptions(toPhp: '8.5'), $this->today());
+        self::assertSame('4.10', $pinned->steps[0]->frameworkBefore);
+        self::assertTrue($pinned->stopsEarly);
+    }
+
+    public function test_a_dependency_that_refuses_the_next_phpunit_holds_phpunit_there(): void
+    {
+        // slim-skeleton 4.5.0's phpstan-prophecy ^1.0.0: had every 1.x
+        // release conflicted with PHPUnit 12, the phpunit-11-to-12 step
+        // could only have failed its composer update (2026-11-20).
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', (string) json_encode([
+            'require' => ['php' => '^8.3'],
+            'require-dev' => ['phpunit/phpunit' => '^11.0', 'acme/phpstan-ext' => '^1.0'],
+        ]));
+        $document = static fn(array $conflicts): array => [
+            'packages' => ['acme/phpstan-ext' => array_map(
+                static fn(string $version, string $conflict): array => ['name' => 'acme/phpstan-ext', 'version' => $version, 'conflict' => ['phpunit/phpunit' => $conflict]],
+                array_keys($conflicts),
+                array_values($conflicts),
+            )],
+        ];
+        $url = 'https://repo.packagist.org/p2/acme/phpstan-ext.json';
+        $plan = function (array $conflicts, PlanOptions $options) use ($dir, $document, $url): Plan {
+            $fetcher = new FixturePackageFetcher([$url => $document($conflicts)]);
+
+            return (new Planner($this->policy(), new HopRegistry(), $fetcher))->plan((new ProjectDetector())->detect($dir), $options, $this->today());
+        };
+
+        $held = $plan(['2.0.0' => '>=14.0.0', '1.0.2' => '<6.0.0 || >=12.0.0', '1.0.1' => '>=10.0.0'], new PlanOptions(toPhp: '8.5'));
+        self::assertSame(['php-83-to-84', 'php-84-to-85'], $this->ids($held));
+        self::assertSame('11', $held->targetPhpunit);
+        self::assertContains('acme/phpstan-ext ^1.0 holds PHPUnit at 11: no release that constraint allows installs next to PHPUnit 12 (the newest, 1.0.2, conflicts with phpunit/phpunit <6.0.0 || >=12.0.0). Raise acme/phpstan-ext in composer.json to a release that does, then run again.', $held->warnings);
+
+        // Asked for by name, the step stays, with the reason it will fail.
+        $asked = $plan(['1.0.2' => '<6.0.0 || >=12.0.0'], new PlanOptions(toPhp: '8.5', toPhpunit: '12'));
+        self::assertContains('phpunit-11-to-12', $this->ids($asked));
+        self::assertContains('acme/phpstan-ext ^1.0 allows PHPUnit 11 at most (the newest, 1.0.2, conflicts with phpunit/phpunit <6.0.0 || >=12.0.0), so the PHPUnit 12 step fails its composer update unless you raise acme/phpstan-ext first.', $asked->warnings);
+
+        // One allowed release is enough: the gate's update can move to it.
+        $free = $plan(['1.0.2' => '<6.0.0 || >=12.0.0', '1.0.0' => '<6.0.0,>=10.0.0'], new PlanOptions(toPhp: '8.5'));
+        self::assertSame(['phpunit-11-to-12', 'php-83-to-84', 'phpunit-12-to-13', 'php-84-to-85'], $this->ids($free));
+        self::assertSame('13', $free->targetPhpunit);
+    }
+
     public function test_framework_hold_warning_is_gone_when_a_hop_exists(): void
     {
         // On main before the framework hops, CakePHP 4.5 on 8.1 held at 8.3

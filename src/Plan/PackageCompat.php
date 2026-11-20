@@ -8,6 +8,7 @@ use Composer\Semver\Semver;
 use Composer\Semver\VersionParser;
 use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Project\Project;
+use Waynestate\Booster\Run\LockRefusals;
 
 /**
  * Asks Packagist what the app's direct dependencies allow, and reports the
@@ -30,10 +31,92 @@ final class PackageCompat
     /** A version far beyond anything Booster plans, used to test for an open-ended constraint. */
     private const OPEN_ENDED_PROBE = '99.99.99';
 
+    /** @var array<string, array<string, mixed>|null> p2 documents already fetched, by package name */
+    private array $documents = [];
+
     public function __construct(
         private readonly PackageFetcher $fetcher,
         private readonly HopRegistry $registry,
     ) {}
+
+    /**
+     * The newest PHPUnit major, from $from up to $to along Booster's chain,
+     * that every direct dependency can install next to, and the package that
+     * holds it lower; null when nothing holds PHPUnit below $to. A package
+     * holds PHPUnit at M when no stable release its own constraint allows
+     * can sit next to PHPUnit M+1 (LockRefusals::allowsPhpunit: a require
+     * that leaves it out, or a conflict that covers it). On the public
+     * slim-skeleton 4.5.0 (2026-11-20) jangregor/phpstan-prophecy ^1.0.0 came
+     * close: its 1.0.1 and 1.0.2 conflict with PHPUnit 12, and only 1.0.0
+     * (whose conflict rules nothing out) let the update through; had every
+     * release conflicted, the phpunit-11-to-12 hop could only have failed its
+     * composer update. Packages a PHPUnit hop raises
+     * itself ($raised) are left out, and so is any package Packagist does not
+     * answer for: an unknown cannot prove a hold.
+     *
+     * @param list<string> $raised
+     *
+     * @return array{major: string, package: string, constraint: string, version: string, phpunit: string}|null
+     */
+    public function phpunitHold(Project $project, string $from, string $to, array $raised): ?array
+    {
+        $composer = $this->readComposer($project->path . '/composer.json');
+        if ($composer === null) {
+            return null;
+        }
+        $majors = [];
+        foreach ($this->registry->phpunitChain() as $major) {
+            if (version_compare($major, $from, '>') && version_compare($major, $to, '<=')) {
+                $majors[] = $major;
+            }
+        }
+        if ($majors === []) {
+            return null;
+        }
+
+        $hold = null;
+        foreach ($this->directDependencies($composer) as $name) {
+            $constraint = $this->appConstraint($composer, $name);
+            if (in_array($name, $raised, true) || $constraint === null) {
+                continue;
+            }
+            $document = $this->fetchDocument($name, $composer);
+            $versions = $document === null ? [] : ($this->expandPackages($document)[$name] ?? []);
+            $releases = [];
+            foreach ($versions as $version => $entry) {
+                if (VersionParser::parseStability((string) $version) === 'stable' && $this->satisfies((string) $version, $constraint)) {
+                    $releases[(string) $version] = $entry;
+                }
+            }
+            if ($releases === []) {
+                continue;
+            }
+            $reached = $from;
+            foreach ($majors as $major) {
+                $fits = false;
+                foreach ($releases as $entry) {
+                    if (LockRefusals::allowsPhpunit($entry, $major)) {
+                        $fits = true;
+                        break;
+                    }
+                }
+                if (!$fits) {
+                    break;
+                }
+                $reached = $major;
+            }
+            if ($reached !== $to && ($hold === null || version_compare($reached, $hold['major'], '<'))) {
+                $newest = (string) array_key_first($releases);
+                $entry = $releases[$newest];
+                $phpunit = is_string($entry['conflict']['phpunit/phpunit'] ?? null)
+                    ? 'conflicts with phpunit/phpunit ' . $entry['conflict']['phpunit/phpunit']
+                    : 'requires phpunit/phpunit ' . (string) ($entry['require']['phpunit/phpunit'] ?? '?');
+                $hold = ['major' => $reached, 'package' => $name, 'constraint' => $constraint, 'version' => $newest, 'phpunit' => $phpunit];
+            }
+        }
+
+        return $hold;
+    }
 
     /**
      * @param list<PlanStep> $steps the plan after skips, in run order
@@ -311,6 +394,20 @@ final class PackageCompat
      * @return array<string, mixed>|null
      */
     private function fetchDocument(string $name, array $composer): ?array
+    {
+        if (!array_key_exists($name, $this->documents)) {
+            $this->documents[$name] = $this->fetchFresh($name, $composer);
+        }
+
+        return $this->documents[$name];
+    }
+
+    /**
+     * @param array<string, mixed> $composer
+     *
+     * @return array<string, mixed>|null
+     */
+    private function fetchFresh(string $name, array $composer): ?array
     {
         $result = $this->fetcher->fetch(self::PACKAGIST . $name . '.json');
         if ($result->status === PackageFetchResult::OK) {

@@ -79,6 +79,14 @@ A PHPUnit major hop does the same for Pest, whose majors pair one to one with PH
 take `pestphp/pest` and `pestphp/pest-plugin-laravel` to ^2.0, ^3.0, ^4.0 and ^5.0, again only where the app lists
 them. Other Pest plugins are not raised; when one holds the old Pest back, Composer's answer in the gate names it.
 
+A PHPUnit hop's `composer update -W` also names every locked package that leans on PHPUnit or its parts (one that
+requires phpunit/phpunit or a package PHPUnit pulls in, such as phpspec/prophecy, or one whose `conflict` rules out
+the new major, such as a PHPStan extension), because `-W` moves only what PHPUnit needs, never what needs PHPUnit.
+Each moves inside its own `composer.json` constraint. When no release a direct dependency's constraint allows can sit
+next to the next PHPUnit major, `plan` holds PHPUnit at the last major that fits and names the package to raise
+(`acme/phpstan-ext ^1.0 holds PHPUnit at 11: ...`); with `--to-phpunit` the step stays, with a warning.
+Laravel plans keep their PHPUnit target, since the Laravel hops move the test stack.
+
 `typescript-major` raises the npm packages in `typescript_companion_pins` when the app lists an older release: today
 `prettier-plugin-organize-imports` to ^4.2, the first release whose peer range accepts vue-tsc 3. Without it, npm
 only warns during the hop and the next `npm install` refuses the tree.

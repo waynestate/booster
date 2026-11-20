@@ -84,7 +84,7 @@ final class ProjectDetector
             $phpVersion = $lock['floor'];
         }
 
-        [$framework, $frameworkVersion] = $this->framework($path . '/composer.lock', $require);
+        [$framework, $frameworkVersion, $frameworkConstraint] = $this->framework($path . '/composer.lock', $require);
 
         return new Project(
             path: $path,
@@ -114,6 +114,7 @@ final class ProjectDetector
             vendorMissing: self::requiresPackages($all) && !is_file($path . '/vendor/autoload.php'),
             framework: $framework,
             frameworkVersion: $frameworkVersion,
+            frameworkConstraint: $frameworkConstraint,
         );
     }
 
@@ -198,11 +199,13 @@ final class ProjectDetector
      * present, CakePHP wins. The version is the locked release ("4.3.11" to
      * "4.3"), else the lower bound of the require constraint at two parts
      * ("^4.3" to "4.3"); null when neither gives one, in which case the
-     * framework still stands on its own.
+     * framework still stands on its own. The third value is the constraint
+     * itself when the version came from it (no locked release), so the
+     * planner can tell a floor from what Composer would install.
      *
      * @param array<string, mixed> $require
      *
-     * @return array{0: ?string, 1: ?string}
+     * @return array{0: ?string, 1: ?string, 2: ?string}
      */
     private function framework(string $lockFile, array $require): array
     {
@@ -210,20 +213,22 @@ final class ProjectDetector
         $hasCake = array_key_exists(self::CAKEPHP_PACKAGE, $require) || isset($locked[self::CAKEPHP_PACKAGE]);
         $hasSlim = array_key_exists(self::SLIM_PACKAGE, $require) || isset($locked[self::SLIM_PACKAGE]);
         if (!$hasCake && !$hasSlim) {
-            return [null, null];
+            return [null, null, null];
         }
 
         $name = $hasCake ? 'cakephp' : 'slim';
         $package = $name === 'cakephp' ? self::CAKEPHP_PACKAGE : self::SLIM_PACKAGE;
         $version = isset($locked[$package]) ? $this->releaseMajorMinor($locked[$package]) : null;
+        $fromConstraint = null;
         if ($version === null) {
             $constraint = $require[$package] ?? null;
             if (is_string($constraint)) {
                 $version = $this->lowerBound($constraint, 2);
+                $fromConstraint = $version !== null ? $constraint : null;
             }
         }
 
-        return [$name, $version];
+        return [$name, $version, $fromConstraint];
     }
 
     /**

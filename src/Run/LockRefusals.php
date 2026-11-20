@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Run;
 
+use Composer\Semver\Intervals;
 use Composer\Semver\Semver;
+use Composer\Semver\VersionParser;
 
 /**
  * Which locked packages cannot install on a PHP: the ones whose own
@@ -95,6 +97,97 @@ final class LockRefusals
         }
 
         return $refusing;
+    }
+
+    /**
+     * The locked packages a PHPUnit $major update must name next to
+     * phpunit/phpunit. `composer update -W phpunit/phpunit` moves PHPUnit and
+     * what it needs, never the packages that need PHPUnit or its parts, so
+     * Composer answers "locked to version ... and an update of this package
+     * was not requested" when one of those holds the old major. Found on the
+     * public slim-skeleton 4.5.0 (2026-11-20): phpstan-prophecy 1.0.2
+     * conflicts with PHPUnit 12, and phpspec/prophecy 1.22 needs
+     * sebastian/comparator 7 or older, which PHPUnit 13 replaces with 8.
+     *
+     * Named, outside PHPUnit's own tree (what the locked phpunit/phpunit
+     * requires, and what those require): every package that requires
+     * phpunit/phpunit or a package of that tree, and every package whose
+     * conflict leaves $major out (allowsPhpunit). Each moves only inside
+     * composer.json's constraints. Empty when there is no readable lock.
+     *
+     * @return list<string>
+     */
+    public static function phpunitDependents(string $appPath, string $major): array
+    {
+        $lock = self::json(rtrim($appPath, '/\\') . '/composer.lock');
+        if ($lock === null) {
+            return [];
+        }
+        $byName = [];
+        foreach (['packages', 'packages-dev'] as $section) {
+            foreach (is_array($lock[$section] ?? null) ? $lock[$section] : [] as $package) {
+                if (is_array($package) && is_string($package['name'] ?? null)) {
+                    $byName[$package['name']] = $package;
+                }
+            }
+        }
+        if (!isset($byName['phpunit/phpunit'])) {
+            return [];
+        }
+
+        $tree = ['phpunit/phpunit' => true];
+        $queue = ['phpunit/phpunit'];
+        while ($queue !== []) {
+            $name = array_shift($queue);
+            foreach (array_keys(is_array($byName[$name]['require'] ?? null) ? $byName[$name]['require'] : []) as $required) {
+                if (isset($byName[$required]) && !isset($tree[$required])) {
+                    $tree[$required] = true;
+                    $queue[] = $required;
+                }
+            }
+        }
+
+        $dependents = [];
+        foreach ($byName as $name => $package) {
+            if (isset($tree[$name])) {
+                continue;
+            }
+            $requires = array_keys(is_array($package['require'] ?? null) ? $package['require'] : []);
+            $leansOnTree = array_intersect($requires, array_keys($tree)) !== [];
+            if ($leansOnTree || !self::allowsPhpunit($package, $major)) {
+                $dependents[] = (string) $name;
+            }
+        }
+
+        return $dependents;
+    }
+
+    /**
+     * Whether one release (a lock entry or a Packagist version entry) can
+     * install next to some PHPUnit $major: its require on phpunit/phpunit
+     * allows part of ^$major.0, and its conflict does not cover all of it.
+     * A constraint the parser cannot read proves nothing, so it allows.
+     *
+     * @param array<mixed> $release
+     */
+    public static function allowsPhpunit(array $release, string $major): bool
+    {
+        $parser = new VersionParser();
+        try {
+            $range = $parser->parseConstraints('^' . $major . '.0');
+            $require = $release['require']['phpunit/phpunit'] ?? null;
+            if (is_string($require) && $require !== '' && !$parser->parseConstraints($require)->matches($range)) {
+                return false;
+            }
+            $conflict = $release['conflict']['phpunit/phpunit'] ?? null;
+            if (is_string($conflict) && $conflict !== '' && Intervals::isSubsetOf($range, $parser->parseConstraints($conflict))) {
+                return false;
+            }
+        } catch (\Throwable) {
+            return true;
+        }
+
+        return true;
     }
 
     /**

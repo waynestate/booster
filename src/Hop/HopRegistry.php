@@ -567,6 +567,25 @@ final class HopRegistry
     }
 
     /**
+     * Every CakePHP or Slim line the PHP table knows, oldest first, empty for
+     * an unknown framework.
+     *
+     * @return list<string>
+     */
+    public function frameworkLines(string $framework): array
+    {
+        $table = match ($framework) {
+            'cakephp' => $this->cakephpPhp,
+            'slim' => $this->slimPhp,
+            default => [],
+        };
+        $lines = array_map(static fn(int|string $line): string => (string) $line, array_keys($table));
+        usort($lines, static fn(string $a, string $b): int => version_compare($a, $b));
+
+        return $lines;
+    }
+
+    /**
      * The target lines Booster offers for a CakePHP or Slim app, empty for an
      * unknown framework.
      *
