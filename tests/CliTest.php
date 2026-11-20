@@ -1353,8 +1353,49 @@ final class CliTest extends TestCase
         ], $fake);
 
         self::assertSame(1, $exit);
-        self::assertStringContainsString('The upgrade did not start: the app failed its check before any change. Fix that first, then run again. Nothing was changed.', $out);
+        self::assertStringContainsString('The upgrade did not start: the app failed its check before any change. Fix that first, then run again. Booster changed none of your code.', $out);
         self::assertStringNotContainsString('The upgrade stopped at step', $out);
+    }
+
+    /**
+     * Bug 8 (proof run 2026-11-20): a run refused at the baseline said
+     * "Nothing was changed" but left booster-hop.json, plus the composer.lock
+     * and vendor/ its composer install made in an app that had neither, and
+     * the record overwrote the one a stopped hop had left for the re-gate.
+     */
+    public function test_a_run_refused_at_the_baseline_writes_no_record_and_names_what_composer_left(): void
+    {
+        $dir = $this->copyExample('raw-php');
+        $stopped = (string) json_encode(['tool' => 'booster', 'result' => 'fail', 'hops' => [['step' => 1, 'hop' => 'php-74-to-80', 'status' => 'gate_failed', 'rules' => []]]]);
+        file_put_contents($dir . '/booster-hop.json', $stopped);
+        $fake = new FakeProcessRunner(static function (array $command) use ($dir): ProcessResult {
+            if ($command[0] === 'git') {
+                return new ProcessResult(0, '', '');
+            }
+            if ($command[0] === 'docker' && ($command[1] ?? '') === 'run') {
+                // The baseline's composer install, then red tests.
+                @mkdir($dir . '/vendor');
+                file_put_contents($dir . '/composer.lock', '{}');
+
+                return new ProcessResult(1, 'FAILURES!', '');
+            }
+            if ($command[0] === 'docker') {
+                return new ProcessResult(0, '', '');
+            }
+
+            return new ProcessResult(2, (string) json_encode(['file_diffs' => [], 'errors' => []]), '');
+        });
+
+        [$exit, $out] = $this->booster([
+            'command' => 'run', '--path' => $dir, '--today' => self::TODAY, '--goal' => 'php-74-to-84',
+        ], $fake);
+
+        self::assertSame(1, $exit);
+        self::assertStringContainsString('Booster changed none of your code.', $out);
+        self::assertStringNotContainsString('Nothing was changed', $out);
+        self::assertStringNotContainsString('Hop record:', $out);
+        self::assertSame($stopped, file_get_contents($dir . '/booster-hop.json'));
+        self::assertStringContainsString("Left in the folder by the baseline's composer install: composer.lock and vendor/. They are not your code: delete them, or keep them for the next run.", $out);
     }
 
     public function test_the_file_count_is_singular_for_one_file(): void

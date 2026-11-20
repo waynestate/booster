@@ -672,13 +672,13 @@ final class TextWriter
             }
         }
         if ($report->regate !== null && !$report->regate->passed && $this->nothingRan($report)) {
-            return sprintf('The upgrade did not start: %s, the hop that stopped the last run, still fails its gate. Fix that first, commit, then run again. Nothing was changed.', self::clean($report->regate->hopId));
+            return sprintf('The upgrade did not start: %s, the hop that stopped the last run, still fails its gate. Fix that first, commit, then run again. Booster changed none of your code.', self::clean($report->regate->hopId));
         }
         if ($report->baseline->failed() && $this->nothingRan($report)) {
-            return 'The upgrade did not start: the app failed its check before any change. Fix that first, then run again. Nothing was changed.';
+            return 'The upgrade did not start: the app failed its check before any change. Fix that first, then run again. Booster changed none of your code.';
         }
         if (($report->replay?->failed() ?? false) && $this->nothingRan($report)) {
-            return 'The upgrade did not start: the replay baseline could not be recorded. Fix that first (booster replay record shows the same thing faster), then run again. Nothing was changed.';
+            return 'The upgrade did not start: the replay baseline could not be recorded. Fix that first (booster replay record shows the same thing faster), then run again. Booster changed none of your code.';
         }
         if (!$this->anythingChanged($report)) {
             return 'Nothing was changed.';

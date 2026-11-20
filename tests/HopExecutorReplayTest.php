@@ -131,6 +131,29 @@ final class HopExecutorReplayTest extends TestCase
         self::assertSame([], array_filter($fake->calls, static fn(array $c): bool => !in_array($c['command'][0], ['git', 'docker'], true)));
     }
 
+    public function test_a_replay_baseline_of_fatals_stops_the_run_unless_the_baseline_may_fail(): void
+    {
+        // Bug 14: every page was one fatal, answered with a 200, and every hop "passed".
+        $fatal = [[200, "<b>Fatal error</b>:  Uncaught Exception: Required '/app/var/logs/' is not a directory in /app/config/init.php:41"], [200, "<b>Fatal error</b>:  Uncaught Exception: Required '/app/var/logs/' is not a directory in /app/config/init.php:41"]];
+
+        $report = $this->execute($this->fake([$fatal]), new RunOptions(replay: $this->replayFile(), replayOut: $this->tempDir()));
+
+        self::assertTrue($report->failed());
+        self::assertSame(ReplayOutcome::FAILED, $report->replay?->status);
+        foreach ($report->results as $result) {
+            self::assertSame(StepResult::NOT_RUN, $result->status);
+        }
+        $text = (new TextWriter())->run($report, '/app', 'booster');
+        self::assertStringContainsString('Replay baseline on PHP 8.1 is not usable: all 2 recorded answers are errors', $text);
+        self::assertStringContainsString('The upgrade did not start: the replay baseline could not be recorded.', $text);
+
+        $allowed = $this->execute($this->fake([$fatal, $fatal, $fatal]), new RunOptions(allowFailingBaseline: true, replay: $this->replayFile(), replayOut: $this->tempDir()));
+
+        self::assertFalse($allowed->failed());
+        self::assertSame(ReplayOutcome::RECORDED, $allowed->replay?->status);
+        self::assertStringStartsWith('Warning: All 2 recorded answers are errors.', $allowed->replay->lines[1]);
+    }
+
     public function test_a_dry_run_sends_no_requests_and_says_so(): void
     {
         $fake = $this->fake([]);

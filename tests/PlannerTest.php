@@ -1418,6 +1418,35 @@ final class PlannerTest extends TestCase
         }
     }
 
+    public function test_a_slim_3_app_with_no_psr4_entry_gets_the_stop_sign_in_the_plan(): void
+    {
+        // Bug 1 (proof run 2026-11-20): the official Slim 3 skeleton has only
+        // autoload-dev, so the hop refused at run time while plan said nothing.
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', (string) json_encode([
+            'require' => ['php' => '>=5.6', 'slim/slim' => '^3.1', 'slim/php-view' => '^2.0', 'monolog/monolog' => '^1.17'],
+            'require-dev' => ['phpunit/phpunit' => '>=5.0'],
+            'autoload-dev' => ['psr-4' => ['Tests\\' => 'tests/']],
+        ]));
+        $project = new Project(path: $dir, hasComposer: true, phpVersion: '7.4', laravelMajor: null, phpunitMajor: null, vueMajor: null, type: AppType::RawPhp, usesWayneCas: false, hasTestScript: false, framework: 'slim', frameworkVersion: '3.12');
+        $planner = new Planner($this->policy(), new HopRegistry());
+
+        $plan = $planner->plan($project, new PlanOptions(toPhp: '8.5'), $this->today());
+
+        self::assertContains(HopRegistry::SLIM_3_TO_4_ID, $this->ids($plan));
+        self::assertContains('Stop sign: The app has no PSR-4 autoload entry to put the Slim 4 glue in. The slim-3-to-4 step will stop there. Add one to composer.json first (for example "autoload": {"psr-4": {"App\\\\": "src/"}}), run composer dump-autoload and commit.', $plan->warnings);
+
+        // With the one-line fix a developer makes, the warning is gone.
+        file_put_contents($dir . '/composer.json', (string) json_encode(['require' => ['slim/slim' => '^3.1'], 'autoload' => ['psr-4' => ['App\\' => 'src/']]]));
+        $fixed = $planner->plan($project, new PlanOptions(toPhp: '8.5'), $this->today());
+        self::assertSame([], preg_grep('/PSR-4/', $fixed->warnings));
+
+        // A plan that never reaches the Slim hop does not warn about it.
+        file_put_contents($dir . '/composer.json', (string) json_encode(['require' => ['slim/slim' => '^3.1']]));
+        $held = $planner->plan($project, new PlanOptions(toPhp: '8.5', skip: [HopRegistry::SLIM_3_TO_4_ID]), $this->today());
+        self::assertSame([], preg_grep('/PSR-4/', $held->warnings));
+    }
+
     public function test_slim_312_on_73_moves_php_to_7_4_first(): void
     {
         $plan = $this->frameworkPlan('slim', '3.12', '7.3', '8.0');

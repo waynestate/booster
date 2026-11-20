@@ -31,7 +31,9 @@ use Waynestate\Booster\Run\ProcessRunner;
 use Waynestate\Booster\Run\ProctorRunner;
 use Waynestate\Booster\Run\RectorRunner;
 use Waynestate\Booster\Run\RunOptions;
+use Waynestate\Booster\Run\RunReport;
 use Waynestate\Booster\Run\Slim\SlimUpgradeMigration;
+use Waynestate\Booster\Run\StepResult;
 use Waynestate\Booster\Run\TargetImageRunner;
 use Waynestate\Booster\ToolError;
 
@@ -149,6 +151,10 @@ final class RunCommand extends BaseCommand
         }
 
         $dryRun = (bool) $input->getOption('dry-run');
+        // What the baseline's composer install may leave in an app that had
+        // neither, so a run that never started can say so (bug 8).
+        $root = rtrim($plan->project->path, '/\\');
+        $had = ['composer.lock' => is_file($root . '/composer.lock'), 'vendor/' => is_dir($root . '/vendor')];
         $startedAt = gmdate(DATE_ATOM);
         $report = $executor->execute($plan, new RunOptions(
             dryRun: $dryRun,
@@ -172,9 +178,13 @@ final class RunCommand extends BaseCommand
 
         // A real run leaves its machine-readable hop record at the app root for
         // ROLLCALL to read from the app repo. A dry run changes nothing, so it
-        // writes none. Booster never commits the file; the developer does.
+        // writes none, and neither does a run refused before its first hop:
+        // there is no hop to commit it with, and it would overwrite the record
+        // of a stopped hop the next run re-gates from. Booster never commits
+        // the file; the developer does.
+        $notStarted = self::notStarted($report);
         $recordFile = null;
-        if (!$dryRun) {
+        if (!$dryRun && !$notStarted) {
             $appPath = realpath($report->plan->project->path);
             if ($appPath === false) {
                 throw new ToolError(sprintf('Could not resolve the app path "%s" to write the hop record.', $report->plan->project->path));
@@ -193,9 +203,42 @@ final class RunCommand extends BaseCommand
         if ($format === 'text' && $recordFile !== null) {
             $body .= PHP_EOL . sprintf('Hop record: %s (commit it with the hop).', $recordFile);
         }
+        $left = [];
+        foreach ($had as $name => $existed) {
+            if (!$existed && ($name === 'vendor/' ? is_dir($root . '/vendor') : is_file($root . '/' . $name))) {
+                $left[] = $name;
+            }
+        }
+        if ($format === 'text' && $notStarted && $left !== []) {
+            $body .= PHP_EOL . sprintf(
+                'Left in the folder by the baseline\'s composer install: %s. They are not your code: delete %s, or keep %s for the next run.',
+                implode(' and ', $left),
+                count($left) === 1 ? 'it' : 'them',
+                count($left) === 1 ? 'it' : 'them',
+            );
+        }
         $output->writeln($body, OutputInterface::OUTPUT_RAW);
 
         return $report->failed() ? self::EXIT_FAIL : self::EXIT_PASS;
+    }
+
+    /**
+     * True when the run was refused before its first hop (the baseline or
+     * the replay baseline failed) and re-gated nothing: no step ran and no
+     * deploy script was added.
+     */
+    private static function notStarted(RunReport $report): bool
+    {
+        if ($report->regate !== null || $report->deployScript !== null || !($report->baseline->failed() || ($report->replay?->failed() ?? false))) {
+            return false;
+        }
+        foreach ($report->results as $result) {
+            if ($result->status !== StepResult::NOT_RUN) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

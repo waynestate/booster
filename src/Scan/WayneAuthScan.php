@@ -117,24 +117,38 @@ final class WayneAuthScan
      * The stop sign lines for detect and plan: what was found, why it stops
      * the upgrade, and the way off. Empty when there are no hits.
      *
+     * An app already on PHP 7 or later (bug 7, proof run 2026-11-20) gets
+     * the reason that fits it: its PHP already verifies the certificate, so
+     * the sign-in fails there unless the app turned verification off.
+     *
      * @param list<string> $hits from find()
+     * @param string|null  $php  the app's PHP line (or composer constraint), when known
      *
      * @return list<string>
      */
-    public static function stopSign(array $hits): array
+    public static function stopSign(array $hits, ?string $php = null): array
     {
         if ($hits === []) {
             return [];
         }
         $shown = array_slice($hits, 0, self::SHOWN);
         $more = count($hits) - count($shown);
+        $line = $php !== null && preg_match('/\d+\.\d+/', $php, $m) === 1 ? $m[0] : null;
+        $stop = sprintf(
+            'Stop sign: the app signs people in through Wayne Auth (%s%s).',
+            implode('; ', $shown),
+            $more > 0 ? sprintf('; and %d more', $more) : '',
+        );
+        if ($line !== null && version_compare($line, '7.0', '>=')) {
+            return [
+                $stop,
+                sprintf('Wayne Auth is deprecated, and this app is on PHP %s, which verifies the service\'s TLS certificate by default; that certificate has expired, so the sign-in fails here unless the app turned the check off.', $line)
+                . ' Ship the move to SESAME\'s Wayne Auth bridge (a one-line swap; SESAME needs PHP 8.3) in the same release as the next hop: ' . self::GUIDE,
+            ];
+        }
 
         return [
-            sprintf(
-                'Stop sign: the app signs people in through Wayne Auth (%s%s).',
-                implode('; ', $shown),
-                $more > 0 ? sprintf('; and %d more', $more) : '',
-            ),
+            $stop,
             'Wayne Auth is deprecated, and its check survives only on PHP 5.6, which never verified the service\'s TLS certificate.'
             . ' PHP 7 and later verify it by default, and that certificate has expired, so once the app leaves PHP 5.6 nobody can sign in.'
             . ' Ship the move to SESAME\'s Wayne Auth bridge (a one-line swap; SESAME needs PHP 8.3) in the same release as the PHP hops,'

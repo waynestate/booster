@@ -45,6 +45,7 @@ final class ReplayCommand extends BaseCommand
             ->addOption('image', null, InputOption::VALUE_REQUIRED, 'Serve the app in this Docker image instead of booster-target, in the same three forms as run --image.')
             ->addOption('out', null, InputOption::VALUE_REQUIRED, 'Folder for the transcripts (default: a new booster-replay-<app>-<time> folder in the system temp folder).')
             ->addOption('no-install', null, InputOption::VALUE_NONE, 'Do not run composer install first; use the vendor/ the app already has.')
+            ->addOption('allow-failing-baseline', null, InputOption::VALUE_NONE, 'record only: keep a baseline whose every answer is an error (a PHP fatal, a 5xx, one error page for every path), with a warning; by default such a baseline is refused.')
             ->addOption('serve-changed', null, InputOption::VALUE_NONE, 'check only: the hop changed how the app is served (docroot, front controller, setup); compare answers anyway, as long as the requests are the same.')
             ->addOption('force', null, InputOption::VALUE_NONE, 'init only: overwrite an existing request file.');
     }
@@ -61,6 +62,9 @@ final class ReplayCommand extends BaseCommand
         $filePath = ReplayFile::locate($appPath, $this->stringOption($input, 'file'));
         if ((bool) $input->getOption('serve-changed') && in_array($action, ['init', 'record'], true)) {
             throw new ToolError('--serve-changed only goes with check.');
+        }
+        if ((bool) $input->getOption('allow-failing-baseline') && $action !== 'record') {
+            throw new ToolError('--allow-failing-baseline only goes with record.');
         }
 
         return match ($action) {
@@ -107,7 +111,7 @@ final class ReplayCommand extends BaseCommand
         $serveChanged = (bool) $input->getOption('serve-changed');
 
         if ($action === 'record') {
-            $outcome = $gate->record($php, $install);
+            $outcome = $gate->record($php, $install, (bool) $input->getOption('allow-failing-baseline'));
             $recording = $gate->recording();
             $lines = $outcome->lines;
             if ($recording !== null) {

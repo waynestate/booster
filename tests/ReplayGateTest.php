@@ -24,9 +24,9 @@ final class ReplayGateTest extends TestCase
     /**
      * @param list<list<array{0: int, 1: string, 2?: list<array{string, string}>}>|string> $replays
      */
-    private function gate(array $replays, ?ReplayFile $file = null, ?string $out = null, ?FakeProcessRunner &$fake = null): ReplayGate
+    private function gate(array $replays, ?ReplayFile $file = null, ?string $out = null, ?FakeProcessRunner &$fake = null, ?string $phpLog = null): ReplayGate
     {
-        $fake = ReplayFake::runner($replays);
+        $fake = ReplayFake::runner($replays, 0, $phpLog);
         $runner = new ReplayRunner(new TargetImageRunner($fake, dirname(__DIR__) . '/docker'), $fake);
 
         return new ReplayGate($runner, $file ?? $this->compareFile(), $this->tempDir(), $out ?? $this->tempDir(), null);
@@ -74,6 +74,91 @@ final class ReplayGateTest extends TestCase
 
         self::assertEmpty(preg_grep('/^Warning: /', $this->gate([$mixed])->record('5.6')->lines));
         self::assertEmpty(preg_grep('/^Warning: /', $this->gate([$apart])->record('5.6')->lines));
+    }
+
+    /**
+     * Bug 14 (proof run 2026-11-20): a Slim 3 app answered all five requests
+     * with one fatal (a gitignored log folder was missing), shown with a 200
+     * because the app turns display_errors on, and every hop "passed".
+     */
+    private const FATAL_BODY = "<br />\n<b>Fatal error</b>:  Uncaught Exception: Required '/app/var/logs/' is not a directory in /app/config/init.php:41\nStack trace:\n#0 {main}\n  thrown in <b>/app/config/init.php</b> on line <b>41</b><br />\n";
+
+    private const FATAL_LOG = "[20-Nov-2026 01:35:00 UTC] PHP Fatal error:  Uncaught Exception: Required '/app/var/logs/' is not a directory in /app/config/init.php:41\n";
+
+    public function test_a_baseline_where_every_answer_is_the_same_fatal_is_not_usable(): void
+    {
+        $fatal = [[200, self::FATAL_BODY], [200, self::FATAL_BODY]];
+        $gate = $this->gate([$fatal], phpLog: self::FATAL_LOG);
+
+        $outcome = $gate->record('7.2');
+
+        self::assertSame(ReplayOutcome::FAILED, $outcome->status);
+        self::assertNull($gate->recording());
+        self::assertSame('Replay baseline on PHP 7.2 is not usable: all 2 recorded answers are errors, before any change. A replay of it would only prove the app fails the same way after each hop.', $outcome->lines[0]);
+        self::assertSame("  01 requests / a number: GET /compare?code=0 answered 200 with a PHP error: Fatal error: Uncaught Exception: Required '/app/var/logs/' is not a directory in /app/config/init.php:41", $outcome->lines[1]);
+        self::assertStringStartsWith('  02 requests / a word: GET /compare?code=abc answered 200 with a PHP error: Fatal error: Uncaught Exception', $outcome->lines[2]);
+        self::assertStringStartsWith('PHP logged 1 distinct message while serving them: ', $outcome->lines[3]);
+        self::assertStringContainsString('or pass --allow-failing-baseline to replay against the errors anyway', $outcome->lines[4]);
+    }
+
+    public function test_a_baseline_of_server_errors_or_one_error_page_everywhere_is_not_usable(): void
+    {
+        $fiveHundreds = [[500, '<html><head><title>Slim Application Error</title></head><body><h1>Slim Application Error</h1></body></html>'], [503, '']];
+        $outcome = $this->gate([$fiveHundreds])->record('7.4');
+        self::assertSame(ReplayOutcome::FAILED, $outcome->status);
+        self::assertSame('  01 requests / a number: GET /compare?code=0 answered 500: Slim Application Error', $outcome->lines[1]);
+        self::assertSame('  02 requests / a word: GET /compare?code=abc answered 503.', $outcome->lines[2]);
+
+        $notFound = [[404, '<h1>Not Found</h1><p>The page was not found.</p>'], [404, '<h1>Not Found</h1><p>The page was not found.</p>']];
+        $outcome = $this->gate([$notFound])->record('7.4');
+        self::assertSame(ReplayOutcome::FAILED, $outcome->status);
+        self::assertSame('Replay baseline on PHP 7.4 is not usable: all 2 recorded answers are the same 404 page, before any change. A replay of it would only prove the app fails the same way after each hop.', $outcome->lines[0]);
+        self::assertSame('  01 requests / a number: GET /compare?code=0 and every other request answered 404: Not Found', $outcome->lines[1]);
+    }
+
+    public function test_error_answers_the_file_expects_are_a_usable_baseline(): void
+    {
+        $file = ReplayFile::fromArray(['requests' => [['path' => '/gone', 'expect' => 404], ['path' => '/also-gone', 'expect' => 404], ['path' => '/boom', 'expect' => 500]]]);
+        $answers = [[404, 'Not Found'], [404, 'Not Found'], [500, 'Server Error']];
+
+        $outcome = $this->gate([$answers], $file)->record('8.1');
+
+        self::assertSame(ReplayOutcome::RECORDED, $outcome->status);
+        self::assertEmpty(preg_grep('/^Warning: /', $outcome->lines));
+    }
+
+    public function test_with_allow_failing_baseline_an_error_baseline_is_recorded_with_a_warning(): void
+    {
+        $fatal = [[200, self::FATAL_BODY], [200, self::FATAL_BODY]];
+        $gate = $this->gate([$fatal, $fatal], phpLog: self::FATAL_LOG);
+
+        $outcome = $gate->record('7.2', false, true);
+
+        self::assertSame(ReplayOutcome::RECORDED, $outcome->status);
+        self::assertSame('Warning: All 2 recorded answers are errors. Recorded anyway because of --allow-failing-baseline, so the replay proves only that the app fails the same way after each hop.', $outcome->lines[1]);
+        self::assertSame(ReplayOutcome::PASSED, $gate->check('7.3', 'step-1')->status);
+    }
+
+    public function test_some_error_answers_and_a_fatal_in_the_log_warn_but_record(): void
+    {
+        $mixed = [[200, '{"code":"0","matches_zero":true}', self::JSON], [500, 'Internal Server Error']];
+
+        $outcome = $this->gate([$mixed], phpLog: self::FATAL_LOG)->record('7.4');
+
+        self::assertSame(ReplayOutcome::RECORDED, $outcome->status);
+        self::assertContains('Warning: 1 of 2 recorded answers are errors, so those requests replay the error, not the page:', $outcome->lines);
+        self::assertContains('  02 requests / a word: GET /compare?code=abc answered 500: Internal Server Error', $outcome->lines);
+        $log = preg_grep('/^Warning: PHP logged 1 fatal error while serving the baseline/', $outcome->lines);
+        self::assertCount(1, $log);
+        self::assertStringEndsWith("First: 1x PHP Fatal error: Uncaught Exception: Required '/app/var/logs/' is not a directory in /app/config/init.php:41", (string) reset($log));
+    }
+
+    public function test_the_php_error_finder_reads_plain_and_html_fatals_and_ignores_pages_that_mention_errors(): void
+    {
+        self::assertSame('Parse error: syntax error, unexpected end of file in /app/x.php on line 3', ReplayGate::phpErrorIn("PHP Parse error:  syntax error, unexpected end of file in /app/x.php on line 3\n"));
+        self::assertSame("Fatal error: Uncaught Exception: Required '/app/var/logs/' is not a directory in /app/config/init.php:41", ReplayGate::phpErrorIn(self::FATAL_BODY));
+        self::assertNull(ReplayGate::phpErrorIn('<p>No errors here, and fatal errors are rare.</p>'));
+        self::assertNull(ReplayGate::phpErrorIn(''));
     }
 
     public function test_a_changed_answer_fails_with_the_first_difference_and_where_the_transcripts_are(): void

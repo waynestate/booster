@@ -720,8 +720,10 @@ current PHP before the first hop (PHP's built-in server in the gate image, no ne
 command), replays them after every hop, and fails the hop on a changed answer, showing the first difference. A PHP 8
 hop that turns `0 == "abc"` from true to false fails there even when no test visits that page. `booster replay init`
 drafts the request file from the app's routes, with `todo` items for what only a person knows; normalizers hide CSRF
-tokens, session ids, timestamps and asset hashes. The file format, the design and the honest limits (no real
-Oracle, SSO or JavaScript-driven pages) are in [the replay gate guide](docs/guides/replay-gate.md).
+tokens, session ids, timestamps and asset hashes. A baseline where every answer is an error (a PHP fatal, an
+unexpected 5xx, or one error page for every path) stops the run before the first hop, since replaying it would only
+prove the app fails the same way; `--allow-failing-baseline` records it anyway. The file format, the design and the
+honest limits (no real Oracle, SSO or JavaScript-driven pages) are in [the replay gate guide](docs/guides/replay-gate.md).
 
 ### Hand-copied libraries to Composer
 

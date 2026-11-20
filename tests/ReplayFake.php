@@ -23,10 +23,11 @@ final class ReplayFake
     /**
      * @param list<list<array{0: int, 1: string, 2?: list<array{string, string}>}>|string> $replays one entry per replay container: answers as [status, body, headers], or SETUP_FAILS / NO_SERVER
      * @param int  $gateExit exit code of each gate (non-replay) docker run
+     * @param string|null $phpLog what PHP logs while serving each replay (default: one deprecation, twice)
      */
-    public static function runner(array $replays, int $gateExit = 0): FakeProcessRunner
+    public static function runner(array $replays, int $gateExit = 0, ?string $phpLog = null): FakeProcessRunner
     {
-        return new FakeProcessRunner(static function (array $command) use (&$replays, $gateExit): ProcessResult {
+        return new FakeProcessRunner(static function (array $command) use (&$replays, $gateExit, $phpLog): ProcessResult {
             if (($command[0] ?? '') === 'git') {
                 return new ProcessResult(0, '', '');
             }
@@ -73,7 +74,7 @@ final class ReplayFake
                 ];
             }
             file_put_contents($scratch . '/result.json', json_encode(['started' => true, 'answers' => $answers]));
-            file_put_contents($scratch . '/php-errors.log', "[05-Nov-2026 20:00:00 UTC] PHP Deprecated:  Old thing in /app/src/app.php on line 3\n[05-Nov-2026 20:00:01 UTC] PHP Deprecated:  Old thing in /app/src/app.php on line 3\n");
+            file_put_contents($scratch . '/php-errors.log', $phpLog ?? "[05-Nov-2026 20:00:00 UTC] PHP Deprecated:  Old thing in /app/src/app.php on line 3\n[05-Nov-2026 20:00:01 UTC] PHP Deprecated:  Old thing in /app/src/app.php on line 3\n");
 
             return new ProcessResult(0, "BOOSTER_REPLAY_PHASE=replay\nBOOSTER_REPLAY_EXIT=0\n", '');
         });
