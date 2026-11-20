@@ -25,6 +25,8 @@ final readonly class PlanStep
         public ?string $phpunitBefore,
         public ?string $phpunitAfter,
         public array $gates,
+        public ?string $frameworkBefore = null,
+        public ?string $frameworkAfter = null,
     ) {}
 
     /**
@@ -32,7 +34,7 @@ final readonly class PlanStep
      */
     public function toArray(): array
     {
-        return [
+        $array = [
             'step' => $this->number,
             'hop' => $this->hop->toArray(),
             'php_before' => $this->phpBefore,
@@ -41,7 +43,14 @@ final readonly class PlanStep
             'laravel_after' => $this->laravelAfter,
             'phpunit_before' => $this->phpunitBefore,
             'phpunit_after' => $this->phpunitAfter,
-            'gates' => $this->gates,
         ];
+        // Only a CakePHP or Slim app carries the keys, so every other plan keeps its shape.
+        if ($this->frameworkBefore !== null || $this->frameworkAfter !== null) {
+            $array['framework_before'] = $this->frameworkBefore;
+            $array['framework_after'] = $this->frameworkAfter;
+        }
+        $array['gates'] = $this->gates;
+
+        return $array;
     }
 }

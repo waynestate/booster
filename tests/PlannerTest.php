@@ -8,8 +8,11 @@ use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanOptions;
 use Waynestate\Booster\Plan\Planner;
+use Waynestate\Booster\Plan\PlanStep;
 use Waynestate\Booster\Policy\Policy;
 use Waynestate\Booster\Policy\PolicyLocator;
+use Waynestate\Booster\Project\AppType;
+use Waynestate\Booster\Project\Project;
 use Waynestate\Booster\Project\ProjectDetector;
 use Waynestate\Booster\ToolError;
 
@@ -47,6 +50,26 @@ final class PlannerTest extends TestCase
         $project = (new ProjectDetector())->detect($dir);
 
         return (new Planner($this->policy(), new HopRegistry()))->plan($project, $options, $this->today());
+    }
+
+    /** Plans a bare CakePHP or Slim app: an empty temp dir carrying only the given framework and PHP. */
+    private function frameworkPlan(string $framework, ?string $frameworkVersion, string $phpVersion, ?string $toPhp = null): Plan
+    {
+        $project = new Project(
+            path: $this->tempDir(),
+            hasComposer: true,
+            phpVersion: $phpVersion,
+            laravelMajor: null,
+            phpunitMajor: null,
+            vueMajor: null,
+            type: AppType::RawPhp,
+            usesWayneCas: false,
+            hasTestScript: false,
+            framework: $framework,
+            frameworkVersion: $frameworkVersion,
+        );
+
+        return (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(toPhp: $toPhp), $this->today());
     }
 
     /** A policy like the frozen fixture, plus one extra version per component. */
@@ -1042,5 +1065,79 @@ final class PlannerTest extends TestCase
 
         $plan = $this->plan('raw-php', new PlanOptions(toPhp: '8.0', vendored: true));
         self::assertContains('Asked for the vendored move, but found no hand-copied Doctrine 2, Smarty 3 or Slim 1 under vendor/; skipped.', $plan->warnings);
+    }
+
+    public function test_a_cakephp_43_app_stays_on_the_php_its_line_runs_on(): void
+    {
+        $plan = $this->frameworkPlan('cakephp', '4.3', '8.1', '8.5');
+
+        self::assertSame([], $this->ids($plan));
+        self::assertTrue($plan->stopsEarly);
+        self::assertSame(['CakePHP 4.3 runs on PHP 7.2 to 8.1, so PHP stays at 8.1. Booster has no CakePHP hop yet; see docs/guides/framework-hops.md.'], $plan->warnings);
+    }
+
+    public function test_a_cakephp_45_app_climbs_to_its_lines_ceiling_and_stops(): void
+    {
+        $plan = $this->frameworkPlan('cakephp', '4.5', '8.1', '8.5');
+
+        self::assertSame(['php-81-to-82', 'php-82-to-83'], $this->ids($plan));
+        self::assertTrue($plan->stopsEarly);
+        self::assertContains('CakePHP 4.5 runs on PHP 7.4 to 8.3, so PHP stays at 8.3. Booster has no CakePHP hop yet; see docs/guides/framework-hops.md.', $plan->warnings);
+        self::assertSame('4.5', $plan->steps[0]->frameworkBefore);
+        self::assertSame('4.5', $plan->steps[0]->frameworkAfter);
+        self::assertSame('4.5', $plan->steps[0]->toArray()['framework_before']);
+    }
+
+    public function test_a_slim_app_above_its_lines_ceiling_warns_about_the_pair_and_holds(): void
+    {
+        $plan = $this->frameworkPlan('slim', '3.12', '7.4', '8.5');
+
+        self::assertSame([], $this->ids($plan));
+        self::assertTrue($plan->stopsEarly);
+        self::assertContains('Slim 3.12 does not list PHP 7.4 (it runs on 5.5 to 7.3); the plan assumes the app really runs on that pair.', $plan->warnings);
+        self::assertContains('Slim 3.12 runs on PHP 5.5 to 7.3, so PHP stays at 7.4. Booster has no Slim hop yet; see docs/guides/framework-hops.md.', $plan->warnings);
+    }
+
+    public function test_an_unknown_cakephp_line_plans_no_php_hop_and_names_the_tables_span(): void
+    {
+        $plan = $this->frameworkPlan('cakephp', '2.10', '8.1', '8.5');
+
+        self::assertSame([], $this->ids($plan));
+        self::assertTrue($plan->stopsEarly);
+        self::assertContains('Booster does not know CakePHP 2.10 (it knows 3.10 to 5.4), so it plans no PHP hop for this app; see docs/guides/framework-hops.md.', $plan->warnings);
+        foreach ($plan->warnings as $warning) {
+            self::assertStringNotContainsString('runs on PHP', $warning);
+        }
+    }
+
+    public function test_a_framework_line_that_reaches_the_target_plans_every_php_hop(): void
+    {
+        $slim = $this->frameworkPlan('slim', '4.15', '8.3', '8.5');
+        self::assertSame(['php-83-to-84', 'php-84-to-85'], $this->ids($slim));
+        self::assertFalse($slim->stopsEarly);
+        self::assertSame([], $slim->warnings);
+
+        $cake = $this->frameworkPlan('cakephp', '5.4', '8.2', '8.5');
+        self::assertSame(['php-82-to-83', 'php-83-to-84', 'php-84-to-85'], $this->ids($cake));
+        self::assertFalse($cake->stopsEarly);
+        self::assertSame([], $cake->warnings);
+    }
+
+    public function test_a_plan_step_carries_the_framework_line_in_its_array(): void
+    {
+        $step = new PlanStep(1, (new HopRegistry())->get('php-81-to-82'), '8.1', '8.2', null, null, null, null, ['target-image-tests'], '4.3', '4.3');
+        $array = $step->toArray();
+
+        self::assertSame('4.3', $array['framework_before']);
+        self::assertSame('4.3', $array['framework_after']);
+    }
+
+    public function test_a_plan_step_without_a_framework_keeps_its_array_shape(): void
+    {
+        $step = new PlanStep(1, (new HopRegistry())->get('php-81-to-82'), '8.1', '8.2', null, null, null, null, ['target-image-tests']);
+        $array = $step->toArray();
+
+        self::assertArrayNotHasKey('framework_before', $array);
+        self::assertArrayNotHasKey('framework_after', $array);
     }
 }
