@@ -492,6 +492,12 @@ final class Mount
             $data['require'] = ['php' => $legacyPhp, ...(is_array($data['require'] ?? null) ? $data['require'] : [])];
             $data['require']['php'] = $legacyPhp;
             $this->notes[] = sprintf('composer.json requires PHP %s, as legacy/ does (the Laravel half asked for %s): one PHP runs both halves.', $legacyPhp, $rootPhp ?? 'none');
+            // Sourdough pins config.platform.php to its own floor so the lock resolves the same everywhere; move the pin up with it.
+            $platform = $data['config']['platform']['php'] ?? null;
+            if (is_string($platform) && version_compare($platform, $legacyFloor . '.0', '<')) {
+                $data['config']['platform']['php'] = $legacyFloor . '.0';
+                $this->notes[] = sprintf('composer.json config.platform.php is %s.0 (it was %s), so the lock resolves for that PHP.', $legacyFloor, $platform);
+            }
         }
         file_put_contents($path, self::json($data));
         $this->changed[] = 'composer.json';

@@ -64,7 +64,7 @@ final class StranglerMountTest extends TestCase
                 }
                 $this->baked[] = $name;
                 $files = [
-                    'composer.json' => json_encode(['name' => 'laravel/laravel', 'require' => ['php' => '^8.3', 'laravel/framework' => '^13.0'], 'scripts' => ['post-autoload-dump' => ['@php artisan package:discover --ansi'], 'post-update-cmd' => ['@boost-update']]], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+                    'composer.json' => json_encode(['name' => 'laravel/laravel', 'require' => ['php' => '^8.3', 'laravel/framework' => '^13.0'], 'config' => ['platform' => ['php' => '8.3.0']], 'scripts' => ['post-autoload-dump' => ['@php artisan package:discover --ansi'], 'post-update-cmd' => ['@boost-update']]], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
                     'artisan' => "#!/usr/bin/env php\n<?php\n",
                     'public/index.php' => "<?php\n// Laravel's stock front controller\n",
                     'public/.htaccess' => "RewriteEngine On\n",
@@ -376,6 +376,7 @@ final class StranglerMountTest extends TestCase
         self::assertSame('php', array_key_first($root['require']));
         self::assertSame('^13.0', $root['require']['laravel/framework'], 'the rest of the Laravel half\'s require is kept');
         self::assertContains('composer.json requires PHP ^8.5, as legacy/ does (the Laravel half asked for ^8.3): one PHP runs both halves.', $result->notes);
+        self::assertSame('8.5.0', $root['config']['platform']['php'], 'Sourdough\'s platform pin moves up with the floor');
 
         // The stock fixture floors at 7.4, below the Laravel half: the root keeps Laravel's own.
         $plain = $this->copyFixture('slim4');
