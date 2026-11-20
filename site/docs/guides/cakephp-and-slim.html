@@ -134,8 +134,16 @@ Move each one to PSR-15 when you next touch it, and delete the adapter when noth
 <li>Route groups: <code>function () use ($app)</code> becomes a callable that takes the group, so prefixes survive, and a route
 adder typed <code>\Slim\App</code> that a group calls is widened to take the group too.</li>
 <li><code>$request-&gt;getAttribute('route')</code> becomes <code>RouteContext::fromRequest($request)-&gt;getRoute()</code>.</li>
-<li><code>composer.json</code> gets <code>slim/slim ^4.15</code>, <code>pimple/pimple ^3</code> and <code>slim/psr7 ^1.7</code>, plus <code>slim/twig-view ^3.4</code> and
-<code>twig/twig ^3.8</code> when the app already lists them.</li>
+<li>Code typed with Slim 3's own <code>Slim\Http\Request</code> and <code>Slim\Http\Response</code> (the official Slim 3 skeleton's routes
+are) moves onto <code>slim/http</code>, whose decorators keep <code>withJson()</code>, <code>write()</code>, <code>getParam()</code> and <code>isXhr()</code> on Slim 4:
+<code>Slim\Http\Request</code> becomes <code>Slim\Http\ServerRequest</code> in use statements, fully qualified names and type hints
+(<code>use Slim\Http\Request;</code> becomes <code>use Slim\Http\ServerRequest as Request;</code>, so the bare name keeps working), and
+<code>Slim\Http\Response</code> keeps its name. Comments and strings are never touched. This covers <code>src</code>, <code>app</code>, <code>routes</code>,
+<code>config</code>, <code>tests</code>, <code>public</code> and the bootstrap file.</li>
+<li>The glue is written in PHP 7.4 syntax, because the hop runs on PHP 7.4.</li>
+<li><code>composer.json</code> gets <code>slim/slim ^4.15</code>, <code>pimple/pimple ^3</code> and <code>slim/psr7 ^1.6</code> (the line that still installs on
+PHP 7.4), <code>slim/http ^1.3</code> when the app names <code>Slim\Http\Request</code>, <code>Response</code> or <code>Environment</code>, plus
+<code>slim/twig-view ^3.4</code> and <code>twig/twig ^3.8</code> when the app already lists them.</li>
 </ul>
 <p><strong>What Booster does not do (the MANUAL list).</strong> Each run prints these as <code>MANUAL:</code> lines, with the file and line:</p>
 <ul>
@@ -145,9 +153,11 @@ handler with the error middleware if you want the old page and logging. This lin
 them), settings Slim 4 has no equivalent for, and <code>$settings-&gt;get('k')</code>, now a plain array read.</li>
 <li><code>pathFor()</code>, <code>urlFor()</code> and <code>relativePathFor()</code> calls (build the URL with the route parser), and Twig templates that
 call <code>path_for(</code> or <code>base_url(</code> (Twig-View 3 has <code>url_for</code>).</li>
-<li><code>getAttribute('routeInfo')</code>, <code>subRequest()</code>, <code>setArgument()</code> calls to check, <code>Slim\Http\Environment</code>, the
-container's <code>router</code>, <code>request</code>, <code>response</code> and <code>environment</code> entries, and code in outer middleware that reads the
-route before routing ran.</li>
+<li><code>getAttribute('routeInfo')</code>, <code>subRequest()</code>, <code>setArgument()</code> calls to check, the container's <code>router</code>, <code>request</code>,
+<code>response</code> and <code>environment</code> entries, and code in outer middleware that reads the route before routing ran.</li>
+<li><code>Slim\Http\Environment</code> (Slim 3 test harnesses build requests with <code>Environment::mock()</code>), one line per file with
+its line numbers, the <code>tests</code> folder included: build test requests with <code>Slim\Psr7\Factory\ServerRequestFactory</code> or
+<code>Slim\Http\Factory\DecoratedServerRequestFactory</code> instead.</li>
 <li>A group callable that uses <code>$this</code>, or calls <code>$app</code> without <code>use ($app)</code>, a route adder typed <code>\Slim\App</code> that was
 not widened, and middleware added by its container name.</li>
 <li><code>LegacyApp::finish($app)</code> where Booster could not place it, and a glue file that already exists and differs from the

@@ -730,8 +730,9 @@ upgrade rules in a container and requires CakePHP 4.6, and leaves the deprecatio
 the Authentication plugin like for like and swaps the Oracle driver, and leaves `isAuthorized()`, custom
 authenticators, RequestHandler and the mutable date classes as MANUAL. `slim-3-to-4` is planned at PHP 7.4; it moves
 the app to Slim 4.15 over its own Pimple container with generated glue, keeps double-pass middleware through an
-adapter and route group prefixes through the group callable, and leaves the old error handlers, `pathFor()` and Twig
-`path_for` as MANUAL. Run them with `--replay` and `--to-php 8.5`; the commands and the full MANUAL lists are in
+adapter and route group prefixes through the group callable, moves code typed with Slim 3's `Slim\Http\Request` and
+`Response` onto slim/http's decorators, and leaves the old error handlers, `pathFor()`, Twig `path_for` and
+`Slim\Http\Environment` as MANUAL. Run them with `--replay` and `--to-php 8.5`; the commands and the full MANUAL lists are in
 [the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/cakephp-and-slim.md).
 
 #### Strict session IDs for raw PHP apps
@@ -1559,6 +1560,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### \[Unreleased\] [#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Fixed: the Slim 3 to 4 hop runs on PHP 7.4 (slim/psr7 ^1.6, glue files in PHP 7.4 syntax) and moves apps typed with Slim 3's request and response classes onto slim/http.
 - Added: a guide for CakePHP and Slim apps (docs/guides/cakephp-and-slim.md): the commands, what each hop does and the MANUAL list.
 - Changed: the CakePHP and Slim playbooks (`booster init`) say the hop is a framework move with the replay as the real gate, and their Boost prompts point at the CakePHP and Slim upgrade guides (plus an Authentication plugin check on the CakePHP 5 step) instead of the Doctrine, Smarty and Slim 4 docs.
 - Fixed: the plan for a CakePHP 4 app on PHP below 7.4 now plans the 4.6 step, deferred to right after PHP reaches 7.4 (it used to drop it and stop at PHP 8.1).
@@ -2268,14 +2270,17 @@ One hop, `slim-3-to-4`, at the lowest PHP Slim 4.15 runs on (7.4: first when the
 - Every `add()` middleware keeps its `($request, $response, $next)` shape through the `LegacyDoublePass` adapter. Move each one to PSR-15 when you next touch it, and delete the adapter when nothing uses it.
 - Route groups: `function () use ($app)` becomes a callable that takes the group, so prefixes survive, and a route adder typed `\Slim\App` that a group calls is widened to take the group too.
 - `$request->getAttribute('route')` becomes `RouteContext::fromRequest($request)->getRoute()`.
-- `composer.json` gets `slim/slim ^4.15`, `pimple/pimple ^3` and `slim/psr7 ^1.7`, plus `slim/twig-view ^3.4` and `twig/twig ^3.8` when the app already lists them.
+- Code typed with Slim 3's own `Slim\Http\Request` and `Slim\Http\Response` (the official Slim 3 skeleton's routes are) moves onto `slim/http`, whose decorators keep `withJson()`, `write()`, `getParam()` and `isXhr()` on Slim 4: `Slim\Http\Request` becomes `Slim\Http\ServerRequest` in use statements, fully qualified names and type hints (`use Slim\Http\Request;` becomes `use Slim\Http\ServerRequest as Request;`, so the bare name keeps working), and `Slim\Http\Response` keeps its name. Comments and strings are never touched. This covers `src`, `app`, `routes`, `config`, `tests`, `public` and the bootstrap file.
+- The glue is written in PHP 7.4 syntax, because the hop runs on PHP 7.4.
+- `composer.json` gets `slim/slim ^4.15`, `pimple/pimple ^3` and `slim/psr7 ^1.6` (the line that still installs on PHP 7.4), `slim/http ^1.3` when the app names `Slim\Http\Request`, `Response` or `Environment`, plus `slim/twig-view ^3.4` and `twig/twig ^3.8` when the app already lists them.
 
 **What Booster does not do (the MANUAL list).** Each run prints these as `MANUAL:` lines, with the file and line:
 
 - Route exceptions now reach Slim's error middleware before your own PHP error or exception handler. Register your handler with the error middleware if you want the old page and logging. This line is always printed.
 - The `errorHandler`, `phpErrorHandler`, `notFoundHandler` and `notAllowedHandler` container keys (Slim 4 never reads them), settings Slim 4 has no equivalent for, and `$settings->get('k')`, now a plain array read.
 - `pathFor()`, `urlFor()` and `relativePathFor()` calls (build the URL with the route parser), and Twig templates that call `path_for(` or `base_url(` (Twig-View 3 has `url_for`).
-- `getAttribute('routeInfo')`, `subRequest()`, `setArgument()` calls to check, `Slim\Http\Environment`, the container's `router`, `request`, `response` and `environment` entries, and code in outer middleware that reads the route before routing ran.
+- `getAttribute('routeInfo')`, `subRequest()`, `setArgument()` calls to check, the container's `router`, `request`, `response` and `environment` entries, and code in outer middleware that reads the route before routing ran.
+- `Slim\Http\Environment` (Slim 3 test harnesses build requests with `Environment::mock()`), one line per file with its line numbers, the `tests` folder included: build test requests with `Slim\Psr7\Factory\ServerRequestFactory` or `Slim\Http\Factory\DecoratedServerRequestFactory` instead.
 - A group callable that uses `$this`, or calls `$app` without `use ($app)`, a route adder typed `\Slim\App` that was not widened, and middleware added by its container name.
 - `LegacyApp::finish($app)` where Booster could not place it, and a glue file that already exists and differs from the one the hop writes.
 

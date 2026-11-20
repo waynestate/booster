@@ -18,8 +18,10 @@ use Waynestate\Booster\ToolError;
  * container. It writes the generated glue (LegacyStubs) under the app's PSR-4
  * root, rewrites the bootstrap (BootstrapRewriter) and the route and
  * middleware code (RouteRewriter, then AdderWidener for route adders a group
- * calls), applies the hop's Composer pins plus Pimple and slim/psr7, and
- * lists what only a person can do as MANUAL lines. A dry run writes nothing
+ * calls), moves Slim 3's own request and response types onto slim/http
+ * (SlimHttpRewriter), applies the hop's Composer pins plus Pimple, slim/psr7
+ * and, when the app needs it, slim/http, and lists what only a person can do
+ * as MANUAL lines. A dry run writes nothing
  * and says what it would do; a second run changes nothing.
  *
  * Slim 3 to 4 is the difficult second album: same band, new label, and the
@@ -33,6 +35,9 @@ final class SlimUpgradeMigration implements FrameworkEngine
     /** Top-level folders whose PHP files the route rewrite reads. */
     private const ROUTE_DIRS = ['src', 'app', 'routes', 'config'];
 
+    /** Top-level folders whose PHP files the Slim\Http rewrite reads (the bootstrap files too). */
+    private const HTTP_DIRS = ['src', 'app', 'routes', 'config', 'tests', 'public'];
+
     /** Text that sends a file through RouteRewriter. */
     private const ROUTE_TRIGGERS = ['->group(', '->add(', "getAttribute('route')", 'getAttribute("route")', 'pathFor('];
 
@@ -44,6 +49,9 @@ final class SlimUpgradeMigration implements FrameworkEngine
     public const ERROR_HANDLER_LINE = "MANUAL: route exceptions now reach Slim's ErrorMiddleware before the app's own PHP error or exception handler;"
         . ' register that handler on the error middleware if you want the old page and logging.';
 
+    public const ENVIRONMENT_NOTE = 'Slim\\Http\\Environment is gone in Slim 4; build test requests with Slim\\Psr7\\Factory\\ServerRequestFactory'
+        . ' or Slim\\Http\\Factory\\DecoratedServerRequestFactory.';
+
     public const TWIG_NOTE = 'Twig-View 3 has no path_for; use url_for from the Twig-View runtime extension';
 
     /**
@@ -54,9 +62,19 @@ final class SlimUpgradeMigration implements FrameworkEngine
      */
     private const EXTRA_PINS = [
         'pimple/pimple' => ['^3', false, 'Slim 4 ships no container; the legacy container is Pimple'],
-        'slim/psr7' => ['^1.7', false, 'the PSR-7 messages the glue builds'],
+        'slim/psr7' => ['^1.6', false, 'the PSR-7 messages the glue builds'],
         'slim/twig-view' => ['^3.4', true, 'Twig-View 3 is the Slim 4 line'],
         'twig/twig' => ['^3.8', true, 'Twig-View 3 needs Twig 3'],
+    ];
+
+    /**
+     * The pin for an app whose code names Slim 3's Slim\Http\Request,
+     * Response or Environment.
+     *
+     * @var array<string, array{string, bool, string}>
+     */
+    private const HTTP_PIN = [
+        'slim/http' => ['^1.3', false, "the decorators that keep withJson, write and getParam for the app's Slim\\Http\\Request and Response types"],
     ];
 
     /** Past-tense first words of change lines and their dry-run form. */
@@ -188,18 +206,49 @@ final class SlimUpgradeMigration implements FrameworkEngine
             }
         }
         foreach ($routeManual as $file => $lines) {
-            $manual = [...$manual, ...self::fileManual($lines, $file)];
+            // Step 5 reports Slim\Http\Environment once per file, in every folder it reads.
+            $lines = array_filter($lines, static fn(string $line): bool => !str_contains($line, 'uses Slim\\Http\\Environment'));
+            $manual = [...$manual, ...self::fileManual(array_values($lines), $file)];
         }
 
-        // 5. Composer.
-        [$composerNew, $composerChanges, $packages] = $this->composerJson($hop, $composerRaw, $composerData);
+        // 5. Slim 3's own request, response and environment classes.
+        $usesHttp = false;
+        $httpRewriter = new SlimHttpRewriter();
+        foreach (array_keys($sources) as $file) {
+            if (!in_array($file, $bootstraps, true) && !in_array(explode('/', $file)[0], self::HTTP_DIRS, true)) {
+                continue;
+            }
+            $current = $after[$file] ?? $sources[$file];
+            if (!self::containsAny(strtolower($current), ['request', 'response', 'environment'])) {
+                continue;
+            }
+            $result = $httpRewriter->rewrite($current);
+            $usesHttp = $usesHttp || $result['uses'];
+            if ($result['code'] !== $current) {
+                $before[$file] ??= $sources[$file];
+                $after[$file] = $result['code'];
+                $changes[] = self::inFile('Rewrote Slim\\Http\\Request to its slim/http decorator, Slim\\Http\\ServerRequest.', $file, $result['renamed']);
+            }
+            if ($result['environment'] !== []) {
+                $manual[] = sprintf(
+                    'MANUAL: %s: %s %s: %s',
+                    $file,
+                    count($result['environment']) === 1 ? 'line' : 'lines',
+                    implode(', ', $result['environment']),
+                    self::ENVIRONMENT_NOTE,
+                );
+            }
+        }
+
+        // 6. Composer.
+        [$composerNew, $composerChanges, $packages] = $this->composerJson($hop, $composerRaw, $composerData, $usesHttp);
         if ($composerNew !== null) {
             $before['composer.json'] = $composerRaw;
             $after['composer.json'] = $composerNew;
             $changes = [...$changes, ...$composerChanges];
         }
 
-        // 6. What only a person can do.
+        // 7. What only a person can do.
         $manual = [...$manual, ...self::twigManual($appPath), ...self::containerReadManual($sources, $after)];
         $manual[] = self::ERROR_HANDLER_LINE;
         $manual = array_values(array_unique($manual));
@@ -290,13 +339,14 @@ final class SlimUpgradeMigration implements FrameworkEngine
 
     /**
      * The hop's pins through ComposerEditor (on a scratch copy, so a dry run
-     * writes nothing), then Pimple, slim/psr7 and the Twig-View line.
+     * writes nothing), then Pimple, slim/psr7, the Twig-View line and, when
+     * the app names Slim 3's HTTP classes, slim/http.
      *
      * @param array<mixed> $data
      *
      * @return array{?string, list<string>, list<string>} the new composer.json (null when unchanged), the lines, the packages touched
      */
-    private function composerJson(Hop $hop, string $raw, array $data): array
+    private function composerJson(Hop $hop, string $raw, array $data, bool $needsHttp): array
     {
         $scratch = RunScratch::dir('slim-upgrade/' . bin2hex(random_bytes(6)));
         self::write($scratch . '/composer.json', $raw);
@@ -310,7 +360,8 @@ final class SlimUpgradeMigration implements FrameworkEngine
         }
 
         $extra = [];
-        foreach (self::EXTRA_PINS as $package => [$constraint, $onlyIfPresent, $why]) {
+        $pins = $needsHttp ? [...self::EXTRA_PINS, ...self::HTTP_PIN] : self::EXTRA_PINS;
+        foreach ($pins as $package => [$constraint, $onlyIfPresent, $why]) {
             $section = isset($new['require'][$package]) ? 'require' : (isset($new['require-dev'][$package]) ? 'require-dev' : null);
             if ($section === null) {
                 if ($onlyIfPresent) {

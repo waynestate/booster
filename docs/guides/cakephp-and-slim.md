@@ -112,8 +112,16 @@ the PHP hop that lands on 7.4), then the PHP hops to 8.5. `--to-slim 3.13` is re
 - Route groups: `function () use ($app)` becomes a callable that takes the group, so prefixes survive, and a route
   adder typed `\Slim\App` that a group calls is widened to take the group too.
 - `$request->getAttribute('route')` becomes `RouteContext::fromRequest($request)->getRoute()`.
-- `composer.json` gets `slim/slim ^4.15`, `pimple/pimple ^3` and `slim/psr7 ^1.7`, plus `slim/twig-view ^3.4` and
-  `twig/twig ^3.8` when the app already lists them.
+- Code typed with Slim 3's own `Slim\Http\Request` and `Slim\Http\Response` (the official Slim 3 skeleton's routes
+  are) moves onto `slim/http`, whose decorators keep `withJson()`, `write()`, `getParam()` and `isXhr()` on Slim 4:
+  `Slim\Http\Request` becomes `Slim\Http\ServerRequest` in use statements, fully qualified names and type hints
+  (`use Slim\Http\Request;` becomes `use Slim\Http\ServerRequest as Request;`, so the bare name keeps working), and
+  `Slim\Http\Response` keeps its name. Comments and strings are never touched. This covers `src`, `app`, `routes`,
+  `config`, `tests`, `public` and the bootstrap file.
+- The glue is written in PHP 7.4 syntax, because the hop runs on PHP 7.4.
+- `composer.json` gets `slim/slim ^4.15`, `pimple/pimple ^3` and `slim/psr7 ^1.6` (the line that still installs on
+  PHP 7.4), `slim/http ^1.3` when the app names `Slim\Http\Request`, `Response` or `Environment`, plus
+  `slim/twig-view ^3.4` and `twig/twig ^3.8` when the app already lists them.
 
 **What Booster does not do (the MANUAL list).** Each run prints these as `MANUAL:` lines, with the file and line:
 
@@ -123,9 +131,11 @@ the PHP hop that lands on 7.4), then the PHP hops to 8.5. `--to-slim 3.13` is re
   them), settings Slim 4 has no equivalent for, and `$settings->get('k')`, now a plain array read.
 - `pathFor()`, `urlFor()` and `relativePathFor()` calls (build the URL with the route parser), and Twig templates that
   call `path_for(` or `base_url(` (Twig-View 3 has `url_for`).
-- `getAttribute('routeInfo')`, `subRequest()`, `setArgument()` calls to check, `Slim\Http\Environment`, the
-  container's `router`, `request`, `response` and `environment` entries, and code in outer middleware that reads the
-  route before routing ran.
+- `getAttribute('routeInfo')`, `subRequest()`, `setArgument()` calls to check, the container's `router`, `request`,
+  `response` and `environment` entries, and code in outer middleware that reads the route before routing ran.
+- `Slim\Http\Environment` (Slim 3 test harnesses build requests with `Environment::mock()`), one line per file with
+  its line numbers, the `tests` folder included: build test requests with `Slim\Psr7\Factory\ServerRequestFactory` or
+  `Slim\Http\Factory\DecoratedServerRequestFactory` instead.
 - A group callable that uses `$this`, or calls `$app` without `use ($app)`, a route adder typed `\Slim\App` that was
   not widened, and middleware added by its container name.
 - `LegacyApp::finish($app)` where Booster could not place it, and a glue file that already exists and differs from the

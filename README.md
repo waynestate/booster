@@ -746,8 +746,9 @@ upgrade rules in a container and requires CakePHP 4.6, and leaves the deprecatio
 the Authentication plugin like for like and swaps the Oracle driver, and leaves `isAuthorized()`, custom
 authenticators, RequestHandler and the mutable date classes as MANUAL. `slim-3-to-4` is planned at PHP 7.4; it moves
 the app to Slim 4.15 over its own Pimple container with generated glue, keeps double-pass middleware through an
-adapter and route group prefixes through the group callable, and leaves the old error handlers, `pathFor()` and Twig
-`path_for` as MANUAL. Run them with `--replay` and `--to-php 8.5`; the commands and the full MANUAL lists are in
+adapter and route group prefixes through the group callable, moves code typed with Slim 3's `Slim\Http\Request` and
+`Response` onto slim/http's decorators, and leaves the old error handlers, `pathFor()`, Twig `path_for` and
+`Slim\Http\Environment` as MANUAL. Run them with `--replay` and `--to-php 8.5`; the commands and the full MANUAL lists are in
 [the guide](docs/guides/cakephp-and-slim.md).
 
 ### Strict session IDs for raw PHP apps

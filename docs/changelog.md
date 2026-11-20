@@ -11,6 +11,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Fixed: the Slim 3 to 4 hop runs on PHP 7.4 (slim/psr7 ^1.6, glue files in PHP 7.4 syntax) and moves apps typed with Slim 3's request and response classes onto slim/http.
 - Added: a guide for CakePHP and Slim apps (docs/guides/cakephp-and-slim.md): the commands, what each hop does and the MANUAL list.
 - Changed: the CakePHP and Slim playbooks (`booster init`) say the hop is a framework move with the replay as the real gate, and their Boost prompts point at the CakePHP and Slim upgrade guides (plus an Authentication plugin check on the CakePHP 5 step) instead of the Doctrine, Smarty and Slim 4 docs.
 - Fixed: the plan for a CakePHP 4 app on PHP below 7.4 now plans the 4.6 step, deferred to right after PHP reaches 7.4 (it used to drop it and stop at PHP 8.1).

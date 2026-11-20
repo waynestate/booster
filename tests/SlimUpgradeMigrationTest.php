@@ -89,6 +89,64 @@ final class SlimUpgradeMigrationTest extends TestCase
 
         PHP;
 
+    /** Routes typed with Slim 3's own request and response, as the official Slim 3 skeleton writes them. */
+    private const SKELETON_ROUTES = <<<'PHP'
+        <?php
+
+        use Slim\Http\Request;
+        use Slim\Http\Response;
+
+        $app->get('/[{name}]', function (Request $request, Response $response, array $args) {
+            return $response->withJson(['name' => $args['name'] ?? 'world']);
+        });
+
+        PHP;
+
+    /** Fully qualified and global qualified request types, and the same name in a comment and a string. */
+    private const TYPED_ROUTES = <<<'PHP'
+        <?php
+
+        // Slim\Http\Request stays in this comment.
+        $app->get('/hello', function (\Slim\Http\Request $request, \Slim\Http\Response $response) {
+            $label = 'Slim\Http\Request';
+
+            return $response->write($label . $request->getParam('name'));
+        });
+        $app->get('/other', function (Slim\Http\Request $request, $response) {
+            return $response;
+        });
+
+        PHP;
+
+    /** A Slim 3 test harness: Environment::mock() and Request::createFromEnvironment(). */
+    private const BASE_TEST_CASE = <<<'PHP'
+        <?php
+
+        namespace Tests\Functional;
+
+        use Slim\Http\Environment;
+        use Slim\Http\Request;
+        use Slim\Http\Response;
+
+        class BaseTestCase extends \PHPUnit\Framework\TestCase
+        {
+            public function runApp($requestMethod, $requestUri)
+            {
+                $environment = Environment::mock([
+                    'REQUEST_METHOD' => $requestMethod,
+                    'REQUEST_URI' => $requestUri,
+                ]);
+                $request = Request::createFromEnvironment($environment);
+                $app = require __DIR__ . '/../../src/app.php';
+
+                return $app->process($request, new Response());
+            }
+        }
+
+        PHP;
+
+    private const HTTP_CHANGE = "Added slim/http ^1.3 to require (the decorators that keep withJson, write and getParam for the app's Slim\\Http\\Request and Response types).";
+
     private const ERROR_HANDLER_LINE = "MANUAL: route exceptions now reach Slim's ErrorMiddleware before the app's own PHP error or exception handler; register that handler on the error middleware if you want the old page and logging.";
 
     private static function hop(): Hop
@@ -405,7 +463,7 @@ final class SlimUpgradeMigrationTest extends TestCase
         self::assertIsArray($require);
         self::assertSame('^4.15', $require['slim/slim']);
         self::assertSame('^3', $require['pimple/pimple']);
-        self::assertSame('^1.7', $require['slim/psr7']);
+        self::assertSame('^1.6', $require['slim/psr7']);
         self::assertArrayNotHasKey('php-di/php-di', $require);
         self::assertSame(['slim/slim', 'pimple/pimple', 'slim/psr7'], $result->packages);
         self::assertContains('Set slim/slim to ^4.15 in require.', $result->changes);
@@ -486,5 +544,188 @@ final class SlimUpgradeMigrationTest extends TestCase
         self::assertSame([], $second->packages);
         self::assertSame(['Nothing left to move: the app already runs on the Slim 4 glue.'], $second->changes);
         self::assertContains(self::ERROR_HANDLER_LINE, $second->manual);
+    }
+
+    public function test_slim_psr7_is_pinned_to_1_6(): void
+    {
+        // slim/psr7 1.6 runs on the PHP 7.4 the hop is planned at; 1.7 and up need PHP 8.0.
+        $dir = $this->slimApp();
+        $result = $this->migrateApp($dir);
+        self::assertSame('^1.6', self::composer($dir)['require']['slim/psr7'] ?? null);
+        self::assertContains('Added slim/psr7 ^1.6 to require (the PSR-7 messages the glue builds).', $result->changes);
+
+        $old = $this->slimApp(['composer.json' => self::composerJson(['slim/psr7' => '^1.5'])]);
+        $raised = $this->migrateApp($old);
+        self::assertSame('^1.6', self::composer($old)['require']['slim/psr7'] ?? null);
+        self::assertContains('Set slim/psr7 to ^1.6 in require (the PSR-7 messages the glue builds).', $raised->changes);
+
+        $same = $this->slimApp(['composer.json' => self::composerJson(['slim/psr7' => '^1.6'])]);
+        $kept = $this->migrateApp($same);
+        self::assertSame('^1.6', self::composer($same)['require']['slim/psr7'] ?? null);
+        self::assertNotContains('slim/psr7', $kept->packages);
+    }
+
+    public function test_slim_http_is_required_when_the_app_uses_slim_3_request_or_response(): void
+    {
+        $dir = $this->slimApp(['src/routes.php' => self::SKELETON_ROUTES]);
+
+        $result = $this->migrateApp($dir);
+
+        self::assertSame('^1.3', self::composer($dir)['require']['slim/http'] ?? null);
+        self::assertContains('slim/http', $result->packages);
+        self::assertContains(self::HTTP_CHANGE, $result->changes);
+
+        // A fully qualified Response type alone is enough, in app/ too, and the dry run says it would.
+        $response = $this->slimApp([
+            'app/Handlers/health.php' => "<?php\n\nfunction health(\$request, \\Slim\\Http\\Response \$response)\n{\n    return \$response->withJson(['ok' => true]);\n}\n",
+        ]);
+        $dry = $this->migrateApp($response, true);
+        self::assertContains('Dry run: would add' . substr(self::HTTP_CHANGE, strlen('Added')), $dry->changes);
+        $this->migrateApp($response);
+        self::assertSame('^1.3', self::composer($response)['require']['slim/http'] ?? null);
+
+        // An older slim/http the app already lists is raised.
+        $older = $this->slimApp(['composer.json' => self::composerJson(['slim/http' => '^0.8']), 'src/routes.php' => self::SKELETON_ROUTES]);
+        $this->migrateApp($older);
+        self::assertSame('^1.3', self::composer($older)['require']['slim/http'] ?? null);
+    }
+
+    public function test_slim_http_request_is_renamed_to_server_request(): void
+    {
+        $relative = "<?php\n\nnamespace Acme\\Controller;\n\nfunction local(Slim\\Http\\Request \$request)\n{\n    return \$request;\n}\n";
+        $dir = $this->slimApp(['src/routes.php' => self::TYPED_ROUTES, 'src/Controller/relative.php' => $relative]);
+
+        $result = $this->migrateApp($dir);
+
+        $routes = (string) file_get_contents($dir . '/src/routes.php');
+        self::assertStringContainsString('function (\\Slim\\Http\\ServerRequest $request, \\Slim\\Http\\Response $response) {', $routes);
+        self::assertStringContainsString('function (Slim\\Http\\ServerRequest $request, $response) {', $routes);
+        // Never in comments or strings.
+        self::assertStringContainsString('// Slim\\Http\\Request stays in this comment.', $routes);
+        self::assertStringContainsString("\$label = 'Slim\\Http\\Request';", $routes);
+        self::assertSame(2, substr_count($routes, 'Slim\\Http\\Request'));
+        self::assertContains('Rewrote Slim\\Http\\Request to its slim/http decorator, Slim\\Http\\ServerRequest in src/routes.php (2 times).', $result->changes);
+        self::assertStringContainsString("\n+\$app->get('/hello', function (\\Slim\\Http\\ServerRequest \$request,", array_column($result->files, 'diff', 'file')['src/routes.php']);
+
+        // In a namespace, a qualified name without an import is the app's own class, so it stays.
+        self::assertSame($relative, file_get_contents($dir . '/src/Controller/relative.php'));
+
+        // A second run renames nothing more.
+        $second = $this->migrateApp($dir);
+        self::assertSame([], $second->files);
+    }
+
+    public function test_slim_http_request_alias_keeps_the_bare_name(): void
+    {
+        $home = <<<'PHP'
+            <?php
+
+            namespace Acme\Controller;
+
+            use Slim\Http\Request;
+            use Slim\Http\Request as HttpRequest;
+
+            final class Home
+            {
+                public function __invoke(Request $request, HttpRequest $again)
+                {
+                    return $request;
+                }
+            }
+
+            PHP;
+        $group = "<?php\n\nnamespace Acme\\Controller;\n\nuse Slim\\Http\\{Request, Response};\nuse \\Slim\\Http\\Request as Leading;\n\nfunction group(Request \$request, Response \$response, Leading \$leading) {}\n";
+        $dir = $this->slimApp(['src/Controller/Home.php' => $home, 'src/Controller/group.php' => $group]);
+
+        $result = $this->migrateApp($dir);
+
+        $rewritten = (string) file_get_contents($dir . '/src/Controller/Home.php');
+        self::assertStringContainsString("use Slim\\Http\\ServerRequest as Request;\nuse Slim\\Http\\ServerRequest as HttpRequest;\n", $rewritten);
+        self::assertStringContainsString('public function __invoke(Request $request, HttpRequest $again)', $rewritten);
+        self::assertStringNotContainsString('Slim\\Http\\Request', $rewritten);
+
+        $grouped = (string) file_get_contents($dir . '/src/Controller/group.php');
+        self::assertStringContainsString("use Slim\\Http\\{ServerRequest as Request, Response};\nuse \\Slim\\Http\\ServerRequest as Leading;\n", $grouped);
+        self::assertStringContainsString('function group(Request $request, Response $response, Leading $leading) {}', $grouped);
+        self::assertContains('Rewrote Slim\\Http\\Request to its slim/http decorator, Slim\\Http\\ServerRequest in src/Controller/group.php (2 times).', $result->changes);
+        self::assertSame('^1.3', self::composer($dir)['require']['slim/http'] ?? null);
+    }
+
+    public function test_environment_use_is_manual_with_line_numbers(): void
+    {
+        $mock = <<<'PHP'
+            <?php
+
+            namespace Acme\Support;
+
+            use Slim\Http\Environment;
+
+            final class Mock
+            {
+                public static function env(): Environment
+                {
+                    return Environment::mock(['REQUEST_URI' => '/']);
+                }
+            }
+
+            PHP;
+        // The routes file also goes through the route rewriter, which has its own Environment rule.
+        $routes = self::ROUTES . "\$env = \\Slim\\Http\\Environment::mock();\n";
+        $dir = $this->slimApp(['src/Support/Mock.php' => $mock, 'src/routes.php' => $routes]);
+
+        $result = $this->migrateApp($dir);
+
+        self::assertSame(
+            'Slim\\Http\\Environment is gone in Slim 4; build test requests with Slim\\Psr7\\Factory\\ServerRequestFactory or Slim\\Http\\Factory\\DecoratedServerRequestFactory.',
+            SlimUpgradeMigration::ENVIRONMENT_NOTE,
+        );
+        self::assertContains('MANUAL: src/Support/Mock.php: lines 5, 9, 11: ' . SlimUpgradeMigration::ENVIRONMENT_NOTE, $result->manual);
+        $routeLines = array_values(array_filter(
+            $result->manual,
+            static fn(string $line): bool => str_starts_with($line, 'MANUAL: src/routes.php') && str_contains($line, 'Environment'),
+        ));
+        self::assertSame([sprintf('MANUAL: src/routes.php: line %d: %s', substr_count(self::ROUTES, "\n") + 1, SlimUpgradeMigration::ENVIRONMENT_NOTE)], $routeLines);
+        // Reported, never edited; and the class needs slim/http's line of Slim 4 messages.
+        self::assertSame($mock, file_get_contents($dir . '/src/Support/Mock.php'));
+        self::assertSame('^1.3', self::composer($dir)['require']['slim/http'] ?? null);
+    }
+
+    public function test_environment_in_tests_folder_is_reported(): void
+    {
+        $dir = $this->slimApp([
+            'tests/Functional/BaseTestCase.php' => self::BASE_TEST_CASE,
+            // Folders the hop does not read stay out of the report.
+            'scripts/mock.php' => "<?php\n\n\$env = \\Slim\\Http\\Environment::mock();\n",
+        ]);
+
+        $result = $this->migrateApp($dir);
+
+        self::assertContains('MANUAL: tests/Functional/BaseTestCase.php: lines 5, 13: ' . SlimUpgradeMigration::ENVIRONMENT_NOTE, $result->manual);
+        self::assertSame([], array_values(array_filter($result->manual, static fn(string $line): bool => str_contains($line, 'scripts/mock.php'))));
+        $harness = (string) file_get_contents($dir . '/tests/Functional/BaseTestCase.php');
+        self::assertStringContainsString("use Slim\\Http\\Environment;\nuse Slim\\Http\\ServerRequest as Request;\nuse Slim\\Http\\Response;\n", $harness);
+        self::assertContains('Rewrote Slim\\Http\\Request to its slim/http decorator, Slim\\Http\\ServerRequest in tests/Functional/BaseTestCase.php.', $result->changes);
+        self::assertContains(self::HTTP_CHANGE, $result->changes);
+    }
+
+    public function test_no_slim_http_requirement_when_the_app_does_not_use_it(): void
+    {
+        $note = "<?php\n\n// Slim\\Http\\Request was Slim 3's request.\n\$name = 'Slim\\Http\\Response';\n";
+        $dir = $this->slimApp([
+            'src/note.php' => $note,
+            // vendor/ is never read, and scripts/ is outside the folders the hop reads.
+            'vendor/slim/slim/Slim/Http/Request.php' => "<?php\n\nnamespace Slim\\Http;\n\nclass Request extends \\Slim\\Http\\Message {}\n",
+            'scripts/env.php' => "<?php\n\n\$env = \\Slim\\Http\\Environment::mock();\n",
+        ]);
+
+        $result = $this->migrateApp($dir);
+
+        $require = self::composer($dir)['require'];
+        self::assertIsArray($require);
+        self::assertArrayNotHasKey('slim/http', $require);
+        self::assertNotContains('slim/http', $result->packages);
+        self::assertSame([], array_values(array_filter([...$result->changes, ...$result->manual], static fn(string $line): bool => str_contains($line, 'Slim\\Http') || str_contains($line, 'slim/http'))));
+        self::assertSame($note, file_get_contents($dir . '/src/note.php'));
+        self::assertSame(['slim/slim', 'pimple/pimple', 'slim/psr7'], $result->packages);
     }
 }

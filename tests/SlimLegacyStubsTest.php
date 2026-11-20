@@ -17,7 +17,7 @@ use Waynestate\Booster\Run\Slim\LegacyStubs;
 /**
  * The files the Slim 3 to 4 hop copies into an app, run for real: the
  * generated classes are loaded under a namespace of their own and driven
- * through slim/slim 4.15 and slim/psr7 (dev dependencies). Pimple is not a
+ * through slim/slim 4.15, slim/psr7 and slim/http (dev dependencies). Pimple is not a
  * Booster dependency, so a small stand-in with Pimple's lazy, shared services
  * is defined here.
  */
@@ -272,6 +272,141 @@ final class SlimLegacyStubsTest extends TestCase
         self::forgetAppFactoryContainer();
         $bare = AppFactory::create();
         self::assertSame($bare, self::call('LegacyApp', 'finish', $bare));
+    }
+
+    public function test_generated_glue_is_php_74_syntax(): void
+    {
+        foreach (['container', 'doublePass', 'app'] as $stub) {
+            self::assertSame([], self::php8Syntax(LegacyStubs::$stub('App\\Legacy')), $stub . ' must parse on PHP 7.4, the PHP the hop runs on');
+        }
+
+        // The scan itself finds each PHP 8 form it looks for.
+        $php8 = <<<'PHP'
+            <?php
+            final class Sample
+            {
+                public function __construct(private int $id) {}
+                public function get(): mixed { return $this?->id; }
+                public function me(): static { return $this; }
+                public function pick(int|string $key, $e, $f,) { return match ($key) { default => str_contains('a', 'b') }; }
+                public function name($e) { return $e::class . strlen(string: 'x') . fdiv(1, 2); }
+                public function first() { try { return strlen(...); } catch (\Throwable) { return $this ?? throw new \Exception(); } }
+            }
+            PHP;
+        $found = self::php8Syntax($php8);
+        foreach (['promoted', 'mixed', 'nullsafe', 'static', 'union', 'trailing comma', 'match', 'PHP 8 function str_contains', 'PHP 8 function fdiv', '::class on an object', 'named argument', 'first-class callable', 'catch without a variable', 'throw expression'] as $form) {
+            self::assertNotSame([], array_filter($found, static fn(string $line): bool => str_contains($line, $form)), 'The scan must find: ' . $form);
+        }
+    }
+
+    public function test_double_pass_refuses_what_is_not_middleware(): void
+    {
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage('LegacyDoublePass needs a callable or a PSR-15 middleware, stdClass given.');
+
+        self::make('LegacyDoublePass', new \stdClass());
+    }
+
+    public function test_routes_typed_with_slim_http_classes_get_the_decorators(): void
+    {
+        if (!class_exists(\Slim\Http\Response::class)) {
+            self::markTestSkipped('slim/http is not installed.');
+        }
+
+        $app = self::call('LegacyApp', 'create');
+        $app->get('/json', function ($request, \Slim\Http\Response $response) {
+            return $response->withJson(['typed' => 'response']);
+        });
+        $app->get('/hello', function (\Slim\Http\ServerRequest $request, \Slim\Http\Response $response) {
+            return $response->write('Hello ' . $request->getParam('name'));
+        });
+        self::call('LegacyApp', 'finish', $app);
+
+        $json = $app->handle(self::request('GET', '/json'));
+        self::assertSame(200, $json->getStatusCode());
+        self::assertSame('{"typed":"response"}', (string) $json->getBody());
+        self::assertSame('application/json', $json->getHeaderLine('Content-Type'));
+
+        // App::run() builds the request through ServerRequestCreatorFactory, which decorates it the same way.
+        $server = $_SERVER;
+
+        try {
+            $_SERVER = [...$_SERVER, 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/hello?name=Booster', 'QUERY_STRING' => 'name=Booster', 'HTTP_HOST' => 'localhost', 'SERVER_PORT' => '80'];
+            $request = \Slim\Factory\ServerRequestCreatorFactory::create()->createServerRequestFromGlobals();
+        } finally {
+            $_SERVER = $server;
+        }
+        self::assertInstanceOf(\Slim\Http\ServerRequest::class, $request);
+
+        $hello = $app->handle($request);
+        self::assertSame(200, $hello->getStatusCode());
+        self::assertSame('Hello Booster', (string) $hello->getBody());
+    }
+
+    /**
+     * PHP 8 syntax in $code, one line per find: what PHP 7.4 cannot parse or
+     * run (types, promotion, match, nullsafe, named arguments, trailing commas
+     * in a list, PHP 8 functions and the rest).
+     *
+     * @return list<string>
+     */
+    private static function php8Syntax(string $code): array
+    {
+        $tokens = array_values(array_filter(\PhpToken::tokenize($code, TOKEN_PARSE), static fn(\PhpToken $token): bool => !$token->isIgnorable()));
+        $functions = ['str_contains', 'str_starts_with', 'str_ends_with', 'get_debug_type', 'get_resource_id', 'fdiv', 'array_is_list', 'preg_last_error_msg'];
+        $found = [];
+        $depth = 0;
+        foreach ($tokens as $i => $token) {
+            $previous = $tokens[$i - 1] ?? null;
+            $next = $tokens[$i + 1] ?? null;
+            $at = sprintf(' at line %d', $token->line);
+            $text = strtolower($token->text);
+            $depth += $token->text === '(' ? 1 : ($token->text === ')' ? -1 : 0);
+
+            if ($token->is([T_MATCH, T_NULLSAFE_OBJECT_OPERATOR, T_READONLY, T_ENUM, T_ATTRIBUTE])) {
+                $found[] = ($token->is(T_MATCH) ? 'match' : ($token->is(T_NULLSAFE_OBJECT_OPERATOR) ? 'nullsafe' : $token->text)) . $at;
+            }
+            if ($token->is(T_STRING) && in_array($text, ['mixed', 'never'], true)) {
+                $found[] = $text . ' type' . $at;
+            }
+            if ($token->text === '|') {
+                $found[] = 'union type' . $at;
+            }
+            if ($token->text === ',' && $next !== null && $next->text === ')') {
+                $found[] = 'trailing comma in a list' . $at;
+            }
+            if ($token->is(T_STATIC) && $previous !== null && $previous->text === ':') {
+                $found[] = 'static return type' . $at;
+            }
+            if ($token->is([T_PUBLIC, T_PROTECTED, T_PRIVATE]) && $depth > 0) {
+                $found[] = 'promoted constructor parameter' . $at;
+            }
+            if ($token->is(T_STRING) && in_array($text, $functions, true) && $next !== null && $next->text === '(') {
+                $found[] = 'PHP 8 function ' . $text . $at;
+            }
+            if ($token->is(T_STRING) && $previous !== null && in_array($previous->text, ['(', ','], true) && $next !== null && $next->text === ':') {
+                $found[] = 'named argument' . $at;
+            }
+            if ($token->is(T_DOUBLE_COLON) && $previous !== null && $previous->is(T_VARIABLE) && $next !== null && strtolower($next->text) === 'class') {
+                $found[] = '::class on an object' . $at;
+            }
+            if ($token->is(T_ELLIPSIS) && $next !== null && $next->text === ')') {
+                $found[] = 'first-class callable' . $at;
+            }
+            if ($token->is(T_CATCH)) {
+                for ($j = $i + 1; isset($tokens[$j]) && $tokens[$j]->text !== ')'; $j++) {
+                    if ($tokens[$j]->is(T_VARIABLE)) {
+                        continue 2;
+                    }
+                }
+                $found[] = 'catch without a variable' . $at;
+            }
+            if ($token->is(T_THROW) && $previous !== null && in_array($previous->text, ['??', '=>', '?', '(', ',', '='], true)) {
+                $found[] = 'throw expression' . $at;
+            }
+        }
+
+        return $found;
     }
 
     private static function request(string $method, string $path): ServerRequestInterface

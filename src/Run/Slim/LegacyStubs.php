@@ -10,7 +10,9 @@ namespace Waynestate\Booster\Run\Slim;
  * answers `$c['x']`, `$c->x` and `$c->get('x')`, an adapter that runs a Slim 3
  * double-pass middleware as PSR-15, and the app factory glue that turns Slim 3
  * settings into Slim 4 middleware. They are copied into the app (no runtime
- * dependency on Booster), so each one is a complete file.
+ * dependency on Booster), so each one is a complete file. The hop runs at
+ * PHP 7.4, so the files are written in PHP 7.4 syntax: no mixed, no union
+ * types, no trailing comma in a parameter list (docblocks carry the types).
  *
  * Slim 3 to 4 is the sequel where the container walked out of the band and
  * started a solo career. These stubs are the reunion tour.
@@ -42,8 +44,10 @@ final class LegacyStubs
         {
             /**
              * @param string $id
+             *
+             * @return mixed
              */
-            public function get($id): mixed
+            public function get($id)
             {
                 if (!$this->offsetExists($id)) {
                     throw new LegacyNotFound(sprintf('Identifier "%s" is not defined in the container.', $id));
@@ -60,7 +64,10 @@ final class LegacyStubs
                 return $this->offsetExists($id);
             }
 
-            public function __get(string $name): mixed
+            /**
+             * @return mixed
+             */
+            public function __get(string $name)
             {
                 return $this[$name];
             }
@@ -93,14 +100,23 @@ final class LegacyStubs
             /** @var callable|\Psr\Http\Server\MiddlewareInterface */
             private $legacy;
 
-            public function __construct(callable|\Psr\Http\Server\MiddlewareInterface $legacy)
+            /**
+             * @param callable|\Psr\Http\Server\MiddlewareInterface $legacy
+             */
+            public function __construct($legacy)
             {
+                if (!is_callable($legacy) && !$legacy instanceof \Psr\Http\Server\MiddlewareInterface) {
+                    throw new \TypeError(sprintf(
+                        'LegacyDoublePass needs a callable or a PSR-15 middleware, %s given.',
+                        is_object($legacy) ? get_class($legacy) : gettype($legacy)
+                    ));
+                }
                 $this->legacy = $legacy;
             }
 
             public function process(
                 \Psr\Http\Message\ServerRequestInterface $request,
-                \Psr\Http\Server\RequestHandlerInterface $handler,
+                \Psr\Http\Server\RequestHandlerInterface $handler
             ): \Psr\Http\Message\ResponseInterface {
                 if ($this->legacy instanceof \Psr\Http\Server\MiddlewareInterface) {
                     return $this->legacy->process($request, $handler);
@@ -109,7 +125,7 @@ final class LegacyStubs
                 $response = new \Slim\Psr7\Response();
                 $next = static function (
                     \Psr\Http\Message\ServerRequestInterface $req,
-                    \Psr\Http\Message\ResponseInterface $res,
+                    \Psr\Http\Message\ResponseInterface $res
                 ) use ($handler): \Psr\Http\Message\ResponseInterface {
                     $answer = $handler->handle($req);
                     foreach ($res->getHeaders() as $name => $values) {
@@ -159,6 +175,13 @@ final class LegacyStubs
                 $container = new LegacyContainer($config);
                 \Slim\Factory\AppFactory::setContainer($container);
 
+                // With slim/http installed, routes typed Slim\Http\ServerRequest or
+                // Slim\Http\Response get its decorators (withJson, write, getParam),
+                // the methods Slim 3's own request and response had. Slim turns this
+                // on by default; it is said here so nobody wonders where they came from.
+                \Slim\Factory\AppFactory::setSlimHttpDecoratorsAutomaticDetection(true);
+                \Slim\Factory\ServerRequestCreatorFactory::setSlimHttpDecoratorsAutomaticDetection(true);
+
                 return \Slim\Factory\AppFactory::create();
             }
 
@@ -186,7 +209,7 @@ final class LegacyStubs
                         new \Slim\Psr7\Factory\StreamFactory(),
                         $buffering === 'prepend'
                             ? \Slim\Middleware\OutputBufferingMiddleware::PREPEND
-                            : \Slim\Middleware\OutputBufferingMiddleware::APPEND,
+                            : \Slim\Middleware\OutputBufferingMiddleware::APPEND
                     ));
                 }
 
