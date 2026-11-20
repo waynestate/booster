@@ -99,14 +99,12 @@ final class LaneStranglerParts implements StranglerParts
 
     public function mover(string $framework): Mover
     {
-        $mover = match ($framework) {
-            'slim' => new SlimMover(),
-            'cakephp' => new CakeMover(),
-            default => throw new ToolError(sprintf('The strangler has no mover for "%s".', $framework)),
-        };
-        if ($mover instanceof SlimMover && !$mover instanceof AddsComposerPackages) {
+        if ($framework === 'cakephp') {
+            return new CakeMover();
+        }
+        if ($framework === 'slim') {
             // SlimMover names its additions as lastComposerAdds(); the engine reads AddsComposerPackages.
-            return new class ($mover) implements Mover, AddsComposerPackages {
+            return new class (new SlimMover()) implements Mover, AddsComposerPackages {
                 public function __construct(private readonly SlimMover $inner) {}
 
                 public function framework(): string
@@ -126,7 +124,7 @@ final class LaneStranglerParts implements StranglerParts
             };
         }
 
-        return $mover;
+        throw new ToolError(sprintf('The strangler has no mover for "%s".', $framework));
     }
 
     public function routeAdd(string $appRoot, Unit $unit): void
