@@ -13,6 +13,71 @@ when that needs a step of yours.
 To take a new Booster, download the PHAR again (the same `curl` line as on [Install](install.md); its
 `releases/latest` link always names the newest release), or run `git pull` and `composer install` in your clone. `booster --version` prints the version you have.
 
+## 1.20.0
+
+Released 2026-11-20. CakePHP 4 apps move to CakePHP 5.4 and Slim 3 apps to Slim 4.15, with the PHP hops to 8.5
+around them. Three hops were added and none removed; `plan` and `run` gain `--to-cakephp` and `--to-slim`,
+`replay check` gains `--serve-changed` and `replay record` gains `--allow-failing-baseline`. No exit code changed, but
+a run whose replay baseline is all errors now stops before the first hop (see below).
+
+### What you see
+
+- **Three framework hops**, planned between the PHP hops for a CakePHP or Slim app:
+  - `cakephp-4-to-4.6` runs CakePHP's own upgrade rules for 4.1 through 4.5 and requires `cakephp/cakephp ^4.6`.
+    It goes first, on the PHP the app runs today, when that is 7.4 or newer; an app below 7.4 gets the PHP hops to
+    7.4 first, then this one.
+  - `cakephp-4.6-to-5` runs the 5.0 through 5.4 rules, moves AuthComponent to the Authentication plugin and swaps
+    the Oracle driver if the app has it. It is planned once PHP reaches 8.2, the first PHP CakePHP 5.4 runs on.
+  - `slim-3-to-4` moves a Slim 3 app's bootstrap, routes and middleware to Slim 4.15 over its own Pimple container.
+    It is planned at PHP 7.4, the lowest Slim 4.15 runs on: first when the app is already there, else right after
+    the PHP hop that lands on 7.4.
+
+  The PHP hops then go on to 8.5, and `plan` keeps a CakePHP or Slim app's PHP within what its framework line runs
+  on, and says so, instead of planning a PHP the framework cannot run.
+- **The Slim hop runs on PHP 7.4.** It pins `slim/psr7 ^1.6`, the line that still installs there, and writes its glue
+  classes in PHP 7.4 syntax. Code typed with Slim 3's `Slim\Http\Request` and `Response` moves onto `slim/http`. An
+  app with no PSR-4 `autoload` entry for the glue (the official Slim 3 skeleton has only `autoload-dev`) gets a stop
+  sign from `plan`: add one, run `composer dump-autoload` and commit before the run.
+- **Install `vendor/` before a CakePHP dry run.** CakePHP's rules read the app's own `vendor/` (mounted read-only),
+  so run `composer install` in the app before `run --dry-run`; an app with no `vendor/` gets a stop sign that says
+  so. A real run's baseline installs it for you.
+- **`--to-cakephp` and `--to-slim`** pick the target framework line. A major such as `5` resolves to that line's
+  newest release (`5.4`), `--to-cakephp 4` stops on 4.6, and the default is the newest line Booster supports. A JSON
+  plan carries the resolved line as `framework_target`.
+- **`detect` names the framework** and its major.minor (`framework cakephp 4.5`), read from `composer.lock`, else
+  `composer.json`.
+- **The MANUAL lists.** Each framework hop prints `MANUAL:` lines for what only a person can do; the guide
+  [CakePHP and Slim apps to PHP 8.5](guides/cakephp-and-slim.md) lists them, with the commands and what each hop
+  changes. One is new to every CakePHP app: CakePHP 4.3 turned some `Cake\Network\Socket` properties into methods
+  (`connected` is `isConnected()`, `encrypted` is `isEncrypted()`), and the upstream rule for them needs a Rector
+  class that no longer exists, so the 4.6 step lists them as a `MANUAL:` line instead of rewriting them.
+- **A replay baseline of errors stops the run.** When every recorded answer is a PHP fatal or parse error, a 5xx the
+  request file does not expect, or the same error page for every path, the run stops before the first hop instead of
+  "passing" after each one. Make the app answer on fake data first, or pass `--allow-failing-baseline` (on `run`, and
+  now on `replay record`) to record it anyway with a warning. A baseline with only some error answers, or a fatal in
+  PHP's log, gets a warning that names them.
+- **`replay init` knows CakePHP and Slim groups.** It drafts a CakePHP app from `config/routes.php` and the
+  controller actions its `fallbacks()` reach, served from `webroot/index.php`, and Slim routes with their group
+  prefixes. Run `replay init` again (after moving the old draft aside) on an app whose draft an older Booster wrote.
+- **A run refused before its first hop writes no `booster-hop.json`**, so it no longer overwrites the record of a
+  stopped hop, and it names the `composer.lock` and `vendor/` its baseline's composer install left behind.
+- **`replay check --serve-changed`** compares answers across a change in how the app is served (docroot, front
+  controller, setup), as long as the requests are the same. It is groundwork for the Laravel move.
+- **The new engine plumbing is internal.** Framework hops name their engine, and CakePHP's own upgrade tool runs in
+  a container, pinned to a commit, so its Rector never meets the app's or Booster's. There is nothing to configure.
+- **Point `--path` at `composer.json`.** Plenty of Slim apps keep `composer.json` under `src/`, not at the
+  repository root. Booster reads the framework from that file, so pass `--path=../my-app/src` for those apps.
+- **New and changed playbooks.** `booster init` writes a playbook for each of the three hops, and the overview
+  playbook names them, so in an app where you ran `booster init` with an earlier Booster, `booster init --check`
+  reports the playbooks as stale until you run `booster init` again.
+
+### Not in this release
+
+- Moving a CakePHP or Slim app to Laravel (Phase 2). It comes next.
+- PHP 8.6 hops for CakePHP and Slim apps. They wait for CakePHP and Slim to support PHP 8.6.
+- CakePHP 3 and Slim 2 (and anything older) have no hop yet: `plan` says so and keeps PHP where the framework still
+  runs.
+
 ## 1.19.0
 
 Released 2026-11-14. The `cas-to-sesame` hop lands on SESAME's native names and sets SESAME `^0.8`. No hop was added

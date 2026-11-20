@@ -4,6 +4,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-11-20
+
+CakePHP 4 apps to 5.4 and Slim 3 apps to 4.15 on PHP 8.5, with --to-cakephp and --to-slim; a replay baseline of errors now stops the run; PHP 8.6 hops follow once the frameworks support it.
+
 - Fixed: the replay nudge names every hop marked for extra review, each with its own reason (the CakePHP 5 and Slim 4 hops as framework majors), instead of giving the PHP 8.0 hop's reasons to whichever came first; `replay_suggestion` in the JSON report still names the first.
 - Fixed: the Wayne Auth stop sign on an app already on PHP 7 or later no longer talks about leaving PHP 5.6: it says that PHP already checks the expired certificate, so the sign-in fails there unless the app turned the check off, and that the move to SESAME's bridge ships with the next hop.
 - Fixed: a run refused before its first hop (a red baseline or replay baseline) no longer writes `booster-hop.json`, so it cannot overwrite the record a stopped hop left for the re-gate, and instead of "Nothing was changed" it says Booster changed none of the code and names the `composer.lock` and `vendor/` the baseline's composer install left in an app that had neither.
