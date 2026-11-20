@@ -1401,7 +1401,7 @@ final class HopExecutor
         $this->replayGate = new ReplayGate($runner, $file, $path, $options->replayOut ?? ReplayGate::defaultOutDir($path), $options->gateImage);
 
         try {
-            $outcome = $this->replayGate->record($php);
+            $outcome = $this->replayGate->record($php, false, $options->allowFailingBaseline);
             if ($built !== null) {
                 $outcome = new ReplayOutcome($outcome->status, $outcome->php, [$built, ...$outcome->lines], $outcome->file, $outcome->outDir, $outcome->transcript, $outcome->requests, $outcome->differences);
             }
