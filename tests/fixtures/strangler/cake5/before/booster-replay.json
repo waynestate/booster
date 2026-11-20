@@ -1,0 +1,41 @@
+{
+    "version": 1,
+    "$about": "The strangler proof's CakePHP 5 app (the CakePHP CMS tutorial, MIT) on a fixture SQLite database. prove.sh records these answers on before/ and checks the mounted copy against them.",
+    "serve": {
+        "docroot": "webroot",
+        "front_controller": "index.php",
+        "setup": "mkdir -p logs tmp/cache/models tmp/cache/persistent tmp/cache/views tmp/sessions tmp/tests && cp config/app_local.example.php config/app_local.php && php bin/booster-fixture-db.php",
+        "env": {
+            "DEBUG": "false",
+            "SECURITY_SALT": "booster-strangler-fixture-salt-not-a-secret-0123456789abcdef"
+        }
+    },
+    "normalize": ["csrf", "session-id", "timestamps"],
+    "sequences": [
+        {
+            "name": "guest",
+            "requests": [
+                {"name": "articles (home)", "path": "/"},
+                {"name": "home, HEAD", "method": "HEAD", "path": "/"},
+                {"name": "one article", "path": "/articles/view/first-post"},
+                {"name": "a missing article", "path": "/articles/view/no-such-post", "expect": 404},
+                {"name": "tagged", "path": "/articles/tagged/funny"},
+                {"name": "a page that needs sign-in", "path": "/articles/add", "expect": 302},
+                {"name": "a POST with no CSRF token", "method": "POST", "path": "/articles/add", "form": {"title": "x"}, "expect": 403},
+                {"name": "an unknown path", "path": "/nope", "expect": 404},
+                {"name": "a stylesheet", "path": "/css/cake.css"},
+                {"name": "an image", "path": "/img/cake.icon.png"}
+            ]
+        },
+        {
+            "name": "sign in",
+            "requests": [
+                {"name": "the login form", "path": "/users/login", "capture": {"csrf": "name=\"_csrfToken\"[^>]*value=\"([^\"]+)\""}},
+                {"name": "sign in", "method": "POST", "path": "/users/login", "form": {"_csrfToken": "{{csrf}}", "email": "fixture@example.edu", "password": "fixture-only"}, "expect": 302},
+                {"name": "the add form, signed in", "path": "/articles/add"},
+                {"name": "sign out", "path": "/users/logout", "expect": 302},
+                {"name": "the add form, signed out again", "path": "/articles/add", "expect": 302}
+            ]
+        }
+    ]
+}

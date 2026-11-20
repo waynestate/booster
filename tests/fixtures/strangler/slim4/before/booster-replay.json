@@ -1,0 +1,29 @@
+{
+    "version": 1,
+    "$about": "The strangler proof's Slim 4 app (slim/slim-skeleton 4.5.0, MIT). prove.sh records these answers on before/ and checks the mounted copy against them.",
+    "serve": {
+        "docroot": "public",
+        "front_controller": "index.php",
+        "setup": "mkdir -p logs var/cache"
+    },
+    "normalize": ["timestamps"],
+    "sequences": [
+        {
+            "name": "guest",
+            "requests": [
+                {"name": "home", "path": "/"},
+                {"name": "home, HEAD", "method": "HEAD", "path": "/"},
+                {"name": "users as JSON", "path": "/users"},
+                {"name": "one user", "path": "/users/1"},
+                {"name": "a missing user", "path": "/users/99", "expect": 404},
+                {"name": "an encoded slash stays in its segment", "path": "/users/1%2F2", "expect": 404},
+                {"name": "a trailing slash is another path", "path": "/users/", "expect": 404},
+                {"name": "an unknown path", "path": "/nope", "expect": 404},
+                {"name": "POST where only GET is routed (405 with Allow)", "method": "POST", "path": "/", "expect": 405},
+                {"name": "the CORS catch-all", "method": "OPTIONS", "path": "/users"},
+                {"name": "a static file", "path": "/robots.txt"},
+                {"name": "a query string", "path": "/users", "query": {"page": "2"}}
+            ]
+        }
+    ]
+}
