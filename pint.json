@@ -9,6 +9,10 @@
     ],
     "notPath": [
         "bin/agent-ready.php",
-        "bin/docs-site.php"
+        "bin/docs-site.php",
+        "src/Strangler/Unit.php",
+        "src/Strangler/UnitSource.php",
+        "src/Strangler/Mover.php",
+        "src/Strangler/MoveResult.php"
     ]
 }
