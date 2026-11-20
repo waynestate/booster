@@ -110,6 +110,7 @@ Booster moved needs then, is on [Upgrading](upgrading.md).
 - [The replay gate](guides/replay-gate.md)
 - [Hand-copied libraries to Composer](guides/framework-hops.md)
 - [CakePHP and Slim apps](guides/cakephp-and-slim.md)
+- [CakePHP and Slim apps onto Laravel](guides/cakephp-and-slim-to-laravel.md)
 - [Strict session IDs](guides/strict-sessions.md)
 - [Laravel hops and vendor/](guides/laravel-and-vendor.md)
 - [Deploying on Citadel](guides/citadel.md)

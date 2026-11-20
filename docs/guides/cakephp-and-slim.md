@@ -7,7 +7,7 @@ description: Booster 1.20 moves a CakePHP 4 app to CakePHP 5.4 and a Slim 3 app 
 
 This page covers the three framework hops for CakePHP and Slim apps: the commands, what each hop changes, and the
 MANUAL list each one prints. Before this: [Hand-copied libraries to Composer](framework-hops.md). Next:
-[Strict session IDs for raw PHP apps](strict-sessions.md).
+[CakePHP and Slim apps onto Laravel](cakephp-and-slim-to-laravel.md).
 
 Booster 1.20 takes a CakePHP 4 app to CakePHP 5.4 and a Slim 3 app to Slim 4.15, and moves PHP to 8.5 around those
 steps. The frameworks hold PHP back: CakePHP 4.5 stops at PHP 8.3 and Slim 3.12 at 7.3, so the PHP hops wait for the

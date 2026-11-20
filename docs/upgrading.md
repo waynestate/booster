@@ -13,6 +13,35 @@ when that needs a step of yours.
 To take a new Booster, download the PHAR again (the same `curl` line as on [Install](install.md); its
 `releases/latest` link always names the newest release), or run `git pull` and `composer install` in your clone. `booster --version` prints the version you have.
 
+## 1.21.0
+
+Not released yet: this section follows the Changelog's Unreleased list. A CakePHP 5 or Slim 4 app can move onto
+Laravel 13 one unit at a time (the strangler). Two hops were added and none removed; `plan` and `run` take a bare
+`--to-laravel`, and `run` gains `--moves`, `--route`, `--hand` and `--finish`. No exit code changed.
+
+### What you see
+
+- **The strangler, opt-in.** `cakephp-to-laravel` and `slim-to-laravel` are planned only with a bare `--to-laravel`
+  (or `--only` naming one), always last, and only for an app on CakePHP 5 or Slim 4 and PHP 8.3 or newer. Without the
+  flag, no plan changes. [The guide](guides/cakephp-and-slim-to-laravel.md) walks through run 1, the later runs and
+  the finish.
+- **`--to-laravel` takes its value optionally.** `--to-laravel=13` and `--to-laravel 13` still set a Laravel app's
+  target; only the bare flag is new.
+- **A ledger at the app root.** A mounted app carries `booster-strangler.json`. Commit it with each run. While it is
+  there, `booster plan` plans only the strangler and says so; patch the old app meanwhile with
+  `--path=<app>/legacy`.
+- **A strangler section in the report**, in text and in the JSON report (`strangler`): units moved and left,
+  refusals with file and line, and the MANUAL lines grouped by sign-in, mount, route moves and finish.
+- **Request files can say more.** Writes gain `"csrf": true`, and `compare` gains `ignore_cookies`, `preset`
+  (`"strangler"`) and `silent_sign_in`. `replay init` now drafts a GET of each write's form page right before it.
+  Existing request files and recordings keep working unchanged: no fingerprint moves, and the replay container only
+  gains `BOOSTER_REPLAY=1`.
+
+### An app that an older Booster already moved
+
+Nothing to do. An app on CakePHP 5 or Slim 4 that 1.20 moved there is exactly where the strangler starts; draft its
+replay first if it has none.
+
 ## 1.20.0
 
 Released 2026-11-20. CakePHP 4 apps move to CakePHP 5.4 and Slim 3 apps to Slim 4.15, with the PHP hops to 8.5

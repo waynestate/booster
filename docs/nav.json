@@ -58,6 +58,10 @@
           "path": "guides/cakephp-and-slim"
         },
         {
+          "title": "CakePHP and Slim onto Laravel",
+          "path": "guides/cakephp-and-slim-to-laravel"
+        },
+        {
           "title": "Strict session IDs",
           "path": "guides/strict-sessions"
         },

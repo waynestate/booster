@@ -382,7 +382,7 @@ Options shared by `plan` and `run`:
 | `--today` | Override today's date (`YYYY-MM-DD`) so runs are repeatable |
 | `--goal` | Shorthand such as `php-74-to-84` (sets `--from-php` and `--to-php`) |
 | `--from-php`, `--from-laravel` | Say what the app runs on when the manifest does not |
-| `--to-php`, `--to-laravel`, `--to-phpunit` | The target. Default: the newest version the policy supports today (PHPUnit: the newest that runs on the target PHP) |
+| `--to-php`, `--to-laravel`, `--to-phpunit` | The target. Default: the newest version the policy supports today (PHPUnit: the newest that runs on the target PHP). A bare `--to-laravel` on a CakePHP 5 or Slim 4 app opts in to the move onto Laravel ([the guide](docs/guides/cakephp-and-slim-to-laravel.md)) |
 | `--to-cakephp`, `--to-slim` | The framework line for a CakePHP or Slim app (default: the newest Booster supports, CakePHP 5.4 or Slim 4.15; `--to-cakephp 4` stops on 4.6). [The guide](docs/guides/cakephp-and-slim.md) |
 | `--sesame` | Include the `wayne-cas` to SESAME swap |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move |
@@ -429,6 +429,7 @@ Options for `run`:
 | `--proctor-command` | An extra command run in the image after the tests, for example a PROCTOR check |
 | `--replay[=FILE]` | Record how the app answers the requests in `booster-replay.json` (or FILE) before the first hop, replay them after every hop's tests, and fail the hop on a changed answer. Off by default |
 | `--replay-out` | Where the replay transcripts go (default: a new `booster-replay-<app>-<time>` folder in the temp folder) |
+| `--moves`, `--route`, `--hand`, `--finish` | Strangler runs after the mount: move the next N units (default 1), one unit by id, flip a unit a person ported (with `--route`), or finish once no unit is left in legacy ([the guide](docs/guides/cakephp-and-slim-to-laravel.md)) |
 | `--proctor-advisory` | Report the PROCTOR result but do not fail the run on it. Applied automatically when the run stops before the final target (`--until`, `--only`, or a target past security support) |
 
 Exit codes: `0` pass, `1` the baseline failed, a hop was capped, errored or failed its gate, or the PROCTOR check
@@ -753,6 +754,19 @@ adapter and route group prefixes through the group callable, moves code typed wi
 `Slim\Http\Environment` as MANUAL. Run them with `--replay` and `--to-php 8.5`; the commands and the full MANUAL lists are in
 [the guide](docs/guides/cakephp-and-slim.md).
 
+### CakePHP and Slim apps onto Laravel
+
+Once a CakePHP app is on 5 or a Slim app on 4, a bare `--to-laravel` plans `cakephp-to-laravel` or `slim-to-laravel`
+last: the strangler, which moves the app onto Laravel 13 one unit (a route, or a form's GET and POST) at a time instead
+of a rewrite. Run 1 moves the old sign-in onto SESAME (Step 0), then mounts Laravel at the root with the old app
+unchanged in `legacy/` and a dispatcher in `public/index.php`, and stops. Each later run moves `--moves N` units (or
+one `--route`), gated by the replay with the moved units answering from Laravel; a unit Booster cannot move is refused
+with file and line, ported by hand and flipped with `--hand --route`. `--finish` deletes `legacy/` and puts back the
+stock front controller. The ledger, `booster-strangler.json`, is the only state between runs, and the replay is
+required. Details in [the guide](docs/guides/cakephp-and-slim-to-laravel.md).
+
+> A strangler fig takes years to swallow its host tree. Booster asks for one unit per run.
+
 ### Strict session IDs for raw PHP apps
 
 PHP ships with `session.use_strict_mode` off, so it accepts a session ID the server never issued, which is how session
@@ -973,7 +987,10 @@ Pimple container; the old error handlers and `pathFor()` stay MANUAL ([the guide
 `--strict-session` for a raw PHP app that calls `session_start()` without strict session IDs, first, on the PHP the
 app runs today; never for Laravel): adds one guarded `ini_set()` line for `session.use_strict_mode` and
 `session.use_only_cookies` before each call, skips what is already covered, and refuses on a stop sign
-([the guide](docs/guides/strict-sessions.md)). `booster hops` prints them all.
+([the guide](docs/guides/strict-sessions.md)). `cakephp-to-laravel` and `slim-to-laravel` (planned last, with a bare
+`--to-laravel`, for a CakePHP 5 or Slim 4 app on PHP 8.3 or newer): the strangler; run 1 moves sign-in onto SESAME and
+mounts Laravel 13 with the old app in `legacy/`, later runs move units one at a time behind the replay, and
+`--finish` removes `legacy/` ([the guide](docs/guides/cakephp-and-slim-to-laravel.md)). `booster hops` prints them all.
 
 > Every other hop lifts the engine; `wayneui-1-to-2` is the one that repaints the bodywork.
 
