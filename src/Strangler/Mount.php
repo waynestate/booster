@@ -554,7 +554,8 @@ final class Mount
             'CACHE_STORE' => 'file',
             'QUEUE_CONNECTION' => 'sync',
             'LOG_CHANNEL' => 'stderr',
-            'BOOSTER_REPLAY' => '1',
+            // No BOOSTER_REPLAY here: the replay container sets it on every
+            // serve, and the dispatcher then says which half answered.
         ];
         foreach ($laravelEnv as $key => $value) {
             if (array_key_exists($key, $env)) {

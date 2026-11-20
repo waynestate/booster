@@ -150,7 +150,7 @@ final class StranglerMountTest extends TestCase
         self::assertSame('mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache && (cd legacy && mkdir -p logs var/cache)', $after->setup);
         self::assertSame(Mount::REPLAY_APP_KEY, $after->env['APP_KEY']);
         self::assertSame(32, strlen((string) base64_decode(substr(Mount::REPLAY_APP_KEY, 7), true)), 'Laravel\'s cipher needs a 32-byte key');
-        self::assertSame('1', $after->env['BOOSTER_REPLAY']);
+        self::assertArrayNotHasKey('BOOSTER_REPLAY', $after->env, 'the replay container sets it, not the request file');
         self::assertSame('file', $after->env['SESSION_DRIVER']);
 
         // The report.

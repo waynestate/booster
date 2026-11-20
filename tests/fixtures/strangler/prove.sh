@@ -128,7 +128,7 @@ PHP
 echo "which half answered:"
 # shellcheck disable=SC2086
 docker run --rm --name "booster-prove-halves-$$" --network none -v "$work/mounted:/app" -v "$work:/prove" \
-  -v "$booster/resources/replay:/booster-replay:ro" -w /app -e HOME=/tmp -e BOOSTER_REPLAY_FRONT=index.php \
+  -v "$booster/resources/replay:/booster-replay:ro" -w /app -e HOME=/tmp -e BOOSTER_REPLAY_FRONT=index.php -e BOOSTER_REPLAY=1 \
   "${env_args[@]}" --user "$uid:$gid" "$image" sh -c "($setup) >/prove/halves-setup.log 2>&1 || { tail -n 20 /prove/halves-setup.log; exit 1; }
     php -d display_errors=0 -S 127.0.0.1:8766 -t public /booster-replay/router.php >/prove/halves-server.log 2>&1 &
     sleep 1; php /prove/halves.php $legacy_paths" \
