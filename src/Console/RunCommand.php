@@ -11,6 +11,7 @@ use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Waynestate\Booster\Hop\EngineId;
 use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Replay\ReplayFile;
@@ -19,7 +20,10 @@ use Waynestate\Booster\Report\HopRecord;
 use Waynestate\Booster\Report\JsonWriter;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\CacheMount;
+use Waynestate\Booster\Run\Cake\CakeUpgradeMigration;
+use Waynestate\Booster\Run\CakeUpgradeRunner;
 use Waynestate\Booster\Run\ComposerEditor;
+use Waynestate\Booster\Run\FrameworkEngine;
 use Waynestate\Booster\Run\GateImage;
 use Waynestate\Booster\Run\HopExecutor;
 use Waynestate\Booster\Run\NodeRunner;
@@ -103,14 +107,16 @@ final class RunCommand extends BaseCommand
         // The registry the plan was built with, so the Node pin and its container match the plan.
         $registry = $this->planRegistry ?? new HopRegistry();
         // The download caches are opt-in: unset, every gate starts empty, as before.
+        $composerEditor = new ComposerEditor();
         $executor = new HopExecutor(
             new RectorRunner($this->processes),
-            new ComposerEditor(),
+            $composerEditor,
             new TargetImageRunner($this->processes, composerCache: CacheMount::fromEnvironment(CacheMount::COMPOSER)),
             $this->processes,
             new NodeRunner($this->processes, (int) $registry->nodePinTarget(), npmCache: CacheMount::fromEnvironment(CacheMount::NPM)),
             $registry,
             new ProctorRunner($this->processes),
+            frameworkEngines: self::frameworkEngines($this->processes, $composerEditor),
         );
         // The prompt only makes sense where a person is watching: text output on an interactive terminal. JSON and
         // --no-interaction runs stop at the threshold instead of asking nobody.
@@ -225,6 +231,23 @@ final class RunCommand extends BaseCommand
         }
 
         return $flags;
+    }
+
+    /**
+     * The framework engines the executor picks from by Hop::$engine (the
+     * vendored engine is the executor's own default). One CakeUpgradeRunner
+     * serves both CakePHP hops, on the same process runner and opt-in
+     * Composer cache as the gate.
+     *
+     * @return array<string, FrameworkEngine>
+     */
+    public static function frameworkEngines(ProcessRunner $processes, ComposerEditor $composerEditor): array
+    {
+        $cakeUpgradeRunner = new CakeUpgradeRunner($processes, composerCache: CacheMount::fromEnvironment(CacheMount::COMPOSER));
+
+        return [
+            EngineId::CakeUpgrade->value => new CakeUpgradeMigration($cakeUpgradeRunner, $composerEditor),
+        ];
     }
 
     /**
