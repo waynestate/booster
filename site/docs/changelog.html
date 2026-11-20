@@ -46,6 +46,7 @@
 <p>All notable changes to Booster are recorded here. The format follows Keep a Changelog.</p>
 <h2 id="unreleased"><span class="docs-heading-tail"><span>[Unreleased]</span><a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></span></h2>
 <ul>
+<li>Added: the plan inserts the CakePHP and Slim framework hops (cakephp-4-to-4.6, cakephp-4.6-to-5, slim-3-to-4) between the PHP hops; their engines land next.</li>
 <li>Changed: framework hops name their engine (a small interface behind HopKind::Framework), the groundwork for the CakePHP and Slim hops; no behaviour change.</li>
 <li>Added: <code>--to-cakephp</code> and <code>--to-slim</code> plan options pick the target framework line (a major such as <code>5</code> resolves to that line's newest release, <code>5.4</code>); the resolved line rides on the plan as <code>framework_target</code> in JSON.</li>
 <li>Added: an internal runner for CakePHP's own upgrade tool (<code>cakephp/upgrade</code>, pinned to a commit), run in a container so its Rector never meets the app's or Booster's; the CakePHP hops use it.</li>

@@ -6,16 +6,30 @@ namespace Waynestate\Booster\Tests;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase as PhpUnitTestCase;
+use Waynestate\Booster\Hop\EngineId;
 use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Hop\HopRegistry;
+use Waynestate\Booster\Run\CakeUpgradeRunner;
+use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\ToolError;
 
 final class HopRegistryTest extends PhpUnitTestCase
 {
     public function test_every_rector_set_a_hop_names_exists_in_the_installed_packages(): void
     {
+        $runner = new CakeUpgradeRunner(new FakeProcessRunner(static fn(): ProcessResult => new ProcessResult(0, '', '')));
         foreach ((new HopRegistry())->all() as $hop) {
             foreach ($hop->rectorSets as $constant) {
+                if ($hop->engine === EngineId::CakeUpgrade) {
+                    // A CakePHP hop's sets are cakephp/upgrade rule set names,
+                    // run by its engine in the tool's own container, not
+                    // Booster's Rector: the runner refuses a malformed name.
+                    $command = $runner->rectorCommand('/srv/app', $constant, 'src');
+                    self::assertSame($constant, $command[array_search('--rules', $command, true) + 1], $hop->id);
+
+                    continue;
+                }
+                self::assertNull($hop->engine, $hop->id . ' names Rector sets, but its engine does not read them');
                 self::assertTrue(defined($constant), $hop->id . ' names a Rector set that does not exist: ' . $constant);
                 self::assertFileExists((string) constant($constant), $hop->id);
             }

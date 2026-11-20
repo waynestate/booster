@@ -201,11 +201,51 @@ templates stop using PHP functions as modifiers.</li>
 the lock's content hash, so Composer never calls it out of date). Run
 <code>composer update</code> once the app lands on its target to pick up the newest releases that PHP allows.</li>
 </ul>
+<h2 id="cakephp-and-slim-apps">CakePHP and Slim <span class="docs-heading-tail"><span>apps</span><a class="docs-heading-link" aria-label="Link to this section" href="#cakephp-and-slim-apps">#</a></span></h2>
+<p>An app built on CakePHP or Slim (which <code>booster detect</code> names, with its major.minor) gets framework hops between its
+PHP hops. The plan moves the framework to the line you pick with <code>--to-cakephp</code> or <code>--to-slim</code> (the newest by
+default), and every PHP hop stays on a PHP that the framework line under it runs on. The engines that do the work land
+in the next release; until then <code>booster run</code> reports the step as having no engine registered and changes nothing.</p>
+<div class="docs-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Hop</th>
+<th>From</th>
+<th>To</th>
+<th>Where the plan puts it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cakephp-4-to-4.6</code></td>
+<td>CakePHP 4.0 to 4.5</td>
+<td>4.6</td>
+<td>first, on the PHP the app runs today, when 4.6 runs on it (7.4 or newer)</td>
+</tr>
+<tr>
+<td><code>cakephp-4.6-to-5</code></td>
+<td>CakePHP 4.6</td>
+<td>5.4</td>
+<td>at the first PHP 5.4 runs on (8.2), after the PHP hops that get there</td>
+</tr>
+<tr>
+<td><code>slim-3-to-4</code></td>
+<td>Slim 3</td>
+<td>4.15</td>
+<td>at the first PHP 4.15 runs on (7.4), after the PHP hops that get there</td>
+</tr>
+</tbody>
+</table></div>
+<p>A CakePHP 4.3 app on PHP 8.1 therefore plans <code>cakephp-4-to-4.6</code>, <code>php-81-to-82</code>, <code>cakephp-4.6-to-5</code>, then the PHP hops
+to 8.5 on CakePHP 5.4. <code>--to-cakephp 4</code> stops on 4.6 and says to plan the 5 step soon. A target PHP below 8.2 leaves
+the CakePHP 5 step out with a warning, <code>--skip cakephp-4.6-to-5</code> leaves it out too, and the PHP hops then stay within
+what 4.6 runs on. <code>--to-slim 3.13</code> is refused: Booster moves Slim 3 apps to Slim 4.15. CakePHP 3 and Slim 2 have no hop, so
+their PHP hops stop at the line's ceiling and the plan says Booster has no hop for them yet.</p>
 </article>
     </main>
     <nav class="docs-pager" aria-label="Pages"><a class="docs-pager__link" href="../../docs/guides/replay-gate.html"><span class="docs-pager__dir">Previous</span><span class="docs-pager__title">The replay gate</span></a><a class="docs-pager__link docs-pager__link--next" href="../../docs/guides/strict-sessions.html"><span class="docs-pager__dir">Next</span><span class="docs-pager__title">Strict session IDs</span></a></nav>
   </div>
-  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#in-two-commands">In two commands</a></li><li class="docs-toc__item"><a href="#the-recipes">The recipes</a></li><li class="docs-toc__item"><a href="#what-the-hop-changes">What the hop changes</a></li><li class="docs-toc__item"><a href="#the-slim-1-bridge">The Slim 1 bridge</a></li><li class="docs-toc__item"><a href="#stop-signs">Stop signs</a></li><li class="docs-toc__item"><a href="#what-stays">What stays</a></li><li class="docs-toc__item"><a href="#why-the-replay-and-the-tests-wait">Why the replay and the tests wait</a></li><li class="docs-toc__item"><a href="#after-the-hop">After the hop</a></li></ul></nav>
+  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#in-two-commands">In two commands</a></li><li class="docs-toc__item"><a href="#the-recipes">The recipes</a></li><li class="docs-toc__item"><a href="#what-the-hop-changes">What the hop changes</a></li><li class="docs-toc__item"><a href="#the-slim-1-bridge">The Slim 1 bridge</a></li><li class="docs-toc__item"><a href="#stop-signs">Stop signs</a></li><li class="docs-toc__item"><a href="#what-stays">What stays</a></li><li class="docs-toc__item"><a href="#why-the-replay-and-the-tests-wait">Why the replay and the tests wait</a></li><li class="docs-toc__item"><a href="#after-the-hop">After the hop</a></li><li class="docs-toc__item"><a href="#cakephp-and-slim-apps">CakePHP and Slim apps</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
   <span>Documents Booster <span data-docs-version>1.19.0</span></span>

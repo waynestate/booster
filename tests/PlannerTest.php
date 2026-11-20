@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Tests;
 
+use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanOptions;
@@ -53,7 +54,7 @@ final class PlannerTest extends TestCase
     }
 
     /** Plans a bare CakePHP or Slim app: an empty temp dir carrying only the given framework and PHP. */
-    private function frameworkPlan(string $framework, ?string $frameworkVersion, string $phpVersion, ?string $toPhp = null): Plan
+    private function frameworkPlan(string $framework, ?string $frameworkVersion, string $phpVersion, ?string $toPhp = null, ?PlanOptions $options = null): Plan
     {
         $project = new Project(
             path: $this->tempDir(),
@@ -69,7 +70,7 @@ final class PlannerTest extends TestCase
             frameworkVersion: $frameworkVersion,
         );
 
-        return (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(toPhp: $toPhp), $this->today());
+        return (new Planner($this->policy(), new HopRegistry()))->plan($project, $options ?? new PlanOptions(toPhp: $toPhp), $this->today());
     }
 
     /** A policy like the frozen fixture, plus one extra version per component. */
@@ -1069,20 +1070,25 @@ final class PlannerTest extends TestCase
 
     public function test_a_cakephp_43_app_stays_on_the_php_its_line_runs_on(): void
     {
-        $plan = $this->frameworkPlan('cakephp', '4.3', '8.1', '8.5');
+        // PHP 7.3 is below what CakePHP 4.6 runs on, so the 4.6 hop waits
+        // for a later plan and PHP climbs only to the 4.3 line's ceiling.
+        $plan = $this->frameworkPlan('cakephp', '4.3', '7.3', '8.5');
 
-        self::assertSame([], $this->ids($plan));
+        self::assertSame(['php-73-to-74', 'php-74-to-80', 'php-80-to-81'], $this->ids($plan));
         self::assertTrue($plan->stopsEarly);
-        self::assertSame(['CakePHP 4.3 runs on PHP 7.2 to 8.1, so PHP stays at 8.1. Booster has no CakePHP hop yet; see docs/guides/framework-hops.md.'], $plan->warnings);
+        self::assertSame([
+            'CakePHP 4.6 does not run on PHP 7.3; move PHP first.',
+            'CakePHP 4.3 runs on PHP 7.2 to 8.1, so PHP stays at 8.1 until the cakephp-4-to-4.6 hop runs; see docs/guides/framework-hops.md.',
+        ], $plan->warnings);
     }
 
     public function test_a_cakephp_45_app_climbs_to_its_lines_ceiling_and_stops(): void
     {
-        $plan = $this->frameworkPlan('cakephp', '4.5', '8.1', '8.5');
+        $plan = $this->frameworkPlan('cakephp', '4.5', '8.1', options: new PlanOptions(toPhp: '8.5', skip: [HopRegistry::CAKEPHP_4_TO_46_ID]));
 
         self::assertSame(['php-81-to-82', 'php-82-to-83'], $this->ids($plan));
         self::assertTrue($plan->stopsEarly);
-        self::assertContains('CakePHP 4.5 runs on PHP 7.4 to 8.3, so PHP stays at 8.3. Booster has no CakePHP hop yet; see docs/guides/framework-hops.md.', $plan->warnings);
+        self::assertContains('CakePHP 4.5 runs on PHP 7.4 to 8.3, so PHP stays at 8.3 until the cakephp-4-to-4.6 hop runs; see docs/guides/framework-hops.md.', $plan->warnings);
         self::assertSame('4.5', $plan->steps[0]->frameworkBefore);
         self::assertSame('4.5', $plan->steps[0]->frameworkAfter);
         self::assertSame('4.5', $plan->steps[0]->toArray()['framework_before']);
@@ -1090,12 +1096,12 @@ final class PlannerTest extends TestCase
 
     public function test_a_slim_app_above_its_lines_ceiling_warns_about_the_pair_and_holds(): void
     {
-        $plan = $this->frameworkPlan('slim', '3.12', '7.4', '8.5');
+        $plan = $this->frameworkPlan('slim', '3.12', '7.4', options: new PlanOptions(toPhp: '8.5', skip: [HopRegistry::SLIM_3_TO_4_ID]));
 
         self::assertSame([], $this->ids($plan));
         self::assertTrue($plan->stopsEarly);
         self::assertContains('Slim 3.12 does not list PHP 7.4 (it runs on 5.5 to 7.3); the plan assumes the app really runs on that pair.', $plan->warnings);
-        self::assertContains('Slim 3.12 runs on PHP 5.5 to 7.3, so PHP stays at 7.4. Booster has no Slim hop yet; see docs/guides/framework-hops.md.', $plan->warnings);
+        self::assertContains('Slim 3.12 runs on PHP 5.5 to 7.3, so PHP stays at 7.4 until the slim-3-to-4 hop runs; see docs/guides/framework-hops.md.', $plan->warnings);
     }
 
     public function test_an_unknown_cakephp_line_plans_no_php_hop_and_names_the_tables_span(): void
@@ -1313,5 +1319,183 @@ final class PlannerTest extends TestCase
 
         self::assertNotSame([], $this->ids($plan));
         self::assertStringStartsWith('php-', $this->ids($plan)[0]);
+    }
+
+    /**
+     * Each step as "hop php-before>php-after fw-before>fw-after", so a
+     * framework plan reads in one line per step.
+     *
+     * @return list<string>
+     */
+    private function frameworkCourse(Plan $plan): array
+    {
+        return array_map(
+            static fn(PlanStep $s): string => sprintf('%s %s>%s %s>%s', $s->hop->id, $s->phpBefore, $s->phpAfter, $s->frameworkBefore, $s->frameworkAfter),
+            $plan->steps,
+        );
+    }
+
+    public function test_cakephp_43_on_81_plans_4_6_then_php_8_2_then_5_4_then_php_8_5(): void
+    {
+        $plan = $this->frameworkPlan('cakephp', '4.3', '8.1', '8.5');
+
+        self::assertSame([
+            'cakephp-4-to-4.6 8.1>8.1 4.3>4.6',
+            'php-81-to-82 8.1>8.2 4.6>4.6',
+            'cakephp-4.6-to-5 8.2>8.2 4.6>5.4',
+            'php-82-to-83 8.2>8.3 5.4>5.4',
+            'php-83-to-84 8.3>8.4 5.4>5.4',
+            'php-84-to-85 8.4>8.5 5.4>5.4',
+        ], $this->frameworkCourse($plan));
+        self::assertSame('5.4', $plan->frameworkTarget);
+        self::assertFalse($plan->stopsEarly);
+        self::assertSame([], $plan->warnings);
+    }
+
+    public function test_cakephp_45_on_81_to_cakephp_4_stops_on_4_6(): void
+    {
+        $plan = $this->frameworkPlan('cakephp', '4.5', '8.1', options: new PlanOptions(toPhp: '8.5', toCakephp: '4'));
+
+        self::assertSame('4.6', $plan->frameworkTarget);
+        self::assertSame(['cakephp-4-to-4.6', 'php-81-to-82', 'php-82-to-83', 'php-83-to-84', 'php-84-to-85'], $this->ids($plan));
+        self::assertNotContains(HopRegistry::CAKEPHP_46_TO_5_ID, $this->ids($plan));
+        self::assertSame('4.6', $plan->steps[count($plan->steps) - 1]->frameworkAfter);
+        self::assertSame(['Stopping on CakePHP 4.6 as asked; it still runs on PHP 8.5, but 4.x is end of life, so plan the 5 step soon.'], $plan->warnings);
+    }
+
+    public function test_cakephp_46_on_83_plans_the_5_hop_immediately(): void
+    {
+        $plan = $this->frameworkPlan('cakephp', '4.6', '8.3', '8.5');
+
+        self::assertSame([
+            'cakephp-4.6-to-5 8.3>8.3 4.6>5.4',
+            'php-83-to-84 8.3>8.4 5.4>5.4',
+            'php-84-to-85 8.4>8.5 5.4>5.4',
+        ], $this->frameworkCourse($plan));
+        self::assertSame([Planner::GATE_TESTS], $plan->steps[0]->gates);
+        self::assertSame([], $plan->warnings);
+    }
+
+    public function test_cakephp_5_hop_waits_for_php_8_2(): void
+    {
+        $plan = $this->frameworkPlan('cakephp', '4.6', '8.0', '8.5');
+
+        self::assertSame([
+            'php-80-to-81 8.0>8.1 4.6>4.6',
+            'php-81-to-82 8.1>8.2 4.6>4.6',
+            'cakephp-4.6-to-5 8.2>8.2 4.6>5.4',
+            'php-82-to-83 8.2>8.3 5.4>5.4',
+            'php-83-to-84 8.3>8.4 5.4>5.4',
+            'php-84-to-85 8.4>8.5 5.4>5.4',
+        ], $this->frameworkCourse($plan));
+    }
+
+    public function test_cakephp_5_hop_is_dropped_when_target_php_is_below_8_2(): void
+    {
+        $plan = $this->frameworkPlan('cakephp', '4.6', '8.0', '8.1');
+
+        self::assertSame(['php-80-to-81'], $this->ids($plan));
+        self::assertContains('CakePHP 5.4 needs PHP 8.2 or newer, so the CakePHP 5 step is not planned.', $plan->warnings);
+        self::assertSame('4.6', $plan->steps[0]->frameworkAfter);
+    }
+
+    public function test_slim_312_on_74_plans_the_slim_hop_then_php_8_5(): void
+    {
+        $plan = $this->frameworkPlan('slim', '3.12', '7.4', '8.5');
+
+        self::assertSame([
+            'slim-3-to-4 7.4>7.4 3.12>4.15',
+            'php-74-to-80 7.4>8.0 4.15>4.15',
+            'php-80-to-81 8.0>8.1 4.15>4.15',
+            'php-81-to-82 8.1>8.2 4.15>4.15',
+            'php-82-to-83 8.2>8.3 4.15>4.15',
+            'php-83-to-84 8.3>8.4 4.15>4.15',
+            'php-84-to-85 8.4>8.5 4.15>4.15',
+        ], $this->frameworkCourse($plan));
+        self::assertFalse($plan->stopsEarly);
+        foreach ($plan->warnings as $warning) {
+            self::assertStringNotContainsString('PHP stays at', $warning);
+        }
+    }
+
+    public function test_slim_312_on_73_moves_php_to_7_4_first(): void
+    {
+        $plan = $this->frameworkPlan('slim', '3.12', '7.3', '8.0');
+
+        self::assertSame([
+            'php-73-to-74 7.3>7.4 3.12>3.12',
+            'slim-3-to-4 7.4>7.4 3.12>4.15',
+            'php-74-to-80 7.4>8.0 4.15>4.15',
+        ], $this->frameworkCourse($plan));
+    }
+
+    public function test_slim_to_3_13_is_refused(): void
+    {
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('--to-slim 3.13 is not supported yet: Booster moves Slim 3 apps to Slim 4.15.');
+        $this->frameworkPlan('slim', '3.12', '7.3', options: new PlanOptions(toPhp: '8.0', toSlim: '3.13'));
+    }
+
+    public function test_cakephp_3_still_gets_the_no_hop_yet_warning(): void
+    {
+        $plan = $this->frameworkPlan('cakephp', '3.10', '7.4', '8.5');
+
+        self::assertSame([], $this->ids($plan));
+        self::assertTrue($plan->stopsEarly);
+        self::assertContains('CakePHP 3.10 runs on PHP 5.6 to 7.4, so PHP stays at 7.4. Booster has no CakePHP hop yet; see docs/guides/framework-hops.md.', $plan->warnings);
+    }
+
+    public function test_framework_hold_warning_is_gone_when_a_hop_exists(): void
+    {
+        // On main before the framework hops, CakePHP 4.5 on 8.1 held at 8.3
+        // with "Booster has no CakePHP hop yet".
+        foreach ([['cakephp', '4.5', '8.1'], ['slim', '3.12', '7.4'], ['cakephp', '4.6', '8.0']] as [$framework, $line, $php]) {
+            $plan = $this->frameworkPlan($framework, $line, $php, '8.5');
+
+            self::assertFalse($plan->stopsEarly, $framework . ' ' . $line);
+            foreach ($plan->warnings as $warning) {
+                self::assertStringNotContainsString('hop yet', $warning);
+                self::assertStringNotContainsString('PHP stays at', $warning);
+            }
+            self::assertSame('php-84-to-85', $this->ids($plan)[count($plan->steps) - 1]);
+        }
+    }
+
+    public function test_skip_drops_the_cakephp_5_hop(): void
+    {
+        $plan = $this->frameworkPlan('cakephp', '4.6', '8.3', options: new PlanOptions(toPhp: '8.5', skip: [HopRegistry::CAKEPHP_46_TO_5_ID]));
+
+        self::assertSame([
+            'php-83-to-84 8.3>8.4 4.6>4.6',
+            'php-84-to-85 8.4>8.5 4.6>4.6',
+        ], $this->frameworkCourse($plan));
+
+        // --until stops the CakePHP 4.3 course after the 4.6 hop.
+        $until = $this->frameworkPlan('cakephp', '4.3', '8.1', options: new PlanOptions(toPhp: '8.5', until: HopRegistry::CAKEPHP_4_TO_46_ID));
+        self::assertSame(['cakephp-4-to-4.6'], $this->ids($until));
+        self::assertTrue($until->stopsEarly);
+    }
+
+    public function test_php_steps_after_the_hop_carry_the_new_framework_line(): void
+    {
+        $plan = $this->frameworkPlan('cakephp', '4.5', '8.1', '8.5');
+
+        $frameworkSteps = array_values(array_filter($plan->steps, static fn(PlanStep $s): bool => $s->hop->kind === HopKind::Framework));
+        self::assertCount(2, $frameworkSteps);
+        foreach ($frameworkSteps as $step) {
+            self::assertSame($step->phpBefore, $step->phpAfter, 'a framework hop leaves PHP where it is');
+            self::assertNotSame($step->frameworkBefore, $step->frameworkAfter);
+        }
+        self::assertSame(['4.5', '4.6'], [$frameworkSteps[0]->frameworkBefore, $frameworkSteps[0]->frameworkAfter]);
+        self::assertSame(['4.6', '5.4'], [$frameworkSteps[1]->frameworkBefore, $frameworkSteps[1]->frameworkAfter]);
+
+        $line = '4.5';
+        foreach ($plan->steps as $step) {
+            self::assertSame($line, $step->frameworkBefore, $step->hop->id);
+            $line = (string) $step->frameworkAfter;
+        }
+        self::assertSame('5.4', $line);
+        $array = $plan->steps[1]->toArray();
+        self::assertSame(['4.6', '4.6'], [$array['framework_before'], $array['framework_after']]);
     }
 }

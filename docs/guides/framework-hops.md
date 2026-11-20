@@ -161,3 +161,22 @@ lines, so you know where to look when the replay says an answer changed.
 - The lock was resolved on the hop's PHP, and later PHP hops move only the packages that refuse theirs (and refresh
   the lock's content hash, so Composer never calls it out of date). Run
   `composer update` once the app lands on its target to pick up the newest releases that PHP allows.
+
+## CakePHP and Slim apps
+
+An app built on CakePHP or Slim (which `booster detect` names, with its major.minor) gets framework hops between its
+PHP hops. The plan moves the framework to the line you pick with `--to-cakephp` or `--to-slim` (the newest by
+default), and every PHP hop stays on a PHP that the framework line under it runs on. The engines that do the work land
+in the next release; until then `booster run` reports the step as having no engine registered and changes nothing.
+
+| Hop | From | To | Where the plan puts it |
+| --- | --- | --- | --- |
+| `cakephp-4-to-4.6` | CakePHP 4.0 to 4.5 | 4.6 | first, on the PHP the app runs today, when 4.6 runs on it (7.4 or newer) |
+| `cakephp-4.6-to-5` | CakePHP 4.6 | 5.4 | at the first PHP 5.4 runs on (8.2), after the PHP hops that get there |
+| `slim-3-to-4` | Slim 3 | 4.15 | at the first PHP 4.15 runs on (7.4), after the PHP hops that get there |
+
+A CakePHP 4.3 app on PHP 8.1 therefore plans `cakephp-4-to-4.6`, `php-81-to-82`, `cakephp-4.6-to-5`, then the PHP hops
+to 8.5 on CakePHP 5.4. `--to-cakephp 4` stops on 4.6 and says to plan the 5 step soon. A target PHP below 8.2 leaves
+the CakePHP 5 step out with a warning, `--skip cakephp-4.6-to-5` leaves it out too, and the PHP hops then stay within
+what 4.6 runs on. `--to-slim 3.13` is refused: Booster moves Slim 3 apps to Slim 4.15. CakePHP 3 and Slim 2 have no hop, so
+their PHP hops stop at the line's ceiling and the plan says Booster has no hop for them yet.
