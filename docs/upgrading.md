@@ -70,6 +70,41 @@ a run whose replay baseline is all errors now stops before the first hop (see be
 - **New and changed playbooks.** `booster init` writes a playbook for each of the three hops, and the overview
   playbook names them, so in an app where you ran `booster init` with an earlier Booster, `booster init --check`
   reports the playbooks as stale until you run `booster init` again.
+- **The CakePHP 5 step does more of the move.** It makes the CakePHP 5 skeleton's own moves (CakePHP's global
+  functions in `config/bootstrap.php`, `phpunit.xml` in the PHPUnit 10 shape, `RequestHandler` out with a
+  `viewClasses()` where the routes need one, the log and cache renames, `WebExceptionRenderer` for the removed
+  `ExceptionRenderer`), keeps a CakePHP 4 app on PHPUnit 9 until this step and then moves it to 11.5, moves
+  bootstrap-ui, cakephp-csvview and cakephp-codesniffer to their CakePHP 5 majors, and keeps sign-in answering as
+  AuthComponent did (the guest actions `allow()` opened, the old `loginAction` open to guests, the same redirect and
+  flash). The replay switches on a `cakephp` normalizer from this step, which hides only the extra
+  `rel="shortcut icon"` link CakePHP 4's `meta('icon')` printed.
+- **The Slim hop keeps Slim 3's runtime.** The container's `environment`, `request` and `response` entries and its
+  four handler keys work as on Slim 3, a missing route or wrong method gets Slim 3's own 404 or 405 page, Slim 3 test
+  harnesses run through the generated `LegacyEnvironment` and `LegacyHttp`, `Slim\Container` type hints move to
+  `LegacyContainer`, Twig 1 and 2's underscore class names move to Twig 3's, and `dflydev/fig-cookies` goes to
+  `^3.0`. The MANUAL lines for the handler keys, the container entries and the error handler are gone.
+- **Locks that break on the new PHP, and unblocks that outlive their step.** A PHP hop updates a locked release that
+  allows the new PHP but misbehaves on it (Twig below 2.8 on 7.4). On the final target, Booster tries once to drop a
+  temporary advisory unblock an earlier step needed, with `composer update -W` for those packages, and keeps the
+  change only when the gate passes again without it.
+
+### What Booster will not do
+
+Each of these is a `MANUAL:` line in the run's output, with the file (and the line or count where there is one). The
+full lists are in [CakePHP and Slim apps to PHP 8.5](guides/cakephp-and-slim.md). New in 1.20.0:
+
+- CakePHP 4.6 step: the `Cake\Network\Socket` properties CakePHP 4.3 turned into methods (see above).
+- CakePHP 5 step, sign-in: an `authError` that is not a plain string (Booster flashes no message then), a custom
+  Auth `flash` config (Booster uses AuthComponent's default flash options), a `loginAction` that is not a plain
+  controller and action array or whose controller is missing, a login controller whose `initialize()` does not call
+  `parent::initialize()`, and `allow()` called with a variable.
+- CakePHP 5 step, other code: what an action does with `logout()`'s return value, the Oracle driver swap to check, a
+  check that the controllers that serialize still answer `.json` and `.xml` after Booster added `viewClasses()`,
+  `->withType()` calls and `View::loadHelper()` calls. Commented-out code is no longer reported.
+- Slim hop: `Slim\Container` or `Slim\Http\Environment` imported in a group `use` statement (import the generated
+  `LegacyContainer` or `LegacyEnvironment` in its own), Slim 3-only `Slim\Http` classes (`Headers`, `Body`,
+  `RequestBody`, `Stream`, `UploadedFile`, `Cookies`, `new Request(...)`), and a Twig underscore class name Rector's
+  map does not know.
 
 ### Not in this release
 

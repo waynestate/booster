@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Upgrading | Booster docs</title>
 <meta name="description" content="What changes when you move Booster to a new release, and what an app an older Booster already moved needs.">
-<meta name="docs-version" content="1.19.0">
+<meta name="docs-version" content="1.20.0">
 <link rel="stylesheet" href="../assets/wayne-ui/wayne-ui.css">
 <link rel="stylesheet" href="../assets/docs.css">
 <link rel="stylesheet" href="../docs/theme/booster.css">
@@ -20,7 +20,7 @@
     <a class="masthead__brand" href="../index.html">
       <img src="../brand/booster-avatar-256.png" width="36" height="36" alt="">
       <span class="masthead__name">BOOSTER</span>
-      <span class="masthead__ver">1.19.0</span>
+      <span class="masthead__ver">1.20.0</span>
     </a>
     <nav class="masthead__nav" aria-label="Site">
       <a href="../index.html#record">Record</a>
@@ -48,10 +48,140 @@ already in orbit. An app that an older Booster already moved keeps what that Boo
 when that needs a step of yours.</p>
 <p>To take a new Booster, download the PHAR again (the same <code>curl</code> line as on <a href="install.html">Install</a>; its
 <code>releases/latest</code> link always names the newest release), or run <code>git pull</code> and <code>composer install</code> in your clone. <code>booster --version</code> prints the version you have.</p>
+<h2 id="1-20-0"><span class="docs-heading-tail"><span>1.20.0</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-20-0">#</a></span></h2>
+<p>Released 2026-11-20. CakePHP 4 apps move to CakePHP 5.4 and Slim 3 apps to Slim 4.15, with the PHP hops to 8.5
+around them. Three hops were added and none removed; <code>plan</code> and <code>run</code> gain <code>--to-cakephp</code> and <code>--to-slim</code>,
+<code>replay check</code> gains <code>--serve-changed</code> and <code>replay record</code> gains <code>--allow-failing-baseline</code>. No exit code changed, but
+a run whose replay baseline is all errors now stops before the first hop (see below).</p>
+<h3 id="what-you-see">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see">#</a></span></h3>
+<ul>
+<li>
+<p><strong>Three framework hops</strong>, planned between the PHP hops for a CakePHP or Slim app:</p>
+<ul>
+<li><code>cakephp-4-to-4.6</code> runs CakePHP's own upgrade rules for 4.1 through 4.5 and requires <code>cakephp/cakephp ^4.6</code>.
+It goes first, on the PHP the app runs today, when that is 7.4 or newer; an app below 7.4 gets the PHP hops to
+7.4 first, then this one.</li>
+<li><code>cakephp-4.6-to-5</code> runs the 5.0 through 5.4 rules, moves AuthComponent to the Authentication plugin and swaps
+the Oracle driver if the app has it. It is planned once PHP reaches 8.2, the first PHP CakePHP 5.4 runs on.</li>
+<li><code>slim-3-to-4</code> moves a Slim 3 app's bootstrap, routes and middleware to Slim 4.15 over its own Pimple container.
+It is planned at PHP 7.4, the lowest Slim 4.15 runs on: first when the app is already there, else right after
+the PHP hop that lands on 7.4.</li>
+</ul>
+<p>The PHP hops then go on to 8.5, and <code>plan</code> keeps a CakePHP or Slim app's PHP within what its framework line runs
+on, and says so, instead of planning a PHP the framework cannot run.</p>
+</li>
+<li>
+<p><strong>The Slim hop runs on PHP 7.4.</strong> It pins <code>slim/psr7 ^1.6</code>, the line that still installs there, and writes its glue
+classes in PHP 7.4 syntax. Code typed with Slim 3's <code>Slim\Http\Request</code> and <code>Response</code> moves onto <code>slim/http</code>. An
+app with no PSR-4 <code>autoload</code> entry for the glue (the official Slim 3 skeleton has only <code>autoload-dev</code>) gets a stop
+sign from <code>plan</code>: add one, run <code>composer dump-autoload</code> and commit before the run.</p>
+</li>
+<li>
+<p><strong>Install <code>vendor/</code> before a CakePHP dry run.</strong> CakePHP's rules read the app's own <code>vendor/</code> (mounted read-only),
+so run <code>composer install</code> in the app before <code>run --dry-run</code>; an app with no <code>vendor/</code> gets a stop sign that says
+so. A real run's baseline installs it for you.</p>
+</li>
+<li>
+<p><strong><code>--to-cakephp</code> and <code>--to-slim</code></strong> pick the target framework line. A major such as <code>5</code> resolves to that line's
+newest release (<code>5.4</code>), <code>--to-cakephp 4</code> stops on 4.6, and the default is the newest line Booster supports. A JSON
+plan carries the resolved line as <code>framework_target</code>.</p>
+</li>
+<li>
+<p><strong><code>detect</code> names the framework</strong> and its major.minor (<code>framework cakephp 4.5</code>), read from <code>composer.lock</code>, else
+<code>composer.json</code>.</p>
+</li>
+<li>
+<p><strong>The MANUAL lists.</strong> Each framework hop prints <code>MANUAL:</code> lines for what only a person can do; the guide
+<a href="guides/cakephp-and-slim.html">CakePHP and Slim apps to PHP 8.5</a> lists them, with the commands and what each hop
+changes. One is new to every CakePHP app: CakePHP 4.3 turned some <code>Cake\Network\Socket</code> properties into methods
+(<code>connected</code> is <code>isConnected()</code>, <code>encrypted</code> is <code>isEncrypted()</code>), and the upstream rule for them needs a Rector
+class that no longer exists, so the 4.6 step lists them as a <code>MANUAL:</code> line instead of rewriting them.</p>
+</li>
+<li>
+<p><strong>A replay baseline of errors stops the run.</strong> When every recorded answer is a PHP fatal or parse error, a 5xx the
+request file does not expect, or the same error page for every path, the run stops before the first hop instead of
+&quot;passing&quot; after each one. Make the app answer on fake data first, or pass <code>--allow-failing-baseline</code> (on <code>run</code>, and
+now on <code>replay record</code>) to record it anyway with a warning. A baseline with only some error answers, or a fatal in
+PHP's log, gets a warning that names them.</p>
+</li>
+<li>
+<p><strong><code>replay init</code> knows CakePHP and Slim groups.</strong> It drafts a CakePHP app from <code>config/routes.php</code> and the
+controller actions its <code>fallbacks()</code> reach, served from <code>webroot/index.php</code>, and Slim routes with their group
+prefixes. Run <code>replay init</code> again (after moving the old draft aside) on an app whose draft an older Booster wrote.</p>
+</li>
+<li>
+<p><strong>A run refused before its first hop writes no <code>booster-hop.json</code></strong>, so it no longer overwrites the record of a
+stopped hop, and it names the <code>composer.lock</code> and <code>vendor/</code> its baseline's composer install left behind.</p>
+</li>
+<li>
+<p><strong><code>replay check --serve-changed</code></strong> compares answers across a change in how the app is served (docroot, front
+controller, setup), as long as the requests are the same. It is groundwork for the Laravel move.</p>
+</li>
+<li>
+<p><strong>The new engine plumbing is internal.</strong> Framework hops name their engine, and CakePHP's own upgrade tool runs in
+a container, pinned to a commit, so its Rector never meets the app's or Booster's. There is nothing to configure.</p>
+</li>
+<li>
+<p><strong>Point <code>--path</code> at <code>composer.json</code>.</strong> Plenty of Slim apps keep <code>composer.json</code> under <code>src/</code>, not at the
+repository root. Booster reads the framework from that file, so pass <code>--path=../my-app/src</code> for those apps.</p>
+</li>
+<li>
+<p><strong>New and changed playbooks.</strong> <code>booster init</code> writes a playbook for each of the three hops, and the overview
+playbook names them, so in an app where you ran <code>booster init</code> with an earlier Booster, <code>booster init --check</code>
+reports the playbooks as stale until you run <code>booster init</code> again.</p>
+</li>
+<li>
+<p><strong>The CakePHP 5 step does more of the move.</strong> It makes the CakePHP 5 skeleton's own moves (CakePHP's global
+functions in <code>config/bootstrap.php</code>, <code>phpunit.xml</code> in the PHPUnit 10 shape, <code>RequestHandler</code> out with a
+<code>viewClasses()</code> where the routes need one, the log and cache renames, <code>WebExceptionRenderer</code> for the removed
+<code>ExceptionRenderer</code>), keeps a CakePHP 4 app on PHPUnit 9 until this step and then moves it to 11.5, moves
+bootstrap-ui, cakephp-csvview and cakephp-codesniffer to their CakePHP 5 majors, and keeps sign-in answering as
+AuthComponent did (the guest actions <code>allow()</code> opened, the old <code>loginAction</code> open to guests, the same redirect and
+flash). The replay switches on a <code>cakephp</code> normalizer from this step, which hides only the extra
+<code>rel=&quot;shortcut icon&quot;</code> link CakePHP 4's <code>meta('icon')</code> printed.</p>
+</li>
+<li>
+<p><strong>The Slim hop keeps Slim 3's runtime.</strong> The container's <code>environment</code>, <code>request</code> and <code>response</code> entries and its
+four handler keys work as on Slim 3, a missing route or wrong method gets Slim 3's own 404 or 405 page, Slim 3 test
+harnesses run through the generated <code>LegacyEnvironment</code> and <code>LegacyHttp</code>, <code>Slim\Container</code> type hints move to
+<code>LegacyContainer</code>, Twig 1 and 2's underscore class names move to Twig 3's, and <code>dflydev/fig-cookies</code> goes to
+<code>^3.0</code>. The MANUAL lines for the handler keys, the container entries and the error handler are gone.</p>
+</li>
+<li>
+<p><strong>Locks that break on the new PHP, and unblocks that outlive their step.</strong> A PHP hop updates a locked release that
+allows the new PHP but misbehaves on it (Twig below 2.8 on 7.4). On the final target, Booster tries once to drop a
+temporary advisory unblock an earlier step needed, with <code>composer update -W</code> for those packages, and keeps the
+change only when the gate passes again without it.</p>
+</li>
+</ul>
+<h3 id="what-booster-will-not-do">What Booster will not <span class="docs-heading-tail"><span>do</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-booster-will-not-do">#</a></span></h3>
+<p>Each of these is a <code>MANUAL:</code> line in the run's output, with the file (and the line or count where there is one). The
+full lists are in <a href="guides/cakephp-and-slim.html">CakePHP and Slim apps to PHP 8.5</a>. New in 1.20.0:</p>
+<ul>
+<li>CakePHP 4.6 step: the <code>Cake\Network\Socket</code> properties CakePHP 4.3 turned into methods (see above).</li>
+<li>CakePHP 5 step, sign-in: an <code>authError</code> that is not a plain string (Booster flashes no message then), a custom
+Auth <code>flash</code> config (Booster uses AuthComponent's default flash options), a <code>loginAction</code> that is not a plain
+controller and action array or whose controller is missing, a login controller whose <code>initialize()</code> does not call
+<code>parent::initialize()</code>, and <code>allow()</code> called with a variable.</li>
+<li>CakePHP 5 step, other code: what an action does with <code>logout()</code>'s return value, the Oracle driver swap to check, a
+check that the controllers that serialize still answer <code>.json</code> and <code>.xml</code> after Booster added <code>viewClasses()</code>,
+<code>-&gt;withType()</code> calls and <code>View::loadHelper()</code> calls. Commented-out code is no longer reported.</li>
+<li>Slim hop: <code>Slim\Container</code> or <code>Slim\Http\Environment</code> imported in a group <code>use</code> statement (import the generated
+<code>LegacyContainer</code> or <code>LegacyEnvironment</code> in its own), Slim 3-only <code>Slim\Http</code> classes (<code>Headers</code>, <code>Body</code>,
+<code>RequestBody</code>, <code>Stream</code>, <code>UploadedFile</code>, <code>Cookies</code>, <code>new Request(...)</code>), and a Twig underscore class name Rector's
+map does not know.</li>
+</ul>
+<h3 id="not-in-this-release">Not in this <span class="docs-heading-tail"><span>release</span><a class="docs-heading-link" aria-label="Link to this section" href="#not-in-this-release">#</a></span></h3>
+<ul>
+<li>Moving a CakePHP or Slim app to Laravel (Phase 2). It comes next.</li>
+<li>PHP 8.6 hops for CakePHP and Slim apps. They wait for CakePHP and Slim to support PHP 8.6.</li>
+<li>CakePHP 3 and Slim 2 (and anything older) have no hop yet: <code>plan</code> says so and keeps PHP where the framework still
+runs.</li>
+</ul>
 <h2 id="1-19-0"><span class="docs-heading-tail"><span>1.19.0</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-19-0">#</a></span></h2>
 <p>Released 2026-11-14. The <code>cas-to-sesame</code> hop lands on SESAME's native names and sets SESAME <code>^0.8</code>. No hop was added
 or removed, no option changed and no exit code changed.</p>
-<h3 id="what-you-see">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see">#</a></span></h3>
+<h3 id="what-you-see-1">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-1">#</a></span></h3>
 <ul>
 <li><strong>Native names for <code>cas-to-sesame</code>.</strong> The hop now lands on SESAME's native names instead of the deprecated
 <code>Waynestate\Sesame\WayneCas</code> shim and writes <code>waynestate/sesame:^0.8</code> (it wrote <code>^0.7</code>): <code>config/sesame.php</code>
@@ -78,7 +208,7 @@ drops from the user models, and the model's <code>ReadOnlyAttributes</code> trai
 <h2 id="1-18-0"><span class="docs-heading-tail"><span>1.18.0</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-18-0">#</a></span></h2>
 <p>Released 2026-11-10. Housekeeping to keep pace with the stack. No hop was added or removed, no option changed and no
 exit code changed.</p>
-<h3 id="what-you-see-1">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-1">#</a></span></h3>
+<h3 id="what-you-see-2">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-2">#</a></span></h3>
 <ul>
 <li><strong>A newer SESAME starting point.</strong> When an app has no vendor copy of SESAME's config, <code>cas-to-sesame</code> now writes
 SESAME 0.7.3's (it was 0.5.0's). The hop still requires <code>^0.7</code>, so an app that already ran it needs nothing.</li>
@@ -91,7 +221,7 @@ SESAME 0.7.3's (it was 0.5.0's). The hop still requires <code>^0.7</code>, so an
 <h2 id="1-17-0"><span class="docs-heading-tail"><span>1.17.0</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-17-0">#</a></span></h2>
 <p>Released 2026-11-09. Follow-ups to 1.16.0. No hop was added or removed, no option changed and no exit code changed.
 Two environment variables are new, and both are off unless you set them.</p>
-<h3 id="what-you-see-2">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-2">#</a></span></h3>
+<h3 id="what-you-see-3">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-3">#</a></span></h3>
 <ul>
 <li><strong>A Node pin that builds.</strong> On an app whose <code>package.json</code> has a <code>build</code> script and a <code>package-lock.json</code>,
 <code>node-pin-24</code> now runs <code>npm ci</code> and <code>npm run build</code> in the <code>node:&lt;major&gt;</code> container before the tests, so a real run
@@ -112,7 +242,7 @@ Node by Booster: run <code>npm ci</code> and <code>npm run build</code> on that 
 <p>Released 2026-11-09. Lessons from a real Laravel app taken from PHP 8.3 to 8.5. No hop was added or removed and no
 exit code changed. <code>plan</code> and <code>run</code> gain <code>--node</code>. The gate's target images are the same; five <code>booster init</code>
 playbooks carry new notes, so <code>booster init --check</code> reports them stale until you run <code>booster init</code> again.</p>
-<h3 id="what-you-see-3">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-3">#</a></span></h3>
+<h3 id="what-you-see-4">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-4">#</a></span></h3>
 <ul>
 <li><strong>A different Citadel deploy step.</strong> A run whose lock change touched only dev packages, or an app with
 <code>scripts/release.sh</code>, or an app with no <code>deployments/</code> folder, gets no <code>deployments/0000_composer_install_*</code> script
@@ -148,7 +278,7 @@ major by hand; <code>npm ci</code> on the server stops warning <code>EBADENGINE<
 <p>Released 2026-11-09. Lessons from a real 2012 raw PHP app taken from PHP 5.6 to 8.5. No hop was added or removed,
 no option or exit code changed, and the gate's target images and the <code>booster init</code> playbooks are the same, so
 <code>booster init --check</code> stays green.</p>
-<h3 id="what-you-see-4">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-4">#</a></span></h3>
+<h3 id="what-you-see-5">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-5">#</a></span></h3>
 <ul>
 <li><strong>New lines in <code>detect</code> and <code>plan</code>.</strong> <code>detect</code> prints a <code>wayne_auth</code> line and lists hand-copied libraries; <code>plan</code>
 lists dynamic properties on the step that crosses PHP 8.2. The JSON reports gain <code>wayne_auth</code> and
@@ -176,7 +306,7 @@ to the Preflight 0.5.0 components, Booster locks Pinstripe 0.1.5, and this page 
 <h2 id="1-13-1"><span class="docs-heading-tail"><span>1.13.1</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-13-1">#</a></span></h2>
 <p>Released 2026-11-09. The stack sweep: the <code>cas-to-sesame</code> hop writes <code>waynestate/sesame:^0.7</code>, and the gate's target
 image runs Composer 2.11.1. No command, option or exit code changed.</p>
-<h3 id="what-you-see-5">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-5">#</a></span></h3>
+<h3 id="what-you-see-6">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see-6">#</a></span></h3>
 <ul>
 <li><strong>A fresh image on the first gate.</strong> For an app on PHP 7.2 or newer, the gate's target image now installs Composer
 2.11.1 (it was 2.10.3, which is no longer maintained). The images for PHP 5.6 and 7.0 build again with Debian's
@@ -212,10 +342,10 @@ JSON sessions. SESAME's
     </main>
     <nav class="docs-pager" aria-label="Pages"><a class="docs-pager__link" href="../docs/next.html"><span class="docs-pager__dir">Previous</span><span class="docs-pager__title">Next</span></a><a class="docs-pager__link docs-pager__link--next" href="../docs/changelog.html"><span class="docs-pager__dir">Next</span><span class="docs-pager__title">Changelog</span></a></nav>
   </div>
-  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#1-19-0">1.19.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-an-older-booster-already-moved">An app that an older Booster already moved</a></li><li class="docs-toc__item"><a href="#1-18-0">1.18.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-1">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-an-older-booster-already-moved-1">An app that an older Booster already moved</a></li><li class="docs-toc__item"><a href="#1-17-0">1.17.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-2">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-an-older-booster-already-moved-2">An app that an older Booster already moved</a></li><li class="docs-toc__item"><a href="#1-16-0">1.16.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-3">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-an-older-booster-already-moved-3">An app that an older Booster already moved</a></li><li class="docs-toc__item"><a href="#1-15-0">1.15.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-4">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-vendored-to-composer-already-moved">An app that vendored-to-composer already moved</a></li><li class="docs-toc__item"><a href="#1-14-0">1.14.0</a></li><li class="docs-toc__item"><a href="#1-13-1">1.13.1</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-5">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-cas-to-sesame-already-moved">An app that cas-to-sesame already moved</a></li></ul></nav>
+  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#1-20-0">1.20.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-booster-will-not-do">What Booster will not do</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#not-in-this-release">Not in this release</a></li><li class="docs-toc__item"><a href="#1-19-0">1.19.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-1">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-an-older-booster-already-moved">An app that an older Booster already moved</a></li><li class="docs-toc__item"><a href="#1-18-0">1.18.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-2">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-an-older-booster-already-moved-1">An app that an older Booster already moved</a></li><li class="docs-toc__item"><a href="#1-17-0">1.17.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-3">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-an-older-booster-already-moved-2">An app that an older Booster already moved</a></li><li class="docs-toc__item"><a href="#1-16-0">1.16.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-4">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-an-older-booster-already-moved-3">An app that an older Booster already moved</a></li><li class="docs-toc__item"><a href="#1-15-0">1.15.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-5">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-vendored-to-composer-already-moved">An app that vendored-to-composer already moved</a></li><li class="docs-toc__item"><a href="#1-14-0">1.14.0</a></li><li class="docs-toc__item"><a href="#1-13-1">1.13.1</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-6">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-cas-to-sesame-already-moved">An app that cas-to-sesame already moved</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
-  <span>Documents Booster <span data-docs-version>1.19.0</span></span>
+  <span>Documents Booster <span data-docs-version>1.20.0</span></span>
   <span><a rel="noopener" href="https://github.com/waynestate/booster">Source</a> <a href="upgrading.md">Markdown</a></span>
 </footer>
 </body>

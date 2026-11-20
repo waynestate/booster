@@ -12,11 +12,53 @@ This page says what changes when you move Booster itself to a new release, newes
 
 To take a new Booster, download the PHAR again (the same `curl` line as on [Install](https://booster.apps.wayne.edu/docs/install.html); its `releases/latest` link always names the newest release), or run `git pull` and `composer install` in your clone. `booster --version` prints the version you have.
 
+## 1.20.0 [#](https://booster.apps.wayne.edu/docs/upgrading.html#1-20-0)
+
+Released 2026-11-20. CakePHP 4 apps move to CakePHP 5.4 and Slim 3 apps to Slim 4.15, with the PHP hops to 8.5 around them. Three hops were added and none removed; `plan` and `run` gain `--to-cakephp` and `--to-slim`, `replay check` gains `--serve-changed` and `replay record` gains `--allow-failing-baseline`. No exit code changed, but a run whose replay baseline is all errors now stops before the first hop (see below).
+
+### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see)
+
+- **Three framework hops**, planned between the PHP hops for a CakePHP or Slim app:
+  - `cakephp-4-to-4.6` runs CakePHP's own upgrade rules for 4.1 through 4.5 and requires `cakephp/cakephp ^4.6`. It goes first, on the PHP the app runs today, when that is 7.4 or newer; an app below 7.4 gets the PHP hops to 7.4 first, then this one.
+  - `cakephp-4.6-to-5` runs the 5.0 through 5.4 rules, moves AuthComponent to the Authentication plugin and swaps the Oracle driver if the app has it. It is planned once PHP reaches 8.2, the first PHP CakePHP 5.4 runs on.
+  - `slim-3-to-4` moves a Slim 3 app's bootstrap, routes and middleware to Slim 4.15 over its own Pimple container. It is planned at PHP 7.4, the lowest Slim 4.15 runs on: first when the app is already there, else right after the PHP hop that lands on 7.4.
+  The PHP hops then go on to 8.5, and `plan` keeps a CakePHP or Slim app's PHP within what its framework line runs on, and says so, instead of planning a PHP the framework cannot run.
+- **The Slim hop runs on PHP 7.4.** It pins `slim/psr7 ^1.6`, the line that still installs there, and writes its glue classes in PHP 7.4 syntax. Code typed with Slim 3's `Slim\Http\Request` and `Response` moves onto `slim/http`. An app with no PSR-4 `autoload` entry for the glue (the official Slim 3 skeleton has only `autoload-dev`) gets a stop sign from `plan`: add one, run `composer dump-autoload` and commit before the run.
+- **Install `vendor/` before a CakePHP dry run.** CakePHP's rules read the app's own `vendor/` (mounted read-only), so run `composer install` in the app before `run --dry-run`; an app with no `vendor/` gets a stop sign that says so. A real run's baseline installs it for you.
+- **`--to-cakephp` and `--to-slim`** pick the target framework line. A major such as `5` resolves to that line's newest release (`5.4`), `--to-cakephp 4` stops on 4.6, and the default is the newest line Booster supports. A JSON plan carries the resolved line as `framework_target`.
+- **`detect` names the framework** and its major.minor (`framework cakephp 4.5`), read from `composer.lock`, else `composer.json`.
+- **The MANUAL lists.** Each framework hop prints `MANUAL:` lines for what only a person can do; the guide [CakePHP and Slim apps to PHP 8.5](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html) lists them, with the commands and what each hop changes. One is new to every CakePHP app: CakePHP 4.3 turned some `Cake\Network\Socket` properties into methods (`connected` is `isConnected()`, `encrypted` is `isEncrypted()`), and the upstream rule for them needs a Rector class that no longer exists, so the 4.6 step lists them as a `MANUAL:` line instead of rewriting them.
+- **A replay baseline of errors stops the run.** When every recorded answer is a PHP fatal or parse error, a 5xx the request file does not expect, or the same error page for every path, the run stops before the first hop instead of "passing" after each one. Make the app answer on fake data first, or pass `--allow-failing-baseline` (on `run`, and now on `replay record`) to record it anyway with a warning. A baseline with only some error answers, or a fatal in PHP's log, gets a warning that names them.
+- **`replay init` knows CakePHP and Slim groups.** It drafts a CakePHP app from `config/routes.php` and the controller actions its `fallbacks()` reach, served from `webroot/index.php`, and Slim routes with their group prefixes. Run `replay init` again (after moving the old draft aside) on an app whose draft an older Booster wrote.
+- **A run refused before its first hop writes no `booster-hop.json`**, so it no longer overwrites the record of a stopped hop, and it names the `composer.lock` and `vendor/` its baseline's composer install left behind.
+- **`replay check --serve-changed`** compares answers across a change in how the app is served (docroot, front controller, setup), as long as the requests are the same. It is groundwork for the Laravel move.
+- **The new engine plumbing is internal.** Framework hops name their engine, and CakePHP's own upgrade tool runs in a container, pinned to a commit, so its Rector never meets the app's or Booster's. There is nothing to configure.
+- **Point `--path` at `composer.json`.** Plenty of Slim apps keep `composer.json` under `src/`, not at the repository root. Booster reads the framework from that file, so pass `--path=../my-app/src` for those apps.
+- **New and changed playbooks.** `booster init` writes a playbook for each of the three hops, and the overview playbook names them, so in an app where you ran `booster init` with an earlier Booster, `booster init --check` reports the playbooks as stale until you run `booster init` again.
+- **The CakePHP 5 step does more of the move.** It makes the CakePHP 5 skeleton's own moves (CakePHP's global functions in `config/bootstrap.php`, `phpunit.xml` in the PHPUnit 10 shape, `RequestHandler` out with a `viewClasses()` where the routes need one, the log and cache renames, `WebExceptionRenderer` for the removed `ExceptionRenderer`), keeps a CakePHP 4 app on PHPUnit 9 until this step and then moves it to 11.5, moves bootstrap-ui, cakephp-csvview and cakephp-codesniffer to their CakePHP 5 majors, and keeps sign-in answering as AuthComponent did (the guest actions `allow()` opened, the old `loginAction` open to guests, the same redirect and flash). The replay switches on a `cakephp` normalizer from this step, which hides only the extra `rel="shortcut icon"` link CakePHP 4's `meta('icon')` printed.
+- **The Slim hop keeps Slim 3's runtime.** The container's `environment`, `request` and `response` entries and its four handler keys work as on Slim 3, a missing route or wrong method gets Slim 3's own 404 or 405 page, Slim 3 test harnesses run through the generated `LegacyEnvironment` and `LegacyHttp`, `Slim\Container` type hints move to `LegacyContainer`, Twig 1 and 2's underscore class names move to Twig 3's, and `dflydev/fig-cookies` goes to `^3.0`. The MANUAL lines for the handler keys, the container entries and the error handler are gone.
+- **Locks that break on the new PHP, and unblocks that outlive their step.** A PHP hop updates a locked release that allows the new PHP but misbehaves on it (Twig below 2.8 on 7.4). On the final target, Booster tries once to drop a temporary advisory unblock an earlier step needed, with `composer update -W` for those packages, and keeps the change only when the gate passes again without it.
+
+### What Booster will not do [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-booster-will-not-do)
+
+Each of these is a `MANUAL:` line in the run's output, with the file (and the line or count where there is one). The full lists are in [CakePHP and Slim apps to PHP 8.5](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html). New in 1.20.0:
+
+- CakePHP 4.6 step: the `Cake\Network\Socket` properties CakePHP 4.3 turned into methods (see above).
+- CakePHP 5 step, sign-in: an `authError` that is not a plain string (Booster flashes no message then), a custom Auth `flash` config (Booster uses AuthComponent's default flash options), a `loginAction` that is not a plain controller and action array or whose controller is missing, a login controller whose `initialize()` does not call `parent::initialize()`, and `allow()` called with a variable.
+- CakePHP 5 step, other code: what an action does with `logout()`'s return value, the Oracle driver swap to check, a check that the controllers that serialize still answer `.json` and `.xml` after Booster added `viewClasses()`, `->withType()` calls and `View::loadHelper()` calls. Commented-out code is no longer reported.
+- Slim hop: `Slim\Container` or `Slim\Http\Environment` imported in a group `use` statement (import the generated `LegacyContainer` or `LegacyEnvironment` in its own), Slim 3-only `Slim\Http` classes (`Headers`, `Body`, `RequestBody`, `Stream`, `UploadedFile`, `Cookies`, `new Request(...)`), and a Twig underscore class name Rector's map does not know.
+
+### Not in this release [#](https://booster.apps.wayne.edu/docs/upgrading.html#not-in-this-release)
+
+- Moving a CakePHP or Slim app to Laravel (Phase 2). It comes next.
+- PHP 8.6 hops for CakePHP and Slim apps. They wait for CakePHP and Slim to support PHP 8.6.
+- CakePHP 3 and Slim 2 (and anything older) have no hop yet: `plan` says so and keeps PHP where the framework still runs.
+
 ## 1.19.0 [#](https://booster.apps.wayne.edu/docs/upgrading.html#1-19-0)
 
 Released 2026-11-14. The `cas-to-sesame` hop lands on SESAME's native names and sets SESAME `^0.8`. No hop was added or removed, no option changed and no exit code changed.
 
-### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see)
+### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-1)
 
 - **Native names for `cas-to-sesame`.** The hop now lands on SESAME's native names instead of the deprecated `Waynestate\Sesame\WayneCas` shim and writes `waynestate/sesame:^0.8` (it wrote `^0.7`): `config/sesame.php` defaults to `ModelUserResolver`, the web routes run under `auth.sesame`, any `wayne.cas` alias registration is removed, user models drop `WayneCasable`, and a model's `ReadOnlyAttributes` trait moves to `app/Models/Concerns` (Booster writes the trait file from SESAME 0.7.5 when it is absent).
 - **Two WayneUI 2 behaviour rows.** A plan for an app on WayneUI 2 (`package:cit-web-infra/wayne-ui@2`) now lists two behaviour-change rows, `wayneui-bootstrap-data-hooks` and `wayneui-nav-active-prefix`, taken from WayneUI's MIGRATING guide.
@@ -31,7 +73,7 @@ An app an older Booster moved with `cas-to-sesame` keeps `waynestate/sesame:^0.7
 
 Released 2026-11-10. Housekeeping to keep pace with the stack. No hop was added or removed, no option changed and no exit code changed.
 
-### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-1)
+### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-2)
 
 - **A newer SESAME starting point.** When an app has no vendor copy of SESAME's config, `cas-to-sesame` now writes SESAME 0.7.3's (it was 0.5.0's). The hop still requires `^0.7`, so an app that already ran it needs nothing.
 - **Pinstripe 0.3.** Booster requires `waynestate/pinstripe` `^0.3` (was `^0.1.4`); the lint presets it reads are 0.3.1's.
@@ -45,7 +87,7 @@ Nothing to do.
 
 Released 2026-11-09. Follow-ups to 1.16.0. No hop was added or removed, no option changed and no exit code changed. Two environment variables are new, and both are off unless you set them.
 
-### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-2)
+### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-3)
 
 - **A Node pin that builds.** On an app whose `package.json` has a `build` script and a `package-lock.json`, `node-pin-24` now runs `npm ci` and `npm run build` in the `node:<major>` container before the tests, so a real run takes longer and needs Docker for that step too. A red build stops the run at that hop. With no build script the hop prints `No build script in package.json, so the front-end build was not checked.` and carries on as before.
 - **A rerun that re-gates.** After a run that stopped at a red gate, the next run reads `booster-hop.json` and runs that hop's gate again: a `Re-gate: PASS` or `FAIL` line after the baseline when the hop left the plan, or a gate on the hop's own step when it is back with nothing to edit. Keep `booster-hop.json` between the two runs. The JSON report and `booster-hop.json` gain `regate` on such a run; a script that reads them by key keeps working.
@@ -59,7 +101,7 @@ Nothing to do. An app that an older Booster already pinned keeps its pin, and it
 
 Released 2026-11-09. Lessons from a real Laravel app taken from PHP 8.3 to 8.5. No hop was added or removed and no exit code changed. `plan` and `run` gain `--node`. The gate's target images are the same; five `booster init` playbooks carry new notes, so `booster init --check` reports them stale until you run `booster init` again.
 
-### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-3)
+### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-4)
 
 - **A different Citadel deploy step.** A run whose lock change touched only dev packages, or an app with `scripts/release.sh`, or an app with no `deployments/` folder, gets no `deployments/0000_composer_install_*` script any more; the report's `Deploy:` line says why and, for the last case, what each server must run. When Booster does write the script, it installs the production packages and stops there: it no longer runs `php artisan migrate --force`.
 - **A Node pin that matches the server.** An app with the Squire kit is pinned to the Node in its Citadel image (`NODE_IMAGE` in `.squire/base-fallback.Dockerfile`, 22 today), not to 26. Any other app still gets the newest Node the policy supports. `--node=<major>` picks one yourself.
@@ -80,7 +122,7 @@ An app that `node-pin-24` already pinned to Node 26 keeps that pin: a newer Boos
 
 Released 2026-11-09. Lessons from a real 2012 raw PHP app taken from PHP 5.6 to 8.5. No hop was added or removed, no option or exit code changed, and the gate's target images and the `booster init` playbooks are the same, so `booster init --check` stays green.
 
-### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-4)
+### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-5)
 
 - **New lines in `detect` and `plan`.** `detect` prints a `wayne_auth` line and lists hand-copied libraries; `plan` lists dynamic properties on the step that crosses PHP 8.2. The JSON reports gain `wayne_auth` and `hand_copied_libraries` (detect) and `dynamic_properties` (plan). A script that reads them by key keeps working.
 - **A Wayne Auth stop sign.** An app that still signs people in through Wayne Auth now sees `detect` and `plan` open with a stop sign. Move the app onto SESAME's Wayne Auth bridge before the first hop off PHP 5.6; the [recipes](https://booster.apps.wayne.edu/docs/recipes.html) link SESAME's guide.
@@ -101,7 +143,7 @@ Released 2026-11-09. Nothing to do: no hop, command, option, exit code or gate i
 
 Released 2026-11-09. The stack sweep: the `cas-to-sesame` hop writes `waynestate/sesame:^0.7`, and the gate's target image runs Composer 2.11.1. No command, option or exit code changed.
 
-### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-5)
+### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-6)
 
 - **A fresh image on the first gate.** For an app on PHP 7.2 or newer, the gate's target image now installs Composer 2.11.1 (it was 2.10.3, which is no longer maintained). The images for PHP 5.6 and 7.0 build again with Debian's current archive keys. The recipe stamp changes with both, so the first `booster run` after the upgrade builds the image again, and that first gate takes a little longer. Images for older PHP keep Composer 2.2. Nothing to do.
 - **A stale playbook.** The `cas-to-sesame` hop's notes name `waynestate/sesame:^0.7`, and the hop playbooks that `booster init` writes carry those notes. In an app where you ran `booster init` with an earlier Booster, `booster init --check` reports that playbook as stale until you run `booster init` again.
