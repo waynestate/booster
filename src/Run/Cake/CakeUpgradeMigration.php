@@ -81,6 +81,7 @@ final class CakeUpgradeMigration implements FrameworkEngine
         private readonly ComposerEditor $composer,
         private readonly AuthRewriter $auth = new AuthRewriter(),
         private readonly ApplicationScaffold $scaffold = new ApplicationScaffold(),
+        private readonly SkeletonRewriter $skeleton = new SkeletonRewriter(),
     ) {}
 
     public function migrate(string $appPath, bool $dryRun, string $php, ?Hop $hop = null): VendoredMigrationResult
@@ -180,6 +181,9 @@ final class CakeUpgradeMigration implements FrameworkEngine
                 self::renameOracleNamespace($copy);
                 $stepManual[] = 'MANUAL: check that the Oracle driver for CakePHP 5 covers the Oracle calls the app makes.';
             }
+            [$skeletonChanges, $skeletonManual] = $this->rewriteSkeleton($copy);
+            $changes = [...$changes, ...$skeletonChanges];
+            $stepManual = [...$stepManual, ...$skeletonManual];
         }
 
         [$files, $written, $deleted] = self::compare($appPath, $copy);
@@ -303,6 +307,90 @@ final class CakeUpgradeMigration implements FrameworkEngine
         }
 
         return [true, $changes, array_values(array_unique($manual))];
+    }
+
+    /**
+     * The CakePHP 5 skeleton lines no rule writes (SkeletonRewriter), in the
+     * copy: the global functions in config/bootstrap.php and the PHPUnit 10
+     * shape of phpunit.xml.dist and phpunit.xml.
+     *
+     * @return array{0: list<string>, 1: list<string>} the changes, the MANUAL lines
+     */
+    private function rewriteSkeleton(string $copy): array
+    {
+        $changes = [];
+        $manual = [];
+        $bootstrap = $copy . '/config/bootstrap.php';
+        if (is_file($bootstrap)) {
+            $result = $this->skeleton->bootstrap(self::read($bootstrap));
+            if ($result['changes'] !== []) {
+                self::write($bootstrap, $result['code']);
+            }
+            [$changes, $manual] = [[...$changes, ...$result['changes']], [...$manual, ...$result['manual']]];
+        }
+        foreach (['phpunit.xml.dist', 'phpunit.xml'] as $name) {
+            if (!is_file($copy . '/' . $name)) {
+                continue;
+            }
+            $result = $this->skeleton->phpunitXml(self::read($copy . '/' . $name), $name);
+            if ($result['changes'] !== []) {
+                self::write($copy . '/' . $name, $result['code']);
+            }
+            [$changes, $manual] = [[...$changes, ...$result['changes']], [...$manual, ...$result['manual']]];
+        }
+
+        // The config and template strings cakephp50 leaves behind.
+        $appConfig = is_file($copy . '/config/app.php') ? self::read($copy . '/config/app.php') : '';
+        $cacheRenamed = str_contains($appConfig, "'_cake_translations_'") && !str_contains($appConfig, "'_cake_core_'");
+        $edited = 0;
+        foreach (['config/app.php', 'config/app_local.php', 'config/bootstrap.php'] as $file) {
+            if (is_file($copy . '/' . $file)) {
+                $result = $this->skeleton->config(self::read($copy . '/' . $file), $cacheRenamed);
+                if ($result['changes'] > 0) {
+                    self::write($copy . '/' . $file, $result['code']);
+                    $edited += $result['changes'];
+                }
+            }
+        }
+        foreach (self::filesWithExtension($copy, 'php') as $file) {
+            if (!str_starts_with($file, 'templates/')) {
+                continue;
+            }
+            $result = $this->skeleton->template(self::read($copy . '/' . $file), $cacheRenamed);
+            if ($result['changes'] > 0) {
+                self::write($copy . '/' . $file, $result['code']);
+                $edited += $result['changes'];
+            }
+        }
+        if ($edited > 0) {
+            $changes[] = sprintf("Moved %d CakePHP 4 config and template %s to CakePHP 5 (log 'scopes' => null, the _cake_translations_ cache, Connection::getDriver()->connect()).", $edited, $edited === 1 ? 'line' : 'lines');
+        }
+
+        // RequestHandlerComponent: drop the loads when nothing reads the component.
+        $sources = array_filter(
+            self::phpSources($copy),
+            static fn(string $file): bool => str_starts_with($file, 'src/') || str_starts_with($file, 'plugins/'),
+            ARRAY_FILTER_USE_KEY,
+        );
+        $readsIt = self::matches($sources, '/->\s*RequestHandler\s*->/') !== [];
+        $routes = is_file($copy . '/config/routes.php') ? self::read($copy . '/config/routes.php') : '';
+        $extensions = preg_match('/setExtensions\s*\(\s*\[[^\]]*[\'"](?:json|xml)[\'"]/', $routes) === 1;
+        if (!$readsIt) {
+            foreach ($sources as $file => $source) {
+                $result = $this->skeleton->requestHandler($source, $extensions && str_ends_with($file, 'src/Controller/AppController.php'));
+                if (!$result['removed']) {
+                    continue;
+                }
+                self::write($copy . '/' . $file, $result['code']);
+                $changes[] = sprintf("Removed loadComponent('RequestHandler') from %s (CakePHP 5 has no RequestHandlerComponent).", $file);
+                if ($result['viewClasses']) {
+                    $changes[] = sprintf('Added viewClasses() with JsonView and XmlView to %s for the .json and .xml extensions config/routes.php sets.', $file);
+                    $manual[] = sprintf('MANUAL: %s now picks JsonView or XmlView through viewClasses(), as RequestHandlerComponent did; check the controllers that serialize (setOption(\'serialize\')) still answer .json and .xml.', $file);
+                }
+            }
+        }
+
+        return [$changes, $manual];
     }
 
     /** The `$this->Auth->name(` calls in $php. */
@@ -617,7 +705,7 @@ final class CakeUpgradeMigration implements FrameworkEngine
         $verbs = [
             'Ran' => 'run', 'Renamed' => 'rename', 'Set' => 'set', 'Removed' => 'remove', 'Added' => 'add',
             'Moved' => 'move', 'Wired' => 'wire', 'Swapped' => 'swap', 'Replaced' => 'replace', 'Rewrote' => 'rewrite',
-            'Changed' => 'change', 'Required' => 'require',
+            'Changed' => 'change', 'Required' => 'require', 'Loaded' => 'load',
         ];
         $space = strpos($line, ' ');
         $first = $space === false ? $line : substr($line, 0, $space);
