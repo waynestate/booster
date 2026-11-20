@@ -1534,7 +1534,7 @@ final class HopExecutor
             }
         }
         if ($outcome->successful()) {
-            return new GateReport(true, $unblock);
+            return new GateReport(true, [...$unblock, ...$outcome->notes]);
         }
 
         // A Composer-phase failure is never reported as the test command

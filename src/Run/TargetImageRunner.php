@@ -182,6 +182,23 @@ final class TargetImageRunner
             'tests_log=/tmp/booster-gate-tests.log',
             $testCommand . ' >"$tests_log" 2>&1',
             'test_exit=$?',
+            // PHPUnit 12 fails a run on its own warnings, and phpunit.xml's
+            // <ini> for an extension the gate image does not load (the
+            // CakePHP skeleton's apc.enable_cli, found 2026-11-20) is one,
+            // with every test green. That run counts as passed, with a note,
+            // only when every PHPUnit warning is such an ini, PHP here does not
+            // know the setting at all, and the app asked for no failOn rule.
+            'if [ "$test_exit" -ne 0 ] && grep -q "OK, but there were issues" "$tests_log" && ! grep -qs -e "failOn[A-Za-z]*=\"true\"" -e "--fail-on" phpunit.xml phpunit.xml.dist composer.json; then',
+            '  ini_names=$(sed -n \'s/.*Failed to set "\([^"=]*\)=.*/\1/p\' "$tests_log" | sort -u)',
+            '  ini_count=$(grep -c \'Failed to set "\' "$tests_log")',
+            '  warn_count=$(sed -n \'s/.*PHPUnit Warnings: \([0-9]*\).*/\1/p\' "$tests_log" | tail -n 1)',
+            '  ini_unknown=yes',
+            '  for name in $ini_names; do php -r \'exit(ini_get($argv[1]) === false ? 0 : 1);\' "$name" || ini_unknown=no; done',
+            '  if [ -n "$ini_names" ] && [ "$ini_count" = "$warn_count" ] && [ "$ini_unknown" = yes ]; then',
+            '    echo "BOOSTER_GATE_NOTE=Every test passed; PHPUnit failed the run only because phpunit.xml sets $(echo $ini_names), which belongs to an extension this gate image does not load. Where that extension is installed the warning goes away."',
+            '    test_exit=0',
+            '  fi',
+            'fi',
         ];
         if ($extraCommand !== null && $extraCommand !== '') {
             $lines[] = 'if [ "$test_exit" -eq 0 ]; then';
@@ -212,7 +229,12 @@ final class TargetImageRunner
         $phase = GateOutcome::PHASE_TESTS;
         $exitCode = $result->exitCode;
         $output = [];
+        $notes = [];
         foreach (explode("\n", trim($result->stdout . "\n" . $result->stderr)) as $line) {
+            if (preg_match('/^BOOSTER_GATE_NOTE=(.+)$/', $line, $m) === 1) {
+                $notes[] = trim($m[1]);
+                continue;
+            }
             if (preg_match('/^BOOSTER_GATE_PHASE=(\S+)$/', $line, $m) === 1) {
                 $phase = $m[1];
                 continue;
@@ -227,7 +249,7 @@ final class TargetImageRunner
             array_pop($output);
         }
 
-        return new GateOutcome($phase, $exitCode, $output);
+        return new GateOutcome($phase, $exitCode, $output, $notes);
     }
 
     /**

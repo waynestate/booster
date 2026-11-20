@@ -18,11 +18,13 @@ final readonly class GateOutcome
 
     /**
      * @param list<string> $output the container's output with Booster's marker lines removed
+     * @param list<string> $notes  lines the gate script asked to show even on a pass (BOOSTER_GATE_NOTE)
      */
     public function __construct(
         public string $phase,
         public int $exitCode,
         public array $output,
+        public array $notes = [],
     ) {}
 
     public function successful(): bool
