@@ -424,9 +424,9 @@ final class CakeUpgradeMigrationTest extends TestCase
         self::assertNotSame([], $rector);
         foreach ($rector as $call) {
             $command = $call['command'];
-            // The copy at /app, then the app's own vendor/ over /app/vendor, read-only, and named as the autoloader.
+            // The copy at /app, then the app's own vendor/ over /app/vendor, read-only, read through the image's class-map autoloader.
             self::assertSame($app . '/vendor:/app/vendor:ro', $command[(int) array_search('-v', $command, true) + 3]);
-            self::assertSame('/app/vendor/autoload.php', $command[(int) array_search('--autoload', $command, true) + 1]);
+            self::assertSame('/booster/app-autoload.php', $command[(int) array_search('--autoload', $command, true) + 1]);
             self::assertStringStartsNotWith($app . ':', $command[(int) array_search('-v', $command, true) + 1], 'Rector writes the copy, never the app');
         }
     }

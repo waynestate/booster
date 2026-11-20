@@ -27,6 +27,16 @@ final class CakeUpgradeRunner
     /** Where the app's own vendor/ is mounted, read-only, for Rector's autoloader. */
     public const VENDOR_MOUNT = '/app/vendor';
 
+    /**
+     * The autoloader Rector gets, baked into the image: the app's Composer
+     * class maps without its files autoloads, which can die on the tool's
+     * newer PHP (docker/cakephp-upgrade/app-autoload.php says why).
+     */
+    public const APP_AUTOLOAD = '/booster/app-autoload.php';
+
+    /** The file in docker/cakephp-upgrade/ the image copies to APP_AUTOLOAD. */
+    public const APP_AUTOLOAD_FILE = 'app-autoload.php';
+
     /** Where the opt-in Composer cache (BOOSTER_COMPOSER_CACHE) is mounted: the tool's own downloads, not the app's. */
     public const COMPOSER_CACHE_MOUNT = '/tmp/composer-cache';
 
@@ -43,9 +53,13 @@ final class CakeUpgradeRunner
      */
     public static function imageTag(string $ref = self::UPGRADE_REF): string
     {
-        $contents = @file_get_contents(self::dockerfilePath());
-        if ($contents === false) {
-            throw new ToolError(sprintf('Could not read the cakephp-upgrade Dockerfile at %s.', self::dockerfilePath()));
+        $contents = '';
+        foreach ([self::dockerfilePath(), self::dockerDir() . '/' . self::APP_AUTOLOAD_FILE] as $file) {
+            $read = @file_get_contents($file);
+            if ($read === false) {
+                throw new ToolError(sprintf('Could not read the cakephp-upgrade image file at %s.', $file));
+            }
+            $contents .= $read;
         }
 
         return 'booster-cakephp-upgrade:' . substr(hash('sha256', $contents . $ref), 0, 12);
@@ -103,9 +117,10 @@ final class CakeUpgradeRunner
      *
      * Rector needs the app's autoloader to know its classes (and without one
      * cakephp/upgrade exits 1 before running a rule), so the app's own
-     * vendor/ is mounted read-only over /app/vendor and named with
-     * --autoload. Rector only writes the path it is given (/app/<subdir>,
-     * never vendor), and the read-only mount makes sure of it.
+     * vendor/ is mounted read-only over /app/vendor, and --autoload names
+     * the image's APP_AUTOLOAD, which reads that vendor's class maps without
+     * running its files autoloads. Rector only writes the path it is given
+     * (/app/<subdir>, never vendor), and the read-only mount makes sure of it.
      *
      * @return list<string>
      */
@@ -124,7 +139,7 @@ final class CakeUpgradeRunner
             '-v', rtrim($vendorPath, '/\\') . ':' . self::VENDOR_MOUNT . ':ro',
             ...$this->cacheMountArgs(),
             self::imageTag(),
-            'bin/cake', 'upgrade', 'rector', '--rules', $ruleSet, '--autoload', self::VENDOR_MOUNT . '/autoload.php', '/app/' . $subdir,
+            'bin/cake', 'upgrade', 'rector', '--rules', $ruleSet, '--autoload', self::APP_AUTOLOAD, '/app/' . $subdir,
         ];
     }
 
