@@ -10,7 +10,7 @@
             "SECURITY_SALT": "booster-strangler-fixture-salt-not-a-secret-0123456789abcdef"
         }
     },
-    "normalize": ["csrf", "session-id", "timestamps"],
+    "normalize": ["csrf", "session-id", "timestamps", {"name": "postLink form names (uniqid, new on every request)", "pattern": "post_[0-9a-f]{13}[0-9]*", "replace": "post_<ID>"}],
     "sequences": [
         {
             "name": "guest",
