@@ -21,11 +21,15 @@ use Waynestate\Booster\Prepass\NewByReferenceFixer;
 use Waynestate\Booster\Prepass\PrepassResult;
 use Waynestate\Booster\Project\AppType;
 use Waynestate\Booster\Refresh\HopDataRefresher;
+use Waynestate\Booster\Replay\ReplayFile;
 use Waynestate\Booster\Replay\ReplayGate;
 use Waynestate\Booster\Replay\ReplayOutcome;
 use Waynestate\Booster\Replay\ReplayRunner;
 use Waynestate\Booster\Replay\ReplaySuggestion;
 use Waynestate\Booster\Report\TextWriter;
+use Waynestate\Booster\Run\Strangler\StranglerParts;
+use Waynestate\Booster\Run\Strangler\StranglerStep;
+use Waynestate\Booster\Run\Strangler\UnwiredStranglerParts;
 use Waynestate\Booster\Scan\BehaviourScan;
 use Waynestate\Booster\Scan\ComposerAuditScan;
 use Waynestate\Booster\Scan\DynamicPropertiesScan;
@@ -73,7 +77,14 @@ final class HopExecutor
          * @var array<string, FrameworkEngine>
          */
         private readonly array $frameworkEngines = [],
+        /** The other lanes' strangler parts (Step 0, the mount, the units and movers, the route table); null runs every strangler part as unwired. */
+        private readonly ?StranglerParts $stranglerParts = null,
     ) {}
+
+    /** The replay runner and transcript folder this run recorded with, so a strangler gate can rebuild the gate on the rewritten request file. */
+    private ?ReplayRunner $replayRunnerUsed = null;
+
+    private ?string $replayOutDir = null;
 
     /** The replay gate for this run, once its baseline is recorded (--replay). */
     private ?ReplayGate $replayGate = null;
@@ -276,7 +287,8 @@ final class HopExecutor
         foreach ($plan->steps as $step) {
             $hopStarted = microtime(true);
             $result = $this->runStep($step, $path, $plan, $options, $baseline);
-            if ($this->stoppedHop === $step->hop->id && $result->status === StepResult::NOTHING_TO_DO) {
+            // A strangler keeps its own failed units in its ledger, so it never re-gates this way.
+            if ($this->stoppedHop === $step->hop->id && $result->status === StepResult::NOTHING_TO_DO && $step->hop->kind !== HopKind::Strangler) {
                 // The stopped hop is back with nothing left to edit: its own
                 // edits are what it would make. Its gate runs instead of the skip.
                 $result = $this->regateStep($step, $path, $options, $baseline, $result);
@@ -726,7 +738,7 @@ final class HopExecutor
             $messages[] = 'Composer audit: clean (no advisories, no abandoned packages).';
         }
 
-        return new StepResult($step->number, $step->hop->id, $result->status, $result->files, $messages, $result->incomplete, $result->prepass, $result->rules, $audit);
+        return new StepResult($step->number, $step->hop->id, $result->status, $result->files, $messages, $result->incomplete, $result->prepass, $result->rules, $audit, $result->strangler);
     }
 
     /**
@@ -798,6 +810,10 @@ final class HopExecutor
 
             if ($hop->kind === HopKind::Session) {
                 return $this->runSessionHop($step, $path, $options, $baseline);
+            }
+
+            if ($hop->kind === HopKind::Strangler) {
+                return $this->runStranglerHop($step, $path, $plan, $options, $baseline);
             }
 
             // PHP hops get the new-by-reference pre-pass first: modern PHP refuses to compile
@@ -1344,8 +1360,9 @@ final class HopExecutor
      * @param list<string>|null $update packages for composer update -W; the
      *        hop's composer set by default, or the hop's own list when it
      *        changes packages outside that set
+     * @param list<string>      $signInChanges request paths whose sign-in hand-off the step changed on purpose (the strangler's Step 0)
      */
-    private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, ?array $update = null): GateReport
+    private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, ?array $update = null, array $signInChanges = []): GateReport
     {
         $gate = $this->runTestGate($step, $path, $options, $baseline, $update);
         if (!$gate->passed || $this->replayGate === null || $this->replayGate->recording() === null) {
@@ -1363,7 +1380,9 @@ final class HopExecutor
         // CakePHP 5's helpers print some markup differently; the preset hides only that.
         $presetLine = $step->hop->id === HopRegistry::CAKEPHP_46_TO_5_ID ? $this->replayGate->addPreset('cakephp') : null;
         try {
-            $outcome = $this->replayGate->check($php, sprintf('step-%d-%s-php%s', $step->number, $step->hop->id, $php));
+            // Only Step 0 passes sign-in changes; REPLAY's ReplayGate::check takes them as signInChanges (merge: a named argument).
+            $extra = $signInChanges === [] ? [] : [false, false, $signInChanges];
+            $outcome = $this->replayGate->check($php, sprintf('step-%d-%s-php%s', $step->number, $step->hop->id, $php), ...$extra);
         } catch (ToolError $e) {
             return new GateReport(false, [...$gate->lines, 'Replay could not run: ' . $e->getMessage(), $this->undoHint($path)]);
         }
@@ -1468,7 +1487,9 @@ final class HopExecutor
             $built = 'Replay: built the front end first (npm ci, npm run build), because a later hop rebuilds it.';
         }
         $runner = $this->replayRunner ?? new ReplayRunner($this->gate, $this->processes);
-        $this->replayGate = new ReplayGate($runner, $file, $path, $options->replayOut ?? ReplayGate::defaultOutDir($path), $options->gateImage);
+        $this->replayRunnerUsed = $runner;
+        $this->replayOutDir = $options->replayOut ?? ReplayGate::defaultOutDir($path);
+        $this->replayGate = new ReplayGate($runner, $file, $path, $this->replayOutDir, $options->gateImage);
 
         try {
             $outcome = $this->replayGate->record($php, false, $options->allowFailingBaseline);
@@ -1928,6 +1949,169 @@ final class HopExecutor
         }
 
         return new StepResult($step->number, $hop->id, StepResult::APPLIED, $migration->files, [...$messages, ...$migration->manual]);
+    }
+
+    /**
+     * The gate command on a mounted app: every PHP file outside the two
+     * vendor folders still parses (the root's syntax check would walk into
+     * legacy/vendor/), then, while legacy/ exists, the legacy half's own
+     * suite (or the person's --test-command) from inside legacy/.
+     */
+    public const STRANGLER_SYNTAX_COMMAND = "find . -name '*.php' -not -path '*/vendor/*' -not -path '*/node_modules/*' -not -path './storage/*' -print0 | xargs -0 -r -n1 php -l > /dev/null";
+
+    /**
+     * A strangler hop (cakephp-to-laravel, slim-to-laravel): StranglerStep
+     * walks run 1 (Step 0, the mount) or a later run (moves, a hand flip,
+     * the finish) and calls back here for the gates, route:list and git.
+     * A strangler that follows other steps in the same run waits: the mount
+     * moves the whole tree, so those steps are committed first.
+     */
+    private function runStranglerHop(PlanStep $step, string $path, Plan $plan, RunOptions $options, BaselineResult $baseline): StepResult
+    {
+        $hop = $step->hop;
+        $framework = (string) HopRegistry::stranglerFramework($hop->id);
+        $next = sprintf('%s run --path=%s --only %s --replay', \Waynestate\Booster\Console\Invocation::program(), \Waynestate\Booster\Console\Invocation::pathArg($plan->project->path), $hop->id);
+        $dirty = fn(): bool => $this->workingCopyDirty($path);
+        if ($step->number > 1 && !$options->dryRun && $dirty()) {
+            return new StepResult($step->number, $hop->id, StepResult::NOT_RUN, [], [
+                sprintf('Held: the steps before this one changed the app in this run, and the move onto Laravel starts from a clean tree (the mount moves the whole app into legacy/). Review and commit them, then run: %s', $next),
+            ]);
+        }
+        $targets = $this->registry()->frameworkTargets($framework);
+        $newestMajor = $targets === [] ? '?' : explode('.', $targets[count($targets) - 1])[0];
+        $require = self::composerRequires($path);
+        $changedPackages = static function () use ($path, $require): array {
+            $now = self::composerRequires($path);
+            $changed = [];
+            foreach ($now as $package => $constraint) {
+                if (($require[$package] ?? null) !== $constraint) {
+                    $changed[] = $package;
+                }
+            }
+
+            return $changed;
+        };
+        $strangler = new StranglerStep(
+            $this->stranglerParts ?? new UnwiredStranglerParts(),
+            fn(array $signInChanges): GateReport => $options->skipGate ? new GateReport(true, ['Gate skipped.']) : $this->runGate($step, $path, $options, $baseline, $changedPackages(), $signInChanges),
+            fn(bool $serveChanged): GateReport => $options->skipGate ? new GateReport(true, ['Gate skipped.']) : $this->stranglerGate($step, $path, $options, $baseline, $serveChanged, $serveChanged ? [] : $changedPackages()),
+            $dirty,
+            fn(): array|string => $this->laravelRouteList($path, $step->phpAfter ?? '', $options),
+            static fn(): string => (new \DateTimeImmutable('now'))->format(DATE_ATOM),
+            fn(): ?array => $this->replayGate?->recording()?->answers,
+        );
+
+        return $strangler->run($step, $path, $options, $plan->project->frameworkVersion, $newestMajor, $next);
+    }
+
+    /**
+     * The gate on a mounted tree: the syntax check over both roots and the
+     * legacy half's own tests, then the replay on the request file as the
+     * mount rewrote it (docroot public, setup in legacy/), compared with this
+     * run's baseline. $serveChanged is the mount's and the finish's: the
+     * baseline was served another way, and the transcript names the change.
+     *
+     * @param list<string> $update
+     */
+    private function stranglerGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, bool $serveChanged, array $update): GateReport
+    {
+        $test = self::STRANGLER_SYNTAX_COMMAND;
+        if (is_dir($path . '/legacy') && ($options->testCommand !== null || $baseline->gateKind === BaselineResult::GATE_TESTS)) {
+            $test .= ' && (cd legacy && ' . ($options->testCommand ?? $this->defaultTestCommand($path . '/legacy')) . ')';
+        }
+        $gate = $this->runTestGateWith($step, $path, $options, $baseline, $update, $test);
+        if (!$gate->passed) {
+            return $gate;
+        }
+        $recording = $this->replayGate?->recording();
+        if ($options->replay === null || $recording === null || $this->replayRunnerUsed === null || $this->replayOutDir === null) {
+            return new GateReport(false, [...$gate->lines, 'The strangler requires the replay, and this run has no replay baseline to compare with.']);
+        }
+        $php = $step->phpAfter ?? '';
+        try {
+            // The mount rewrote the serve section on disk; read it again.
+            $file = ReplayFile::load($options->replay->path);
+            $replay = new ReplayGate($this->replayRunnerUsed, $file, $path, $this->replayOutDir, $options->gateImage);
+            $replay->useRecording($recording, $file->path, $serveChanged);
+            $outcome = $replay->check($php, sprintf('step-%d-%s-php%s', $step->number, $step->hop->id, $php), false, $serveChanged);
+        } catch (ToolError $e) {
+            return new GateReport(false, [...$gate->lines, 'Replay could not run: ' . $e->getMessage(), $this->undoHint($path)]);
+        }
+        if ($outcome->failed()) {
+            return new GateReport(false, [
+                ...$gate->lines,
+                ...$outcome->lines,
+                'The syntax check (and the legacy tests) passed, but an answer changed. The working copy keeps the changes so you can read them.',
+                $this->undoHint($path),
+            ]);
+        }
+
+        return new GateReport(true, [...$gate->lines, ...$outcome->lines]);
+    }
+
+    /**
+     * Laravel's routes as `php artisan route:list --json` prints them in the
+     * gate image, or why they could not be read. The --hand move checks the
+     * ported route is there before it flips the route table.
+     *
+     * @return list<array{methods: list<string>, uri: string}>|string
+     */
+    private function laravelRouteList(string $path, string $php, RunOptions $options): array|string
+    {
+        $command = 'echo BOOSTER-ROUTES-BEGIN; php artisan route:list --json; echo; echo BOOSTER-ROUTES-END';
+        $result = $this->gate->run($path, $php, $command, null, $options->gateImage, [], $options->testEnv);
+        $out = $result->stdout;
+        $begin = strpos($out, 'BOOSTER-ROUTES-BEGIN');
+        $end = strrpos($out, 'BOOSTER-ROUTES-END');
+        if (!$result->successful() || $begin === false || $end === false || $end < $begin) {
+            $tail = array_slice(array_values(array_filter(explode("\n", trim($result->stderr . "\n" . $out)), static fn(string $l): bool => trim($l) !== '')), -3);
+
+            return sprintf('php artisan route:list exited %d%s', $result->exitCode, $tail === [] ? '.' : ': ' . implode(' / ', $tail));
+        }
+        $json = json_decode(trim(substr($out, $begin + strlen('BOOSTER-ROUTES-BEGIN'), $end - $begin - strlen('BOOSTER-ROUTES-BEGIN'))), true);
+        if (!is_array($json)) {
+            return 'php artisan route:list --json did not print JSON.';
+        }
+        $routes = [];
+        foreach ($json as $route) {
+            if (!is_array($route) || !is_string($route['uri'] ?? null) || !is_string($route['method'] ?? null)) {
+                continue;
+            }
+            $routes[] = ['methods' => array_values(array_filter(explode('|', strtoupper($route['method'])))), 'uri' => $route['uri']];
+        }
+
+        return $routes;
+    }
+
+    /** Whether the app's working copy has uncommitted changes; a folder git cannot read counts as dirty. */
+    private function workingCopyDirty(string $path): bool
+    {
+        $status = $this->processes->run(['git', '-C', $path, 'status', '--porcelain'], null, [], 60);
+
+        return !$status->successful() || trim($status->stdout) !== '';
+    }
+
+    /**
+     * The app's composer.json require and require-dev constraints, so a
+     * strangler gate can update just the packages a part added or changed.
+     *
+     * @return array<string, string>
+     */
+    private static function composerRequires(string $path): array
+    {
+        $data = is_file($path . '/composer.json') ? json_decode((string) file_get_contents($path . '/composer.json'), true) : null;
+        $all = [];
+        foreach (['require', 'require-dev'] as $section) {
+            if (is_array($data) && is_array($data[$section] ?? null)) {
+                foreach ($data[$section] as $package => $constraint) {
+                    if (is_string($constraint) && str_contains((string) $package, '/')) {
+                        $all[(string) $package] = $constraint;
+                    }
+                }
+            }
+        }
+
+        return $all;
     }
 
     /**

@@ -38,5 +38,13 @@ final readonly class RunOptions
         public ?ReplayFile $replay = null,
         /** The folder for the replay transcripts; null picks a new one in the system temp folder. */
         public ?string $replayOut = null,
+        /** Strangler runs after the mount: how many units to move this run (--moves N); null means 1. */
+        public ?int $moves = null,
+        /** Strangler runs: the one unit to move (--route "GET /users/{id}"), or with $hand the unit a person ported. */
+        public ?string $route = null,
+        /** Strangler runs: flip a hand-ported unit (--hand --route) once route:list shows it. */
+        public bool $hand = false,
+        /** Strangler runs: the finish step (--finish), once no unit is left in legacy. */
+        public bool $finish = false,
     ) {}
 }

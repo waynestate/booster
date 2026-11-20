@@ -61,7 +61,45 @@ final class RunCommand extends BaseCommand
             ->addOption('proctor-command', null, InputOption::VALUE_REQUIRED, 'Extra command run in the image after the tests, for example a PROCTOR check.')
             ->addOption('proctor-advisory', null, InputOption::VALUE_NONE, 'Report the PROCTOR result but do not fail the run on it.')
             ->addOption('replay', null, InputOption::VALUE_OPTIONAL, 'Also gate on request replay: record how the app answers before the first hop, replay after each hop, fail on a changed answer. Takes the request file (default: booster-replay.json).', false)
-            ->addOption('replay-out', null, InputOption::VALUE_REQUIRED, 'Folder for the replay transcripts (default: a new booster-replay-<app>-<time> folder in the system temp folder).');
+            ->addOption('replay-out', null, InputOption::VALUE_REQUIRED, 'Folder for the replay transcripts (default: a new booster-replay-<app>-<time> folder in the system temp folder).')
+            ->addOption('moves', null, InputOption::VALUE_REQUIRED, 'Strangler runs after the mount: move this many units onto Laravel this run, in move order (default 1).')
+            ->addOption('route', null, InputOption::VALUE_REQUIRED, 'Strangler runs after the mount: move just this unit (its id from booster-strangler.json, for example "GET /users/{id}").')
+            ->addOption('hand', null, InputOption::VALUE_NONE, 'Strangler runs, with --route: a person ported this unit; check route:list, flip it in the route table and gate it.')
+            ->addOption('finish', null, InputOption::VALUE_NONE, 'Strangler runs, once no unit is left in legacy: delete legacy/, put back the stock front controller, move /login to Laravel.');
+    }
+
+    /**
+     * The strangler's later-run options, checked against each other: --hand
+     * needs --route, and --finish, --moves and --route are three different
+     * runs.
+     *
+     * @return array{0: ?int, 1: ?string, 2: bool, 3: bool}
+     */
+    private static function stranglerOptions(InputInterface $input): array
+    {
+        $movesRaw = $input->getOption('moves');
+        $moves = null;
+        if ($movesRaw !== null) {
+            if (preg_match('/^[1-9]\d*$/', (string) $movesRaw) !== 1) {
+                throw new ToolError(sprintf('Invalid --moves value "%s". Expected a whole number of units, 1 or more.', $movesRaw));
+            }
+            $moves = (int) $movesRaw;
+        }
+        $routeRaw = $input->getOption('route');
+        $route = is_string($routeRaw) && trim($routeRaw) !== '' ? trim($routeRaw) : null;
+        $hand = (bool) $input->getOption('hand');
+        $finish = (bool) $input->getOption('finish');
+        if ($hand && $route === null) {
+            throw new ToolError('--hand needs --route "<id>": the unit a person ported (the ids are in booster-strangler.json).');
+        }
+        if ($finish && ($moves !== null || $route !== null)) {
+            throw new ToolError('--finish is a run of its own: drop --moves and --route.');
+        }
+        if ($moves !== null && $route !== null) {
+            throw new ToolError('--moves and --route are two ways to pick units: use one.');
+        }
+
+        return [$moves, $route, $hand, $finish];
     }
 
     protected function handle(InputInterface $input, OutputInterface $output): int
@@ -101,6 +139,8 @@ final class RunCommand extends BaseCommand
                 throw new ToolError(ReplayGate::todoMessage($replay));
             }
         }
+
+        [$moves, $route, $hand, $finish] = self::stranglerOptions($input);
 
         $plan = $this->buildPlan($input);
         $gateImage = GateImage::fromOption($this->stringOption($input, 'image'));
@@ -172,6 +212,10 @@ final class RunCommand extends BaseCommand
             progress: $progress,
             replay: $replay,
             replayOut: $this->stringOption($input, 'replay-out'),
+            moves: $moves,
+            route: $route,
+            hand: $hand,
+            finish: $finish,
         ));
 
         $finishedAt = gmdate(DATE_ATOM);

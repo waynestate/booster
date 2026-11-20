@@ -34,6 +34,7 @@ final readonly class StepResult
      * @param list<array{file: string, rewrites: int}> $prepass files the new-by-reference pre-pass rewrote before Rector ran
      * @param array<string, int>                       $rules short rule name to number of files the rule changed; set on capped and previewed PHP and PHPUnit steps
      * @param ComposerAuditResult|null                 $composerAudit the advisory audit of the app's packages, when the hop changed its composer files and the audit found something or could not run
+     * @param array<string, mixed>|null                $strangler the strangler's report for a strangler step (StranglerReport::toArray): units moved and left, refusals, MANUAL groups, the next command
      */
     public function __construct(
         public int $step,
@@ -45,6 +46,7 @@ final readonly class StepResult
         public array $prepass = [],
         public array $rules = [],
         public ?ComposerAuditResult $composerAudit = null,
+        public ?array $strangler = null,
     ) {}
 
     public function failed(): bool
@@ -74,6 +76,10 @@ final readonly class StepResult
         }
         if ($this->composerAudit !== null) {
             $data['composer_audit'] = $this->composerAudit->toArray();
+        }
+        // Only a strangler step carries the key, so every other step keeps its shape.
+        if ($this->strangler !== null) {
+            $data['strangler'] = $this->strangler;
         }
 
         return $data;
