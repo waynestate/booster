@@ -723,7 +723,10 @@ hop that turns `0 == "abc"` from true to false fails there even when no test vis
 drafts the request file from the app's routes, with `todo` items for what only a person knows; normalizers hide CSRF
 tokens, session ids, timestamps and asset hashes. A baseline where every answer is an error (a PHP fatal, an
 unexpected 5xx, or one error page for every path) stops the run before the first hop, since replaying it would only
-prove the app fails the same way; `--allow-failing-baseline` records it anyway. The file format, the design and the
+prove the app fails the same way; `--allow-failing-baseline` records it anyway. A write drafted with `"csrf": true`
+takes its CSRF field from the form page before it, whichever framework printed it. For the Laravel strangler the file
+can ignore the frameworks' session cookies, compare cookie flags and security headers (`"preset": "strangler"`), and
+the replay reports which half of the mounted app answered each request. The file format, the design and the
 honest limits (no real Oracle, SSO or JavaScript-driven pages) are in [the replay gate guide](docs/guides/replay-gate.md).
 
 ### Hand-copied libraries to Composer
