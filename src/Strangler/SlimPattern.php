@@ -76,6 +76,106 @@ final class SlimPattern
         return new self($uri === '' ? '/' : $uri, $wheres, $refusal);
     }
 
+    /**
+     * Every path shape an optional-segment pattern answers, shortest first
+     * (FastRoute's rule: `a[/b[/c]]`, nested at the end only):
+     * `/[login[/]]` gives "/", "/login" and "/login/". Null when the brackets
+     * are not FastRoute's (one in the middle, unbalanced).
+     *
+     * @return list<string>|null
+     */
+    public static function expand(string $pattern): ?array
+    {
+        $outside = '';
+        $depth = 0;
+        $positions = [];
+        $length = strlen($pattern);
+        for ($i = 0; $i < $length; $i++) {
+            $char = $pattern[$i];
+            if ($char === '{') {
+                $end = self::placeholderEnd($pattern, $i);
+                if ($end === null) {
+                    return null;
+                }
+                $outside .= substr($pattern, $i, $end - $i + 1);
+                $i = $end;
+
+                continue;
+            }
+            if ($char === '[') {
+                $positions[] = strlen($outside);
+                $depth++;
+
+                continue;
+            }
+            if ($char === ']') {
+                $depth--;
+                if ($depth < 0) {
+                    return null;
+                }
+                // FastRoute: optional segments only at the end, closing together.
+                $rest = substr($pattern, $i + 1);
+                if (trim($rest, ']') !== '') {
+                    return null;
+                }
+
+                continue;
+            }
+            $outside .= $char;
+        }
+        if ($depth !== 0) {
+            return null;
+        }
+        $out = [];
+        foreach ($positions as $cut) {
+            $out[] = substr($outside, 0, $cut);
+        }
+        $out[] = $outside;
+        foreach ($out as $n => $shape) {
+            $out[$n] = $shape === '' ? '/' : $shape;
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * The Laravel URIs a pattern answers (optional segments expanded), each
+     * with its wheres and the route-table form: the URI with an inline
+     * `{x:regex}` and a trailing `[/]` when the legacy route also answers the
+     * path with its trailing slash. Null with the reason when one shape
+     * cannot be said in Laravel.
+     *
+     * @return array{list<array{uri: string, wheres: array<string, string>, table: string}>, ?string}
+     */
+    public static function variants(string $pattern): array
+    {
+        $shapes = self::expand($pattern);
+        if ($shapes === null) {
+            return [[], 'the pattern ' . $pattern . ' has optional segments FastRoute itself would refuse (only at the end, nested)'];
+        }
+        $byUri = [];
+        foreach ($shapes as $shape) {
+            $p = self::convert($shape);
+            if ($p->refusal !== null) {
+                return [[], $p->refusal];
+            }
+            $slash = $shape !== '/' && str_ends_with($shape, '/');
+            $entry = $byUri[$p->uri] ?? ['uri' => $p->uri, 'wheres' => $p->wheres, 'plain' => false, 'slash' => false];
+            $entry[$slash ? 'slash' : 'plain'] = true;
+            $byUri[$p->uri] = $entry;
+        }
+        $out = [];
+        foreach ($byUri as $entry) {
+            $table = (string) preg_replace_callback('/\{(\w+)\}/', static fn(array $m): string => isset($entry['wheres'][$m[1]]) ? '{' . $m[1] . ':' . $entry['wheres'][$m[1]] . '}' : $m[0], $entry['uri']);
+            if ($entry['slash'] && $entry['uri'] !== '/') {
+                $table .= '[/]';
+            }
+            $out[] = ['uri' => $entry['uri'], 'wheres' => $entry['wheres'], 'table' => $table];
+        }
+
+        return [$out, null];
+    }
+
     /** The unit id path for a Laravel URI: "/" or "/users/{id}". */
     public static function idPath(string $uri): string
     {

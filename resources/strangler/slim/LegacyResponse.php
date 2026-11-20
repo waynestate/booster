@@ -23,6 +23,9 @@ final class LegacyResponse extends Response
     /** @var list<string> */
     private array $cacheControl = [];
 
+    /** @var list<string> */
+    private array $rawCookies = [];
+
     public function keepContentType(): void
     {
         $this->hadType = $this->headers->has('Content-Type');
@@ -35,6 +38,17 @@ final class LegacyResponse extends Response
      *
      * @param list<string> $lines
      */
+    /**
+     * Set-Cookie lines sent as legacy wrote them (bootstrap mode): Laravel's
+     * EncryptCookies never sees them, so the legacy half still reads them.
+     *
+     * @param list<string> $lines
+     */
+    public function keepRawCookies(array $lines): void
+    {
+        $this->rawCookies = $lines;
+    }
+
     public function keepCacheControl(array $lines): void
     {
         $this->cacheControl = $lines;
@@ -52,6 +66,9 @@ final class LegacyResponse extends Response
         }
         foreach ($this->cacheControl as $n => $line) {
             header('Cache-Control: ' . $line, $n === 0);
+        }
+        foreach ($this->rawCookies as $line) {
+            header('Set-Cookie: ' . $line, false);
         }
 
         return $this;

@@ -57,28 +57,44 @@ final class SlimUnitSource implements UnitSource
         }
         $routeUnits = [];
         $byId = [];
-        foreach (SlimRouteScanner::scan($codes) as $seq => $route) {
-            $pattern = SlimPattern::convert($route->pattern);
-            $methods = $route->methods;
-            $id = self::methodsLabel($methods) . ' ' . SlimPattern::idPath($pattern->uri);
-            if (isset($byId[$id])) {
-                continue;
+        $seq = 0;
+        foreach (SlimRouteScanner::scan($codes) as $scanned) {
+            // An optional segment answers several paths: one unit per Laravel
+            // URI, the route name on the longest (section 10.3). Each unit's
+            // uri is the route table's form, `{id:regex}` and a trailing
+            // `[/]` inline, so the table is as narrow as the legacy route.
+            [$variants, $refusal] = SlimPattern::variants($scanned->pattern);
+            $shapes = [];
+            if ($refusal !== null || count($variants) < 2) {
+                $shapes[] = [$scanned, $refusal === null && $variants !== [] ? $variants[0]['table'] : SlimPattern::convert($scanned->pattern)->uri, $refusal === null && $variants !== [] ? $variants[0]['uri'] : SlimPattern::convert($scanned->pattern)->uri];
+            } else {
+                foreach ($variants as $n => $variant) {
+                    $shapes[] = [$scanned->withPattern($variant['table'] === '/' ? '/' : '/' . $variant['table'], $n === count($variants) - 1), $variant['table'], $variant['uri']];
+                }
             }
-            $text = $this->handlerText($route, $sources, $classFiles);
-            $signIn = self::needsSignIn($route, $text);
-            $unit = new Unit(
-                $id,
-                'route',
-                $methods,
-                $pattern->uri,
-                $route->name,
-                self::order($methods, $signIn, $text),
-                $signIn,
-                'legacy/' . $route->file,
-                $route->line,
-            );
-            $byId[$id] = [$route];
-            $routeUnits[] = ['unit' => $unit, 'seq' => $seq, 'catchAll' => SlimPattern::isCatchAll($route->pattern)];
+            foreach ($shapes as [$route, $tableUri, $laravelUri]) {
+                $seq++;
+                $methods = $route->methods;
+                $id = self::methodsLabel($methods) . ' ' . SlimPattern::idPath($laravelUri);
+                if (isset($byId[$id])) {
+                    continue;
+                }
+                $text = $this->handlerText($route, $sources, $classFiles);
+                $signIn = self::needsSignIn($route, $text);
+                $unit = new Unit(
+                    $id,
+                    'route',
+                    $methods,
+                    $tableUri,
+                    $route->name,
+                    self::order($methods, $signIn, $text),
+                    $signIn,
+                    'legacy/' . $route->file,
+                    $route->line,
+                );
+                $byId[$id] = [$route];
+                $routeUnits[] = ['unit' => $unit, 'seq' => $seq, 'catchAll' => SlimPattern::isCatchAll($route->written())];
+            }
         }
         $units = $this->pairForms($routeUnits, $byId);
         usort($units, static function (array $a, array $b): int {
@@ -161,7 +177,7 @@ final class SlimUnitSource implements UnitSource
             $taken[$gets[$u['unit']->uri]] = true;
             $taken[$k] = true;
             $signIn = $get['unit']->needsSignIn || $post['unit']->needsSignIn;
-            $id = 'FORM ' . SlimPattern::idPath($get['unit']->uri);
+            $id = 'FORM ' . substr($get['unit']->id, (int) strpos($get['unit']->id, ' ') + 1);
             $byId[$id] = array_merge($byId[$get['unit']->id], $byId[$post['unit']->id]);
             $out[] = [
                 'unit' => new Unit(

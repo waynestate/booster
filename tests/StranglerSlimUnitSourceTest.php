@@ -33,7 +33,7 @@ final class StranglerSlimUnitSourceTest extends TestCase
     public function testListsEveryRouteAsAUnit(): void
     {
         self::assertSame(
-            ['GET /items', 'GET /page[/{n}]', 'GET /', 'GET /items/{id}', 'FORM /contact', 'GET /admin/users', 'OPTIONS /{routes}'],
+            ['GET /items', 'GET /page', 'GET /page/{n}', 'GET /', 'GET /items/{id}', 'FORM /contact', 'GET /admin/users', 'OPTIONS /{routes}'],
             array_keys(self::units()),
         );
     }
@@ -43,7 +43,7 @@ final class StranglerSlimUnitSourceTest extends TestCase
         $units = array_values(self::units());
         $orders = array_map(static fn(Unit $u): string => $u->order, $units);
 
-        self::assertSame(['stateless', 'stateless', 'page', 'page', 'write', 'signin', 'page'], $orders);
+        self::assertSame(['stateless', 'stateless', 'stateless', 'page', 'page', 'write', 'signin', 'page'], $orders);
         self::assertSame('OPTIONS /{routes}', end($units)->id);
     }
 
@@ -60,7 +60,18 @@ final class StranglerSlimUnitSourceTest extends TestCase
 
     public function testRegexPlaceholderWithSpacesAndTrailingSlash(): void
     {
-        self::assertSame('items/{id}', self::units()['GET /items/{id}']->uri);
+        // The route table's form: the regex inline, the trailing [/] kept.
+        self::assertSame('items/{id:[0-9]+}[/]', self::units()['GET /items/{id}']->uri);
+    }
+
+    public function testAnOptionalSegmentIsOneUnitPerPathNamedOnTheLongest(): void
+    {
+        $units = self::units();
+
+        self::assertSame('page', $units['GET /page']->uri);
+        self::assertSame('page/{n}', $units['GET /page/{n}']->uri);
+        self::assertSame('legacy/app/routes.php', $units['GET /page']->sourceFile);
+        self::assertSame($units['GET /page']->sourceLine, $units['GET /page/{n}']->sourceLine);
     }
 
     public function testAFormGetAndPostMoveTogether(): void

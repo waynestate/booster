@@ -73,21 +73,23 @@ final class SlimRouteScanner
             }
         }
         foreach ($scanner->files as $path => $src) {
-            $scanner->walk($path, 0, count($src->t) - 1, '', [], [], 0);
+            $scanner->walk($path, 0, count($src->t) - 1, '', [], [], 0, [], []);
         }
 
         return $scanner->routes;
     }
 
     /**
-     * @param list<string> $guards
-     * @param list<string> $middleware
+     * @param list<string>             $guards
+     * @param list<string>             $middleware
+     * @param list<array{string, int, int}> $links  each step from a file to the route: file, the call token, where that walk began
+     * @param list<string>             $mwFiles    the file each middleware is written in
      */
-    private function walk(string $path, int $from, int $to, string $base, array $guards, array $middleware, int $depth): void
+    private function walk(string $path, int $from, int $to, string $base, array $guards, array $middleware, int $depth, array $links, array $mwFiles): void
     {
         $src = $this->files[$path];
         $t = $src->t;
-        /** @var list<array{int, string, list<string>}> $stack group end, prefix, middleware */
+        /** @var list<array{int, string, list<string>, list<string>}> $stack group end, prefix, middleware, their files */
         $stack = [];
         $skipTo = -1;
         for ($i = $from; $i <= $to; $i++) {
@@ -102,7 +104,7 @@ final class SlimRouteScanner
             if ($i < $skipTo) {
                 continue;
             }
-            [$prefix, $groupMiddleware] = $stack === [] ? [$base, $middleware] : [$stack[count($stack) - 1][1], $stack[count($stack) - 1][2]];
+            [$prefix, $groupMiddleware, $groupFiles] = $stack === [] ? [$base, $middleware, $mwFiles] : [$stack[count($stack) - 1][1], $stack[count($stack) - 1][2], $stack[count($stack) - 1][3]];
             if ($t[$i][0] === T_DOUBLE_COLON && $depth < 8) {
                 $key = $this->staticTarget($src, $i);
                 if ($key !== null && isset($this->methods[$key])) {
@@ -111,7 +113,8 @@ final class SlimRouteScanner
                     if (!isset($this->seen[$visit])) {
                         $this->seen[$visit] = true;
                         $here = array_merge($guards, $src->guardsAt($i, $from));
-                        $this->walk($mf, $bodyFrom + 1, $bodyTo - 1, $prefix, $here, $groupMiddleware, $depth + 1);
+                        $hereLinks = array_merge($links, [[$path, $i, $from]]);
+                        $this->walk($mf, $bodyFrom + 1, $bodyTo - 1, $prefix, $here, $groupMiddleware, $depth + 1, $hereLinks, $groupFiles);
                     }
                 }
 
@@ -127,7 +130,7 @@ final class SlimRouteScanner
                 $pattern = isset($args[0]) ? $src->stringAt($args[0][0], $args[0][1]) : null;
                 if ($pattern !== null && ($prefix !== '' || str_starts_with($pattern, '/'))) {
                     $added = $this->chain($src, $end)['middleware'];
-                    $stack[] = [$end, $prefix . $pattern, array_merge($groupMiddleware, $added)];
+                    $stack[] = [$end, $prefix . $pattern, array_merge($groupMiddleware, $added), array_merge($groupFiles, array_fill(0, count($added), $path))];
                 }
 
                 continue;
@@ -135,7 +138,8 @@ final class SlimRouteScanner
             if (!in_array($name, self::VERBS, true)) {
                 continue;
             }
-            $route = $this->route($path, $src, $i, $name, $args, $end, $prefix, array_merge($guards, $src->guardsAt($i, $from)), $groupMiddleware);
+            $routeLinks = array_merge($links, [[$path, $i, $from]]);
+            $route = $this->route($path, $src, $i, $name, $args, $end, $prefix, array_merge($guards, $src->guardsAt($i, $from)), $groupMiddleware, $routeLinks, $groupFiles);
             if ($route !== null) {
                 $this->routes[] = $route;
                 $skipTo = $end;
@@ -147,8 +151,10 @@ final class SlimRouteScanner
      * @param list<array{int, int}> $args
      * @param list<string>          $guards
      * @param list<string>          $middleware
+     * @param list<array{string, int, int}> $links
+     * @param list<string>          $mwFiles
      */
-    private function route(string $path, SlimSource $src, int $at, string $verb, array $args, int $end, string $prefix, array $guards, array $middleware): ?SlimRoute
+    private function route(string $path, SlimSource $src, int $at, string $verb, array $args, int $end, string $prefix, array $guards, array $middleware, array $links, array $mwFiles): ?SlimRoute
     {
         $patternArg = $verb === 'map' ? 1 : 0;
         if (count($args) < $patternArg + 2) {
@@ -191,6 +197,8 @@ final class SlimRouteScanner
             array_values(array_unique($guards)),
             array_merge($middleware, $chain['middleware']),
             $handler['static'],
+            $links,
+            array_merge($mwFiles, array_fill(0, count($chain['middleware']), $path)),
         );
     }
 

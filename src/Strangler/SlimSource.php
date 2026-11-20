@@ -247,6 +247,132 @@ final class SlimSource
     /**
      * @return array<int, int>
      */
+    /**
+     * The tokens of the if, elseif and else keywords whose blocks hold $i
+     * (from $from on), outermost first: guardsAt() as positions.
+     *
+     * @return list<int>
+     */
+    public function guardSitesAt(int $i, int $from = 0): array
+    {
+        $sites = [];
+        for ($k = max(0, $from); $k < $i; $k++) {
+            $id = $this->t[$k][0];
+            if ($id !== T_IF && $id !== T_ELSEIF && $id !== T_ELSE) {
+                continue;
+            }
+            $after = $this->next($k);
+            if ($id !== T_ELSE) {
+                if ($after === null || $this->t[$after][1] !== '(' || !isset($this->parens[$after])) {
+                    continue;
+                }
+                $after = $this->next($this->parens[$after]);
+            }
+            if ($after !== null && $this->t[$after][1] === '{' && isset($this->braces[$after]) && $after < $i && $this->braces[$after] > $i) {
+                $sites[] = $k;
+            }
+        }
+
+        return $sites;
+    }
+
+    /**
+     * The innermost function, method or closure whose body holds $i: its
+     * parameter names, its use (...) names, and its body's "{" (null for
+     * an arrow function or top-level code).
+     *
+     * @return array{params: list<string>, uses: list<string>, open: int, close: int}|null
+     */
+    public function enclosingFunction(int $i): ?array
+    {
+        $best = null;
+        foreach ($this->t as $k => [$id]) {
+            if ($k >= $i) {
+                break;
+            }
+            if ($id !== T_FUNCTION) {
+                continue;
+            }
+            $open = $k;
+            while ($open < $i && $this->t[$open][1] !== '(') {
+                $open++;
+            }
+            if (!isset($this->parens[$open])) {
+                continue;
+            }
+            $params = [];
+            for ($p = $open; $p < $this->parens[$open]; $p++) {
+                if ($this->t[$p][0] === T_VARIABLE && ($this->t[$this->prev($p) ?? $p][1] ?? '') !== '=') {
+                    $params[] = substr($this->t[$p][1], 1);
+                }
+            }
+            $uses = [];
+            $body = $this->parens[$open] + 1;
+            while ($body < count($this->t) && $this->t[$body][1] !== '{' && $this->t[$body][1] !== ';') {
+                if ($this->t[$body][0] === T_USE) {
+                    $u = $this->next($body);
+                    if ($u !== null && isset($this->parens[$u])) {
+                        for ($q = $u; $q < $this->parens[$u]; $q++) {
+                            if ($this->t[$q][0] === T_VARIABLE) {
+                                $uses[] = substr($this->t[$q][1], 1);
+                            }
+                        }
+                        $body = $this->parens[$u];
+                    }
+                }
+                $body++;
+            }
+            if (!isset($this->braces[$body]) || $body >= $i || $this->braces[$body] <= $i) {
+                continue;
+            }
+            if ($best === null || $body > $best['open']) {
+                $best = ['params' => $params, 'uses' => $uses, 'open' => $body, 'close' => $this->braces[$body]];
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * The statements written directly in the block opened at $open and before
+     * $before, each as its first and last token (the ";" included).
+     *
+     * @return list<array{int, int}>
+     */
+    public function statementsBefore(int $open, int $before): array
+    {
+        $out = [];
+        $start = $open + 1;
+        for ($k = $open + 1; $k < $before; $k++) {
+            $text = $this->t[$k][1];
+            if ($text === '(' && isset($this->parens[$k])) {
+                $k = $this->parens[$k];
+
+                continue;
+            }
+            if (($text === '{' || $this->t[$k][0] === T_CURLY_OPEN || $this->t[$k][0] === T_DOLLAR_OPEN_CURLY_BRACES) && isset($this->braces[$k])) {
+                if ($this->braces[$k] >= $before) {
+                    break;
+                }
+                $k = $this->braces[$k];
+                // A block statement (if, foreach, function) ends at its "}".
+                $next = $this->next($k);
+                if ($next === null || !in_array($this->t[$next][1], [')', ';', ',', '->', '?->'], true)) {
+                    $out[] = [$start, $k];
+                    $start = $k + 1;
+                }
+
+                continue;
+            }
+            if ($text === ';') {
+                $out[] = [$start, $k];
+                $start = $k + 1;
+            }
+        }
+
+        return $out;
+    }
+
     private function match(string $open, string $close): array
     {
         $stack = [];

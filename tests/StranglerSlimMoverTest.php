@@ -88,9 +88,10 @@ final class StranglerSlimMoverTest extends TestCase
 
         self::assertSame(1, substr_count($this->read('bootstrap/providers.php'), 'App\\Providers\\LegacyServiceProvider::class'));
         $composer = json_decode($this->read('composer.json'), true);
-        self::assertSame('^1.7 || ^2.0', $composer['require']['slim/psr7']);
-        self::assertSame('^4.15 || ^5.0', $composer['require']['slim/slim']);
-        self::assertSame('^7.0 || ^8.0', $composer['require']['php-di/php-di']);
+        // No root composer.lock to conflict with: the legacy constraints as they are.
+        self::assertSame('^1.7', $composer['require']['slim/psr7']);
+        self::assertSame('^4.15', $composer['require']['slim/slim']);
+        self::assertSame('^7.0', $composer['require']['php-di/php-di']);
         self::assertSame(['php', 'laravel/framework', 'php-di/php-di', 'slim/psr7', 'slim/slim'], array_keys($composer['require']));
     }
 
@@ -163,17 +164,19 @@ final class StranglerSlimMoverTest extends TestCase
         self::assertStringContainsString('already in routes/web.php', self::reasons($again->refusals));
     }
 
-    public function testOptionalSegmentsAreRefused(): void
+    public function testAnOptionalSegmentMovesOnePathAtATime(): void
     {
-        $result = $this->move('GET /page[/{n}]');
+        $short = $this->move('GET /page');
+        $long = $this->move('GET /page/{n}');
 
-        self::assertFalse($result->moved);
-        self::assertSame([], $result->changedFiles);
-        self::assertStringContainsString('optional', self::reasons($result->refusals));
-        self::assertStringNotContainsString('booster:strangler', $this->read('routes/web.php'));
+        self::assertTrue($short->moved, self::reasons($short->refusals));
+        self::assertTrue($long->moved, self::reasons($long->refusals));
+        $web = $this->read('routes/web.php');
+        self::assertStringContainsString("Route::match(['GET'], 'page', ", $web);
+        self::assertStringContainsString("Route::match(['GET'], 'page/{n}', ", $web);
     }
 
-    public function testSignedInUnitsWaitForStepZeroAndRoleChecksAreRefused(): void
+    public function testSignedInUnitsWaitForStepZeroAndRoleChecksMoveInBootstrapMode(): void
     {
         $pending = $this->move('GET /admin/users');
         self::assertFalse($pending->moved);
@@ -181,9 +184,28 @@ final class StranglerSlimMoverTest extends TestCase
 
         file_put_contents($this->app . '/booster-strangler.json', json_encode(['framework' => 'slim', 'mounted_at' => 'x', 'step0' => 'done', 'units' => []]));
         $done = $this->move('GET /admin/users');
-        self::assertFalse($done->moved);
-        self::assertStringNotContainsString('Step 0', self::reasons($done->refusals));
-        self::assertStringContainsString("registered only when `(\$_SESSION['role'] ?? '') === 'admin'`", self::reasons($done->refusals));
+        self::assertTrue($done->moved, self::reasons($done->refusals));
+
+        // The role check runs per request in a copy of the legacy front
+        // controller, whose routes script registers only the moved route.
+        $manifest = require $this->app . '/app/Http/Controllers/Legacy/booster-slim.php';
+        self::assertSame('bootstrap', $manifest['mode']);
+        self::assertSame('app/Http/Controllers/Legacy/boot/public/index.php', $manifest['front']);
+        $front = $this->read('app/Http/Controllers/Legacy/boot/public/index.php');
+        self::assertStringContainsString('true;', $front, 'the legacy autoloader is not loaded');
+        self::assertStringContainsString("require \base_path('app/Http/Controllers/Legacy/routes/app/routes.php')", $front);
+        $routes = $this->read('app/Http/Controllers/Legacy/routes/app/routes.php');
+        token_get_all($routes, TOKEN_PARSE);
+        self::assertStringStartsWith("<?php
+", $routes);
+        self::assertStringContainsString('return function ($booster_app) {', $routes);
+        self::assertStringContainsString("if ((\$_SESSION['role'] ?? '') === 'admin') {", $routes);
+        self::assertStringContainsString("\$booster_app->get('/admin/users', \App\Http\Controllers\Legacy\App\Action\ListItems::class)", $routes);
+        self::assertStringNotContainsString("->get('/contact'", $routes, 'an unmoved route stays out');
+        // Unmoved named routes are there for url_for() only.
+        self::assertStringContainsString("\$booster_app->map(['BOOSTER_NOT_MOVED'], '/', ", $routes);
+        self::assertStringContainsString('SlimAdapter::bindContainer($booster_app->getContainer());', $routes);
+        self::assertStringContainsString("->defaults('booster_slim', 'bootstrap')", $this->read('routes/web.php'));
     }
 
     public function testRefusesBeforeTheMount(): void
@@ -218,7 +240,7 @@ final class StranglerSlimMoverTest extends TestCase
             token_get_all((string) file_get_contents($file), TOKEN_PARSE);
             self::assertStringContainsString('declare(strict_types=1);', (string) file_get_contents($file), basename($file));
         }
-        self::assertCount(6, glob(dirname(__DIR__) . '/resources/strangler/slim/*.php') ?: []);
+        self::assertCount(7, glob(dirname(__DIR__) . '/resources/strangler/slim/*.php') ?: []);
     }
 
     private static function copyTree(string $from, string $to): void

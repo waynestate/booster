@@ -40,7 +40,7 @@ final class SlimMover implements Mover
     public const PROVIDER = 'app/Providers/LegacyServiceProvider.php';
 
     /** The runtime files every Slim move needs, from resources/strangler/slim/. */
-    private const SUPPORT = ['SlimAdapter.php', 'LegacyClosure.php', 'LegacyContainer.php', 'CapturingEmitter.php', 'LegacyResponse.php'];
+    private const SUPPORT = ['SlimAdapter.php', 'LegacyClosure.php', 'LegacyContainer.php', 'CapturingEmitter.php', 'LegacyResponse.php', 'LegacyTwigExtension.php'];
 
     /** Paths the Laravel half always owns (section 10.6); a legacy route there cannot move. */
     private const LARAVEL_OWNED = ['_laravel', 'build', 'up'];
@@ -90,12 +90,16 @@ final class SlimMover implements Mover
         if (!isset($legacyComposer['require']['slim/psr7'])) {
             $refusals[] = ['file' => 'legacy/composer.json', 'line' => 1, 'reason' => 'the app does not use slim/psr7; the adapter builds Slim\'s own PSR-7 request and response, so another PSR-7 implementation would change what the handler sees'];
         }
+        $front = $this->frontController($appRoot, $scan['sources']);
+        $movedIds = self::movedIds($webCode, $unit->id);
+        $csrf = self::csrf($legacyComposer, $scan['sources']);
+        $bootstrap = isset($scan['sources']['public/index.php'])
+            && ($front['container'] !== 'php-di' || $front['refusal'] !== null || $csrf !== null || self::needsBootstrap($movedIds, $scan));
         foreach ($routes as $route) {
-            $refusals = array_merge($refusals, $this->routeRefusals($route, $appRoot));
+            $refusals = array_merge($refusals, $this->routeRefusals($route, $appRoot, $bootstrap));
         }
         $refusals = array_merge($refusals, $this->shadowRefusals($unit, $scan, $ledger));
-        $front = $this->frontController($appRoot, $scan['sources']);
-        if ($front['refusal'] !== null) {
+        if ($front['refusal'] !== null && !$bootstrap) {
             $refusals[] = $front['refusal'];
         }
         if ($refusals !== []) {
@@ -103,6 +107,9 @@ final class SlimMover implements Mover
         }
 
         $copier = new SlimCodeCopier($appRoot, $scan['sources']);
+        if ($bootstrap) {
+            return $this->moveBootstrap($unit, $appRoot, $scan, $routes, $movedIds, $copier, $csrf, $webCode, $web);
+        }
         $manual = [];
         $blocks = [];
         foreach ($routes as $route) {
@@ -114,10 +121,10 @@ final class SlimMover implements Mover
             }
             $blocks[] = $this->routeLine($route, $spec);
             if (array_diff($route->methods, ['GET', 'HEAD', 'OPTIONS']) !== []) {
-                $manual[] = 'legacy/' . $route->file . ':' . $route->line . ' ' . implode('|', $route->methods) . ' ' . $route->pattern . ' had no CSRF check in Slim and has none in Laravel either (the route skips ValidateCsrfToken so the legacy form still posts); add one when its form is ported';
+                $manual[] = 'legacy/' . $route->file . ':' . $route->line . ' ' . implode('|', $route->methods) . ' ' . $route->pattern . ' had no CSRF check in Slim and has none in Laravel either (the route skips PreventRequestForgery so the legacy form still posts); add one when its form is ported';
             }
         }
-        $manifest = $this->manifest($front, $copier, $scan['sources'], $appRoot);
+        $manifest = $this->manifest($front, $copier, $scan['sources'], $appRoot, self::twigManifest($scan));
         if ($copier->refusals !== []) {
             return new MoveResult(false, [], self::unique($copier->refusals), []);
         }
@@ -151,6 +158,254 @@ final class SlimMover implements Mover
         return new MoveResult(true, array_values(array_unique($changed)), [], array_values(array_unique($manual)));
     }
 
+    /**
+     * Bootstrap mode (design 9.2, 10.2): the moved routes run in a copy of
+     * the legacy front controller and everything it loads, with the routes
+     * script swapped for one that registers only the moved routes (see
+     * SlimBootstrap). The container, app middleware, guards, route
+     * middleware and CSRF check are the legacy code's own.
+     *
+     * @param array{units: list<Unit>, routes: array<string, list<SlimRoute>>, sources: array<string, SlimSource>} $scan
+     * @param list<SlimRoute> $routes
+     * @param list<string>    $movedIds
+     */
+    private function moveBootstrap(Unit $unit, string $appRoot, array $scan, array $routes, array $movedIds, SlimCodeCopier $copier, ?string $csrf, string $webCode, string $web): MoveResult
+    {
+        $manual = [];
+        $scripts = $this->bootstrapScripts($copier, $scan, $movedIds);
+        $blocks = [];
+        foreach ($routes as $route) {
+            $blocks[] = $this->routeLine($route, 'bootstrap');
+            if (array_diff($route->methods, ['GET', 'HEAD', 'OPTIONS']) === []) {
+                continue;
+            }
+            $manual[] = $csrf !== null
+                ? 'legacy/' . $route->file . ':' . $route->line . ' ' . implode('|', $route->methods) . ' ' . $route->written() . ' still has the legacy CSRF check (' . $csrf . '): it runs in the copied pipeline, and Laravel\'s PreventRequestForgery stays off on the route because the legacy form posts the legacy token'
+                : 'legacy/' . $route->file . ':' . $route->line . ' ' . implode('|', $route->methods) . ' ' . $route->written() . ' had no CSRF check in Slim and has none in Laravel either (the route skips PreventRequestForgery so the legacy form still posts); add one when its form is ported';
+        }
+        if ($copier->refusals !== []) {
+            return new MoveResult(false, [], self::unique($copier->refusals), []);
+        }
+        $changed = [];
+        foreach (self::SUPPORT as $file) {
+            $copier->write(SlimCodeCopier::DIR . 'Support/' . $file, (string) file_get_contents(self::resource($file)));
+        }
+        $copier->write(self::PROVIDER, (string) file_get_contents(self::resource('LegacyServiceProvider.php')));
+        $manifest = [
+            'mode' => 'bootstrap',
+            'front' => SlimCodeCopier::BOOT . 'public/index.php',
+            'keys' => self::containerKeys($copier, $scan['sources']),
+            'csrf' => $csrf,
+            'twig' => self::twigManifest($scan),
+        ];
+        $generated = $scripts + [self::MANIFEST => "<?php\n\n// Written by Booster's strangler (slim-to-laravel): how the moved Slim handlers run. App-owned.\n\nreturn " . self::export($manifest) . ";\n"];
+        foreach ($generated as $relative => $code) {
+            $file = $appRoot . '/' . $relative;
+            if (is_file($file) && file_get_contents($file) === $code) {
+                continue;
+            }
+            if (!is_dir(dirname($file))) {
+                mkdir(dirname($file), 0o777, true);
+            }
+            file_put_contents($file, $code);
+            $changed[] = $relative;
+        }
+        $changed = array_merge($changed, $copier->flush());
+        if ($this->registerProvider($appRoot)) {
+            $changed[] = 'bootstrap/providers.php';
+        }
+        $block = "\n" . self::marker($unit->id) . $unit->sourceFile . ':' . $unit->sourceLine . "\n" . implode("\n", $blocks) . "\n";
+        file_put_contents($web, rtrim($webCode, "\n") . "\n" . $block);
+        $changed[] = 'routes/web.php';
+        $front = ['container' => 'bootstrap', 'error_middleware' => true, 'error_handler' => null, 'emitter' => null];
+        if ($this->requirePackages($appRoot, $copier, $front, $manual)) {
+            $changed[] = 'composer.json';
+        }
+        $manual[] = 'the moved routes run in a copy of legacy/public/index.php and what it loads (' . SlimCodeCopier::BOOT . '); its routes script registers only the moved routes, inside the same role checks and with the same middleware, so a guest gets what legacy answers';
+        $manual = array_merge($manual, $copier->manual);
+        sort($changed);
+
+        return new MoveResult(true, array_values(array_unique($changed)), [], array_values(array_unique($manual)));
+    }
+
+    /**
+     * The generated routes scripts: app-relative file to code.
+     *
+     * @param array{units: list<Unit>, routes: array<string, list<SlimRoute>>, sources: array<string, SlimSource>} $scan
+     * @param list<string> $movedIds
+     *
+     * @return array<string, string>
+     */
+    private function bootstrapScripts(SlimCodeCopier $copier, array $scan, array $movedIds): array
+    {
+        $copier->bootstrap = true;
+        foreach ($scan['routes'] as $list) {
+            foreach ($list as $route) {
+                $entry = $route->links[0][0] ?? null;
+                if ($entry !== null && ($scan['sources'][$entry] ?? null)?->classes === []) {
+                    $copier->routeScripts[$entry] = SlimCodeCopier::DIR . 'routes/' . $entry;
+                }
+            }
+        }
+        $copier->copyScript('public/index.php');
+        $boot = new SlimBootstrap($scan['sources'], $copier);
+        $blocks = [];
+        $moved = [];
+        foreach ($movedIds as $id) {
+            foreach ($scan['routes'][$id] ?? [] as $route) {
+                $moved[self::routeKey($route)] = true;
+                $entry = $route->links[0][0] ?? '';
+                $where = ['file' => 'legacy/' . $route->file, 'line' => $route->line];
+                if (!isset($copier->routeScripts[$entry]) || !isset($copier->routeHits[$entry])) {
+                    $copier->refusals[] = $where + ['reason' => 'the route is registered from legacy/' . $entry . ', which legacy/public/index.php never loads as a routes script; Booster swaps only a routes script the front controller loads'];
+
+                    continue;
+                }
+                $registration = $boot->registration($route);
+                if ($registration['code'] === null) {
+                    $copier->refusals[] = $where + ['reason' => (string) $registration['refusal']];
+
+                    continue;
+                }
+                $blocks[$entry][$registration['code']] = true;
+            }
+        }
+        $names = [];
+        foreach ($scan['routes'] as $list) {
+            foreach ($list as $route) {
+                $entry = $route->links[0][0] ?? '';
+                if ($route->name === null || isset($names[$route->name]) || isset($moved[self::routeKey($route)]) || !isset($copier->routeHits[$entry])) {
+                    continue;
+                }
+                $names[$route->name] = true;
+                $blocks[$entry][SlimBootstrap::placeholder($route)] = true;
+            }
+        }
+        $out = [];
+        foreach ($copier->routeScripts as $entry => $target) {
+            if (isset($copier->routeHits[$entry])) {
+                $out[$target] = SlimBootstrap::script($scan['sources'][$entry], $entry, array_map('strval', array_keys($blocks[$entry] ?? [])));
+            }
+        }
+
+        return $out;
+    }
+
+    /** One legacy route definition, whatever expansion of it a unit holds. */
+    private static function routeKey(SlimRoute $route): string
+    {
+        return implode('|', $route->methods) . ' ' . $route->written() . ' ' . $route->file . ':' . $route->line;
+    }
+
+    /**
+     * The unit ids routes/web.php already holds, and this one.
+     *
+     * @return list<string>
+     */
+    private static function movedIds(string $webCode, string $unitId): array
+    {
+        preg_match_all('#^// booster:strangler (.+?) from #m', $webCode, $m);
+
+        return array_values(array_unique(array_merge($m[1], [$unitId])));
+    }
+
+    /**
+     * The legacy CSRF check, when the app has one: slim/csrf, or a
+     * middleware class of its own named for CSRF.
+     *
+     * @param array<mixed>              $legacyComposer
+     * @param array<string, SlimSource> $sources
+     */
+    private static function csrf(array $legacyComposer, array $sources): ?string
+    {
+        if (isset($legacyComposer['require']['slim/csrf'])) {
+            return 'slim/csrf';
+        }
+        foreach ($sources as $path => $src) {
+            if (preg_match('/\bnew\s+\\\\?((?:\w+\\\\)*\w*Csrf\w*)\s*\(|\b((?:\w+\\\\)*\w*Csrf\w*)::class/i', $src->code, $m) === 1 && !str_starts_with($path, 'vendor/')) {
+                return ltrim($m[1] !== '' ? $m[1] : $m[2], '\\');
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether a moved route needs the legacy pipeline: it is registered
+     * inside an if, adds middleware, or its closure imports variables.
+     *
+     * @param list<string> $movedIds
+     * @param array{units: list<Unit>, routes: array<string, list<SlimRoute>>, sources: array<string, SlimSource>} $scan
+     */
+    private static function needsBootstrap(array $movedIds, array $scan): bool
+    {
+        foreach ($movedIds as $id) {
+            foreach ($scan['routes'][$id] ?? [] as $route) {
+                if ($route->guards !== [] || $route->middleware !== [] || $route->closureUses !== []) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The legacy container's keys, read from the copied scripts that return
+     * `'key' => function ($c) {...}` arrays (core.php, globals.php) and the
+     * `$container['key'] = ...` lines: each is bound as legacy.<key>.
+     *
+     * @param array<string, SlimSource> $sources
+     *
+     * @return list<string>
+     */
+    private static function containerKeys(SlimCodeCopier $copier, array $sources): array
+    {
+        $keys = [];
+        foreach (array_keys($copier->scripts) as $path) {
+            if (isset($copier->routeScripts[$path])) {
+                continue;
+            }
+            $code = $sources[$path]->code;
+            preg_match_all('/^\s*[\'"]([\w.\-]+)[\'"]\s*=>\s*(?:static\s+)?(?:function|fn)\s*\(\s*(?:[\\\\\w]+\s+)?(?:\$(?:c|container|ci)\b)?\s*\)/m', $code, $m);
+            $keys = array_merge($keys, $m[1]);
+        }
+        foreach ($sources as $path => $src) {
+            if (str_starts_with($path, 'vendor/')) {
+                continue;
+            }
+            preg_match_all('/\$(?:this->)?(?:container|c|ci)\s*\[\s*[\'"]([\w.\-]+)[\'"]\s*\]\s*=(?!=)/', $src->code, $m);
+            $keys = array_merge($keys, $m[1]);
+        }
+        $keys = array_values(array_unique($keys));
+        sort($keys);
+
+        return $keys;
+    }
+
+    /**
+     * Every named legacy route's pattern, for LegacyTwigExtension's url_for()
+     * in Laravel-rendered Twig views (TwigBridge).
+     *
+     * @param array{units: list<Unit>, routes: array<string, list<SlimRoute>>, sources: array<string, SlimSource>} $scan
+     *
+     * @return array{routes: array<string, string>, templates: string}
+     */
+    private static function twigManifest(array $scan): array
+    {
+        $routes = [];
+        foreach ($scan['routes'] as $list) {
+            foreach ($list as $route) {
+                if ($route->name !== null) {
+                    $routes[$route->name] ??= $route->written();
+                }
+            }
+        }
+        ksort($routes);
+
+        return ['routes' => $routes, 'templates' => 'legacy/templates'];
+    }
+
     /** The routes/web.php comment that marks a moved unit (the finish and --hand steps find it). */
     public static function marker(string $unitId): string
     {
@@ -160,7 +415,7 @@ final class SlimMover implements Mover
     /**
      * @return list<array{file: string, line: int, reason: string}>
      */
-    private function routeRefusals(SlimRoute $route, string $appRoot): array
+    private function routeRefusals(SlimRoute $route, string $appRoot, bool $bootstrap = false): array
     {
         $out = [];
         $where = 'legacy/' . $route->file;
@@ -170,7 +425,12 @@ final class SlimMover implements Mover
         }
         $first = explode('/', $pattern->uri)[0];
         if (in_array($first, self::LARAVEL_OWNED, true)) {
-            $out[] = ['file' => $where, 'line' => $route->line, 'reason' => 'the path ' . $route->pattern . ' is one the Laravel half always owns (/' . $first . ')'];
+            $out[] = ['file' => $where, 'line' => $route->line, 'reason' => 'the path ' . $route->written() . ' is one the Laravel half always owns (/' . $first . ')'];
+        }
+        if ($bootstrap) {
+            // The copied front controller registers the route as legacy
+            // does: guards, middleware and closure imports included.
+            return $out;
         }
         foreach ($route->guards as $guard) {
             $out[] = ['file' => $where, 'line' => $route->line, 'reason' => 'the route is registered only when `' . $guard . '` is true, and the Laravel half has no such rule; port the check into the handler or a Laravel middleware, then run the --hand move'];
@@ -383,7 +643,8 @@ final class SlimMover implements Mover
             $line .= "\n    ->where(" . var_export($name, true) . ', ' . var_export($regex, true) . ')';
         }
         if (array_diff($route->methods, ['GET', 'HEAD', 'OPTIONS']) !== []) {
-            $line .= "\n    ->withoutMiddleware(\\Illuminate\\Foundation\\Http\\Middleware\\ValidateCsrfToken::class)";
+            // PreventRequestForgery is Laravel 13's name for ValidateCsrfToken.
+            $line .= "\n    ->withoutMiddleware([\\Illuminate\\Foundation\\Http\\Middleware\\PreventRequestForgery::class, \\Illuminate\\Foundation\\Http\\Middleware\\ValidateCsrfToken::class])";
         }
         if ($route->name !== null) {
             $line .= "\n    ->name(" . var_export($route->name, true) . ')';
@@ -401,7 +662,7 @@ final class SlimMover implements Mover
      *
      * @return array<string, mixed>
      */
-    private function manifest(array $front, SlimCodeCopier $copier, array $sources, string $appRoot): array
+    private function manifest(array $front, SlimCodeCopier $copier, array $sources, string $appRoot, array $twig = []): array
     {
         $files = [];
         $keys = [];
@@ -452,6 +713,7 @@ final class SlimMover implements Mover
             'emitter' => $emitter,
             'body_parsing' => $front['body_parsing'],
             'output_buffering' => $front['output_buffering'],
+            'twig' => $twig,
         ];
     }
 
@@ -551,10 +813,18 @@ final class SlimMover implements Mover
 
                 continue;
             }
-            // The next major is allowed too: the legacy major can conflict
-            // with Laravel's own (PHP-DI 6 needs serializable-closure 1,
-            // Laravel 13 has 2), and the copied code is the legacy code.
-            if (preg_match('/^\^(\d+)(?:\.\d+)*$/', trim($constraint), $major) === 1) {
+            $conflict = self::lockConflict($package, $legacyLock, $rootVersions);
+            if ($conflict !== null) {
+                // PHP-DI and Slim's own packages may take the next major:
+                // PHP-DI 6 needs serializable-closure 1, Laravel 13 has 2,
+                // and PHP-DI 7 runs the same definitions. Any other package
+                // would change under the moved code, so it is left out.
+                $widen = $package === 'php-di/php-di' || str_starts_with($package, 'slim/');
+                if (!$widen || preg_match('/^\^(\d+)(?:\.\d+)*$/', trim($constraint), $major) !== 1) {
+                    $manual[] = 'composer.json does not require ' . $package . ' ' . $constraint . ': the legacy copy needs ' . $conflict . '; the moved code that uses it fails in Laravel until it is ported to what the Laravel half has';
+
+                    continue;
+                }
                 $constraint .= ' || ^' . ((int) $major[1] + 1) . '.0';
             }
             $root['require'][$package] = $constraint;
@@ -570,6 +840,44 @@ final class SlimMover implements Mover
         file_put_contents($rootFile, $edited ?? json_encode($root, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
 
         return true;
+    }
+
+    /**
+     * What stops a legacy-locked package from installing beside the Laravel
+     * half: one of its requires whose allowed majors miss the root's locked
+     * version ("league/flysystem ^1.0, the Laravel half has 3.30.0"), or null.
+     *
+     * @param array<mixed>          $legacyLock
+     * @param array<string, string> $rootVersions
+     */
+    private static function lockConflict(string $package, array $legacyLock, array $rootVersions): ?string
+    {
+        foreach (array_merge((array) ($legacyLock['packages'] ?? []), (array) ($legacyLock['packages-dev'] ?? [])) as $entry) {
+            if (!is_array($entry) || ($entry['name'] ?? null) !== $package) {
+                continue;
+            }
+            foreach ((array) ($entry['require'] ?? []) as $dep => $constraint) {
+                $dep = (string) $dep;
+                if ($dep === 'php' || str_starts_with($dep, 'ext-') || !isset($rootVersions[$dep])) {
+                    continue;
+                }
+                $root = (int) explode('.', $rootVersions[$dep])[0];
+                $majors = [];
+                $open = false;
+                foreach (preg_split('/\s*\|\|?\s*/', (string) $constraint) ?: [] as $alternative) {
+                    if (preg_match('/^[\^~]?v?(\d+)(?:\.[\d*x]+)*$/', trim($alternative), $m) === 1) {
+                        $majors[] = (int) $m[1];
+                    } else {
+                        $open = true;
+                    }
+                }
+                if (!$open && $majors !== [] && !in_array($root, $majors, true)) {
+                    return $dep . ' ' . $constraint . ', the Laravel half has ' . $rootVersions[$dep];
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

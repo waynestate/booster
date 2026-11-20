@@ -44,6 +44,9 @@ final class SlimAdapter
             }
         }
         $manifest = self::manifest();
+        if (($manifest['mode'] ?? 'php-di') === 'bootstrap') {
+            return self::bootstrap($manifest);
+        }
         $container = app('legacy.container');
         self::pointSesameAtLaravel();
         $responseFactory = self::responseFactory();
@@ -106,6 +109,139 @@ final class SlimAdapter
     }
 
     /** sesame_user() in moved code reads the Laravel half's SESAME session, the one its guard reads. */
+    /**
+     * Bootstrap mode (design 10.2): run the copy of the legacy front
+     * controller (boot/public/index.php), whose routes script registers only
+     * the moved routes, as the legacy web server would: PHP's own error
+     * handling and ini settings, the legacy public/ folder as the working
+     * directory, and everything it echoes and every header() it sends
+     * captured into the Laravel response. Laravel's own handlers come back
+     * afterwards. A legacy exit() ends the request as it does in legacy.
+     *
+     * @param array<string, mixed> $manifest
+     */
+    private static function bootstrap(array $manifest): \Symfony\Component\HttpFoundation\Response
+    {
+        self::pointSesameAtLaravel();
+        $front = base_path((string) ($manifest['front'] ?? 'app/Http/Controllers/Legacy/boot/public/index.php'));
+        $previousError = set_error_handler(null);
+        $previousException = set_exception_handler(null);
+        $ini = [];
+        foreach (['display_errors', 'error_reporting', 'log_errors', 'error_log', 'html_errors'] as $key) {
+            $ini[$key] = ini_get($key);
+            ini_restore($key);
+        }
+        $reporting = error_reporting();
+        error_reporting((int) ini_get('error_reporting'));
+        $cwd = getcwd();
+        @chdir(base_path('legacy/public'));
+        $level = ob_get_level();
+        ob_start();
+        $thrown = null;
+        try {
+            (static function (string $file): void {
+                require $file;
+            })($front);
+        } catch (Throwable $e) {
+            $thrown = $e;
+        }
+        $legacyException = set_exception_handler(null);
+        if ($thrown !== null && is_callable($legacyException)) {
+            // Uncaught in legacy: its own exception handler answers.
+            try {
+                $legacyException($thrown);
+                $thrown = null;
+            } catch (Throwable $e) {
+                $thrown = $e;
+            }
+        }
+        $body = '';
+        while (ob_get_level() > $level) {
+            $body = (string) ob_get_clean() . $body;
+        }
+        $status = http_response_code();
+        $lines = headers_list();
+        header_remove();
+        if ($cwd !== false) {
+            @chdir($cwd);
+        }
+        foreach ($ini as $key => $value) {
+            if ($value !== false) {
+                ini_set($key, $value);
+            }
+        }
+        error_reporting($reporting);
+        set_error_handler($previousError);
+        set_exception_handler($previousException);
+        if ($thrown !== null) {
+            throw $thrown;
+        }
+
+        return self::captured($body, is_int($status) ? $status : 200, $lines);
+    }
+
+    /**
+     * A Laravel response from what the legacy run sent.
+     *
+     * @param list<string> $lines header() lines as headers_list() gives them
+     */
+    public static function captured(string $body, int $status, array $lines): LegacyResponse
+    {
+        $out = new LegacyResponse($body, $status);
+        $cookies = [];
+        $cache = [];
+        $typed = false;
+        foreach ($lines as $line) {
+            [$name, $value] = array_map('trim', explode(':', $line, 2)) + [1 => ''];
+            if (strcasecmp($name, 'Set-Cookie') === 0) {
+                $cookies[] = $value;
+
+                continue;
+            }
+            if (strcasecmp($name, 'Cache-Control') === 0) {
+                $cache[] = $value;
+            }
+            $typed = $typed || strcasecmp($name, 'Content-Type') === 0;
+            $out->headers->set($name, $value, false);
+        }
+        if (!$typed) {
+            // PHP's default_mimetype, as the legacy server sends it.
+            $type = (string) ini_get('default_mimetype');
+            $charset = (string) ini_get('default_charset');
+            if ($type !== '') {
+                $out->headers->set('Content-Type', $type . ($charset !== '' && str_starts_with($type, 'text/') ? '; charset=' . $charset : ''));
+            }
+        }
+        $out->keepContentType();
+        $out->keepCacheControl($cache);
+        $out->keepRawCookies($cookies);
+
+        return $out;
+    }
+
+    /** The generated routes script calls this with the legacy container, so legacy.<key> resolves. */
+    public static function bindContainer(mixed $container): void
+    {
+        app()->instance('legacy.container', $container);
+    }
+
+    /** A legacy service by key, from the legacy container (ArrayAccess, as Pimple, or PSR-11). */
+    public static function service(string $key): mixed
+    {
+        $container = app('legacy.container');
+        if ($container instanceof \ArrayAccess) {
+            return $container[$key];
+        }
+
+        return $container instanceof ContainerInterface ? $container->get($key) : null;
+    }
+
+    /** The placeholder handler for an unmoved named route; no request reaches it. */
+    public static function notMoved(): never
+    {
+        throw new RuntimeException('This legacy route has not moved to Laravel; Booster registered it only for its name');
+    }
+
     private static function pointSesameAtLaravel(): void
     {
         $class = 'Waynestate\\Sesame\\Sesame';

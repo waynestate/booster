@@ -39,6 +39,36 @@ final class SlimCodeCopier
     /** @var array<string, string> constant name to the legacy file:line that defines it */
     private array $constants = [];
 
+    /** @var array<string, array{string, int, int}> constant name to the file and tokens of its define() value */
+    private array $constantValues = [];
+
+    /**
+     * Bootstrap mode (design 10.2): the moved units run a copy of the legacy
+     * front controller, so the constants it defines exist in Laravel and a
+     * require or include is repointed at the copied script it names.
+     */
+    public bool $bootstrap = false;
+
+    /**
+     * Fragment mode: every class name is written fully qualified, and
+     * `__CLASS__`, `self` and `static` become the copied class, so a
+     * statement can be pasted into a file with no namespace (the generated
+     * routes file).
+     */
+    public bool $qualify = false;
+
+    /** @var array<string, string> legacy-relative routes script to the app-relative file that replaces it */
+    public array $routeScripts = [];
+
+    /** @var array<string, bool> routes scripts the copied front controller loads */
+    public array $routeHits = [];
+
+    /** @var array<string, bool> legacy-relative scripts copied */
+    public array $scripts = [];
+
+    /** Where copied legacy scripts (the front controller and what it requires) live. */
+    public const BOOT = self::DIR . 'boot/';
+
     /** @var array<string, string> lower-cased namespace prefix to Composer package */
     private array $packagePrefixes = [];
 
@@ -89,6 +119,9 @@ final class SlimCodeCopier
                 $name = isset($args[0]) ? $src->stringAt($args[0][0], $args[0][1]) : null;
                 if ($name !== null && preg_match('/^\w+$/', $name) === 1) {
                     $this->constants[$name] ??= 'legacy/' . $path . ':' . $line;
+                    if (isset($args[1])) {
+                        $this->constantValues[$name] ??= [$path, $args[1][0], $args[1][1]];
+                    }
                 }
             }
         }
@@ -224,6 +257,27 @@ final class SlimCodeCopier
                     continue;
                 }
             }
+            if (in_array($id, [T_REQUIRE, T_REQUIRE_ONCE, T_INCLUDE, T_INCLUDE_ONCE], true) && $this->bootstrap) {
+                $end = $this->expressionEnd($src, $i + 1, $to);
+                $out .= $this->repointInclude($src, $path, $i, $end);
+                $i = $end;
+
+                continue;
+            }
+            if ($this->qualify && in_array($id, [T_CLASS_C, T_STATIC, T_STRING], true)) {
+                $n = $src->next($i);
+                $self = $id === T_CLASS_C || ($n !== null && $t[$n][0] === T_DOUBLE_COLON && ($id === T_STATIC || strtolower($text) === 'self'));
+                $class = $self ? $src->classAt($i) : null;
+                if ($class !== null) {
+                    $mapped = $this->isAppClass($class) ? (string) $this->map($class) : $class;
+                    if ($this->isAppClass($class)) {
+                        $refs[] = $class;
+                    }
+                    $out .= $id === T_CLASS_C ? var_export($mapped, true) : '\\' . $mapped;
+
+                    continue;
+                }
+            }
             if ($id === T_DIR || $id === T_FILE) {
                 $where = 'legacy/' . ($id === T_DIR ? (dirname($path) === '.' ? '' : dirname($path)) : $path);
                 $out .= "\\base_path('" . rtrim($where, '/') . "')";
@@ -253,7 +307,12 @@ final class SlimCodeCopier
 
                     continue;
                 }
-                if ($id === T_STRING && !$inUse && isset($this->constants[$text]) && $this->constantPosition($src, $i)) {
+                if ($this->qualify && !$inUse && $resolved !== null && !in_array(strtolower($text), ['self', 'static', 'parent'], true)) {
+                    $out .= '\\' . ($this->isAppClass($resolved) ? (string) $this->map($resolved) : $resolved);
+
+                    continue;
+                }
+                if ($id === T_STRING && !$inUse && !$this->bootstrap && isset($this->constants[$text]) && $this->constantPosition($src, $i)) {
                     $this->refusals[] = ['file' => 'legacy/' . $path, 'line' => $line, 'reason' => 'uses the constant ' . $text . ', which legacy defines at ' . $this->constants[$text] . ' and the Laravel half does not'];
                 }
             }
@@ -271,7 +330,251 @@ final class SlimCodeCopier
             $out .= $text;
         }
 
-        return [$out, array_values(array_unique($refs))];
+        return [$this->userArrays($out, 'legacy/' . $path), array_values(array_unique($refs))];
+    }
+
+    /**
+     * SESAME's Laravel half hands moved code a user object wrapping the
+     * legacy `['username' => ...]` array, so `is_array()` on the user becomes
+     * `is_array()` on its array; other array reads of it get a MANUAL line.
+     */
+    private function userArrays(string $code, string $where): string
+    {
+        if (!str_contains($code, 'sesame_user(')) {
+            return $code;
+        }
+        $wrap = static fn(string $expr): string => 'is_array(\is_object($__booster_user = ' . $expr . ') && method_exists($__booster_user, \'toArray\') ? $__booster_user->toArray() : $__booster_user)';
+        $code = (string) preg_replace_callback('/\bis_array\(\s*(\\\\?sesame_user\(\s*\))\s*\)/', static fn(array $m): string => $wrap($m[1]), $code);
+        preg_match_all('/(\$\w+)\s*=\s*\\\\?sesame_user\(\s*\)/', $code, $vars);
+        foreach (array_unique($vars[1]) as $var) {
+            $code = (string) preg_replace_callback('/\bis_array\(\s*(' . preg_quote($var, '/') . ')\s*\)/', static fn(array $m): string => $wrap($m[1]), $code);
+            if (preg_match('/' . preg_quote($var, '/') . '\s*\[/', $code) === 1) {
+                $this->manual[] = $where . ' reads ' . $var . '[...] from sesame_user(), which the Laravel half answers with a user object; read it through ' . $var . '->toArray()';
+            }
+        }
+
+        return $code;
+    }
+
+    /**
+     * Copy a legacy script (the front controller, or a file it requires) to
+     * boot/ with its requires repointed (bootstrap mode). Returns the
+     * app-relative file.
+     */
+    public function copyScript(string $path): string
+    {
+        $target = self::BOOT . $path;
+        if (isset($this->scripts[$path])) {
+            return $target;
+        }
+        $this->scripts[$path] = true;
+        $src = $this->sources[$path];
+        [$code, $refs] = $this->rewrite($src, $path, 0, count($src->t) - 1);
+        $this->pending[$target] = $code;
+        foreach ($refs as $ref) {
+            $this->copyClass($ref);
+        }
+
+        return $target;
+    }
+
+    /**
+     * The token that ends the expression starting at $from: the ";" or ","
+     * after it, or the ")" or "]" that closes a bracket opened before it.
+     */
+    private function expressionEnd(SlimSource $src, int $from, int $to): int
+    {
+        $depth = 0;
+        for ($k = $from; $k <= $to; $k++) {
+            $text = $src->t[$k][0] === null ? $src->t[$k][1] : '';
+            if (in_array($text, ['(', '['], true)) {
+                $depth++;
+            } elseif (in_array($text, [')', ']'], true)) {
+                if ($depth === 0) {
+                    return $k - 1;
+                }
+                $depth--;
+            } elseif ($depth === 0 && in_array($text, [';', ',', '?', ':'], true)) {
+                return $k - 1;
+            } elseif ($depth === 0 && $src->t[$k][0] === T_CLOSE_TAG) {
+                return $k - 1;
+            }
+        }
+
+        return $to;
+    }
+
+    /**
+     * A require or include, repointed: the legacy autoloader becomes `true`
+     * (Laravel's autoloader has the packages, section 10.2), a routes script
+     * the generated one with only the moved routes, an app script its copy
+     * in boot/, and anything else the legacy file itself.
+     */
+    private function repointInclude(SlimSource $src, string $path, int $at, int $end): string
+    {
+        $keyword = $src->t[$at][1];
+        $line = $src->t[$at][2];
+        $value = $this->evaluate($src, $path, $at + 1, $end);
+        $target = $value === null ? null : $this->locate($value, $path);
+        if ($target === null) {
+            $this->refusals[] = ['file' => 'legacy/' . $path, 'line' => $line, 'reason' => 'Booster cannot work out which file `' . trim($src->text($at, $end)) . '` loads, so it cannot repoint it in the copied front controller'];
+
+            return $src->text($at, $end);
+        }
+        if (preg_match('#(^|/)vendor/autoload\.php$#', $target) === 1) {
+            return 'true';
+        }
+        if (isset($this->routeScripts[$target])) {
+            $this->routeHits[$target] = true;
+
+            return $keyword . ' \\base_path(' . var_export($this->routeScripts[$target], true) . ')';
+        }
+        if (isset($this->sources[$target]) && !str_starts_with($target, 'vendor/')) {
+            if ($this->sources[$target]->classes !== []) {
+                foreach ($this->sources[$target]->classes as [, , $fqcn]) {
+                    $this->copyClass($fqcn);
+                }
+                $mapped = $this->map($this->sources[$target]->classes[0][2]);
+                if ($mapped !== null) {
+                    return $keyword . ' \\base_path(' . var_export(self::targetFile($mapped), true) . ')';
+                }
+            }
+
+            return $keyword . ' \\base_path(' . var_export($this->copyScript($target), true) . ')';
+        }
+        $this->manual[] = 'legacy/' . $path . ':' . $line . ' the copied code still loads legacy/' . $target . '; move it into the Laravel half before the finish step deletes legacy/';
+
+        return $keyword . ' \\base_path(' . var_export('legacy/' . $target, true) . ')';
+    }
+
+    /**
+     * The legacy-relative file a statically known include path names: a
+     * path from __DIR__ or a constant is already legacy-relative ("/L/..."),
+     * "./x" and "../x" are relative to legacy/public (the cwd the legacy
+     * front controller runs in), and a bare "x" is looked up there and then
+     * beside the including file, as PHP's include_path does.
+     */
+    private function locate(string $value, string $path): ?string
+    {
+        if (str_starts_with($value, '/L/') || $value === '/L') {
+            return self::normalizePath(substr($value, 3));
+        }
+        if (str_starts_with($value, '/') || preg_match('/^[A-Za-z]:/', $value) === 1) {
+            return null;
+        }
+        $candidates = str_starts_with($value, './') || str_starts_with($value, '../')
+            ? ['public/' . $value]
+            : ['public/' . $value, (dirname($path) === '.' ? '' : dirname($path) . '/') . $value];
+        foreach ($candidates as $candidate) {
+            $candidate = self::normalizePath($candidate);
+            if (isset($this->sources[$candidate]) || is_file($this->appRoot . '/legacy/' . $candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The value of a path expression, worked out without running it:
+     * string literals, ".", parentheses, __DIR__ and __FILE__ (as "/L/..."
+     * paths), DIRECTORY_SEPARATOR, realpath(), dirname() and the constants
+     * legacy define()s from such values. Null when it is anything else.
+     *
+     * @param array<string, bool> $seen
+     */
+    private function evaluate(SlimSource $src, string $path, int $from, int $to, array $seen = []): ?string
+    {
+        $out = '';
+        $expectValue = true;
+        for ($k = $from; $k <= $to; $k++) {
+            [$id, $text] = $src->t[$k];
+            if (in_array($id, [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+                continue;
+            }
+            if (!$expectValue) {
+                if ($text !== '.') {
+                    return null;
+                }
+                $expectValue = true;
+
+                continue;
+            }
+            $expectValue = false;
+            if ($id === T_CONSTANT_ENCAPSED_STRING) {
+                $out .= SlimSource::unquote($text);
+            } elseif ($id === T_DIR) {
+                $out .= rtrim('/L/' . (dirname($path) === '.' ? '' : dirname($path)), '/');
+            } elseif ($id === T_FILE) {
+                $out .= '/L/' . $path;
+            } elseif ($text === '(' && isset($src->parens[$k])) {
+                $inner = $this->evaluate($src, $path, $k + 1, $src->parens[$k] - 1, $seen);
+                if ($inner === null) {
+                    return null;
+                }
+                $out .= $inner;
+                $k = $src->parens[$k];
+            } elseif (in_array($id, [T_STRING, T_NAME_FULLY_QUALIFIED], true)) {
+                $name = ltrim($text, '\\');
+                $open = $src->next($k);
+                if ($open !== null && $src->t[$open][1] === '(' && isset($src->parens[$open])) {
+                    $args = $src->args($open, $src->parens[$open]);
+                    $arg = isset($args[0]) ? $this->evaluate($src, $path, $args[0][0], $args[0][1], $seen) : null;
+                    if ($arg === null) {
+                        return null;
+                    }
+                    $lower = strtolower($name);
+                    if ($lower === 'realpath') {
+                        $out .= rtrim(self::normalizePath($arg, true), '/');
+                    } elseif ($lower === 'dirname') {
+                        $levels = isset($args[1]) ? (int) $this->evaluate($src, $path, $args[1][0], $args[1][1], $seen) : 1;
+                        $dir = rtrim(self::normalizePath($arg, true), '/');
+                        for ($n = 0; $n < max(1, $levels); $n++) {
+                            $dir = str_contains($dir, '/') ? substr($dir, 0, (int) strrpos($dir, '/')) : '.';
+                        }
+                        $out .= $dir;
+                    } else {
+                        return null;
+                    }
+                    $k = $src->parens[$open];
+                } elseif ($name === 'DIRECTORY_SEPARATOR') {
+                    $out .= '/';
+                } elseif (isset($this->constantValues[$name]) && !isset($seen[$name])) {
+                    [$file, $a, $b] = $this->constantValues[$name];
+                    $value = $this->evaluate($this->sources[$file], $file, $a, $b, $seen + [$name => true]);
+                    if ($value === null) {
+                        return null;
+                    }
+                    $out .= $value;
+                } else {
+                    return null;
+                }
+            } elseif ($id === T_LNUMBER) {
+                $out .= $text;
+            } else {
+                return null;
+            }
+        }
+
+        return $expectValue && $out === '' ? null : $out;
+    }
+
+    /** "a/./b/../c" as "a/c"; with $keepRoot a "/L/" path keeps its root. */
+    private static function normalizePath(string $path, bool $keepRoot = false): string
+    {
+        $root = $keepRoot && str_starts_with($path, '/L') ? '/L/' : '';
+        $rest = $root === '' ? $path : substr($path, 2);
+        $parts = [];
+        foreach (explode('/', str_replace('\\', '/', $rest)) as $part) {
+            if ($part === '..') {
+                array_pop($parts);
+            } elseif ($part !== '.' && $part !== '') {
+                $parts[] = $part;
+            }
+        }
+        $trail = str_ends_with($rest, '/') && $parts !== [] ? '/' : '';
+
+        return $root . implode('/', $parts) . $trail;
     }
 
     /**

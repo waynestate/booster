@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Http\Controllers\Legacy\Support\LegacyContainer;
+use App\Http\Controllers\Legacy\Support\LegacyTwigExtension;
 use App\Http\Controllers\Legacy\Support\SlimAdapter;
 use Illuminate\Support\ServiceProvider;
 
@@ -25,7 +26,24 @@ final class LegacyServiceProvider extends ServiceProvider
         $this->app->singleton('legacy.container', static fn() => SlimAdapter::buildContainer(SlimAdapter::manifest()));
         $this->app->singleton('legacy', static fn($app) => new LegacyContainer($app));
         foreach ((array) (SlimAdapter::manifest()['keys'] ?? []) as $key) {
-            $this->app->singleton('legacy.' . $key, static fn($app) => $app->make('legacy.container')?->get($key));
+            $this->app->bind('legacy.' . $key, static fn() => SlimAdapter::service($key));
         }
+    }
+
+    /**
+     * Legacy Twig templates rendered by the Laravel half through TwigBridge
+     * (rcrowe/twigbridge) find legacy/templates and slim/twig-view's
+     * url_for, full_url_for, base_path and is_current_url.
+     */
+    public function boot(): void
+    {
+        if (!class_exists('TwigBridge\ServiceProvider')) {
+            return;
+        }
+        $templates = base_path((string) (SlimAdapter::manifest()['twig']['templates'] ?? 'legacy/templates'));
+        if (is_dir($templates)) {
+            $this->callAfterResolving('view', static fn($view) => $view->addLocation($templates));
+        }
+        $this->callAfterResolving('twig', static fn($twig) => $twig->addExtension(LegacyTwigExtension::forRequest()));
     }
 }

@@ -17,6 +17,8 @@ final class SlimRoute
      * @param list<string> $closureUses the variables a closure handler imports with use (...)
      * @param list<string> $guards     the conditions of the if blocks the route is registered inside
      * @param list<string> $middleware the ->add(...) arguments on the route and its groups
+     * @param list<array{string, int, int}> $links each step from the file the registration starts in to the route call: file, call token, the token that walk began at
+     * @param list<string> $middlewareFiles the file each middleware argument is written in
      */
     public function __construct(
         public readonly array $methods,
@@ -33,5 +35,41 @@ final class SlimRoute
         public readonly array $guards,
         public readonly array $middleware,
         public readonly bool $closureIsStatic = false,
+        public readonly array $links = [],
+        public readonly array $middlewareFiles = [],
+        public readonly ?string $legacyPattern = null,
     ) {}
+
+    /** The pattern as written in legacy, before an optional segment was expanded. */
+    public function written(): string
+    {
+        return $this->legacyPattern ?? $this->pattern;
+    }
+
+    /**
+     * One expansion of this route's optional segments (section 10.3): the
+     * same route answering one Laravel URI, named only when $named.
+     */
+    public function withPattern(string $pattern, bool $named): self
+    {
+        return new self(
+            $this->methods,
+            $pattern,
+            $named ? $this->name : null,
+            $this->handlerKind,
+            $this->handlerClass,
+            $this->handlerMethod,
+            $this->handlerText,
+            $this->closureUses,
+            $this->file,
+            $this->line,
+            $this->handlerLine,
+            $this->guards,
+            $this->middleware,
+            $this->closureIsStatic,
+            $this->links,
+            $this->middlewareFiles,
+            $this->written(),
+        );
+    }
 }
