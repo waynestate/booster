@@ -30,7 +30,7 @@ namespace Waynestate\Booster\Strangler;
 final class SlimBootstrap
 {
     /** The method name the placeholder routes use: no request ever has it. */
-    public const NOT_MOVED = 'BOOSTER_NOT_MOVED';
+    public const NOT_MOVED = 'BOOSTER-NOT-MOVED';
 
     private const VERBS = '(?:get|post|put|patch|delete|options|any|map|group)';
 

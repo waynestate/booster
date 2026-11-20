@@ -203,7 +203,7 @@ final class StranglerSlimMoverTest extends TestCase
         self::assertStringContainsString("\$booster_app->get('/admin/users', \App\Http\Controllers\Legacy\App\Action\ListItems::class)", $routes);
         self::assertStringNotContainsString("->get('/contact'", $routes, 'an unmoved route stays out');
         // Unmoved named routes are there for url_for() only.
-        self::assertStringContainsString("\$booster_app->map(['BOOSTER_NOT_MOVED'], '/', ", $routes);
+        self::assertStringContainsString("\$booster_app->map(['BOOSTER-NOT-MOVED'], '/', ", $routes);
         self::assertStringContainsString('SlimAdapter::bindContainer($booster_app->getContainer());', $routes);
         self::assertStringContainsString("->defaults('booster_slim', 'bootstrap')", $this->read('routes/web.php'));
     }

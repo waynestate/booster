@@ -124,7 +124,7 @@ final class StranglerSlimBootstrapTest extends TestCase
         self::assertStringContainsString("if (in_array('staff', \$app->getContainer()['user']->roles)) {", $routes);
         self::assertStringContainsString("\$booster_app->get('/staff/', ", $routes, 'a group route is registered at its full pattern');
         self::assertStringNotContainsString("->post('/[login[/]]'", $routes, 'an unmoved route stays out');
-        self::assertStringContainsString("\$booster_app->map(['BOOSTER_NOT_MOVED'], '/[login[/]]', ", $routes, 'url_for still finds an unmoved named route');
+        self::assertStringContainsString("\$booster_app->map(['BOOSTER-NOT-MOVED'], '/[login[/]]', ", $routes, 'url_for still finds an unmoved named route');
         self::assertStringContainsString('SlimAdapter::bindContainer($booster_app->getContainer());', $routes);
 
         $web = $this->read('routes/web.php');
