@@ -1,0 +1,16 @@
+{
+    "name": "fixture/slim-pimple",
+    "require": {
+        "php": "^8.3",
+        "league/flysystem-sftp": "^1.1",
+        "pimple/pimple": "^3.5",
+        "slim/psr7": "^1.7",
+        "slim/slim": "^4.15",
+        "slim/twig-view": "^3.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/"
+        }
+    }
+}

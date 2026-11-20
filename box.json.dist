@@ -32,6 +32,7 @@
         "resources/strangler/slim/LegacyContainer.php",
         "resources/strangler/slim/LegacyResponse.php",
         "resources/strangler/slim/LegacyServiceProvider.php",
+        "resources/strangler/slim/LegacyTwigExtension.php",
         "resources/strangler/slim/SlimAdapter.php",
         "vendor/bin/phpcs",
         "vendor/bin/phpstan",

@@ -659,6 +659,7 @@ final class SlimMover implements Mover
      *
      * @param array{container: string, files: list<string>, error_handler: ?string, error_middleware: bool, emitter: ?string, body_parsing: bool, output_buffering: string, refusal: ?array{file: string, line: int, reason: string}, manual: list<string>} $front
      * @param array<string, SlimSource> $sources
+     * @param array<string, mixed>      $twig
      *
      * @return array<string, mixed>
      */

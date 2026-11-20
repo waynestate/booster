@@ -243,7 +243,7 @@ final class StranglerSlimMoverTest extends TestCase
         self::assertCount(7, glob(dirname(__DIR__) . '/resources/strangler/slim/*.php') ?: []);
     }
 
-    private static function copyTree(string $from, string $to): void
+    public static function copyTree(string $from, string $to): void
     {
         $items = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($from, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::SELF_FIRST);
         mkdir($to, 0o777, true);
@@ -257,7 +257,7 @@ final class StranglerSlimMoverTest extends TestCase
         }
     }
 
-    private static function removeTree(string $dir): void
+    public static function removeTree(string $dir): void
     {
         if (!is_dir($dir)) {
             return;

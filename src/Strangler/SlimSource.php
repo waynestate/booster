@@ -373,6 +373,7 @@ final class SlimSource
         return $out;
     }
 
+    /** @return array<int, int> each opening token's closing token */
     private function match(string $open, string $close): array
     {
         $stack = [];

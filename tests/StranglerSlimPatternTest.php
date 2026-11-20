@@ -71,4 +71,35 @@ final class StranglerSlimPatternTest extends TestCase
         self::assertSame('/', SlimPattern::idPath('/'));
         self::assertSame('/users/{id}', SlimPattern::idPath('users/{id}'));
     }
+
+    public function testExpandsOptionalSegmentsShortestFirst(): void
+    {
+        self::assertSame(['/', '/login', '/login/'], SlimPattern::expand('/[login[/]]'));
+        self::assertSame(['/page', '/page/{n}'], SlimPattern::expand('/page[/{n}]'));
+        self::assertSame(['/a', '/a/{b}', '/a/{b}/{c:[0-9]+}'], SlimPattern::expand('/a[/{b}[/{c:[0-9]+}]]'));
+        self::assertSame(['/users'], SlimPattern::expand('/users'));
+        self::assertNull(SlimPattern::expand('/a[/b]/c'), 'FastRoute allows optional segments only at the end');
+        self::assertNull(SlimPattern::expand('/a[/b'));
+    }
+
+    public function testVariantsAreLaravelUrisWithTheirRouteTableForm(): void
+    {
+        [$login, $refusal] = SlimPattern::variants('/[login[/]]');
+        self::assertNull($refusal);
+        self::assertSame([
+            ['uri' => '/', 'wheres' => [], 'table' => '/'],
+            ['uri' => 'login', 'wheres' => [], 'table' => 'login[/]'],
+        ], $login);
+
+        [$items] = SlimPattern::variants('/items/{id:[0-9]+}[/]');
+        self::assertSame([['uri' => 'items/{id}', 'wheres' => ['id' => '[0-9]+'], 'table' => 'items/{id:[0-9]+}[/]']], $items);
+
+        [$logout] = SlimPattern::variants('/logout/');
+        self::assertSame('logout[/]', $logout[0]['table']);
+
+        [$none, $why] = SlimPattern::variants('/a[/b]/c');
+        self::assertSame([], $none);
+        self::assertStringContainsString('FastRoute itself would refuse', (string) $why);
+        self::assertNotNull(SlimPattern::variants('/user/[{:uid}[/]]')[1], 'a nameless placeholder still refuses');
+    }
 }

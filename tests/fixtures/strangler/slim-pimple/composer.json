@@ -1,0 +1,11 @@
+{
+    "name": "laravel/laravel",
+    "type": "project",
+    "require": {
+        "php": "^8.3",
+        "laravel/framework": "^13.17"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

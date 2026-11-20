@@ -396,8 +396,14 @@ final class SlimCodeCopier
                 $depth--;
             } elseif ($depth === 0 && in_array($text, [';', ',', '?', ':'], true)) {
                 return $k - 1;
-            } elseif ($depth === 0 && $src->t[$k][0] === T_CLOSE_TAG) {
-                return $k - 1;
+            } elseif ($depth === 0 && in_array($src->t[$k][0], [T_CLOSE_TAG, T_AS, T_LOGICAL_AND, T_LOGICAL_OR, T_LOGICAL_XOR], true)) {
+                // `foreach (require X as $f)` and `require X or die()` end the expression too.
+                $end = $k - 1;
+                while ($end > $from && $src->t[$end][0] === T_WHITESPACE) {
+                    $end--;
+                }
+
+                return $end;
             }
         }
 

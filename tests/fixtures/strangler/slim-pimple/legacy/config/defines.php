@@ -1,0 +1,4 @@
+<?php
+define('PROJECT_ROOT', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..') . DIRECTORY_SEPARATOR);
+define('CONFIG_PATH', PROJECT_ROOT . 'config' . DIRECTORY_SEPARATOR);
+define('CSRF_KEY', 'CSRF_KEY');
