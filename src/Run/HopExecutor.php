@@ -630,7 +630,7 @@ final class HopExecutor
                 );
             }
         }
-        $refusing = LockRefusals::find($path, $php);
+        $refusing = LockRefusals::find($path, $php, false);
         if ($refusing !== []) {
             return sprintf(
                 'The lock holds packages that do not install on PHP %s: %s. Run composer update -W %s on PHP %s, commit composer.lock, then run again.',
@@ -1260,11 +1260,19 @@ final class HopExecutor
             return null;
         }
         $held = [];
+        $broken = [];
         foreach ($refusing as $name => $package) {
-            $held[] = sprintf('%s %s, which needs php %s', $name, $package['version'], $package['constraint']);
+            if (isset($package['reason'])) {
+                $broken[] = sprintf('the lock held %s %s, which allows PHP %s but misbehaves on it: %s', $name, $package['version'], $step->phpAfter, $package['reason']);
+            } else {
+                $held[] = sprintf('%s %s, which needs php %s', $name, $package['version'], $package['constraint']);
+            }
+        }
+        if ($held !== []) {
+            array_unshift($broken, sprintf('the lock held %s, not PHP %s', implode(', and ', $held), $step->phpAfter));
         }
 
-        return sprintf('the lock held %s, not PHP %s', implode(', and ', $held), $step->phpAfter);
+        return implode('; ', $broken);
     }
 
     /**
