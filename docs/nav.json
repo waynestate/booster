@@ -89,6 +89,10 @@
         {
           "title": "Hops",
           "path": "reference/hops"
+        },
+        {
+          "title": "Strangler sign-in",
+          "path": "reference/strangler-sign-in"
         }
       ]
     },
