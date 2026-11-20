@@ -15,8 +15,9 @@
  *   4. Moved routes: bootstrap/booster-moved.php (Booster writes it) lists
  *      method and regex per moved unit; HEAD counts as GET; first match wins.
  *   5. A real file under the legacy docroot is served as it was: static files
- *      streamed with a fixed type map, ETag, Last-Modified and 304; a .php
- *      script runs as its own script, as Apache ran it before.
+ *      streamed with the type the server in front gave (php -S or Apache), ETag,
+ *      Last-Modified and 304; a .php script runs as its own script, as Apache
+ *      ran it before.
  *   6. Everything else goes to the legacy front controller, with SCRIPT_NAME,
  *      SCRIPT_FILENAME, PHP_SELF and DOCUMENT_ROOT set to what it saw before.
  *
@@ -136,41 +137,67 @@ $booster_route = (static function (): array {
         $script = $file;
         $name = $base . '/' . ltrim(str_replace('\\', '/', substr($file, strlen($legacyDir))), '/');
     } elseif ($file !== null) {
-        $types = [
-            'css' => 'text/css; charset=UTF-8', 'js' => 'text/javascript; charset=UTF-8', 'mjs' => 'text/javascript; charset=UTF-8',
-            'json' => 'application/json', 'map' => 'application/json', 'html' => 'text/html; charset=UTF-8', 'htm' => 'text/html; charset=UTF-8',
-            'txt' => 'text/plain; charset=UTF-8', 'csv' => 'text/csv; charset=UTF-8', 'xml' => 'text/xml; charset=UTF-8', 'md' => 'text/markdown; charset=UTF-8',
-            'svg' => 'image/svg+xml', 'png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif',
-            'ico' => 'image/vnd.microsoft.icon', 'webp' => 'image/webp', 'avif' => 'image/avif', 'bmp' => 'image/bmp',
-            'woff' => 'font/woff', 'woff2' => 'font/woff2', 'ttf' => 'font/ttf', 'otf' => 'font/otf', 'eot' => 'application/vnd.ms-fontobject',
-            'pdf' => 'application/pdf', 'zip' => 'application/zip', 'mp4' => 'video/mp4', 'webm' => 'video/webm', 'mp3' => 'audio/mpeg',
-            'wav' => 'audio/wav', 'ogg' => 'audio/ogg', 'wasm' => 'application/wasm', 'swf' => 'application/x-shockwave-flash',
-        ];
+        // Answered as the server in front answered it before the mount:
+        // php -S (the replay) with its own type table and a charset on text/*,
+        // Apache with the system mime.types and no charset. Any method gets
+        // the file, as both servers do; HEAD gets no body.
         $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+        $phpTypes = [
+            'css' => 'text/css', 'js' => 'application/javascript', 'mjs' => 'application/javascript',
+            'json' => 'application/json', 'map' => 'application/json', 'html' => 'text/html', 'htm' => 'text/html',
+            'txt' => 'text/plain', 'csv' => 'text/csv', 'xml' => 'application/xml', 'md' => 'text/markdown',
+            'yml' => 'text/yaml', 'yaml' => 'text/yaml', 'svg' => 'image/svg+xml', 'png' => 'image/png',
+            'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif', 'ico' => 'image/vnd.microsoft.icon',
+            'webp' => 'image/webp', 'avif' => 'image/avif', 'bmp' => 'image/bmp', 'tif' => 'image/tiff', 'tiff' => 'image/tiff',
+            'woff' => 'font/woff', 'woff2' => 'font/woff2', 'ttf' => 'font/ttf', 'otf' => 'font/otf',
+            'eot' => 'application/vnd.ms-fontobject', 'pdf' => 'application/pdf', 'zip' => 'application/zip',
+            'mp4' => 'video/mp4', 'webm' => 'video/webm', 'mp3' => 'audio/mpeg', 'wav' => 'audio/wave', 'ogg' => 'audio/ogg',
+            'wasm' => 'application/wasm', 'swf' => 'application/x-shockwave-flash', 'rss' => 'application/rss+xml',
+            'atom' => 'application/atom+xml', 'webmanifest' => 'application/manifest+json', 'jsonld' => 'application/ld+json',
+        ];
+        $type = null;
+        if (PHP_SAPI === 'cli-server') {
+            $type = $phpTypes[$ext] ?? null;
+            if ($type !== null && strncmp($type, 'text/', 5) === 0) {
+                $type .= '; charset=UTF-8';
+            }
+        } else {
+            $mimeTypes = @file_get_contents('/etc/mime.types');
+            if (is_string($mimeTypes) && $ext !== '') {
+                // "type ext ext ...", one type per line; the extension is a whole token.
+                if (preg_match('/^([^#\s]+)(?:[ \t]+\S+)*?[ \t]+' . preg_quote($ext, '/') . '(?=[ \t]*$|[ \t])/mi', $mimeTypes, $m) === 1) {
+                    $type = $m[1];
+                }
+            } elseif ($ext !== '') {
+                $type = $phpTypes[$ext] ?? null;
+                if ($type === 'application/javascript') {
+                    $type = 'text/javascript';
+                }
+            }
+        }
         $size = (int) filesize($file);
         $mtime = (int) filemtime($file);
         $etag = '"' . dechex($size) . '-' . dechex($mtime) . '"';
-        if ($method !== 'GET' && $method !== 'HEAD') {
-            http_response_code(405);
-            header('Allow: GET, HEAD');
-
-            return ['done'];
+        if ($type === null) {
+            // No type, as the server sent none (PHP would add text/html).
+            ini_set('default_mimetype', '');
+        } else {
+            header('Content-Type: ' . $type);
         }
-        header('Content-Type: ' . ($types[$ext] ?? 'application/octet-stream'));
         header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime) . ' GMT');
         header('ETag: ' . $etag);
         $match = (string) ($_SERVER['HTTP_IF_NONE_MATCH'] ?? '');
         $since = isset($_SERVER['HTTP_IF_MODIFIED_SINCE']) ? strtotime((string) $_SERVER['HTTP_IF_MODIFIED_SINCE']) : false;
-        $fresh = $match !== ''
+        $fresh = ($method === 'GET' || $method === 'HEAD') && ($match !== ''
             ? in_array($etag, array_map('trim', explode(',', $match)), true) || trim($match) === '*'
-            : $since !== false && $since >= $mtime;
+            : $since !== false && $since >= $mtime);
         if ($fresh) {
             http_response_code(304);
 
             return ['done'];
         }
         header('Content-Length: ' . $size);
-        if ($method === 'GET') {
+        if ($method !== 'HEAD') {
             readfile($file);
         }
 

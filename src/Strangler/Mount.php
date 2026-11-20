@@ -24,7 +24,8 @@ use Waynestate\Booster\ToolError;
  * 3. The baked tree is laid over the root where paths are free; a
  *    collision keeps the app's file and becomes a MANUAL line (.gitignore is
  *    merged instead).
- * 4. public/index.php becomes the dispatcher, bootstrap/booster-moved.php
+ * 4. public/index.php becomes the dispatcher (and public/.htaccess Laravel's
+ *    without the trailing-slash 301), bootstrap/booster-moved.php
  *    the empty route table, bin/install-legacy.php the install hook that the
  *    root composer.json runs after every install and update.
  * 5. Laravel's own routes move under /_laravel (health, readiness, the demo
@@ -66,7 +67,7 @@ final class Mount
     ];
 
     /** The baked files whose collision is expected and silent: the mount writes its own. */
-    private const MOUNT_OWNED = ['public/index.php', 'bootstrap/booster-moved.php', 'bin/install-legacy.php'];
+    private const MOUNT_OWNED = ['public/index.php', 'public/.htaccess', 'bootstrap/booster-moved.php', 'bin/install-legacy.php'];
 
     /** Config files a Citadel dashboard may write into the source tree, relative to the Composer root. */
     private const CONFIG_FILES = [
@@ -157,6 +158,8 @@ final class Mount
         RouteTable::load($root)->save();
         $this->changed[] = RouteTable::FILE;
         $this->writeFile($root, 'bin/install-legacy.php', $this->resource('install-legacy.php'));
+        // Laravel's .htaccess without its trailing-slash 301, which would answer legacy paths first.
+        $this->writeFile($root, 'public/.htaccess', $this->resource('public.htaccess'));
         $this->addInstallHook($root);
 
         // 5. Laravel's own routes under /_laravel.

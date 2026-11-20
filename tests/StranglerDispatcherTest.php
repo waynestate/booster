@@ -78,6 +78,7 @@ final class StranglerDispatcherTest extends TestCase
             'legacy/webroot/raw.php' => "<?php\necho json_encode(['half' => 'raw', 'script' => \$_SERVER['SCRIPT_NAME'], 'cwd' => getcwd()]);\n",
             'legacy/webroot/css/app.css' => "body { color: #0c5449; }\n",
             'legacy/webroot/build/legacy.js' => "console.log('legacy');\n",
+            'legacy/webroot/data.blob' => "blob\n",
             'legacy/webroot/.env' => "SECRET=1\n",
             'legacy/webroot/.well-known/security.txt' => "Contact: mailto:security@example.edu\n",
             'legacy/composer.json' => "{}\n",
@@ -141,8 +142,16 @@ final class StranglerDispatcherTest extends TestCase
             $lines[] = $name . ': ' . $value;
         }
         $context = stream_context_create(['http' => ['method' => $method, 'ignore_errors' => true, 'follow_location' => 0, 'header' => implode("\r\n", $lines), 'timeout' => 20]]);
-        $body = (string) @file_get_contents('http://127.0.0.1:' . $this->port . $path, false, $context);
-        $raw = $http_response_header ?? [];
+        // fopen's wrapper_data, not $http_response_header (deprecated on PHP 8.5).
+        $stream = @fopen('http://127.0.0.1:' . $this->port . $path, 'r', false, $context);
+        $body = '';
+        $raw = [];
+        if (is_resource($stream)) {
+            $raw = stream_get_meta_data($stream)['wrapper_data'] ?? [];
+            $body = (string) stream_get_contents($stream);
+            fclose($stream);
+        }
+        $raw = is_array($raw) ? array_values(array_filter($raw, 'is_string')) : [];
         $status = (int) (explode(' ', $raw[0] ?? '')[1] ?? 0);
         $out = [];
         foreach (array_slice($raw, 1) as $line) {
@@ -254,8 +263,13 @@ final class StranglerDispatcherTest extends TestCase
         self::assertSame(200, $head['status']);
         self::assertSame('', $head['body']);
         $post = $this->request('POST', '/css/app.css');
-        self::assertSame(405, $post['status']);
-        self::assertSame('GET, HEAD', $post['headers']['allow'] ?? null);
+        self::assertSame(200, $post['status'], 'php -S and Apache both answer any method on a static file');
+        self::assertSame("body { color: #0c5449; }\n", $post['body']);
+        $js = $this->request('GET', '/build/legacy.js');
+        self::assertSame('application/javascript', $js['headers']['content-type'] ?? null, 'php -S\'s own type, no charset');
+        $unknown = $this->request('GET', '/data.blob');
+        self::assertSame("blob\n", $unknown['body']);
+        self::assertArrayNotHasKey('content-type', $unknown['headers'], 'php -S sends no type for an unknown extension');
 
         self::assertSame("Contact: mailto:security@example.edu\n", $this->request('GET', '/.well-known/security.txt')['body'], '.well-known/ is the one dotted folder served');
         self::assertSame("User-agent: *\n", $this->request('GET', '/robots.txt')['body'], 'a real file under public/ is served before the dispatcher runs');

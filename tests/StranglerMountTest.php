@@ -125,7 +125,9 @@ final class StranglerMountTest extends TestCase
         self::assertFileDoesNotExist($dir . '/public/robots.txt');
         self::assertContains('Sourdough\'s public/robots.txt was not written: legacy/public/robots.txt answers that URL, and a file in public/ would be served before the dispatcher runs.', $result->notes);
         self::assertFileExists($dir . '/public/favicon.ico', 'the app has no favicon, so Laravel\'s is served');
-        self::assertFileExists($dir . '/public/.htaccess');
+        $htaccess = (string) file_get_contents($dir . '/public/.htaccess');
+        self::assertStringContainsString('RewriteRule ^ index.php [L]', $htaccess);
+        self::assertStringNotContainsString('[L,R=301]', $htaccess, 'no trailing-slash 301 in front of legacy paths');
 
         // The dispatcher, the empty table, the install hook.
         $dispatcher = (string) file_get_contents($dir . '/public/index.php');

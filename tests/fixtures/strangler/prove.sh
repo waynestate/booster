@@ -106,8 +106,8 @@ cat >"$work/halves.php" <<'PHP'
 $fail = 0;
 $probe = function (string $path, string $want, int $status = 0) use (&$fail): void {
     $context = stream_context_create(['http' => ['ignore_errors' => true, 'follow_location' => 0, 'timeout' => 30]]);
-    @file_get_contents('http://127.0.0.1:8766' . $path, false, $context);
-    $headers = $http_response_header ?? [];
+    $s = @fopen('http://127.0.0.1:8766' . $path, 'r', false, $context);
+    $headers = is_resource($s) ? (stream_get_meta_data($s)['wrapper_data'] ?? []) : [];
     $code = (int) (explode(' ', $headers[0] ?? '')[1] ?? 0);
     $half = '';
     foreach ($headers as $h) {
@@ -134,4 +134,68 @@ docker run --rm --name "booster-prove-halves-$$" --network none -v "$work/mounte
     sleep 1; php /prove/halves.php $legacy_paths" \
   || { echo "FAIL: a request went to the wrong half (server log: $work/halves-server.log)"; exit 1; }
 
-echo "PROVED: $app mount (all answers match, legacy answered the app's paths, Laravel answered /_laravel/up)"
+# 6. Apache (opt-in): the replay serves through php -S, but Citadel serves
+# through Apache with .htaccess. With BOOSTER_PROVE_APACHE_IMAGE set to a local
+# PHP-Apache image (mod_rewrite on, AllowOverride All under /var/www, the
+# docroot at /var/www/html), the untouched app and the mounted one are each
+# served by Apache, and every GET path must answer the same status,
+# Content-Type and body (CSRF values and postLink names hidden).
+apache_line="Apache not checked (set BOOSTER_PROVE_APACHE_IMAGE to a local PHP-Apache image)"
+if [ -n "${BOOSTER_PROVE_APACHE_IMAGE:-}" ]; then
+  cat >"$work/apache-probe.php" <<'PHP'
+<?php
+$out = [];
+foreach (array_slice($argv, 1) as $path) {
+    $context = stream_context_create(['http' => ['ignore_errors' => true, 'follow_location' => 0, 'timeout' => 30]]);
+    $s = @fopen('http://127.0.0.1' . $path, 'r', false, $context);
+    $headers = is_resource($s) ? (stream_get_meta_data($s)['wrapper_data'] ?? []) : [];
+    $body = is_resource($s) ? (string) stream_get_contents($s) : '';
+    $type = '-';
+    $half = '-';
+    foreach ($headers as $h) {
+        if (stripos($h, 'Content-Type:') === 0) {
+            $type = strtolower(str_replace(' ', '', trim(substr($h, 13))));
+        }
+        if (stripos($h, 'X-Booster-Half:') === 0) {
+            $half = trim(substr($h, 15));
+        }
+    }
+    $body = (string) preg_replace(['/(name="_csrfToken"[^>]*value=")[^"]*/', '/(name="csrfToken" content=")[^"]*/', '/post_[0-9a-f]{13}[0-9]*/'], ['$1', '$1', 'post_'], $body);
+    printf("%s %s %s %s\n", $path, explode(' ', $headers[0] ?? '- 0')[1] ?? '0', $type, md5($body));
+    fwrite(STDERR, sprintf("%s half=%s\n", $path, $half));
+}
+PHP
+  apache() { # <label> <docroot> <replay file> <extra env...>
+    local label=$1 docroot=$2 file=$3
+    shift 3
+    local aenv=()
+    while IFS= read -r pair; do aenv+=(-e "$pair"); done < <("$php" -r '$f = json_decode(file_get_contents($argv[1]), true); foreach ($f["serve"]["env"] ?? [] as $k => $v) { echo $k, "=", $v, "\n"; }' "$file")
+    local asetup
+    asetup=$("$php" -r '$f = json_decode(file_get_contents($argv[1]), true); echo $f["serve"]["setup"] ?? "true";' "$file")
+    docker run -d --name "booster-prove-apache-$label-$$" --network none -v "$work/$label:/var/www/app" -v "$work:/prove" \
+      "${aenv[@]}" "$@" --user 0:0 "$BOOSTER_PROVE_APACHE_IMAGE" sh -c "cd /var/www/app && ($asetup) >/prove/apache-$label-setup.log 2>&1 \
+        && chmod -R a+rwX /var/www/app && grep -rl /var/www/html /etc/apache2 | xargs sed -i 's#/var/www/html#/var/www/app/$docroot#g' \
+        && exec apache2-foreground" >/dev/null
+    sleep 3
+    docker exec "booster-prove-apache-$label-$$" php /prove/apache-probe.php $legacy_paths /_laravel/up >"$work/apache-$label.txt" 2>"$work/apache-$label-halves.txt" || true
+    docker exec "booster-prove-apache-$label-$$" chown -R "$uid:$gid" /var/www/app || true
+    docker logs "booster-prove-apache-$label-$$" >"$work/apache-$label-server.log" 2>&1 || true
+    docker rm -f "booster-prove-apache-$label-$$" >/dev/null
+  }
+  before_docroot=$("$php" -r '$f = json_decode(file_get_contents($argv[1]), true); echo trim($f["serve"]["docroot"] ?? ".", "/");' "$work/before/booster-replay.json")
+  apache before "$before_docroot" "$work/before/booster-replay.json"
+  apache mounted public "$work/mounted/booster-replay.json" -e BOOSTER_REPLAY=1
+  echo "Apache, before and mounted (path status type body-md5):"
+  # /_laravel/up is Laravel's in the mounted app and a 404 before: compare the rest.
+  if diff <(grep -v '^/_laravel/up ' "$work/apache-before.txt") <(grep -v '^/_laravel/up ' "$work/apache-mounted.txt"); then
+    grep -q '^/_laravel/up 200 ' "$work/apache-mounted.txt" || { echo "FAIL: Apache: /_laravel/up did not answer 200 in the mounted app"; exit 1; }
+    grep -v '^/_laravel/up ' "$work/apache-mounted-halves.txt" | grep -qv 'half=legacy' && { echo "FAIL: Apache: a legacy path went to Laravel ($work/apache-mounted-halves.txt)"; exit 1; }
+    apache_line="Apache answered all $(grep -vc '^/_laravel/up ' "$work/apache-mounted.txt") GET paths the same before and after the mount"
+    echo "$apache_line"
+  else
+    echo "FAIL: Apache answered differently after the mount (logs: $work/apache-*-server.log)"
+    exit 1
+  fi
+fi
+
+echo "PROVED: $app mount (all answers match, legacy answered the app's paths, Laravel answered /_laravel/up; $apache_line)"

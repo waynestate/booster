@@ -19,6 +19,7 @@
         "resources/slim1/slim1-bridge.php",
         "resources/strangler/dispatcher.php",
         "resources/strangler/install-legacy.php",
+        "resources/strangler/public.htaccess",
         "vendor/bin/phpcs",
         "vendor/bin/phpstan",
         "vendor/waynestate/creed/policy/policy.json"
