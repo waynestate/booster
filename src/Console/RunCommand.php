@@ -11,6 +11,7 @@ use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Waynestate\Booster\Hop\EngineId;
 use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Replay\ReplayFile;
@@ -20,6 +21,7 @@ use Waynestate\Booster\Report\JsonWriter;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\CacheMount;
 use Waynestate\Booster\Run\ComposerEditor;
+use Waynestate\Booster\Run\FrameworkEngine;
 use Waynestate\Booster\Run\GateImage;
 use Waynestate\Booster\Run\HopExecutor;
 use Waynestate\Booster\Run\NodeRunner;
@@ -27,6 +29,7 @@ use Waynestate\Booster\Run\ProcessRunner;
 use Waynestate\Booster\Run\ProctorRunner;
 use Waynestate\Booster\Run\RectorRunner;
 use Waynestate\Booster\Run\RunOptions;
+use Waynestate\Booster\Run\Slim\SlimUpgradeMigration;
 use Waynestate\Booster\Run\TargetImageRunner;
 use Waynestate\Booster\ToolError;
 
@@ -103,14 +106,16 @@ final class RunCommand extends BaseCommand
         // The registry the plan was built with, so the Node pin and its container match the plan.
         $registry = $this->planRegistry ?? new HopRegistry();
         // The download caches are opt-in: unset, every gate starts empty, as before.
+        $composerEditor = new ComposerEditor();
         $executor = new HopExecutor(
             new RectorRunner($this->processes),
-            new ComposerEditor(),
+            $composerEditor,
             new TargetImageRunner($this->processes, composerCache: CacheMount::fromEnvironment(CacheMount::COMPOSER)),
             $this->processes,
             new NodeRunner($this->processes, (int) $registry->nodePinTarget(), npmCache: CacheMount::fromEnvironment(CacheMount::NPM)),
             $registry,
             new ProctorRunner($this->processes),
+            frameworkEngines: self::frameworkEngines($composerEditor),
         );
         // The prompt only makes sense where a person is watching: text output on an interactive terminal. JSON and
         // --no-interaction runs stop at the threshold instead of asking nobody.
@@ -189,6 +194,19 @@ final class RunCommand extends BaseCommand
         $output->writeln($body, OutputInterface::OUTPUT_RAW);
 
         return $report->failed() ? self::EXIT_FAIL : self::EXIT_PASS;
+    }
+
+    /**
+     * The framework engines the executor runs, by EngineId value. The
+     * vendored engine needs no entry (the executor always has it).
+     *
+     * @return array<string, FrameworkEngine>
+     */
+    public static function frameworkEngines(ComposerEditor $composerEditor): array
+    {
+        return [
+            EngineId::SlimUpgrade->value => new SlimUpgradeMigration($composerEditor),
+        ];
     }
 
     /**
