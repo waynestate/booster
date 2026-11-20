@@ -58,10 +58,15 @@ final class ReplayGate
 
     /**
      * Records the baseline: every request answered on $php. It is only
-     * usable when every request got an answer and every answer has the
-     * status the request file expects (when it says).
+     * usable when every request got an answer, every answer has the status
+     * the request file expects (when it says), and the answers are not all
+     * errors: a baseline of fatals replays the same fatals after every hop
+     * and "passes" while proving nothing (the proof run's bug 14, a Slim 3
+     * app whose five pages were one missing-folder fatal). $allowErrors
+     * (--allow-failing-baseline) records such a baseline anyway, with a
+     * warning.
      */
-    public function record(string $php, bool $install = false): ReplayOutcome
+    public function record(string $php, bool $install = false, bool $allowErrors = false): ReplayOutcome
     {
         if ($this->file->todos !== []) {
             throw new ToolError(self::todoMessage($this->file));
@@ -98,14 +103,37 @@ final class ReplayGate
             ], $name, $this->outDir, $transcript, count($this->file->requests));
         }
 
+        $failing = self::errorBaseline($this->file->requests, $run->answers);
+        if ($failing !== null && !$allowErrors) {
+            return new ReplayOutcome(ReplayOutcome::FAILED, $php, [
+                sprintf('Replay baseline on PHP %s is not usable: %s, before any change. A replay of it would only prove the app fails the same way after each hop.', $php, $failing['why']),
+                ...self::indent($failing['lines']),
+                ...($errors === null ? [] : [sprintf('PHP logged %d distinct message%s while serving them: %s', count($run->phpErrors), count($run->phpErrors) === 1 ? '' : 's', $errors)]),
+                'Make the app answer on fake data first (a missing folder, config file or setup step is the usual cause), or pass --allow-failing-baseline to replay against the errors anyway. Transcript: ' . $transcript,
+            ], $name, $this->outDir, $transcript, count($this->file->requests));
+        }
+
         $this->recording = new ReplayRecording($php, $this->file->fingerprint, $run->answers, $this->file->requestsFingerprint, $this->file->serveFingerprint, $this->file->serveSummary());
         $lines = [sprintf('Replay: recorded %d answer%s on PHP %s from %s.', count($run->answers), count($run->answers) === 1 ? '' : 's', $php, $name)];
+        if ($failing !== null) {
+            $lines[] = sprintf('Warning: %s. Recorded anyway because of --allow-failing-baseline, so the replay proves only that the app fails the same way after each hop.', ucfirst($failing['why']));
+            array_push($lines, ...self::indent($failing['lines']));
+        } else {
+            $some = self::errorAnswers($this->file->requests, $run->answers);
+            if ($some !== []) {
+                $lines[] = sprintf('Warning: %d of %d recorded answers are errors, so those requests replay the error, not the page:', count($some), count($run->answers));
+                array_push($lines, ...self::indent($some));
+            }
+        }
         $redirect = self::sameRedirect($run->answers);
         if ($redirect !== null) {
             $lines[] = self::sameRedirectWarning(count($run->answers), $redirect);
         }
         if ($errors !== null) {
-            $lines[] = sprintf('PHP logged %d distinct message%s while serving them (%s).', count($run->phpErrors), count($run->phpErrors) === 1 ? '' : 's', $errors);
+            $fatal = self::fatalLogLines($run->phpErrors);
+            $lines[] = $fatal === []
+                ? sprintf('PHP logged %d distinct message%s while serving them (%s).', count($run->phpErrors), count($run->phpErrors) === 1 ? '' : 's', $errors)
+                : sprintf('Warning: PHP logged %d fatal error%s while serving the baseline (%d distinct message%s in all; %s). First: %s', count($fatal), count($fatal) === 1 ? '' : 's', count($run->phpErrors), count($run->phpErrors) === 1 ? '' : 's', $errors, self::shorten($fatal[0]));
         }
         $lines[] = 'Transcripts: ' . $this->outDir;
 
@@ -208,6 +236,179 @@ final class ReplayGate
         }
 
         return $location;
+    }
+
+    /**
+     * Why a baseline is all errors, with one line per failing request, or
+     * null when at least one answer is a real page. An answer is an error
+     * when its body shows a PHP fatal or parse error (an app that turns
+     * display_errors on answers its fatals with a 200), or when it is a 5xx
+     * the request file does not expect. Two or more answers that are the same
+     * 4xx page byte for byte count too (every path hit one "Not Found" or one
+     * error template), unless the file expects each of those statuses.
+     *
+     * @param list<ReplayRequest> $requests
+     * @param list<ReplayAnswer>  $answers
+     *
+     * @return array{why: string, lines: list<string>}|null
+     */
+    public static function errorBaseline(array $requests, array $answers): ?array
+    {
+        $count = count($answers);
+        if ($count === 0) {
+            return null;
+        }
+        $lines = [];
+        foreach ($answers as $i => $answer) {
+            $line = self::errorLine($requests[$i] ?? null, $answer);
+            if ($line === null) {
+                $lines = null;
+                break;
+            }
+            $lines[] = $line;
+        }
+        if ($lines !== null) {
+            return [
+                'why' => $count === 1 ? 'the one recorded answer is an error' : sprintf('all %d recorded answers are errors', $count),
+                'lines' => self::capped($lines),
+            ];
+        }
+        if ($count < 2) {
+            return null;
+        }
+        $first = $answers[0];
+        $expected = true;
+        foreach ($answers as $i => $answer) {
+            if ($answer->status < 400 || $answer->status !== $first->status || $answer->body !== $first->body) {
+                return null;
+            }
+            $expected = $expected && ($requests[$i] ?? null)?->expect === $answer->status;
+        }
+        if ($expected) {
+            return null;
+        }
+        $text = self::firstText($first->body);
+
+        return [
+            'why' => sprintf('all %d recorded answers are the same %d page', $count, $first->status),
+            'lines' => [sprintf('%s and every other request answered %d%s', ($requests[0] ?? null)?->label() ?? 'Request 01', $first->status, $text === '' ? ', with the same body.' : ': ' . $text)],
+        ];
+    }
+
+    /**
+     * One line per answer that is an error in a baseline that also has real
+     * pages, so the warning names the requests that replay an error.
+     *
+     * @param list<ReplayRequest> $requests
+     * @param list<ReplayAnswer>  $answers
+     *
+     * @return list<string>
+     */
+    public static function errorAnswers(array $requests, array $answers): array
+    {
+        $lines = [];
+        foreach ($answers as $i => $answer) {
+            $line = self::errorLine($requests[$i] ?? null, $answer);
+            if ($line !== null) {
+                $lines[] = $line;
+            }
+        }
+
+        return self::capped($lines);
+    }
+
+    /**
+     * The PHP fatal or parse error an answer's body shows ("Fatal error:
+     * Uncaught Exception: ..."), tags stripped and shortened, or null.
+     */
+    public static function phpErrorIn(string $body): ?string
+    {
+        if ($body === '' || stripos($body, 'error') === false) {
+            return null;
+        }
+        $text = html_entity_decode(strip_tags($body), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (preg_match('/\b((?:fatal|parse) error)\s*:\s*([^\r\n]*)/i', $text, $m) !== 1) {
+            return null;
+        }
+
+        return self::shorten(ucfirst(strtolower($m[1])) . ': ' . $m[2]);
+    }
+
+    /**
+     * The lines of PHP's own log that are fatal or parse errors.
+     *
+     * @param list<string> $phpErrors
+     *
+     * @return list<string>
+     */
+    public static function fatalLogLines(array $phpErrors): array
+    {
+        return array_values(array_filter($phpErrors, static fn(string $line): bool => preg_match('/\b(?:fatal|parse) error\s*:/i', $line) === 1));
+    }
+
+    private static function errorLine(?ReplayRequest $request, ReplayAnswer $answer): ?string
+    {
+        $label = $request?->label() ?? sprintf('Request %02d', $answer->number);
+        $php = self::phpErrorIn($answer->body);
+        if ($php !== null) {
+            return sprintf('%s answered %d with a PHP error: %s', $label, $answer->status, $php);
+        }
+        if ($answer->status >= 500 && $request?->expect !== $answer->status) {
+            $text = self::firstText($answer->body);
+
+            return sprintf('%s answered %d%s', $label, $answer->status, $text === '' ? '.' : ': ' . $text);
+        }
+
+        return null;
+    }
+
+    /**
+     * What an error page calls itself: its <title>, else its first line of
+     * readable text, shortened; '' for none.
+     */
+    private static function firstText(string $body): string
+    {
+        if (preg_match('//u', $body) !== 1) {
+            return '';
+        }
+        if (preg_match('#<title[^>]*>(.*?)</title>#is', $body, $m) === 1 && trim(strip_tags($m[1])) !== '') {
+            return self::shorten(html_entity_decode(strip_tags($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        }
+        $body = (string) preg_replace('#<(script|style)\b.*?</\1>#is', '', $body);
+        $body = (string) preg_replace('#<(?:br|/?(?:p|div|h[1-6]|li|tr|pre|body|head|html))\b[^>]*>#i', "\n", $body);
+        $text = html_entity_decode(strip_tags($body), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        foreach (preg_split('/\R/', $text) ?: [] as $line) {
+            if (trim($line) !== '') {
+                return self::shorten($line);
+            }
+        }
+
+        return '';
+    }
+
+    private static function shorten(string $text): string
+    {
+        $text = trim((string) preg_replace('/\s+/', ' ', (string) preg_replace('/[\x00-\x08\x0B-\x1F\x7F]/', '', $text)));
+
+        if (strlen($text) <= 160) {
+            return $text;
+        }
+
+        return (preg_match('/^.{0,157}/su', $text, $m) === 1 ? $m[0] : substr($text, 0, 157)) . '...';
+    }
+
+    /**
+     * @param list<string> $lines
+     *
+     * @return list<string>
+     */
+    private static function capped(array $lines): array
+    {
+        if (count($lines) <= 5) {
+            return $lines;
+        }
+
+        return [...array_slice($lines, 0, 5), sprintf('... and %d more.', count($lines) - 5)];
     }
 
     /** What to say when every recorded answer is the same redirect. */
