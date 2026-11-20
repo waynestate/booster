@@ -75,6 +75,14 @@ final readonly class ReplayNormalizer
             ['/(?<=\{)(&quot;|")sharedProps\1:\[[^\]]*\],/', ''],
             ['/<script\s+data-inertia-devtools-id\b[^>]*>[^<]*<\/script>/i', ''],
         ]],
+        // Markup CakePHP's own helpers print differently on 5 than on 4, so
+        // the CakePHP 5 hop is not failed for the framework's output
+        // (found on the CakePHP 4 skeleton, 2026-11-20): HtmlHelper's
+        // meta('icon') printed a second rel="shortcut icon" link on 4 and
+        // prints only rel="icon" on 5. The rel="icon" link is still compared.
+        'cakephp' => ['markup CakePHP 5\'s helpers print differently from CakePHP 4\'s (the extra rel="shortcut icon" link meta(\'icon\') printed on 4)', [
+            ['/<link\s+href\s*=\s*"[^"]*"\s+type\s*=\s*"image\/x-icon"\s+rel\s*=\s*"shortcut icon"\s*\/?>/i', ''],
+        ]],
     ];
 
     /**

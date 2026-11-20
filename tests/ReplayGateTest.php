@@ -100,6 +100,23 @@ final class ReplayGateTest extends TestCase
         ], array_slice($outcome->lines, 0, 7));
     }
 
+    // CAKE-7: CakePHP 5's HtmlHelper::meta('icon') drops the second rel="shortcut icon" link 4 printed.
+    public function test_the_cakephp_preset_hides_only_the_shortcut_icon_link_once_added(): void
+    {
+        $html = [['Content-Type', 'text/html']];
+        $four = '<head><link href="/favicon.ico" type="image/x-icon" rel="icon"><link href="/favicon.ico" type="image/x-icon" rel="shortcut icon"></head>';
+        $five = '<head><link href="/favicon.ico" type="image/x-icon" rel="icon"></head>';
+        $gate = $this->gate([[[200, $four, $html], [200, $four, $html]], [[200, $five, $html], [200, $five, $html]], [[200, $five, $html], [200, $five, $html]], [[200, '<head></head>', $html], [200, $five, $html]]]);
+        $gate->record('8.1');
+
+        self::assertTrue($gate->check('8.2', 'before')->failed());
+        self::assertSame('Replay: the "cakephp" normalizer is on from this step (' . \Waynestate\Booster\Replay\ReplayNormalizer::PRESETS['cakephp'][0] . ').', $gate->addPreset('cakephp'));
+        self::assertNull($gate->addPreset('cakephp'));
+        self::assertSame(ReplayOutcome::PASSED, $gate->check('8.2', 'after')->status);
+        // The rel="icon" link is still compared.
+        self::assertSame(1, $gate->check('8.3', 'gone')->differences);
+    }
+
     public function test_a_baseline_that_does_not_meet_its_expectations_is_not_usable(): void
     {
         $file = ReplayFile::fromArray(['requests' => [['path' => '/', 'expect' => 200], ['path' => '/gone']]]);
