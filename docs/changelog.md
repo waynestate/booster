@@ -11,6 +11,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Added: the plan inserts the CakePHP and Slim framework hops (cakephp-4-to-4.6, cakephp-4.6-to-5, slim-3-to-4) between the PHP hops; their engines land next.
 - Changed: framework hops name their engine (a small interface behind HopKind::Framework), the groundwork for the CakePHP and Slim hops; no behaviour change.
 - Added: `--to-cakephp` and `--to-slim` plan options pick the target framework line (a major such as `5` resolves to that line's newest release, `5.4`); the resolved line rides on the plan as `framework_target` in JSON.
 - Added: an internal runner for CakePHP's own upgrade tool (`cakephp/upgrade`, pinned to a commit), run in a container so its Rector never meets the app's or Booster's; the CakePHP hops use it.

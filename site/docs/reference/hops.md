@@ -40,6 +40,9 @@ This page lists every hop Booster knows; the list is generated from the hop data
 | `cas-to-sesame` | sesame | wayne-cas | sesame | Swap the wayne-cas package for SESAME native names: ModelUserResolver, auth.sesame, and the app's own ReadOnlyAttributes. |
 | `wayneui-1-to-2` | wayneui | 1 | 2 | Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. |
 | `vendored-to-composer` | framework | hand-copied | composer | Move hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto their maintained Composer releases (doctrine/orm 2.20, smarty/smarty 4.5, slim/slim 4 through a Slim 1 bridge). |
+| `cakephp-4-to-4.6` | framework | 4 | 4.6 | Move a CakePHP 4 app to the last 4.x release (4.6) with CakePHP's own upgrade rules, so every deprecation is flagged before the jump to 5. |
+| `cakephp-4.6-to-5` | framework | 4.6 | 5.4 | Move a CakePHP 4.6 app to CakePHP 5.4 with CakePHP's own upgrade rules: AuthComponent moves to the Authentication plugin and .ctp templates become .php. |
+| `slim-3-to-4` | framework | 3 | 4.15 | Move a Slim 3 app to Slim 4.15: the app factory, PSR-7 through slim/psr7, Slim's ErrorMiddleware, and a double-pass adapter so the app's middleware keeps working. |
 | `session-strict-mode` | session | off | strict | Turn on strict session IDs in a raw PHP app: set session.use_strict_mode and session.use_only_cookies before each session_start() call. |
 | `node-pin-24` | node | any | 26 | Pin the app to Node 26: set engines.node in package.json and write .nvmrc. |
 | `mix-to-vite` | node | laravel-mix | vite | Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). |
