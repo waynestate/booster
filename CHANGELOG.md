@@ -16,6 +16,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - Added: the strangler's Step 0 check accepts the sign-in hand-off it moves to CAS on the request paths it names (a redirect before, a redirect to sign-in now, nothing else changed), lists each in the report, and compares every other request as always.
 - Added: `ReplayFile::usableForStrangler()`, the strangler's check that the app has a usable replay (a file with no todo items, and a baseline that is not one redirect everywhere or all errors).
 - Changed: the `csrf` preset also hides CakePHP's `csrfToken` meta tag and meta tags that put `content` before `name`.
+- Added: the strangler mount (`Waynestate\Booster\Strangler\Mount`, the first step of slim-to-laravel and cakephp-to-laravel). Sourdough 0.4.2 bakes the Laravel half at the root in the gate image, the old Composer root moves unchanged to `legacy/` (from the root or a `src/` folder), and a framework-free `public/index.php` sends each request to exactly one half: `/_laravel/`, `/build/` and the moved routes in `bootstrap/booster-moved.php` (the new `RouteTable`) to Laravel, everything else to the legacy front controller or its static files, with the server variables it saw before. One `composer install` installs both roots. The mount points `booster-replay.json` at the dispatcher (the recording stays valid for `replay check --serve-changed`), maps `.env.example`, and lists the Citadel public directory, config file paths and leftover `.htaccess` lines as MANUAL.
 
 ## [1.20.0] - 2026-11-20
 
