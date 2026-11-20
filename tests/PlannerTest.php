@@ -1070,14 +1070,14 @@ final class PlannerTest extends TestCase
 
     public function test_a_cakephp_43_app_stays_on_the_php_its_line_runs_on(): void
     {
-        // PHP 7.3 is below what CakePHP 4.6 runs on, so the 4.6 hop waits
-        // for a later plan and PHP climbs only to the 4.3 line's ceiling.
-        $plan = $this->frameworkPlan('cakephp', '4.3', '7.3', '8.5');
+        // With the 4.6 hop skipped, PHP climbs only to the 4.3 line's ceiling
+        // and holds there. (Without --skip the hop is deferred to PHP 7.4; see
+        // test_cakephp_43_on_73_plans_php_74_then_the_4_6_hop.)
+        $plan = $this->frameworkPlan('cakephp', '4.3', '7.3', options: new PlanOptions(toPhp: '8.5', skip: [HopRegistry::CAKEPHP_4_TO_46_ID]));
 
         self::assertSame(['php-73-to-74', 'php-74-to-80', 'php-80-to-81'], $this->ids($plan));
         self::assertTrue($plan->stopsEarly);
         self::assertSame([
-            'CakePHP 4.6 does not run on PHP 7.3; move PHP first.',
             'CakePHP 4.3 runs on PHP 7.2 to 8.1, so PHP stays at 8.1 until the cakephp-4-to-4.6 hop runs; see docs/guides/framework-hops.md.',
         ], $plan->warnings);
     }
@@ -1497,5 +1497,68 @@ final class PlannerTest extends TestCase
         self::assertSame('5.4', $line);
         $array = $plan->steps[1]->toArray();
         self::assertSame(['4.6', '4.6'], [$array['framework_before'], $array['framework_after']]);
+    }
+
+    public function test_cakephp_43_on_73_plans_php_74_then_the_4_6_hop(): void
+    {
+        // CakePHP 4.6 needs PHP 7.4, and 4.3 runs up to 8.1, so the hop is
+        // deferred until the PHP hop that lands on 7.4, not dropped.
+        $plan = $this->frameworkPlan('cakephp', '4.3', '7.3', '8.5');
+
+        self::assertSame([
+            'php-73-to-74 7.3>7.4 4.3>4.3',
+            'cakephp-4-to-4.6 7.4>7.4 4.3>4.6',
+        ], array_slice($this->frameworkCourse($plan), 0, 2));
+        self::assertSame('php-74-to-80 7.4>8.0 4.6>4.6', $this->frameworkCourse($plan)[2]);
+        foreach ($plan->warnings as $warning) {
+            self::assertStringNotContainsString('move PHP first', $warning);
+            self::assertStringNotContainsString('PHP stays at', $warning);
+        }
+    }
+
+    public function test_cakephp_43_on_73_reaches_5_4_and_php_8_5(): void
+    {
+        $plan = $this->frameworkPlan('cakephp', '4.3', '7.3', '8.5');
+
+        self::assertSame([
+            'php-73-to-74 7.3>7.4 4.3>4.3',
+            'cakephp-4-to-4.6 7.4>7.4 4.3>4.6',
+            'php-74-to-80 7.4>8.0 4.6>4.6',
+            'php-80-to-81 8.0>8.1 4.6>4.6',
+            'php-81-to-82 8.1>8.2 4.6>4.6',
+            'cakephp-4.6-to-5 8.2>8.2 4.6>5.4',
+            'php-82-to-83 8.2>8.3 5.4>5.4',
+            'php-83-to-84 8.3>8.4 5.4>5.4',
+            'php-84-to-85 8.4>8.5 5.4>5.4',
+        ], $this->frameworkCourse($plan));
+        self::assertSame('5.4', $plan->frameworkTarget);
+        self::assertFalse($plan->stopsEarly);
+        self::assertSame([], $plan->warnings);
+    }
+
+    public function test_cakephp_hop_is_still_dropped_when_target_php_is_below_7_4(): void
+    {
+        // The plan ends on PHP 7.3, below the 4.6 floor: no deferral, the
+        // hop is left out with the old warning.
+        $plan = $this->frameworkPlan('cakephp', '4.3', '7.2', '7.3');
+
+        self::assertSame(['php-72-to-73'], $this->ids($plan));
+        self::assertNotContains(HopRegistry::CAKEPHP_4_TO_46_ID, $this->ids($plan));
+        self::assertContains('CakePHP 4.6 does not run on PHP 7.2; move PHP first.', $plan->warnings);
+        self::assertSame('4.3', $plan->steps[0]->frameworkAfter);
+    }
+
+    public function test_cakephp_4_6_hop_deferred_still_respects_skip(): void
+    {
+        $plan = $this->frameworkPlan('cakephp', '4.3', '7.3', options: new PlanOptions(toPhp: '8.5', skip: [HopRegistry::CAKEPHP_4_TO_46_ID]));
+
+        self::assertNotContains(HopRegistry::CAKEPHP_4_TO_46_ID, $this->ids($plan));
+        self::assertNotContains(HopRegistry::CAKEPHP_46_TO_5_ID, $this->ids($plan));
+        self::assertSame('php-80-to-81', $this->ids($plan)[count($plan->steps) - 1]);
+        foreach ($plan->steps as $step) {
+            self::assertSame('4.3', $step->frameworkAfter, $step->hop->id);
+        }
+        self::assertTrue($plan->stopsEarly);
+        self::assertNotContains('CakePHP 4.6 does not run on PHP 7.3; move PHP first.', $plan->warnings);
     }
 }
