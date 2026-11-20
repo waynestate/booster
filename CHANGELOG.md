@@ -4,6 +4,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Fixed: a CakePHP 4 app on PHPUnit 9 keeps PHPUnit 9 until the CakePHP 5 step, which moves it to PHPUnit 11.5 with CakePHP (CakePHP 4's TestCase cannot load on PHPUnit 10, so the phpunit-9-to-10 step failed every such app); a plan that stays on CakePHP 4 says why PHPUnit stays (CAKE-2).
 - Fixed: the CakePHP rule sets no longer die on PHP 8.4 and later while loading a CakePHP 4 app: Rector reads the app's classes through Composer's class maps only (the image's app-autoload.php), so the app's own files autoloads, such as Chronos 2 on PHP 8.5, never run (CAKE-1).
 - Fixed: the Slim 3 to 4 hop runs on PHP 7.4 (slim/psr7 ^1.6, glue files in PHP 7.4 syntax) and moves apps typed with Slim 3's request and response classes onto slim/http.
 - Fixed: the undo hint after a failed step says it undoes the whole run and gives paths relative to the app folder; the Slim 4 message no longer claims Booster has no Slim hop.

@@ -66,6 +66,9 @@ final class HopRegistry
     /** The CakePHP hop from 4.6 to 5.4. */
     public const CAKEPHP_46_TO_5_ID = 'cakephp-4.6-to-5';
 
+    /** The PHPUnit the CakePHP 5 hop moves a PHPUnit 9 app to (CakePHP 5.4's test suite needs 11.5). */
+    public const CAKEPHP_5_PHPUNIT = '^11.5';
+
     /** The Slim hop from any 3.x line to 4.15. */
     public const SLIM_3_TO_4_ID = 'slim-3-to-4';
 
@@ -1067,7 +1070,9 @@ final class HopRegistry
             summary: 'Move a CakePHP 4.6 app to CakePHP 5.4 with CakePHP\'s own upgrade rules: AuthComponent moves to the Authentication plugin and .ctp templates become .php.',
             rectorSets: ['cakephp50', 'cakephp51', 'cakephp52', 'cakephp53', 'cakephp54', 'chronos3', 'migrations50'],
             composerSet: ['cakephp/cakephp' => '^5.4'],
-            composerSetIfPresent: $this->frameworkCompanionPins('cakephp', '5.4'),
+            // CakePHP 4 tests stop at PHPUnit 9 and CakePHP 5.4's need 11, so
+            // PHPUnit moves in this step's update (the planner counts it).
+            composerSetIfPresent: [...$this->frameworkCompanionPins('cakephp', '5.4'), 'phpunit/phpunit' => self::CAKEPHP_5_PHPUNIT],
             notes: [
                 'AuthComponent moves to the Authentication plugin like for like: the same login form, the same session, the same user lookup.',
                 'MANUAL: isAuthorized(), the authorize setting, loginRedirect, logoutRedirect and custom authenticators stay as they are; move them to the Authorization and Authentication plugins by hand.',
