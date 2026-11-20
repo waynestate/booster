@@ -1390,9 +1390,8 @@ final class HopExecutor
         // CakePHP 5's helpers print some markup differently; the preset hides only that.
         $presetLine = $step->hop->id === HopRegistry::CAKEPHP_46_TO_5_ID ? $this->replayGate->addPreset('cakephp') : null;
         try {
-            // Only Step 0 passes sign-in changes; REPLAY's ReplayGate::check takes them as signInChanges (merge: a named argument).
-            $extra = $signInChanges === [] ? [] : [false, false, $signInChanges];
-            $outcome = $this->replayGate->check($php, sprintf('step-%d-%s-php%s', $step->number, $step->hop->id, $php), ...$extra);
+            // Only Step 0 passes sign-in changes: the hand-off to sign-in it moved onto SESAME on purpose.
+            $outcome = $this->replayGate->check($php, sprintf('step-%d-%s-php%s', $step->number, $step->hop->id, $php), signInChanges: $signInChanges);
         } catch (ToolError $e) {
             return new GateReport(false, [...$gate->lines, 'Replay could not run: ' . $e->getMessage(), $this->undoHint($path)]);
         }
@@ -2003,7 +2002,8 @@ final class HopExecutor
         };
         $strangler = new StranglerStep(
             $this->stranglerParts ?? new UnwiredStranglerParts(),
-            fn(array $signInChanges): GateReport => $options->skipGate ? new GateReport(true, ['Gate skipped.']) : $this->runGate($step, $path, $options, $baseline, $changedPackages(), $signInChanges),
+            // Step 0 rewrites serve.env in the request file (SESAME's replay settings), so its gate reads the file again, as the mount's does.
+            fn(array $signInChanges): GateReport => $options->skipGate ? new GateReport(true, ['Gate skipped.']) : $this->stranglerGate($step, $path, $options, $baseline, true, $changedPackages(), $signInChanges),
             fn(bool $serveChanged): GateReport => $options->skipGate ? new GateReport(true, ['Gate skipped.']) : $this->stranglerGate($step, $path, $options, $baseline, $serveChanged, $serveChanged ? [] : $changedPackages()),
             $dirty,
             fn(): array|string => $this->laravelRouteList($path, $step->phpAfter ?? '', $options),
@@ -2022,15 +2022,25 @@ final class HopExecutor
      * run's baseline. $serveChanged is the mount's and the finish's: the
      * baseline was served another way, and the transcript names the change.
      *
+     * Step 0 passes $signInChanges (SignInResult->replayChanges): it runs
+     * before the mount, so the gate is the app's own (its tests, or the
+     * syntax check), and the replay reads the request file Step 0 rewrote
+     * (serve.env), accepting the sign-in hand-off it moved on purpose.
+     *
      * @param list<string> $update
+     * @param list<string> $signInChanges
      */
-    private function stranglerGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, bool $serveChanged, array $update): GateReport
+    private function stranglerGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, bool $serveChanged, array $update, ?array $signInChanges = null): GateReport
     {
-        $test = self::STRANGLER_SYNTAX_COMMAND;
-        if (is_dir($path . '/legacy') && ($options->testCommand !== null || $baseline->gateKind === BaselineResult::GATE_TESTS)) {
-            $test .= ' && (cd legacy && ' . ($options->testCommand ?? $this->defaultTestCommand($path . '/legacy')) . ')';
+        if ($signInChanges !== null) {
+            $gate = $this->runTestGate($step, $path, $options, $baseline, $update);
+        } else {
+            $test = self::STRANGLER_SYNTAX_COMMAND;
+            if (is_dir($path . '/legacy') && ($options->testCommand !== null || $baseline->gateKind === BaselineResult::GATE_TESTS)) {
+                $test .= ' && (cd legacy && ' . ($options->testCommand ?? $this->defaultTestCommand($path . '/legacy')) . ')';
+            }
+            $gate = $this->runTestGateWith($step, $path, $options, $baseline, $update, $test);
         }
-        $gate = $this->runTestGateWith($step, $path, $options, $baseline, $update, $test);
         if (!$gate->passed) {
             return $gate;
         }
@@ -2044,7 +2054,7 @@ final class HopExecutor
             $file = ReplayFile::load($options->replay->path);
             $replay = new ReplayGate($this->replayRunnerUsed, $file, $path, $this->replayOutDir, $options->gateImage);
             $replay->useRecording($recording, $file->path, $serveChanged);
-            $outcome = $replay->check($php, sprintf('step-%d-%s-php%s', $step->number, $step->hop->id, $php), false, $serveChanged);
+            $outcome = $replay->check($php, sprintf('step-%d-%s-php%s', $step->number, $step->hop->id, $php), serveChanged: $serveChanged, signInChanges: $signInChanges ?? []);
         } catch (ToolError $e) {
             return new GateReport(false, [...$gate->lines, 'Replay could not run: ' . $e->getMessage(), $this->undoHint($path)]);
         }

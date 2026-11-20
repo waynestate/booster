@@ -34,7 +34,9 @@ use Waynestate\Booster\Run\RunOptions;
 use Waynestate\Booster\Run\RunReport;
 use Waynestate\Booster\Run\Slim\SlimUpgradeMigration;
 use Waynestate\Booster\Run\StepResult;
+use Waynestate\Booster\Run\Strangler\LaneStranglerParts;
 use Waynestate\Booster\Run\TargetImageRunner;
+use Waynestate\Booster\Strangler\MountSourdough;
 use Waynestate\Booster\ToolError;
 
 final class RunCommand extends BaseCommand
@@ -151,15 +153,18 @@ final class RunCommand extends BaseCommand
         $registry = $this->planRegistry ?? new HopRegistry();
         // The download caches are opt-in: unset, every gate starts empty, as before.
         $composerEditor = new ComposerEditor();
+        $targetImage = new TargetImageRunner($this->processes, composerCache: CacheMount::fromEnvironment(CacheMount::COMPOSER));
         $executor = new HopExecutor(
             new RectorRunner($this->processes),
             $composerEditor,
-            new TargetImageRunner($this->processes, composerCache: CacheMount::fromEnvironment(CacheMount::COMPOSER)),
+            $targetImage,
             $this->processes,
             new NodeRunner($this->processes, (int) $registry->nodePinTarget(), npmCache: CacheMount::fromEnvironment(CacheMount::NPM)),
             $registry,
             new ProctorRunner($this->processes),
             frameworkEngines: self::frameworkEngines($this->processes, $composerEditor),
+            // The strangler's real parts: Step 0 and the Laravel half's sign-in, the mount (Sourdough in the gate image), the route table, the Slim and CakePHP movers.
+            stranglerParts: new LaneStranglerParts(new MountSourdough($targetImage)),
         );
         // The prompt only makes sense where a person is watching: text output on an interactive terminal. JSON and
         // --no-interaction runs stop at the threshold instead of asking nobody.
