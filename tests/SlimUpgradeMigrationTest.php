@@ -788,4 +788,26 @@ final class SlimUpgradeMigrationTest extends TestCase
         self::assertSame($page, file_get_contents($dir . '/src/Controller/Page.php'));
         self::assertSame([], array_values(array_filter($again->changes, static fn(string $line): bool => str_contains($line, 'Page.php'))));
     }
+
+    public function test_twig_names_move_when_the_hop_moves_twig(): void
+    {
+        // Bug S8 (testeval): Twig 3 has no underscore names, and Twig-View 3's
+        // constructor takes a loader.
+        $core = "<?php\n\nreturn ['view' => function (\$c) {\n    \$view = new Slim\\Views\\Twig('templates', []);\n    \$view->addExtension(new Twig_Extension_Debug());\n\n    return \$view;\n}];\n";
+        $files = ['src/core.php' => $core, 'scripts/mail.php' => "<?php\n\n\$t = new Twig_Environment();\n"];
+        $dir = $this->slimApp(['composer.json' => self::composerJson(['slim/twig-view' => '^2.5']), ...$files]);
+
+        $result = $this->migrateApp($dir);
+
+        $moved = (string) file_get_contents($dir . '/src/core.php');
+        self::assertStringContainsString("\$view = Slim\\Views\\Twig::create('templates', []);", $moved);
+        self::assertStringContainsString('new \\Twig\\Extension\\DebugExtension()', $moved);
+        self::assertContains("Rewrote Twig 1 and 2's underscore class names and new Slim\\Views\\Twig(...) to Twig 3's namespaced classes and Twig::create(...) in src/core.php (2 times).", $result->changes);
+        self::assertSame($files['scripts/mail.php'], file_get_contents($dir . '/scripts/mail.php'), 'scripts/ is outside the folders the hop reads');
+
+        // An app that keeps no Twig is left alone.
+        $plain = $this->slimApp($files);
+        $this->migrateApp($plain);
+        self::assertSame($core, file_get_contents($plain . '/src/core.php'));
+    }
 }

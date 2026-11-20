@@ -139,6 +139,10 @@ the PHP hop that lands on 7.4), then the PHP hops to 8.5. `--to-slim 3.13` is re
   bare name through an alias), and container-interop's `Interop\Container\ContainerInterface`, which Slim 4 no
   longer installs, becomes PSR-11's `Psr\Container\ContainerInterface`. `LegacyApp::create()` also takes a container
   the app built first.
+- When the app lists Twig-View or Twig, Twig 1 and 2's underscore class names (`Twig_Environment`,
+  `Twig_SimpleFilter`, `\Twig_Extension`), which Twig 3 removed, become the namespaced classes, and
+  `new Slim\Views\Twig($path, $settings)` becomes Twig-View 3's `Slim\Views\Twig::create($path, $settings)`. The
+  name map is Rector's own Twig set, read from the Rector Booster ships.
 - The glue is written in PHP 7.4 syntax, because the hop runs on PHP 7.4.
 - `composer.json` gets `slim/slim ^4.15`, `pimple/pimple ^3` and `slim/psr7 ^1.6` (the line that still installs on
   PHP 7.4), `slim/http ^1.3` (always: the container's request and response are its decorators, so `withJson()`,
@@ -154,7 +158,7 @@ the PHP hop that lands on 7.4), then the PHP hops to 8.5. `--to-slim 3.13` is re
   call `path_for(` or `base_url(` (Twig-View 3 has `url_for`).
 - `getAttribute('routeInfo')`, `subRequest()`, `setArgument()` calls to check, the container's `router` entry, and
   code in outer middleware that reads the route before routing ran.
-- `Slim\Container` imported in a group `use`
+- A Twig underscore class name Rector's map does not know, and `Slim\Container` imported in a group `use`
   statement (import the generated `LegacyContainer` by hand).
 - `Slim\Http\Environment` imported in a group `use` statement (import the generated `LegacyEnvironment` by hand), and
   Slim 3's `Headers`, `Body`, `RequestBody`, `Stream`, `UploadedFile` and `Cookies` classes or `new Request(...)`, which

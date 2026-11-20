@@ -57,6 +57,8 @@ final class SlimUpgradeMigration implements FrameworkEngine
     public const SLIM3_ONLY_NOTE = "Slim 3's Slim\\Http Headers, Body, RequestBody, Stream, UploadedFile and Cookies classes, and its Request"
         . ' constructor, have no Slim 4 form; build these with Slim\\Psr7 or the PSR-17 factories (the generated LegacyHttp shows how).';
 
+    public const TWIG_NAMES_NOTE = "a Twig 1 or 2 underscore class name Booster has no Twig 3 name for (Twig 3 removed them); use the namespaced class from Twig's documentation.";
+
     public const TWIG_NOTE = 'Twig-View 3 has no path_for; use url_for from the Twig-View runtime extension';
 
     /**
@@ -79,7 +81,10 @@ final class SlimUpgradeMigration implements FrameworkEngine
         'Removed' => 'remove', 'Wrapped' => 'wrap', 'Widened' => 'widen',
     ];
 
-    public function __construct(private readonly ComposerEditor $composer) {}
+    /**
+     * @param array<string, string>|null $twigNames lower-case Twig underscore name to namespaced class; Rector's Twig set when null
+     */
+    public function __construct(private readonly ComposerEditor $composer, private readonly ?array $twigNames = null) {}
 
     public function migrate(string $appPath, bool $dryRun, string $php, ?Hop $hop = null): VendoredMigrationResult
     {
@@ -258,6 +263,40 @@ final class SlimUpgradeMigration implements FrameworkEngine
                     implode(', ', $result['environment']),
                     self::ENVIRONMENT_NOTE,
                 );
+            }
+        }
+
+        // 5b. Twig 1 and 2's underscore class names and Twig-View 2's
+        // constructor, when the hop moves Twig-View and Twig to 3.
+        $twig = false;
+        foreach (['require', 'require-dev'] as $section) {
+            $twig = $twig || isset($composerData[$section]['slim/twig-view']) || isset($composerData[$section]['twig/twig']);
+        }
+        if ($twig) {
+            $twigRewriter = new TwigNameRewriter($this->twigNames);
+            foreach (array_keys($sources) as $file) {
+                if (!in_array($file, $bootstraps, true) && !in_array(explode('/', $file)[0], self::HTTP_DIRS, true)) {
+                    continue;
+                }
+                $current = $after[$file] ?? $sources[$file];
+                if (!str_contains(strtolower($current), 'twig')) {
+                    continue;
+                }
+                $result = $twigRewriter->rewrite($current);
+                if ($result['code'] !== $current) {
+                    $before[$file] ??= $sources[$file];
+                    $after[$file] = $result['code'];
+                    $changes[] = self::inFile("Rewrote Twig 1 and 2's underscore class names and new Slim\\Views\\Twig(...) to Twig 3's namespaced classes and Twig::create(...).", $file, $result['renamed']);
+                }
+                if ($result['unknown'] !== []) {
+                    $manual[] = sprintf(
+                        'MANUAL: %s: %s %s: %s',
+                        $file,
+                        count($result['unknown']) === 1 ? 'line' : 'lines',
+                        implode(', ', $result['unknown']),
+                        self::TWIG_NAMES_NOTE,
+                    );
+                }
             }
         }
 
