@@ -165,6 +165,19 @@ final class SkeletonRewriter
             $code = str_replace(["'_cake_core_'", '"_cake_core_"', '._cake_core_.'], ["'_cake_translations_'", '"_cake_translations_"', '._cake_translations_.'], $code, $renamed);
             $changes += $renamed;
         }
+        // CAKE-9: the 4.4 skeleton names Cake\Error\ExceptionRenderer as the
+        // exceptionRenderer; CakePHP 5 removed that class, so ExceptionTrap
+        // warns and every error page (a 404 included) became an empty 200.
+        // The web renderer is the class 5 uses when none is named.
+        $web = 'Cake\\\\Error\\\\Renderer\\\\WebExceptionRenderer';
+        $code = (string) preg_replace('/^(\s*use\s+\\\\?)Cake\\\\Error\\\\ExceptionRenderer\s*;/m', '${1}' . $web . ';', $code, -1, $imported);
+        $changes += $imported;
+        if ($imported > 0) {
+            $code = (string) preg_replace('/(?<![\\\\\w$])ExceptionRenderer::class/', 'WebExceptionRenderer::class', $code, -1, $count);
+            $changes += $count;
+        }
+        $code = (string) preg_replace('/(\\\\?)Cake\\\\Error\\\\ExceptionRenderer(?=::class|[\'"])/', '${1}' . $web, $code, -1, $qualified);
+        $changes += $qualified;
 
         return ['code' => $code, 'changes' => $changes];
     }

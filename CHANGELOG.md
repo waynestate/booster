@@ -4,6 +4,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- The CakePHP 5 step names CakeErrorRendererWebExceptionRenderer where config/app.php named the removed CakeErrorExceptionRenderer; on 5 every error page, a 404 included, had become an empty 200 (CAKE-9).
 - The CakePHP 5 step moves friendsofcake/bootstrap-ui (^5.1), friendsofcake/cakephp-csvview (^5.0) and cakephp/cakephp-codesniffer (^5.2) when the app has them; their CakePHP 4 majors stopped composer update on a fleet app (CAKE-8).
 - Fixed: the replay gate no longer fails the CakePHP 5 step on markup CakePHP's own helpers print differently on 5: a new `cakephp` normalizer preset (the extra rel="shortcut icon" link CakePHP 4's meta('icon') printed) is switched on from that step, and the step report says so (CAKE-7).
 - Fixed: a green PHPUnit 12 or 13 suite is no longer failed by phpunit.xml's <ini> for an extension the gate image does not load (the CakePHP skeleton's apc.enable_cli): when every PHPUnit warning is such a setting, PHP in the gate does not know it at all and the app asks for no failOn rule, the step passes with a note that names the setting (CAKE-6).

@@ -127,6 +127,25 @@ final class CakeSkeletonRewriterTest extends TestCase
         $this->assertSame(0, $kept['changes']);
     }
 
+    // CAKE-9: attendance's 404 became an empty 200 on 5, because the class it named as exceptionRenderer is gone.
+    public function test_config_names_the_web_exception_renderer(): void
+    {
+        $code = "<?php\nuse Cake\\Cache\\Engine\\FileEngine;\nuse Cake\\Error\\ExceptionRenderer;\n\nreturn [\n    'Error' => [\n        'exceptionRenderer' => ExceptionRenderer::class,\n    ],\n    'Other' => \\My\\ExceptionRenderer::class,\n];\n";
+        $result = (new SkeletonRewriter())->config($code, false);
+
+        $this->assertSame(2, $result['changes']);
+        $this->assertStringContainsString("use Cake\\Error\\Renderer\\WebExceptionRenderer;\n", $result['code']);
+        $this->assertStringContainsString("'exceptionRenderer' => WebExceptionRenderer::class,", $result['code']);
+        $this->assertStringContainsString("\\My\\ExceptionRenderer::class", $result['code']);
+
+        $qualified = (new SkeletonRewriter())->config("'exceptionRenderer' => \\Cake\\Error\\ExceptionRenderer::class, 'x' => 'Cake\\Error\\ExceptionRenderer',", false);
+        $this->assertSame(2, $qualified['changes']);
+        $this->assertSame("'exceptionRenderer' => \\Cake\\Error\\Renderer\\WebExceptionRenderer::class, 'x' => 'Cake\\Error\\Renderer\\WebExceptionRenderer',", $qualified['code']);
+
+        $custom = "use App\\Error\\ExceptionRenderer;\n'exceptionRenderer' => ExceptionRenderer::class,";
+        $this->assertSame(0, (new SkeletonRewriter())->config($custom, false)['changes']);
+    }
+
     public function test_template_connects_through_the_driver(): void
     {
         $code = "<?php\ntry {\n    \$connection = ConnectionManager::get('default');\n    \$connected = \$connection->connect();\n} catch (Exception \$e) {}\n\$other = ConnectionManager::get('test')->connect();\n\$settings = Cache::getConfig('_cake_core_');\n";

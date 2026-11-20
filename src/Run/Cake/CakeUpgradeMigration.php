@@ -363,7 +363,7 @@ final class CakeUpgradeMigration implements FrameworkEngine
             }
         }
         if ($edited > 0) {
-            $changes[] = sprintf("Moved %d CakePHP 4 config and template %s to CakePHP 5 (log 'scopes' => null, the _cake_translations_ cache, Connection::getDriver()->connect()).", $edited, $edited === 1 ? 'line' : 'lines');
+            $changes[] = sprintf("Moved %d CakePHP 4 config and template %s to CakePHP 5 (log 'scopes' => null, the _cake_translations_ cache, Connection::getDriver()->connect(), WebExceptionRenderer).", $edited, $edited === 1 ? 'line' : 'lines');
         }
 
         // RequestHandlerComponent: drop the loads when nothing reads the component.
