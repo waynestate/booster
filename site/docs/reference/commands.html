@@ -171,7 +171,7 @@
 </table></div>
 <h3 id="booster-plan"><span class="docs-heading-tail"><code>booster plan</code><a class="docs-heading-link" aria-label="Link to this section" href="#booster-plan">#</a></span></h3>
 <p>Show the ordered hops from the app to a supported version. Changes nothing.</p>
-<p>Usage: <code>booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--node NODE] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--no-scan]</code></p>
+<p>Usage: <code>booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--to-cakephp TO-CAKEPHP] [--to-slim TO-SLIM] [--with-node] [--node NODE] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--no-scan]</code></p>
 <div class="docs-table" role="region" aria-label="Table" tabindex="0"><table>
 <thead>
 <tr>
@@ -229,6 +229,16 @@
 <tr>
 <td><code>--to-phpunit=VALUE</code></td>
 <td>Target PHPUnit major (default: the newest that runs on the target PHP).</td>
+<td></td>
+</tr>
+<tr>
+<td><code>--to-cakephp=VALUE</code></td>
+<td>Target CakePHP line (default: the newest Booster supports, 5.4).</td>
+<td></td>
+</tr>
+<tr>
+<td><code>--to-slim=VALUE</code></td>
+<td>Target Slim line (default: the newest Booster supports, 4.15).</td>
 <td></td>
 </tr>
 <tr>
@@ -380,7 +390,7 @@
 </table></div>
 <h3 id="booster-run"><span class="docs-heading-tail"><code>booster run</code><a class="docs-heading-link" aria-label="Link to this section" href="#booster-run">#</a></span></h3>
 <p>Run the plan: Rector, composer.json edits and a test gate per hop. Edits the working copy only.</p>
-<p>Usage: <code>booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--with-node] [--node NODE] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory] [--replay [REPLAY]] [--replay-out REPLAY-OUT]</code></p>
+<p>Usage: <code>booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--to-cakephp TO-CAKEPHP] [--to-slim TO-SLIM] [--with-node] [--node NODE] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory] [--replay [REPLAY]] [--replay-out REPLAY-OUT]</code></p>
 <div class="docs-table" role="region" aria-label="Table" tabindex="0"><table>
 <thead>
 <tr>
@@ -438,6 +448,16 @@
 <tr>
 <td><code>--to-phpunit=VALUE</code></td>
 <td>Target PHPUnit major (default: the newest that runs on the target PHP).</td>
+<td></td>
+</tr>
+<tr>
+<td><code>--to-cakephp=VALUE</code></td>
+<td>Target CakePHP line (default: the newest Booster supports, 5.4).</td>
+<td></td>
+</tr>
+<tr>
+<td><code>--to-slim=VALUE</code></td>
+<td>Target Slim line (default: the newest Booster supports, 4.15).</td>
 <td></td>
 </tr>
 <tr>

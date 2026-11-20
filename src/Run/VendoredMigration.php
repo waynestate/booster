@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Run;
 
+use Waynestate\Booster\Hop\Hop;
 use Waynestate\Booster\Packaging\PharFiles;
 use Waynestate\Booster\Scan\VendoredLibraries;
 use Waynestate\Booster\Scan\VendoredLibrary;
@@ -24,7 +25,7 @@ use Waynestate\Booster\ToolError;
  * and changes nothing. Guessing is how a framework move breaks production on
  * a Friday afternoon, and Booster would rather sulk than guess.
  */
-final class VendoredMigration
+final class VendoredMigration implements FrameworkEngine
 {
     /** Where the Slim 1 bridge lands, at the app root, loaded by Composer's classmap. */
     public const BRIDGE_FILE = 'slim1-bridge.php';
@@ -109,9 +110,10 @@ final class VendoredMigration
     /**
      * Moves the hand-copied libraries to Composer. $php is the PHP the hop
      * lands on; a new composer.json asks for it the way the PHP hops do.
-     * A dry run or a refusal writes nothing.
+     * A dry run or a refusal writes nothing. The hop is accepted for the
+     * FrameworkEngine contract and not read: this engine has one hop.
      */
-    public function migrate(string $appPath, bool $dryRun, string $php): VendoredMigrationResult
+    public function migrate(string $appPath, bool $dryRun, string $php, ?Hop $hop = null): VendoredMigrationResult
     {
         $appPath = rtrim($appPath, '/\\');
         $work = $this->work($appPath);

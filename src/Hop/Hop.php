@@ -25,6 +25,7 @@ final readonly class Hop
      * @param list<string>          $npmRemove            packages to drop from dependencies and devDependencies
      * @param bool                  $pinNode              also write .nvmrc with the hop's target version
      * @param list<string>          $aliasOf              hop ids this manual hop stands in for
+     * @param EngineId|null         $engine               the engine a framework hop runs through; null for every other hop
      */
     public function __construct(
         public string $id,
@@ -46,6 +47,7 @@ final readonly class Hop
         public array $npmRemove = [],
         public bool $pinNode = false,
         public array $aliasOf = [],
+        public ?EngineId $engine = null,
     ) {}
 
     /**
@@ -86,6 +88,9 @@ final readonly class Hop
         ];
         if ($this->aliasOf !== []) {
             $array['alias_of'] = $this->aliasOf;
+        }
+        if ($this->engine !== null) {
+            $array['engine'] = $this->engine->value;
         }
 
         return $array;

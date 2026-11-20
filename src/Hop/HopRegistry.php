@@ -1009,6 +1009,7 @@ final class HopRegistry
                 'https://www.doctrine-project.org/projects/doctrine-orm/en/2.20/index.html',
                 'https://www.slimframework.com/docs/v4/',
             ],
+            engine: EngineId::Vendored,
         );
     }
 

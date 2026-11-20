@@ -8,6 +8,7 @@ use Composer\Semver\Semver;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use Waynestate\Booster\Hop\EngineId;
 use Waynestate\Booster\Hop\Hop;
 use Waynestate\Booster\Hop\HopKind;
 use Waynestate\Booster\Hop\HopRegistry;
@@ -65,6 +66,13 @@ final class HopExecutor
         private readonly ?ReplayRunner $replayRunner = null,
         private readonly VendoredMigration $vendoredMigration = new VendoredMigration(),
         private readonly StrictSession $strictSession = new StrictSession(),
+        /**
+         * The framework engines by EngineId value. EngineId::Vendored falls
+         * back to $vendoredMigration when the map has no entry for it.
+         *
+         * @var array<string, FrameworkEngine>
+         */
+        private readonly array $frameworkEngines = [],
     ) {}
 
     /** The replay gate for this run, once its baseline is recorded (--replay). */
@@ -1753,19 +1761,28 @@ final class HopExecutor
     }
 
     /**
-     * The vendored-to-composer hop. VendoredMigration does the work: the
-     * hand copies leave vendor/, composer.json asks for the maintained
-     * releases, and the require lines load Composer's autoloader. The gate
-     * then installs them on the hop's PHP (an app with no lock gets its first
-     * composer.lock from that install) and runs the app's tests or the syntax
-     * check; with --replay the replay proves the pages answer the same.
+     * A framework hop. The engine the hop names does the work (a hop built
+     * without one runs VendoredMigration, the vendored-to-composer engine:
+     * the hand copies leave vendor/, composer.json asks for the maintained
+     * releases, and the require lines load Composer's autoloader). The gate
+     * then installs the packages on the hop's PHP (an app with no lock gets
+     * its first composer.lock from that install) and runs the app's tests or
+     * the syntax check; with --replay the replay proves the pages answer the
+     * same.
      */
     private function runFrameworkHop(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline): StepResult
     {
         $hop = $step->hop;
+        $engineId = $hop->engine ?? EngineId::Vendored;
+        $engine = $this->frameworkEngine($engineId);
+        if ($engine === null) {
+            return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [
+                sprintf('No engine is registered for the %s hop engine, so nothing changed.', $engineId->value),
+            ]);
+        }
         $php = $step->phpAfter ?? $step->phpBefore ?? '';
         $hadLock = is_file($path . '/composer.lock');
-        $migration = $this->vendoredMigration->migrate($path, $options->dryRun, $php);
+        $migration = $engine->migrate($path, $options->dryRun, $php, $hop);
         if ($migration->refused()) {
             return new StepResult($step->number, $hop->id, StepResult::ERROR, [], [
                 'Refused: Booster will not guess past a stop sign, so nothing changed.',
@@ -1792,6 +1809,13 @@ final class HopExecutor
         }
 
         return new StepResult($step->number, $hop->id, StepResult::APPLIED, $migration->files, [...$messages, ...$migration->manual]);
+    }
+
+    /** The engine registered for $id; the vendored engine is always there. */
+    private function frameworkEngine(EngineId $id): ?FrameworkEngine
+    {
+        return $this->frameworkEngines[$id->value]
+            ?? ($id === EngineId::Vendored ? $this->vendoredMigration : null);
     }
 
     /**
