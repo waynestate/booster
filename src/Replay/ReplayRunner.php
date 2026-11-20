@@ -81,7 +81,9 @@ final class ReplayRunner
      */
     public function runCommand(string $appPath, string $scratch, string $image, ReplayFile $file, ?string $network = null, ?int $uid = null, ?int $gid = null): array
     {
-        $command = [$this->docker, 'run', '--rm', '--network', $network ?? 'none', '-v', $appPath . ':/app', '-v', $scratch . ':' . self::MOUNT, '-w', '/app', '-e', 'HOME=/tmp'];
+        // BOOSTER_REPLAY=1 tells a strangled app's dispatcher to name the half
+        // that answered (X-Booster-Half); nothing else reads it.
+        $command = [$this->docker, 'run', '--rm', '--network', $network ?? 'none', '-v', $appPath . ':/app', '-v', $scratch . ':' . self::MOUNT, '-w', '/app', '-e', 'HOME=/tmp', '-e', 'BOOSTER_REPLAY=1'];
         foreach ($file->env as $key => $value) {
             array_push($command, '-e', $key . '=' . $value);
         }

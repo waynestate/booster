@@ -217,7 +217,9 @@ final class RouteCallScannerTest extends TestCase
             'GET /login/',
             'GET /after',
             'GET /booster-replay-no-such-page',
+            'GET /staff/admin/save',
             'POST /staff/admin/save',
+            'GET /staff/admin/users',
             'POST /staff/admin/users',
         ], array_map(static fn($r): string => $r->method . ' ' . $r->path, $file->requests));
     }

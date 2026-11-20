@@ -23,6 +23,17 @@ final readonly class ReplayFile
 
     public const COMPARE_WHITESPACE_COLLAPSE = 'collapse';
 
+    /** The compare preset every file has unless it names another. */
+    public const COMPARE_PRESET_DEFAULT = 'default';
+
+    /**
+     * The strangler's compare preset: on top of the default view it compares
+     * each cookie's attributes (Secure, HttpOnly, SameSite, Path) and the
+     * security headers (CSP, HSTS, X-Frame-Options, CORS), and it hides which
+     * framework's CSRF field a form carries (_csrfToken or _token).
+     */
+    public const COMPARE_PRESET_STRANGLER = 'strangler';
+
     /** The methods a request may use. */
     private const METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
 
@@ -34,6 +45,8 @@ final readonly class ReplayFile
      * @param array<string, string>       $ini         php -d settings for the server
      * @param list<array{name: string, image: string, env: array<string, string>}> $services containers the app reaches on a private network (a fixture database)
      * @param list<string>                $todos       what a person still has to fill in, one line each
+     * @param list<string>                $ignoreCookies cookie names left out of the compared set-cookie line (framework session and CSRF cookies), exact names
+     * @param list<string>                $silentSignIn  paths whose redirect is a browser's silent sign-in round trip: the client follows it (GET requests only)
      */
     public function __construct(
         public string $path,
@@ -52,6 +65,9 @@ final readonly class ReplayFile
         public string $fingerprint = '',
         public string $requestsFingerprint = '',
         public string $serveFingerprint = '',
+        public array $ignoreCookies = [],
+        public string $comparePreset = self::COMPARE_PRESET_DEFAULT,
+        public array $silentSignIn = [],
     ) {}
 
     /**
@@ -152,7 +168,30 @@ final readonly class ReplayFile
         }
 
         $compare = self::object($data['compare'] ?? [], $file . ' "compare"');
-        self::onlyKeys($compare, ['json', 'whitespace'], $file . ' "compare"');
+        self::onlyKeys($compare, ['json', 'whitespace', 'preset', 'ignore_cookies', 'silent_sign_in'], $file . ' "compare"');
+        $comparePreset = self::text($compare['preset'] ?? self::COMPARE_PRESET_DEFAULT, $file . ' "compare.preset"');
+        if (!in_array($comparePreset, [self::COMPARE_PRESET_DEFAULT, self::COMPARE_PRESET_STRANGLER], true)) {
+            throw new ToolError(sprintf('%s: "compare.preset" must be "default" or "strangler" (which also compares cookie attributes and the security headers).', $file));
+        }
+        $ignoreCookies = [];
+        foreach (self::list($compare['ignore_cookies'] ?? [], $file . ' "compare.ignore_cookies"') as $i => $name) {
+            $name = self::text($name, sprintf('%s "compare.ignore_cookies[%d]"', $file, $i));
+            // RFC 6265 cookie-name: a token, so no spaces, separators or "=".
+            if (preg_match('/^[!#$%&\'*+\-.^_`|~0-9A-Za-z]+$/', $name) !== 1) {
+                throw new ToolError(sprintf('%s: "compare.ignore_cookies" entry "%s" is not a cookie name (exact names only, no patterns).', $file, $name));
+            }
+            if (!in_array($name, $ignoreCookies, true)) {
+                $ignoreCookies[] = $name;
+            }
+        }
+        $silentSignIn = [];
+        foreach (self::list($compare['silent_sign_in'] ?? [], $file . ' "compare.silent_sign_in"') as $i => $prefix) {
+            $prefix = self::text($prefix, sprintf('%s "compare.silent_sign_in[%d]"', $file, $i));
+            if (!str_starts_with($prefix, '/') || str_contains($prefix, '?') || str_contains($prefix, '..')) {
+                throw new ToolError(sprintf('%s: "compare.silent_sign_in" entry "%s" must be a path on the app, such as /_laravel/login.', $file, $prefix));
+            }
+            $silentSignIn[] = $prefix;
+        }
         $compareJson = self::text($compare['json'] ?? self::COMPARE_JSON_VALUE, $file . ' "compare.json"');
         if (!in_array($compareJson, [self::COMPARE_JSON_VALUE, self::COMPARE_EXACT], true)) {
             throw new ToolError(sprintf('%s: "compare.json" must be "value" (key order and 1.0 versus 1 do not matter) or "exact".', $file));
@@ -189,9 +228,12 @@ final readonly class ReplayFile
                 throw new ToolError(sprintf('%s: sequence "%s" has no requests.', $file, $sequence['name']));
             }
             $captured = [];
-            foreach ($list as $raw) {
+            foreach ($list as $position => $raw) {
                 $number++;
                 $request = self::request($raw, $number, $sequence['name'], $defaultHeaders, $file);
+                if ($request->csrf && $position === 0) {
+                    throw new ToolError(sprintf('%s: request %s has "csrf": true but is the first request of sequence "%s", so there is no earlier answer to take the CSRF field from. Put the page that shows the form before it.', $file, $request->label(), $sequence['name']));
+                }
                 foreach (self::placeholders($request) as $placeholder) {
                     if (!in_array($placeholder, $captured, true)) {
                         throw new ToolError(sprintf('%s: request %s uses {{%s}}, which no earlier request in sequence "%s" captures.', $file, $request->label(), $placeholder, $sequence['name']));
@@ -236,7 +278,87 @@ final readonly class ReplayFile
             fingerprint: $fingerprint,
             requestsFingerprint: $requestsFingerprint,
             serveFingerprint: $serveFingerprint,
+            ignoreCookies: $ignoreCookies,
+            comparePreset: $comparePreset,
+            silentSignIn: $silentSignIn,
         );
+    }
+
+    /**
+     * The same file with other normalizers (a hop that adds a framework
+     * preset); everything the recording depends on stays as it was.
+     *
+     * @param list<ReplayNormalizer> $normalizers
+     */
+    public function withNormalizers(array $normalizers): self
+    {
+        return new self(
+            path: $this->path,
+            requests: $this->requests,
+            sequences: $this->sequences,
+            normalizers: $normalizers,
+            docroot: $this->docroot,
+            frontController: $this->frontController,
+            setup: $this->setup,
+            env: $this->env,
+            ini: $this->ini,
+            services: $this->services,
+            compareJson: $this->compareJson,
+            compareWhitespace: $this->compareWhitespace,
+            todos: $this->todos,
+            fingerprint: $this->fingerprint,
+            requestsFingerprint: $this->requestsFingerprint,
+            serveFingerprint: $this->serveFingerprint,
+            ignoreCookies: $this->ignoreCookies,
+            comparePreset: $this->comparePreset,
+            silentSignIn: $this->silentSignIn,
+        );
+    }
+
+    public function isStrangler(): bool
+    {
+        return $this->comparePreset === self::COMPARE_PRESET_STRANGLER;
+    }
+
+    /**
+     * Why the strangler may not move a unit on this app's replay, or null
+     * when it may (design section 5.5: the strangler requires the replay).
+     * The mount may still run without one, with the usual warning; every
+     * move refuses. Reasons, in order: no request file; a file that does not
+     * parse; one with todo items left; and, when the baseline answers are
+     * given (the run's own recording), a baseline whose every answer is the
+     * same redirect to sign-in, or whose every answer is an error, since a
+     * replay of either passes whatever the move broke.
+     *
+     * @param list<ReplayAnswer>|null $answers the baseline answers, when this run recorded them
+     */
+    public static function usableForStrangler(string $appRoot, ?array $answers = null, ?string $file = null): ?string
+    {
+        $path = self::locate($appRoot, $file);
+        if (!is_file($path)) {
+            return sprintf('the strangler requires the replay, and there is no %s. Draft one with: booster replay init, fill in its todo items, and give it a test login (%s).', basename($path), ReplayGate::SIGN_IN_GUIDE);
+        }
+        try {
+            $replay = self::load($path);
+        } catch (ToolError $e) {
+            return 'the strangler requires a replay that parses: ' . $e->getMessage();
+        }
+        if ($replay->todos !== []) {
+            return sprintf('the strangler requires the replay, and %s still has %d todo item%s to fill in.', basename($path), count($replay->todos), count($replay->todos) === 1 ? '' : 's');
+        }
+        if ($answers === null || $answers === []) {
+            return null;
+        }
+        $redirect = ReplayGate::sameRedirect($answers);
+        if ($redirect !== null) {
+            return sprintf('every answer in the replay baseline is the same redirect (Location: %s), so the replay could not tell a moved page from a broken one. Give the replay a test login first: %s', preg_replace('/[\x00-\x1F\x7F]/', '', $redirect), ReplayGate::SIGN_IN_GUIDE);
+        }
+        $failing = ReplayGate::errorBaseline($replay->requests, $answers);
+        if ($failing !== null) {
+            return sprintf('%s in the replay baseline, so the replay could not tell a moved page from a broken one. Make the app answer on fake data first.', ucfirst($failing['why']));
+        }
+
+        return null;
     }
 
     /**
@@ -272,7 +394,12 @@ final readonly class ReplayFile
             $out[] = ['name' => $name, 'requests' => $sequences[$name] ?? []];
         }
 
-        return ['timeout' => $timeoutSeconds, 'sequences' => $out];
+        $plan = ['timeout' => $timeoutSeconds, 'sequences' => $out];
+        if ($this->silentSignIn !== []) {
+            $plan['silent_sign_in'] = $this->silentSignIn;
+        }
+
+        return $plan;
     }
 
     /**
@@ -282,7 +409,7 @@ final readonly class ReplayFile
     {
         $where = sprintf('%s request %d (sequence "%s")', $file, $number, $sequence);
         $raw = self::object($raw, $where);
-        self::onlyKeys($raw, ['name', 'method', 'path', 'query', 'headers', 'cookies', 'form', 'json', 'body', 'capture', 'expect', 'todo'], $where);
+        self::onlyKeys($raw, ['name', 'method', 'path', 'query', 'headers', 'cookies', 'form', 'json', 'body', 'capture', 'expect', 'csrf', 'todo'], $where);
         $method = strtoupper(self::text($raw['method'] ?? 'GET', $where . ' "method"'));
         if (!in_array($method, self::METHODS, true)) {
             throw new ToolError(sprintf('%s: method "%s" is not one of %s.', $where, $method, implode(', ', self::METHODS)));
@@ -328,6 +455,13 @@ final readonly class ReplayFile
         if ($expect !== null && (!is_int($expect) || $expect < 100 || $expect > 599)) {
             throw new ToolError(sprintf('%s: "expect" must be an HTTP status such as 200.', $where));
         }
+        $csrf = $raw['csrf'] ?? false;
+        if (!is_bool($csrf)) {
+            throw new ToolError(sprintf('%s: "csrf" must be true or false.', $where));
+        }
+        if ($csrf && in_array($method, ['GET', 'HEAD', 'OPTIONS'], true)) {
+            throw new ToolError(sprintf('%s: "csrf": true goes on a request that changes something (POST, PUT, PATCH, DELETE), not %s.', $where, $method));
+        }
         $headers = $defaultHeaders;
         foreach (self::stringMap($raw['headers'] ?? [], $where . ' "headers"') as $name => $value) {
             foreach (array_keys($headers) as $existing) {
@@ -353,6 +487,7 @@ final readonly class ReplayFile
             capture: $capture,
             expect: $expect,
             todo: isset($raw['todo']) ? self::text($raw['todo'], $where . ' "todo"') : null,
+            csrf: $csrf,
         );
     }
 

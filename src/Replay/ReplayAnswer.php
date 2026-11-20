@@ -11,9 +11,18 @@ namespace Waynestate\Booster\Replay;
  */
 final readonly class ReplayAnswer
 {
+    /** The header a strangled app's dispatcher sets while BOOSTER_REPLAY=1, naming the half that answered. */
+    public const HALF_HEADER = 'X-Booster-Half';
+
+    public const HALF_LARAVEL = 'laravel';
+
+    public const HALF_LEGACY = 'legacy';
+
     /**
      * @param list<array{string, string}> $headers name and value, in the order the app sent them
      * @param list<string>                $notes   what the client could not do (a capture that matched nothing)
+     * @param list<string>                $actions what the client did on its own for this answer: the CSRF field it sent ("csrf": true)
+     *                                              and the silent sign-in redirects it followed (compare.silent_sign_in); reported, never compared
      */
     public function __construct(
         public int $number,
@@ -22,6 +31,7 @@ final readonly class ReplayAnswer
         public string $body,
         public ?string $error = null,
         public array $notes = [],
+        public array $actions = [],
     ) {}
 
     /** The first value of a header, case-insensitive, or null. */
@@ -60,13 +70,67 @@ final readonly class ReplayAnswer
     }
 
     /**
+     * Which half of a strangled app answered: "laravel" or "legacy", from the
+     * X-Booster-Half header the dispatcher sets while BOOSTER_REPLAY=1, or
+     * null when the answer has none (an app that is not mounted). Reported,
+     * never compared.
+     */
+    public function half(): ?string
+    {
+        $half = strtolower(trim((string) $this->header(self::HALF_HEADER)));
+
+        return in_array($half, [self::HALF_LARAVEL, self::HALF_LEGACY], true) ? $half : null;
+    }
+
+    /**
+     * The attributes that change what a browser does with each cookie the
+     * answer sets (Path, Secure, HttpOnly, SameSite), one entry per
+     * Set-Cookie header in name order, for the strangler compare preset.
+     * Expires, Max-Age and Domain stay out: they move with the clock and the
+     * host, not with the framework.
+     *
+     * @return list<array{string, string}> cookie name and its attributes, such as "path=/; httponly; samesite=lax"
+     */
+    public function cookieAttributes(): array
+    {
+        $out = [];
+        foreach ($this->headers as [$key, $value]) {
+            if (strcasecmp($key, 'Set-Cookie') !== 0) {
+                continue;
+            }
+            $parts = explode(';', $value);
+            $name = trim(explode('=', (string) array_shift($parts), 2)[0]);
+            if ($name === '') {
+                continue;
+            }
+            $attributes = [];
+            foreach ($parts as $part) {
+                $pair = explode('=', trim($part), 2);
+                $attribute = strtolower(trim($pair[0]));
+                if ($attribute === 'path') {
+                    $attributes['path'] = 'path=' . trim($pair[1] ?? '');
+                } elseif ($attribute === 'secure' || $attribute === 'httponly') {
+                    $attributes[$attribute] = $attribute;
+                } elseif ($attribute === 'samesite') {
+                    $attributes['samesite'] = 'samesite=' . strtolower(trim($pair[1] ?? ''));
+                }
+            }
+            ksort($attributes, SORT_STRING);
+            $out[] = [$name, $attributes === [] ? '(none)' : implode('; ', $attributes)];
+        }
+        usort($out, static fn(array $a, array $b): int => strcmp($a[0], $b[0]));
+
+        return $out;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toArray(): array
     {
         $utf8 = preg_match('//u', $this->body) === 1;
 
-        return [
+        $out = [
             'number' => $this->number,
             'status' => $this->status,
             'headers' => $this->headers,
@@ -75,6 +139,11 @@ final readonly class ReplayAnswer
             'error' => $this->error,
             'notes' => $this->notes,
         ];
+        if ($this->actions !== []) {
+            $out['actions'] = $this->actions;
+        }
+
+        return $out;
     }
 
     /**
@@ -97,10 +166,12 @@ final readonly class ReplayAnswer
             $decoded = base64_decode($body, true);
             $body = $decoded === false ? '' : $decoded;
         }
-        $notes = [];
-        foreach (is_array($data['notes'] ?? null) ? $data['notes'] : [] as $note) {
-            if (is_string($note)) {
-                $notes[] = $note;
+        $lists = ['notes' => [], 'actions' => []];
+        foreach (array_keys($lists) as $key) {
+            foreach (is_array($data[$key] ?? null) ? $data[$key] : [] as $line) {
+                if (is_string($line)) {
+                    $lists[$key][] = $line;
+                }
             }
         }
 
@@ -110,7 +181,8 @@ final readonly class ReplayAnswer
             $headers,
             $body,
             is_string($data['error'] ?? null) ? $data['error'] : null,
-            $notes,
+            $lists['notes'],
+            $lists['actions'],
         );
     }
 }

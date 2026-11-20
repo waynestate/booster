@@ -28,11 +28,15 @@ final readonly class ReplayNormalizer
      * @var array<string, array{string, list<array{string, string}>}>
      */
     public const PRESETS = [
-        'csrf' => ['CSRF tokens in hidden form fields and meta tags', [
-            ['/((?:name|id)\s*=\s*["\'](?:_token|[\w.\-]*(?:csrf|xsrf)[\w.\-]*|authenticity_token|__RequestVerificationToken)["\'][^>]*?\bvalue\s*=\s*["\'])[^"\']*/i', '$1<CSRF>'],
-            ['/(\bvalue\s*=\s*["\'])[^"\']*(["\'][^>]*?(?:name|id)\s*=\s*["\'](?:_token|[\w.\-]*(?:csrf|xsrf)[\w.\-]*|authenticity_token|__RequestVerificationToken)["\'])/i', '$1<CSRF>$2'],
-            ['/(<meta\s+name\s*=\s*["\'](?:csrf-token|_csrf|csrf)["\']\s+content\s*=\s*["\'])[^"\']*/i', '$1<CSRF>'],
-            ['/("(?:_token|csrf_token|csrfToken|_csrf)"\s*:\s*")[^"]*/', '$1<CSRF>'],
+        // CakePHP's FormHelper names its field _csrfToken and its layouts print
+        // <meta name="csrfToken" content="...">; Laravel's are _token and
+        // csrf-token (strangler design section 5.3).
+        'csrf' => ['CSRF tokens in hidden form fields and meta tags (Laravel\'s _token and csrf-token, CakePHP\'s _csrfToken and csrfToken)', [
+            ['/((?:name|id)\s*=\s*["\'](?:_token|_csrfToken|[\w.\-]*(?:csrf|xsrf)[\w.\-]*|authenticity_token|__RequestVerificationToken)["\'][^>]*?\bvalue\s*=\s*["\'])[^"\']*/i', '$1<CSRF>'],
+            ['/(\bvalue\s*=\s*["\'])[^"\']*(["\'][^>]*?(?:name|id)\s*=\s*["\'](?:_token|_csrfToken|[\w.\-]*(?:csrf|xsrf)[\w.\-]*|authenticity_token|__RequestVerificationToken)["\'])/i', '$1<CSRF>$2'],
+            ['/(<meta\s+name\s*=\s*["\'](?:csrf-token|csrfToken|_csrf|csrf)["\']\s+content\s*=\s*["\'])[^"\']*/i', '$1<CSRF>'],
+            ['/(<meta\s+content\s*=\s*["\'])[^"\']*(["\']\s+name\s*=\s*["\'](?:csrf-token|csrfToken|_csrf|csrf)["\'])/i', '$1<CSRF>$2'],
+            ['/("(?:_token|_csrfToken|csrf_token|csrfToken|_csrf)"\s*:\s*")[^"]*/', '$1<CSRF>'],
         ]],
         'session-id' => ['session ids in links, forms and scripts (PHPSESSID, laravel_session and the like)', [
             ['/\b(PHPSESSID|[A-Za-z_]*session(?:_id|id)?)(=|%3D)[A-Za-z0-9%,\-]{8,}/i', '$1$2<SESSION>'],
@@ -83,6 +87,27 @@ final readonly class ReplayNormalizer
         'cakephp' => ['markup CakePHP 5\'s helpers print differently from CakePHP 4\'s (the extra rel="shortcut icon" link meta(\'icon\') printed on 4)', [
             ['/<link\s+href\s*=\s*"[^"]*"\s+type\s*=\s*"image\/x-icon"\s+rel\s*=\s*"shortcut icon"\s*\/?>/i', ''],
         ]],
+    ];
+
+    /**
+     * What the strangler compare preset hides on top of the file's own
+     * normalizers: which framework's CSRF field and meta tag a page carries.
+     * A form moves from CakePHP's _csrfToken (or a Slim app's csrf_name and
+     * csrf_value) to Laravel's _token with its unit, and the person using it
+     * sees no difference. Each hidden CSRF input becomes one fixed tag, and
+     * each CSRF meta tag another, so a field that appears or vanishes still
+     * differs. The form's own fields are never touched.
+     *
+     * @var list<array{string, string}>
+     */
+    public const STRANGLER_CSRF = [
+        // Quoted values are skipped whole: the csrf preset's "<CSRF>" marker
+        // holds a ">" that must not end the tag.
+        ['/<input(?=(?:[^>"\']|"[^"]*"|\'[^\']*\')*?\stype\s*=\s*["\']hidden["\'])(?=(?:[^>"\']|"[^"]*"|\'[^\']*\')*?\sname\s*=\s*["\'](?:_token|_csrfToken|[\w.\-]*(?:csrf|xsrf)[\w.\-]*|authenticity_token|__RequestVerificationToken)["\'])(?:[^>"\']|"[^"]*"|\'[^\']*\')*>/i', '<input type="hidden" name="<CSRF-FIELD>">'],
+        // Slim-Csrf prints two fields (csrf_name and csrf_value) where
+        // Laravel prints one: side by side they count as one CSRF field.
+        ['/(<input type="hidden" name="<CSRF-FIELD>">)(?:\s*<input type="hidden" name="<CSRF-FIELD>">)+/', '$1'],
+        ['/<meta(?=(?:[^>"\']|"[^"]*"|\'[^\']*\')*?\sname\s*=\s*["\'](?:csrf-token|csrfToken|_csrf|csrf)["\'])(?:[^>"\']|"[^"]*"|\'[^\']*\')*>/i', '<meta name="<CSRF-META>">'],
     ];
 
     /**

@@ -23,6 +23,9 @@ final class ReplayGate
     /** The replay guide's section on pages behind sign-in. */
     public const SIGN_IN_GUIDE = 'https://booster.apps.wayne.edu/docs/guides/replay-gate.html#pages-behind-sign-in';
 
+    /** The replay guide's section on signed-in sequences in a strangler run. */
+    public const SIGNED_IN_GUIDE = 'https://booster.apps.wayne.edu/docs/guides/replay-gate.html#signed-in-sequences';
+
     private ?ReplayRecording $recording = null;
 
     public function __construct(
@@ -135,9 +138,14 @@ final class ReplayGate
                 ? sprintf('PHP logged %d distinct message%s while serving them (%s).', count($run->phpErrors), count($run->phpErrors) === 1 ? '' : 's', $errors)
                 : sprintf('Warning: PHP logged %d fatal error%s while serving the baseline (%d distinct message%s in all; %s). First: %s', count($fatal), count($fatal) === 1 ? '' : 's', count($run->phpErrors), count($run->phpErrors) === 1 ? '' : 's', $errors, self::shorten($fatal[0]));
         }
+        $halves = self::halves($this->file->requests, $run->answers);
+        $halfLine = self::halfLine($halves);
+        if ($halfLine !== null) {
+            $lines[] = $halfLine;
+        }
         $lines[] = 'Transcripts: ' . $this->outDir;
 
-        return new ReplayOutcome(ReplayOutcome::RECORDED, $php, $lines, $name, $this->outDir, $transcript, count($run->answers));
+        return new ReplayOutcome(ReplayOutcome::RECORDED, $php, $lines, $name, $this->outDir, $transcript, count($run->answers), 0, $halves);
     }
 
     /**
@@ -154,8 +162,7 @@ final class ReplayGate
                 return null;
             }
         }
-        $f = $this->file;
-        $this->file = new ReplayFile($f->path, $f->requests, $f->sequences, [...$f->normalizers, ReplayNormalizer::preset($preset)], $f->docroot, $f->frontController, $f->setup, $f->env, $f->ini, $f->services, $f->compareJson, $f->compareWhitespace, $f->todos, $f->fingerprint, $f->requestsFingerprint, $f->serveFingerprint);
+        $this->file = $this->file->withNormalizers([...$this->file->normalizers, ReplayNormalizer::preset($preset)]);
 
         return sprintf('Replay: the "%s" normalizer is on from this step (%s).', $preset, ReplayNormalizer::PRESETS[$preset][0]);
     }
@@ -191,12 +198,15 @@ final class ReplayGate
         $differences = ReplayComparison::differences($this->file, $recording->answers, $run->answers);
         $total = count($this->file->requests);
         $errorLine = $errors === null ? [] : [sprintf('PHP logged %d distinct message%s while serving (%s).', count($run->phpErrors), count($run->phpErrors) === 1 ? '' : 's', $errors)];
+        $halves = self::halves($this->file->requests, $run->answers);
+        $halfLine = self::halfLine($halves);
         if ($differences === []) {
             return new ReplayOutcome(ReplayOutcome::PASSED, $php, [
                 sprintf('Replay passed: all %d answer%s match the baseline from PHP %s.', $total, $total === 1 ? '' : 's', $recording->php),
                 ...($serveLine === null ? [] : [$serveLine]),
+                ...($halfLine === null ? [] : [$halfLine]),
                 ...$errorLine,
-            ], $name, $this->outDir, $transcript, $total);
+            ], $name, $this->outDir, $transcript, $total, 0, $halves);
         }
 
         $first = $differences[0];
@@ -213,10 +223,132 @@ final class ReplayGate
             'First difference: ' . $first['request']->label() . ' (- baseline, + now)',
             ...self::indent($diff),
             ...($others === [] ? [] : ['Also different: request' . (count($others) === 1 ? ' ' : 's ') . implode(', ', $others) . (count($differences) > 13 ? ', ...' : '') . '.']),
+            ...self::signInLines($this->file, $differences, $recording->answers, $run->answers),
+            ...($halfLine === null ? [] : [$halfLine]),
             sprintf('Every difference: diff %s %s', $baselineTranscript, $transcript),
             'A value that changes on every request (a token, a time) is not a real difference: hide it with a normalizer in ' . $name . '.',
             ...$errorLine,
-        ], $name, $this->outDir, $transcript, $total, count($differences));
+        ], $name, $this->outDir, $transcript, $total, count($differences), $halves);
+    }
+
+    /**
+     * Request number to the half that answered it, for every answer whose
+     * X-Booster-Half header said (a mounted app under replay).
+     *
+     * @param list<ReplayRequest> $requests
+     * @param list<ReplayAnswer>  $answers
+     *
+     * @return array<int, string>
+     */
+    public static function halves(array $requests, array $answers): array
+    {
+        $out = [];
+        foreach ($requests as $i => $request) {
+            $half = isset($answers[$i]) ? $answers[$i]->half() : null;
+            if ($half !== null) {
+                $out[$request->number] = $half;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * "Answered by: legacy 5, laravel 2 (laravel: 03, 04)." for a mounted
+     * app, or null when no answer named its half. Never part of the
+     * comparison: it is how a strangler run shows a moved unit really came
+     * from Laravel.
+     *
+     * @param array<int, string> $halves
+     */
+    public static function halfLine(array $halves): ?string
+    {
+        if ($halves === []) {
+            return null;
+        }
+        $laravel = array_keys(array_filter($halves, static fn(string $h): bool => $h === ReplayAnswer::HALF_LARAVEL));
+        $legacy = count($halves) - count($laravel);
+        $line = sprintf('Answered by: legacy %d, laravel %d', $legacy, count($laravel));
+        if ($laravel !== []) {
+            $line .= ' (laravel: ' . implode(', ', array_map(static fn(int $n): string => sprintf('%02d', $n), array_slice($laravel, 0, 20))) . (count($laravel) > 20 ? ', ...' : '') . ')';
+        }
+
+        return $line . '.';
+    }
+
+    /**
+     * The failure line for a signed-in sequence that lost its sign-in (design
+     * section 5.4): a request that now answers a redirect to sign-in where
+     * the baseline answered 200. When it is the first request of its
+     * sequence the cause is always the same, the sequence never signed in
+     * before its first moved route, and the line says exactly that. When it
+     * is later in the sequence and Laravel answered, the Laravel half had no
+     * session of its own yet (each half keeps its own, D-121).
+     *
+     * @param list<array{request: ReplayRequest, diff: list<string>}> $differences
+     * @param list<ReplayAnswer>                                       $baseline
+     * @param list<ReplayAnswer>                                       $replay
+     *
+     * @return list<string>
+     */
+    public static function signInLines(ReplayFile $file, array $differences, array $baseline, array $replay): array
+    {
+        $index = [];
+        $first = [];
+        foreach ($file->requests as $i => $request) {
+            $index[$request->number] = $i;
+            $first[$request->sequence] ??= $request->number;
+        }
+        $lines = [];
+        foreach ($differences as $difference) {
+            $request = $difference['request'];
+            $i = $index[$request->number] ?? null;
+            $before = $i === null ? null : ($baseline[$i] ?? null);
+            $after = $i === null ? null : ($replay[$i] ?? null);
+            if ($before === null || $after === null || $before->status !== 200 || !self::isSignInRedirect($after)) {
+                continue;
+            }
+            $location = (string) preg_replace('/[\x00-\x1F\x7F]/', '', str_replace(ReplayComparison::APP_ORIGIN, '', (string) $after->header('Location')));
+            $from = $after->half() === null ? '' : ' (answered by ' . $after->half() . ')';
+            if ($first[$request->sequence] === $request->number) {
+                $lines[] = sprintf(
+                    'Signed-in sequence: %s is the first request of sequence "%s" and now answers the redirect to sign-in (Location: %s)%s where the baseline answered 200. A sequence must sign in through a legacy request before its first moved route: start it with the test login POST, or a seeded session plus any legacy page. Guide: %s',
+                    $request->label(),
+                    $request->sequence,
+                    $location,
+                    $from,
+                    self::SIGNED_IN_GUIDE,
+                );
+            } elseif ($after->half() === ReplayAnswer::HALF_LARAVEL) {
+                $lines[] = sprintf(
+                    'Signed-in sequence: %s moved to Laravel and now answers the redirect to sign-in (Location: %s) where the baseline answered 200. Each half keeps its own session, so the Laravel half signs in on its own: list its sign-in path in compare.silent_sign_in (the fake driver signs in at once) so the replay follows that round trip the way a browser does. Guide: %s',
+                    $request->label(),
+                    $location,
+                    self::SIGNED_IN_GUIDE,
+                );
+            }
+            if (count($lines) >= 3) {
+                break;
+            }
+        }
+
+        return $lines;
+    }
+
+    /**
+     * A 3xx whose Location reads like a sign-in page: login, signin,
+     * sign-in, sso, cas or auth in its path (Laravel's /_laravel/login,
+     * CakePHP's /users/login, Slim's /auth/login, a CAS server).
+     */
+    public static function isSignInRedirect(ReplayAnswer $answer): bool
+    {
+        $location = $answer->header('Location');
+        if ($answer->status < 300 || $answer->status > 399 || $location === null) {
+            return false;
+        }
+        $path = (string) (parse_url($location, PHP_URL_PATH) ?? $location);
+
+        return preg_match('#(?:^|/)(?:[\w.\-]*login|log-in|signin|sign-in|sso|cas|auth)(?:/|$|[.?])#i', $path . '/') === 1;
     }
 
     /**

@@ -17,6 +17,8 @@ final readonly class ReplayRequest
      * @param array<string, string> $cookies  cookies sent on top of the ones the sequence collected
      * @param array<string, mixed>|null $form form fields, sent as application/x-www-form-urlencoded
      * @param array<string, string> $capture  name to regular expression with one group, read from this answer for later requests
+     * @param bool                  $csrf     take the CSRF field (name and value) from the previous answer in the sequence and send it
+     *                                        with this request: as a form field when the request posts a form, else as an X-CSRF-Token header
      */
     public function __construct(
         public int $number,
@@ -34,6 +36,7 @@ final readonly class ReplayRequest
         public array $capture = [],
         public ?int $expect = null,
         public ?string $todo = null,
+        public bool $csrf = false,
     ) {}
 
     /** The request line as the transcript shows it: method, path and query. */
@@ -65,8 +68,11 @@ final readonly class ReplayRequest
     {
         $headers = $this->headers;
         $body = $this->body ?? '';
-        if ($this->form !== null) {
-            $body = http_build_query($this->form, '', '&');
+        // A CSRF request with no body of its own posts a form that holds only
+        // the token, the way a bare button form does.
+        $form = $this->form ?? ($this->csrf && !$this->hasJson && $this->body === null ? [] : null);
+        if ($form !== null) {
+            $body = http_build_query($form, '', '&');
             $headers = self::withDefault($headers, 'Content-Type', 'application/x-www-form-urlencoded');
         } elseif ($this->hasJson) {
             $body = (string) json_encode($this->json, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -77,7 +83,7 @@ final readonly class ReplayRequest
             $headerList[] = [$name, $value];
         }
 
-        return [
+        $out = [
             'number' => $this->number,
             'method' => $this->method,
             'target' => $this->target(),
@@ -86,6 +92,13 @@ final readonly class ReplayRequest
             'body' => $body,
             'capture' => $this->capture === [] ? new \stdClass() : $this->capture,
         ];
+        // Only when set, so a request file without the flag keeps the
+        // fingerprint its recording was made with.
+        if ($this->csrf) {
+            $out['csrf'] = $form !== null ? 'form' : 'header';
+        }
+
+        return $out;
     }
 
     /**

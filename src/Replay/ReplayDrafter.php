@@ -89,7 +89,10 @@ final class ReplayDrafter
             }
             if ($method !== 'GET') {
                 $request['form'] = (object) [];
-                $todo[] = 'fill in the form fields this route reads (and a CSRF capture if it checks one)';
+                // The CSRF field comes from the answer before it (the form
+                // page drafted in front of it), whichever framework printed it.
+                $request['csrf'] = true;
+                $todo[] = 'fill in the form fields this route reads';
                 if ($readsPost) {
                     $request['name'] = 'POST ' . $path . ' (the page reads $_POST)';
                 }
@@ -100,6 +103,17 @@ final class ReplayDrafter
             if ($method === 'GET') {
                 $pages[] = $request;
             } else {
+                // "csrf": true reads the field from the previous answer, so
+                // each write follows the page that shows its form (a form
+                // moves as one unit in the strangler: its GET and its POST).
+                $formPage = ['name' => 'the form for ' . $key, 'method' => 'GET', 'path' => $path];
+                $placeholders = preg_match('/\{[^}]+\}|:[A-Za-z_]+|<[^>]+>|\[[^\]]*\]/', $path) === 1;
+                if ($placeholders) {
+                    $formPage['todo'] = 'replace the placeholders in the path with ids from your fake data';
+                } elseif (!self::hasRoute($routes, 'GET', $path)) {
+                    $formPage['todo'] = 'point this at the page that shows the form ' . $key . ' posts';
+                }
+                $writes[] = $formPage;
                 $writes[] = $request;
             }
         }
@@ -137,6 +151,20 @@ final class ReplayDrafter
         }
 
         return ['json' => $json, 'source' => $source, 'requests' => count($pages) + count($writes), 'todos' => $todos];
+    }
+
+    /**
+     * @param list<array{0: string, 1: string, 2: bool}> $routes
+     */
+    private static function hasRoute(array $routes, string $method, string $path): bool
+    {
+        foreach ($routes as [$m, $p]) {
+            if ($m === $method && $p === $path) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -21,7 +21,7 @@ final class ReplayRunnerTest extends TestCase
         $file = ReplayFile::load(__DIR__ . '/fixtures/replay-app/booster-replay.json');
         $command = $this->runner(ReplayFake::runner([]))->runCommand('/srv/app', '/tmp/scratch', 'booster-target:7.4-abc', $file, null, 1000, 1000);
 
-        self::assertSame(['docker', 'run', '--rm', '--network', 'none', '-v', '/srv/app:/app', '-v', '/tmp/scratch:/booster-replay', '-w', '/app', '-e', 'HOME=/tmp', '-e', 'NOTES_DB=/tmp/notes.sqlite', '-e', 'BOOSTER_REPLAY_SETUP=php replay/seed.php', '-e', 'BOOSTER_REPLAY_FRONT=index.php', '--user', '1000:1000', 'booster-target:7.4-abc', 'sh', '-c'], array_slice($command, 0, 24));
+        self::assertSame(['docker', 'run', '--rm', '--network', 'none', '-v', '/srv/app:/app', '-v', '/tmp/scratch:/booster-replay', '-w', '/app', '-e', 'HOME=/tmp', '-e', 'BOOSTER_REPLAY=1', '-e', 'NOTES_DB=/tmp/notes.sqlite', '-e', 'BOOSTER_REPLAY_SETUP=php replay/seed.php', '-e', 'BOOSTER_REPLAY_FRONT=index.php', '--user', '1000:1000', 'booster-target:7.4-abc', 'sh', '-c'], array_slice($command, 0, 26));
     }
 
     public function test_the_container_script_runs_setup_then_the_built_in_server_then_the_client(): void

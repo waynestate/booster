@@ -9,9 +9,12 @@ namespace Waynestate\Booster\Replay;
  * transcript, and compares two sets of answers request by request.
  *
  * What is compared: the status, Content-Type, Location, Allow, the names of
- * the cookies the answer sets, and the body. Everything else (Date, ETag,
- * Content-Length, X-Powered-By, which names the PHP version) differs between
- * PHP versions without changing what a person sees, so it stays out.
+ * the cookies the answer sets (less compare.ignore_cookies), and the body.
+ * Everything else (Date, ETag, Content-Length, X-Powered-By, which names the
+ * PHP version) differs between PHP versions without changing what a person
+ * sees, so it stays out. The strangler compare preset adds each cookie's
+ * attributes and the security headers, because moving a page to another
+ * framework can change those where a PHP upgrade does not.
  */
 final class ReplayComparison
 {
@@ -20,6 +23,25 @@ final class ReplayComparison
 
     /** How many diff lines the report shows for the first difference. */
     public const DIFF_LINES = 14;
+
+    /**
+     * What the strangler compare preset adds to the view when an answer
+     * carries them: the headers that change what a browser allows. Compared
+     * only when present on either side, so an app that sends none sees no
+     * new lines.
+     */
+    public const SECURITY_HEADERS = [
+        'content-security-policy',
+        'content-security-policy-report-only',
+        'strict-transport-security',
+        'x-frame-options',
+        'access-control-allow-origin',
+        'access-control-allow-credentials',
+        'access-control-allow-methods',
+        'access-control-allow-headers',
+        'access-control-expose-headers',
+        'access-control-max-age',
+    ];
 
     /**
      * The compared view of one answer, one line per item, the body last.
@@ -42,19 +64,79 @@ final class ReplayComparison
             return $line;
         };
         $contentType = $answer->header('Content-Type');
+        // compare.ignore_cookies: framework session and CSRF cookies whose
+        // names change when a unit moves halves (exact names, design 5.2).
+        $cookies = array_values(array_filter($answer->cookieNames(), static fn(string $n): bool => !in_array($n, $file->ignoreCookies, true)));
         $lines = [
             'status: ' . $answer->status,
             $header('content-type', $contentType === null ? null : self::contentType($contentType)),
             $header('location', $answer->header('Location')),
             $header('allow', $answer->header('Allow')),
-            $header('set-cookie', $answer->cookieNames() === [] ? null : implode(', ', $answer->cookieNames())),
+            $header('set-cookie', $cookies === [] ? null : implode(', ', $cookies)),
         ];
+        if ($file->isStrangler()) {
+            foreach ($answer->cookieAttributes() as [$name, $attributes]) {
+                if (!in_array($name, $file->ignoreCookies, true)) {
+                    $lines[] = $header('cookie ' . $name, $attributes);
+                }
+            }
+            foreach (self::SECURITY_HEADERS as $name) {
+                $value = $answer->header($name);
+                if ($value !== null) {
+                    $lines[] = $header($name, self::securityValue($name, $value));
+                }
+            }
+        }
         foreach ($answer->notes as $note) {
             $lines[] = 'note: ' . $note;
         }
         $lines[] = '--- body';
 
         return [...$lines, ...self::body($answer->body, $contentType, $file)];
+    }
+
+    /**
+     * One security header's compared value: a CSP nonce is new on every
+     * request, so it becomes a marker; list headers lose case and spacing
+     * differences that mean nothing to a browser.
+     */
+    private static function securityValue(string $name, string $value): string
+    {
+        if (str_starts_with($name, 'content-security-policy')) {
+            return (string) preg_replace("/'nonce-[A-Za-z0-9+\\/=_\\-]+'/", "'nonce-<NONCE>'", trim($value));
+        }
+        if (in_array($name, ['access-control-allow-methods', 'access-control-allow-headers', 'access-control-expose-headers'], true)) {
+            $items = array_filter(array_map(static fn(string $i): string => strtolower(trim($i)), explode(',', $value)), static fn(string $i): bool => $i !== '');
+            sort($items, SORT_STRING);
+
+            return implode(', ', $items);
+        }
+        if ($name === 'x-frame-options') {
+            return strtoupper(trim($value));
+        }
+
+        return trim($value);
+    }
+
+    /**
+     * The lines a transcript shows for an answer but the comparison never
+     * reads: which half answered (X-Booster-Half), and what the client did on
+     * its own (the CSRF field it sent, the silent sign-in redirects it
+     * followed to get the answer).
+     *
+     * @return list<string>
+     */
+    public static function reported(ReplayAnswer $answer): array
+    {
+        $lines = [];
+        if ($answer->half() !== null) {
+            $lines[] = 'answered by: ' . $answer->half();
+        }
+        foreach ($answer->actions as $action) {
+            $lines[] = 'client: ' . self::origin($action);
+        }
+
+        return $lines;
     }
 
     /**
@@ -68,7 +150,7 @@ final class ReplayComparison
         foreach ($file->requests as $i => $request) {
             $lines[] = '=== ' . $request->label();
             $answer = $answers[$i] ?? null;
-            foreach ($answer === null ? ['(not sent)'] : self::view($answer, $file) as $line) {
+            foreach ($answer === null ? ['(not sent)'] : [...self::reported($answer), ...self::view($answer, $file)] as $line) {
                 $lines[] = $line;
             }
             $lines[] = '';
@@ -203,6 +285,9 @@ final class ReplayComparison
             if ($normalizer->appliesToBody()) {
                 $body = $normalizer->apply($body);
             }
+        }
+        if ($file->isStrangler()) {
+            $body = (new ReplayNormalizer('strangler', ReplayNormalizer::STRANGLER_CSRF))->apply($body);
         }
         if ($file->compareJson === ReplayFile::COMPARE_JSON_VALUE) {
             $trimmed = trim($body);

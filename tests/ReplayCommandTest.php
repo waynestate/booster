@@ -156,10 +156,10 @@ final class ReplayCommandTest extends TestCase
         [$exit, $text] = $this->booster(['command' => 'replay', 'action' => 'init', '--path' => $app]);
 
         self::assertSame(0, $exit, $text);
-        self::assertStringContainsString('Drafted booster-replay.json with 4 requests, from PHP entry points under public/.', $text);
+        self::assertStringContainsString('Drafted booster-replay.json with 5 requests, from PHP entry points under public/.', $text);
         $file = ReplayFile::load($app . '/booster-replay.json');
         $paths = array_map(static fn($r): string => $r->method . ' ' . $r->path, $file->requests);
-        self::assertSame(['GET /', 'GET /edit.php', 'GET /booster-replay-no-such-page', 'POST /edit.php'], $paths);
+        self::assertSame(['GET /', 'GET /edit.php', 'GET /booster-replay-no-such-page', 'GET /edit.php', 'POST /edit.php'], $paths);
         self::assertCount(2, $file->todos);
 
         [$exit, $text] = $this->booster(['command' => 'replay', 'action' => 'record', '--path' => $app, '--php' => '7.4']);
@@ -181,9 +181,16 @@ final class ReplayCommandTest extends TestCase
         $file = ReplayFile::fromArray((array) json_decode($draft['json'], true));
 
         self::assertSame('index.php', $file->frontController);
-        self::assertSame(['GET /', 'GET /batches/:id', 'GET /booster-replay-no-such-page', 'POST /change_role'], array_map(static fn($r): string => $r->method . ' ' . $r->path, $file->requests));
+        self::assertSame(['GET /', 'GET /batches/:id', 'GET /booster-replay-no-such-page', 'GET /change_role', 'POST /change_role'], array_map(static fn($r): string => $r->method . ' ' . $r->path, $file->requests));
         self::assertStringContainsString('replace the placeholders in the path', implode("\n", $file->todos));
         self::assertStringContainsString('fill in the form fields', implode("\n", $file->todos));
+        // The write takes its CSRF field from the form page drafted in front
+        // of it (strangler design 5.3); that page is a todo, since the app has
+        // no GET /change_role route.
+        self::assertTrue($file->requests[4]->csrf);
+        self::assertFalse($file->requests[3]->csrf);
+        self::assertSame('forms', $file->requests[3]->sequence);
+        self::assertStringContainsString('point this at the page that shows the form POST /change_role posts', implode("\n", $file->todos));
     }
 
     public function test_the_drafter_uses_laravels_route_list_when_the_app_can_print_it(): void
@@ -208,7 +215,7 @@ final class ReplayCommandTest extends TestCase
         self::assertSame('php artisan route:list', $draft['source']);
         self::assertSame(['artisan', 'route:list', '--json'], array_slice($fake->calls[0]['command'], 1));
         self::assertSame('public', $file->docroot);
-        self::assertSame(['GET /', 'GET /notes/{note}', 'GET /booster-replay-no-such-page', 'POST /notes'], array_map(static fn($r): string => $r->method . ' ' . $r->path, $file->requests));
+        self::assertSame(['GET /', 'GET /notes/{note}', 'GET /booster-replay-no-such-page', 'GET /notes', 'POST /notes'], array_map(static fn($r): string => $r->method . ' ' . $r->path, $file->requests));
         // No front end: only the presets every app needs.
         self::assertSame(['csrf', 'session-id'], json_decode($draft['json'], true)['normalize']);
     }
