@@ -630,8 +630,8 @@ final class CakeUpgradeMigration implements FrameworkEngine
      * The source with its line and block comments blanked (CAKE-13): code an app commented
      * out, and the comments Booster writes next to its own moves, are not
      * calls a person has to port; a fleet app got two MANUAL lines for
-     * $this->Auth calls that lived only in comments. Doc blocks stay: an
-     * @property naming AuthComponent is a stale type a person updates.
+     * $this->Auth calls that lived only in comments. Doc blocks stay: a
+     * property tag naming AuthComponent is a stale type a person updates.
      */
     private static function withoutComments(string $source): string
     {
