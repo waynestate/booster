@@ -1097,7 +1097,7 @@ final class HopRegistry
             composerSet: ['slim/slim' => '^4.15'],
             composerSetIfPresent: $this->frameworkCompanionPins('slim', '4.15'),
             notes: [
-                'Route exceptions now reach Slim\'s ErrorMiddleware before the app\'s own PHP error handler; check what an error page looks like.',
+                'Errors, missing routes and wrong methods still go to the container\'s errorHandler, phpErrorHandler, notFoundHandler and notAllowedHandler, as on Slim 3; without them the answer is Slim 3\'s own page.',
                 'The app\'s double-pass middleware keeps working through a copied-in double-pass adapter; move each one to PSR-15 when you next touch it.',
                 'MANUAL: pathFor() calls are reported, not rewritten; Slim 4 builds URLs with RouteParser::urlFor().',
             ],

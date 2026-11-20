@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Run\Slim;
 
 /**
- * The three small PHP files the `slim-3-to-4` hop copies into a Slim 3 app so
- * its bootstrap runs on Slim 4 with the fewest edits: a container that still
- * answers `$c['x']`, `$c->x` and `$c->get('x')`, an adapter that runs a Slim 3
- * double-pass middleware as PSR-15, and the app factory glue that turns Slim 3
- * settings into Slim 4 middleware. They are copied into the app (no runtime
+ * The five small PHP files the `slim-3-to-4` hop copies into a Slim 3 app so
+ * it runs on Slim 4 with the fewest edits: a container that still answers
+ * `$c['x']`, `$c->x` and `$c->get('x')` and holds Slim 3's default services,
+ * an adapter that runs a Slim 3 double-pass middleware as PSR-15, the app
+ * factory glue that turns Slim 3 settings into Slim 4 middleware and answers
+ * route misses and errors where and how Slim 3 did, Slim 3's Environment, and
+ * Slim 3's request and response factories. They are copied into the app (no runtime
  * dependency on Booster), so each one is a complete file. The hop runs at
  * PHP 7.4, so the files are written in PHP 7.4 syntax: no mixed, no union
  * types, no trailing comma in a parameter list (docblocks carry the types).
@@ -38,10 +40,66 @@ final class LegacyStubs
         /**
          * Slim 3's container on Slim 4: the app's Pimple container, readable the three
          * ways Slim 3 allowed ($c['x'], $c->x and $c->get('x')), handed to
-         * AppFactory::setContainer() so no factory file has to change.
+         * AppFactory::setContainer() so no factory file has to change. Like Slim 3's,
+         * it holds environment, request and response (built from PHP's globals) and
+         * the four handlers (Slim 3's own pages) unless the app sets them, so code that
+         * reads $c['request'] or calls $c['notFoundHandler'] keeps working, and an app
+         * that unsets a handler still sends that error on to PHP's own handler.
          */
         final class LegacyContainer extends \Pimple\Container implements \Psr\Container\ContainerInterface
         {
+            /**
+             * @param array<string, mixed> $values
+             */
+            public function __construct(array $values = [])
+            {
+                parent::__construct($values);
+
+                $defaults = [
+                    'environment' => static function () {
+                        return new LegacyEnvironment($_SERVER);
+                    },
+                    'request' => static function ($c) {
+                        return LegacyHttp::createRequest($c['environment']);
+                    },
+                    'response' => static function ($c) {
+                        $settings = isset($c['settings']) && is_array($c['settings']) ? $c['settings'] : [];
+                        $version = isset($settings['httpVersion']) ? (string) $settings['httpVersion'] : '1.1';
+
+                        return LegacyHttp::createResponse(200, ['Content-Type' => 'text/html; charset=UTF-8'])->withProtocolVersion($version);
+                    },
+                    'notFoundHandler' => static function () {
+                        return static function ($request, $response) {
+                            return LegacyHttp::notFound($request, $response);
+                        };
+                    },
+                    'notAllowedHandler' => static function () {
+                        return static function ($request, $response, array $methods) {
+                            return LegacyHttp::notAllowed($request, $response, $methods);
+                        };
+                    },
+                    'errorHandler' => static function ($c) {
+                        $details = isset($c['settings']['displayErrorDetails']) && $c['settings']['displayErrorDetails'];
+
+                        return static function ($request, $response, $exception) use ($details) {
+                            return LegacyHttp::error($request, $response, $exception, $details);
+                        };
+                    },
+                    'phpErrorHandler' => static function ($c) {
+                        $details = isset($c['settings']['displayErrorDetails']) && $c['settings']['displayErrorDetails'];
+
+                        return static function ($request, $response, $error) use ($details) {
+                            return LegacyHttp::error($request, $response, $error, $details);
+                        };
+                    },
+                ];
+                foreach ($defaults as $id => $service) {
+                    if (!$this->offsetExists($id)) {
+                        $this[$id] = $service;
+                    }
+                }
+            }
+
             /**
              * @param string $id
              *
@@ -147,10 +205,14 @@ final class LegacyStubs
         /**
          * Builds a Slim 4 app the way the Slim 3 app was built, and adds what Slim 3
          * did by itself. Call create() where the app did `new \Slim\App(...)`, and
-         * finish() just before run(), after the app's own middleware.
+         * finish() just before run(), after the app's own middleware. A test that
+         * called Slim 3's $app->process($request, $response) calls process() here.
          */
         final class LegacyApp
         {
+            /** @var array<int, \WeakReference> the apps finish() already ran on */
+            private static $finished = [];
+
             /** Slim 3's settings defaults: a setting the app never set still meant this. */
             private const SLIM3_DEFAULTS = [
                 'httpVersion' => '1.1',
@@ -165,14 +227,28 @@ final class LegacyStubs
             /**
              * @param array<string, mixed> $config Slim 3's container values, e.g. ['settings' => [...]]
              */
-            public static function create(array $config = []): \Slim\App
+            /**
+             * @param array<string, mixed>|LegacyContainer $config Slim 3's settings array, or the container an app built first
+             */
+            public static function create($config = []): \Slim\App
             {
-                $settings = $config['settings'] ?? [];
-                if (is_array($settings)) {
-                    $config['settings'] = array_merge(self::SLIM3_DEFAULTS, $settings);
+                if ($config instanceof LegacyContainer) {
+                    // Built first, as `new \Slim\Container($settings)` was: fill in the
+                    // defaults unless settings is a service (Pimple would refuse the write).
+                    $container = $config;
+                    $raw = isset($container['settings']) ? $container->raw('settings') : [];
+                    if (is_array($raw)) {
+                        $container['settings'] = array_merge(self::SLIM3_DEFAULTS, $raw);
+                    }
+                } else {
+                    $config = (array) $config;
+                    $settings = $config['settings'] ?? [];
+                    if (is_array($settings)) {
+                        $config['settings'] = array_merge(self::SLIM3_DEFAULTS, $settings);
+                    }
+                    $container = new LegacyContainer($config);
                 }
 
-                $container = new LegacyContainer($config);
                 \Slim\Factory\AppFactory::setContainer($container);
 
                 // With slim/http installed, routes typed Slim\Http\ServerRequest or
@@ -182,15 +258,77 @@ final class LegacyStubs
                 \Slim\Factory\AppFactory::setSlimHttpDecoratorsAutomaticDetection(true);
                 \Slim\Factory\ServerRequestCreatorFactory::setSlimHttpDecoratorsAutomaticDetection(true);
 
-                return \Slim\Factory\AppFactory::create();
+                $app = \Slim\Factory\AppFactory::create();
+
+                // Slim 3 worked out the folder the app is served from by itself; Slim 4
+                // needs it before the first route is added.
+                if (PHP_SAPI !== 'cli') {
+                    $basePath = self::basePath($_SERVER);
+                    if ($basePath !== '') {
+                        $app->setBasePath($basePath);
+                    }
+                }
+
+                // Added first, so it runs last: Slim 3 answered a path with no route
+                // inside the app's own middleware, through notFoundHandler.
+                $app->add(new LegacyRouteMiss($app));
+
+                return $app;
+            }
+
+            /**
+             * Slim 3's $app->process($request, $response) for a test: the app with
+             * Slim 3's middleware, answering one request. The response is not used;
+             * Slim 4 makes its own.
+             */
+            public static function process(
+                \Slim\App $app,
+                \Psr\Http\Message\ServerRequestInterface $request,
+                ?\Psr\Http\Message\ResponseInterface $response = null
+            ): \Psr\Http\Message\ResponseInterface {
+                self::finish($app);
+
+                return $app->handle($request);
+            }
+
+            /**
+             * Slim 3's base path rule: the script name when the request path starts with
+             * it, else the script's folder when the request path starts with that.
+             *
+             * @param array<string, mixed> $server
+             */
+            public static function basePath(array $server): string
+            {
+                if (!isset($server['SCRIPT_NAME'], $server['REQUEST_URI'])) {
+                    return '';
+                }
+                $script = (string) parse_url((string) $server['SCRIPT_NAME'], PHP_URL_PATH);
+                $folder = str_replace('\\', '/', dirname($script));
+                $path = (string) parse_url('http://example.com' . (string) $server['REQUEST_URI'], PHP_URL_PATH);
+                if ($script !== '' && stripos($path, $script) === 0) {
+                    return rtrim($script, '/');
+                }
+                if ($folder !== '/' && $folder !== '.' && $folder !== '' && stripos($path, $folder) === 0) {
+                    return rtrim($folder, '/');
+                }
+
+                return '';
             }
 
             /**
              * Slim 4 runs the last added middleware first, so the error middleware,
-             * added last, is outermost, and routing runs before the app's middleware.
+             * added last, is outermost, and routing runs before the app's middleware
+             * (and never stops it: a path with no route still reaches the app's
+             * middleware, as on Slim 3). Running it twice changes nothing.
              */
             public static function finish(\Slim\App $app): \Slim\App
             {
+                $id = spl_object_id($app);
+                if (isset(self::$finished[$id]) && self::$finished[$id]->get() === $app) {
+                    return $app;
+                }
+                self::$finished[$id] = \WeakReference::create($app);
+
                 $settings = [];
                 $container = $app->getContainer();
                 if ($container instanceof \ArrayAccess && isset($container['settings']) && is_array($container['settings'])) {
@@ -213,16 +351,549 @@ final class LegacyStubs
                     ));
                 }
 
-                // Outside output buffering, so the length counts echoed output, as Slim 3's did.
+                $app->addBodyParsingMiddleware();
+                $app->add(new LegacyRouting($app));
+                $errors = $app->addErrorMiddleware((bool) $settings['displayErrorDetails'], true, true);
+                $container = $app->getContainer();
+                if ($container instanceof \Psr\Container\ContainerInterface) {
+                    $errors->setDefaultErrorHandler(new LegacyErrors($container));
+                }
+
+                // Outermost, so the length counts echoed output and error pages, as Slim 3's did.
                 if ($settings['addContentLengthHeader'] === true) {
                     $app->add(new \Slim\Middleware\ContentLengthMiddleware());
                 }
 
-                $app->addBodyParsingMiddleware();
-                $app->addRoutingMiddleware();
-                $app->addErrorMiddleware((bool) $settings['displayErrorDetails'], true, true);
-
                 return $app;
+            }
+        }
+
+        /**
+         * Routing that never throws: the route (or Slim 3's "no route" answer) is on
+         * the request before the app's middleware runs, and a miss goes on inward to
+         * LegacyRouteMiss, after the app's middleware, where Slim 3 handled it.
+         */
+        final class LegacyRouting implements \Psr\Http\Server\MiddlewareInterface
+        {
+            /** @var \Slim\App */
+            private $app;
+
+            public function __construct(\Slim\App $app)
+            {
+                $this->app = $app;
+            }
+
+            public function process(
+                \Psr\Http\Message\ServerRequestInterface $request,
+                \Psr\Http\Server\RequestHandlerInterface $handler
+            ): \Psr\Http\Message\ResponseInterface {
+                return $handler->handle(self::route($this->app, $request));
+            }
+
+            /** The request with its routing results (and its route, when one matched). */
+            public static function route(\Slim\App $app, \Psr\Http\Message\ServerRequestInterface $request): \Psr\Http\Message\ServerRequestInterface
+            {
+                $routing = new \Slim\Middleware\RoutingMiddleware($app->getRouteResolver(), $app->getRouteCollector()->getRouteParser());
+                $request = $request->withAttribute(\Slim\Routing\RouteContext::BASE_PATH, $app->getBasePath());
+                try {
+                    return $routing->performRouting($request);
+                } catch (\Slim\Exception\HttpNotFoundException $miss) {
+                    return $miss->getRequest();
+                } catch (\Slim\Exception\HttpMethodNotAllowedException $miss) {
+                    return $miss->getRequest();
+                }
+            }
+        }
+
+        /**
+         * The innermost layer: a request with no route (or the wrong method) gets the
+         * app's notFoundHandler or notAllowedHandler answer, as Slim 3 gave it; with
+         * the handler unset, the error goes on to PHP. A request whose path or method
+         * the app's middleware changed is routed again first, as Slim 3 did.
+         */
+        final class LegacyRouteMiss implements \Psr\Http\Server\MiddlewareInterface
+        {
+            /** @var \Slim\App */
+            private $app;
+
+            public function __construct(\Slim\App $app)
+            {
+                $this->app = $app;
+            }
+
+            public function process(
+                \Psr\Http\Message\ServerRequestInterface $request,
+                \Psr\Http\Server\RequestHandlerInterface $handler
+            ): \Psr\Http\Message\ResponseInterface {
+                $results = $request->getAttribute(\Slim\Routing\RouteContext::ROUTING_RESULTS);
+                if (!$results instanceof \Slim\Routing\RoutingResults) {
+                    return $handler->handle($request);
+                }
+                $path = '/' . ltrim(rawurldecode($request->getUri()->getPath()), '/');
+                if ($results->getUri() !== $path || $results->getMethod() !== $request->getMethod()) {
+                    $request = LegacyRouting::route($this->app, $request->withoutAttribute(\Slim\Routing\RouteContext::ROUTE));
+                    $results = $request->getAttribute(\Slim\Routing\RouteContext::ROUTING_RESULTS);
+                }
+                if (!$results instanceof \Slim\Routing\RoutingResults || $results->getRouteStatus() === \Slim\Routing\RoutingResults::FOUND) {
+                    return $handler->handle($request);
+                }
+
+                if ($results->getRouteStatus() === \Slim\Routing\RoutingResults::METHOD_NOT_ALLOWED) {
+                    $miss = new \Slim\Exception\HttpMethodNotAllowedException($request);
+                    $miss->setAllowedMethods($results->getAllowedMethods());
+                } else {
+                    $miss = new \Slim\Exception\HttpNotFoundException($request);
+                }
+                $container = $this->app->getContainer();
+                if (!$container instanceof \Psr\Container\ContainerInterface) {
+                    throw $miss;
+                }
+
+                return LegacyErrors::answer($container, $request, $miss);
+            }
+        }
+
+        /**
+         * The error middleware's handler: each error goes to the Slim 3 handler the
+         * container holds (errorHandler for an exception, phpErrorHandler for a PHP
+         * error, notFoundHandler and notAllowedHandler for a route miss), as Slim 3
+         * sent it; with that handler unset, the error goes on to PHP's own handler.
+         */
+        final class LegacyErrors
+        {
+            /** @var \Psr\Container\ContainerInterface */
+            private $container;
+
+            public function __construct(\Psr\Container\ContainerInterface $container)
+            {
+                $this->container = $container;
+            }
+
+            public function __invoke(
+                \Psr\Http\Message\ServerRequestInterface $request,
+                \Throwable $error,
+                bool $displayErrorDetails,
+                bool $logErrors,
+                bool $logErrorDetails
+            ): \Psr\Http\Message\ResponseInterface {
+                return self::answer($this->container, $request, $error);
+            }
+
+            public static function answer(
+                \Psr\Container\ContainerInterface $container,
+                \Psr\Http\Message\ServerRequestInterface $request,
+                \Throwable $error
+            ): \Psr\Http\Message\ResponseInterface {
+                if ($error instanceof \Slim\Exception\HttpMethodNotAllowedException) {
+                    $key = 'notAllowedHandler';
+                } elseif ($error instanceof \Slim\Exception\HttpNotFoundException) {
+                    $key = 'notFoundHandler';
+                } elseif ($error instanceof \Exception) {
+                    $key = 'errorHandler';
+                } else {
+                    $key = 'phpErrorHandler';
+                }
+                if (!$container->has($key)) {
+                    throw $error;
+                }
+                $handler = $container->get($key);
+                // The container's response with an empty body of its own: one request's
+                // error page must never land in the next one's (Slim 3 began each
+                // request with a fresh response).
+                $response = $container->has('response') ? $container->get('response') : new \Slim\Psr7\Response();
+                $response = $response->withBody((new \Slim\Psr7\Factory\StreamFactory())->createStream());
+                if ($error instanceof \Slim\Exception\HttpMethodNotAllowedException) {
+                    return $handler($request, $response, $error->getAllowedMethods());
+                }
+                if ($error instanceof \Slim\Exception\HttpNotFoundException) {
+                    return $handler($request, $response);
+                }
+
+                return $handler($request, $response, $error);
+            }
+        }
+
+        PHP;
+
+    private const ENVIRONMENT = <<<'PHP'
+        /**
+         * Slim 3's Environment on Slim 4: the server values as a collection, read
+         * with ['KEY'] or get('KEY'). mock() builds the fake values a test sends,
+         * with Slim 3's defaults.
+         */
+        final class LegacyEnvironment extends \ArrayObject
+        {
+            /**
+             * @param array<string, mixed> $settings
+             */
+            public static function mock(array $settings = []): self
+            {
+                $secure = (isset($settings['HTTPS']) && $settings['HTTPS'] !== 'off')
+                    || (isset($settings['REQUEST_SCHEME']) && $settings['REQUEST_SCHEME'] === 'https');
+
+                return new self(array_merge([
+                    'SERVER_PROTOCOL' => 'HTTP/1.1',
+                    'REQUEST_METHOD' => 'GET',
+                    'REQUEST_SCHEME' => $secure ? 'https' : 'http',
+                    'SCRIPT_NAME' => '',
+                    'REQUEST_URI' => '',
+                    'QUERY_STRING' => '',
+                    'SERVER_NAME' => 'localhost',
+                    'SERVER_PORT' => $secure ? 443 : 80,
+                    'HTTP_HOST' => 'localhost',
+                    'HTTP_ACCEPT' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'HTTP_ACCEPT_LANGUAGE' => 'en-US,en;q=0.8',
+                    'HTTP_ACCEPT_CHARSET' => 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+                    'HTTP_USER_AGENT' => 'Slim Framework',
+                    'REMOTE_ADDR' => '127.0.0.1',
+                    'REQUEST_TIME' => time(),
+                    'REQUEST_TIME_FLOAT' => microtime(true),
+                ], $settings));
+            }
+
+            /**
+             * @param string $key
+             * @param mixed $default
+             *
+             * @return mixed
+             */
+            public function get($key, $default = null)
+            {
+                return $this->offsetExists($key) ? $this->offsetGet($key) : $default;
+            }
+
+            /**
+             * @param string $key
+             * @param mixed $value
+             */
+            public function set($key, $value): void
+            {
+                $this->offsetSet($key, $value);
+            }
+
+            /**
+             * @param string $key
+             */
+            public function has($key): bool
+            {
+                return $this->offsetExists($key);
+            }
+
+            /**
+             * @param string $key
+             */
+            public function remove($key): void
+            {
+                if ($this->offsetExists($key)) {
+                    $this->offsetUnset($key);
+                }
+            }
+
+            /**
+             * @return array<string, mixed>
+             */
+            public function all(): array
+            {
+                return $this->getArrayCopy();
+            }
+        }
+
+        PHP;
+
+    private const HTTP = <<<'PHP'
+        /**
+         * What Slim 3's own HTTP classes did, on Slim 4's PSR-7 messages: a request
+         * from an environment (Request::createFromEnvironment), a response
+         * (new Response(...)), both with slim/http's helpers when it is installed,
+         * and Slim 3's own not-found, not-allowed and error pages.
+         */
+        final class LegacyHttp
+        {
+            /** Server values that are headers without an HTTP_ prefix. */
+            private const SPECIAL = ['CONTENT_TYPE', 'CONTENT_LENGTH', 'PHP_AUTH_USER', 'PHP_AUTH_PW', 'PHP_AUTH_DIGEST', 'AUTH_TYPE'];
+
+            /** The types Slim 3's pages came in, picked by the Accept header. */
+            private const TYPES = ['application/json', 'application/xml', 'text/xml', 'text/html'];
+
+            /**
+             * @param iterable<string, mixed> $environment a LegacyEnvironment, $_SERVER or the like
+             */
+            public static function createRequest($environment): \Psr\Http\Message\ServerRequestInterface
+            {
+                $env = [];
+                foreach ($environment as $key => $value) {
+                    $env[(string) $key] = $value;
+                }
+                $method = isset($env['REQUEST_METHOD']) ? (string) $env['REQUEST_METHOD'] : 'GET';
+                $secure = isset($env['HTTPS']) && $env['HTTPS'] !== '' && $env['HTTPS'] !== 'off';
+
+                $port = null;
+                if (isset($env['HTTP_HOST']) && (string) $env['HTTP_HOST'] !== '') {
+                    $host = (string) $env['HTTP_HOST'];
+                } else {
+                    $host = isset($env['SERVER_NAME']) ? (string) $env['SERVER_NAME'] : 'localhost';
+                    $port = isset($env['SERVER_PORT']) ? (int) $env['SERVER_PORT'] : null;
+                }
+                if (preg_match('/^(\[[a-fA-F0-9:.]+\])(:\d+)?\z/', $host, $match) === 1) {
+                    $host = $match[1];
+                    if (isset($match[2])) {
+                        $port = (int) substr($match[2], 1);
+                    }
+                } elseif (strpos($host, ':') !== false) {
+                    $port = (int) substr($host, strpos($host, ':') + 1);
+                    $host = (string) strstr($host, ':', true);
+                }
+
+                $target = isset($env['REQUEST_URI']) ? (string) $env['REQUEST_URI'] : '';
+                $path = (string) parse_url('http://example.com' . $target, PHP_URL_PATH);
+                $query = isset($env['QUERY_STRING']) ? (string) $env['QUERY_STRING'] : '';
+                if ($query === '') {
+                    $query = (string) parse_url('http://example.com' . $target, PHP_URL_QUERY);
+                }
+                $uri = (new \Slim\Psr7\Factory\UriFactory())->createUri('')
+                    ->withScheme($secure ? 'https' : 'http')
+                    ->withHost($host)
+                    ->withPort($port)
+                    ->withPath($path === '' ? '/' : $path)
+                    ->withQuery($query);
+                if (isset($env['PHP_AUTH_USER'])) {
+                    $uri = $uri->withUserInfo((string) $env['PHP_AUTH_USER'], isset($env['PHP_AUTH_PW']) ? (string) $env['PHP_AUTH_PW'] : null);
+                }
+
+                $headers = [];
+                foreach ($env as $key => $value) {
+                    $upper = strtoupper($key);
+                    if ($upper === 'HTTP_CONTENT_LENGTH' || (strpos($upper, 'HTTP_') !== 0 && !in_array($upper, self::SPECIAL, true))) {
+                        continue;
+                    }
+                    $name = strpos($upper, 'HTTP_') === 0 ? substr($upper, 5) : $upper;
+                    $headers[str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', $name))))] = (string) $value;
+                }
+
+                $cookies = [];
+                if (isset($headers['Cookie'])) {
+                    foreach (preg_split('/[;,]\s*/', $headers['Cookie']) ?: [] as $pair) {
+                        $parts = explode('=', $pair, 2);
+                        if (count($parts) === 2 && $parts[0] !== '' && !isset($cookies[$parts[0]])) {
+                            $cookies[$parts[0]] = urldecode($parts[1]);
+                        }
+                    }
+                }
+
+                $streams = new \Slim\Psr7\Factory\StreamFactory();
+                $input = @fopen('php://input', 'r');
+                $body = $streams->createStream($input === false ? '' : (string) stream_get_contents($input));
+                if ($input !== false) {
+                    fclose($input);
+                }
+
+                $request = new \Slim\Psr7\Request($method, $uri, new \Slim\Psr7\Headers($headers, $env), $cookies, $env, $body);
+                if (isset($_FILES) && $_FILES !== []) {
+                    $request = $request->withUploadedFiles(\Slim\Psr7\UploadedFile::createFromGlobals($env));
+                }
+                $type = strtolower(trim(explode(';', $request->getHeaderLine('Content-Type'))[0]));
+                if ($method === 'POST' && in_array($type, ['application/x-www-form-urlencoded', 'multipart/form-data'], true)) {
+                    $request = $request->withParsedBody($_POST);
+                }
+
+                return class_exists('Slim\\Http\\ServerRequest') ? new \Slim\Http\ServerRequest($request) : $request;
+            }
+
+            /**
+             * Slim 3's new Response($status, $headers, $body).
+             *
+             * @param iterable<string, string|list<string>>|null $headers
+             */
+            public static function createResponse(int $status = 200, $headers = null, ?\Psr\Http\Message\StreamInterface $body = null): \Psr\Http\Message\ResponseInterface
+            {
+                $response = new \Slim\Psr7\Response($status);
+                if (is_iterable($headers)) {
+                    foreach ($headers as $name => $value) {
+                        $response = $response->withHeader((string) $name, $value);
+                    }
+                }
+                if ($body !== null) {
+                    $response = $response->withBody($body);
+                }
+
+                return class_exists('Slim\\Http\\Response') ? new \Slim\Http\Response($response, new \Slim\Psr7\Factory\StreamFactory()) : $response;
+            }
+
+            /** Slim 3's default notFoundHandler page. */
+            public static function notFound(
+                \Psr\Http\Message\ServerRequestInterface $request,
+                \Psr\Http\Message\ResponseInterface $response
+            ): \Psr\Http\Message\ResponseInterface {
+                if ($request->getMethod() === 'OPTIONS') {
+                    $type = 'text/plain';
+                    $output = 'Not found';
+                } else {
+                    $type = self::type($request);
+                    if ($type === 'application/json') {
+                        $output = '{"message":"Not found"}';
+                    } elseif ($type === 'text/html') {
+                        $basePath = $request->getAttribute(\Slim\Routing\RouteContext::BASE_PATH);
+                        $home = (string) $request->getUri()->withPath('')->withQuery('')->withFragment('') . (is_string($basePath) ? $basePath : '') . '/';
+                        $output = str_replace('{{home}}', $home, self::NOT_FOUND_PAGE);
+                    } else {
+                        $output = '<root><message>Not found</message></root>';
+                    }
+                }
+
+                return self::page($response, 404, 'Content-Type', $type, $output);
+            }
+
+            /**
+             * Slim 3's default notAllowedHandler page (200 with the allowed methods for OPTIONS).
+             *
+             * @param list<string> $methods
+             */
+            public static function notAllowed(
+                \Psr\Http\Message\ServerRequestInterface $request,
+                \Psr\Http\Message\ResponseInterface $response,
+                array $methods
+            ): \Psr\Http\Message\ResponseInterface {
+                $allow = implode(', ', $methods);
+                if ($request->getMethod() === 'OPTIONS') {
+                    return self::page($response, 200, 'Content-type', 'text/plain', 'Allowed methods: ' . $allow)->withHeader('Allow', $allow);
+                }
+                $type = self::type($request);
+                if ($type === 'application/json') {
+                    $output = '{"message":"Method not allowed. Must be one of: ' . $allow . '"}';
+                } elseif ($type === 'text/html') {
+                    $output = str_replace('{{allow}}', $allow, self::NOT_ALLOWED_PAGE);
+                } else {
+                    $output = '<root><message>Method not allowed. Must be one of: ' . $allow . '</message></root>';
+                }
+
+                return self::page($response, 405, 'Content-type', $type, $output)->withHeader('Allow', $allow);
+            }
+
+            /** Slim 3's default errorHandler and phpErrorHandler page. */
+            public static function error(
+                \Psr\Http\Message\ServerRequestInterface $request,
+                \Psr\Http\Message\ResponseInterface $response,
+                \Throwable $error,
+                bool $displayErrorDetails
+            ): \Psr\Http\Message\ResponseInterface {
+                $title = 'Slim Application Error';
+                $previous = $error instanceof \Exception ? 'Previous exception' : 'Previous error';
+                $type = self::type($request);
+                if ($type === 'application/json') {
+                    $data = ['message' => $title];
+                    if ($displayErrorDetails) {
+                        $data['exception'] = [];
+                        for ($each = $error; $each !== null; $each = $each->getPrevious()) {
+                            $data['exception'][] = [
+                                'type' => get_class($each),
+                                'code' => $each->getCode(),
+                                'message' => $each->getMessage(),
+                                'file' => $each->getFile(),
+                                'line' => $each->getLine(),
+                                'trace' => explode("\n", $each->getTraceAsString()),
+                            ];
+                        }
+                    }
+                    $output = (string) json_encode($data, JSON_PRETTY_PRINT);
+                } elseif ($type === 'text/html') {
+                    if ($displayErrorDetails) {
+                        $html = '<p>The application could not run because of the following error:</p><h2>Details</h2>' . self::htmlError($error);
+                        for ($each = $error->getPrevious(); $each !== null; $each = $each->getPrevious()) {
+                            $html .= '<h2>' . $previous . '</h2>' . self::htmlError($each);
+                        }
+                    } else {
+                        $html = '<p>A website error has occurred. Sorry for the temporary inconvenience.</p>';
+                    }
+                    $output = sprintf(self::ERROR_PAGE, $title, $title, $html);
+                } else {
+                    $output = "<error>\n  <message>" . $title . "</message>\n";
+                    if ($displayErrorDetails) {
+                        for ($each = $error; $each !== null; $each = $each->getPrevious()) {
+                            $output .= "  <exception>\n    <type>" . get_class($each) . "</type>\n    <code>" . $each->getCode() . "</code>\n"
+                                . '    <message>' . self::cdata($each->getMessage()) . "</message>\n    <file>" . $each->getFile() . "</file>\n"
+                                . '    <line>' . $each->getLine() . "</line>\n    <trace>" . self::cdata($each->getTraceAsString()) . "</trace>\n  </exception>\n";
+                        }
+                    }
+                    $output .= '</error>';
+                }
+                if (!$displayErrorDetails) {
+                    $text = $title . ':' . PHP_EOL . self::textError($error);
+                    for ($each = $error->getPrevious(); $each !== null; $each = $each->getPrevious()) {
+                        $text .= PHP_EOL . 'Previous error:' . PHP_EOL . self::textError($each);
+                    }
+                    error_log($text . PHP_EOL . 'View in rendered output by enabling the "displayErrorDetails" setting.' . PHP_EOL);
+                }
+
+                return self::page($response, 500, 'Content-type', $type, $output);
+            }
+
+            private const NOT_FOUND_PAGE = "<html>\n    <head>\n        <title>Page Not Found</title>\n        <style>\n            body{\n                margin:0;\n                padding:30px;\n                font:12px/1.5 Helvetica,Arial,Verdana,sans-serif;\n            }\n            h1{\n                margin:0;\n                font-size:48px;\n                font-weight:normal;\n                line-height:48px;\n            }\n            strong{\n                display:inline-block;\n                width:65px;\n            }\n        </style>\n    </head>\n    <body>\n        <h1>Page Not Found</h1>\n        <p>\n            The page you are looking for could not be found. Check the address bar\n            to ensure your URL is spelled correctly. If all else fails, you can\n            visit our home page at the link below.\n        </p>\n        <a href='{{home}}'>Visit the Home Page</a>\n    </body>\n</html>";
+
+            private const NOT_ALLOWED_PAGE = "<html>\n    <head>\n        <title>Method not allowed</title>\n        <style>\n            body{\n                margin:0;\n                padding:30px;\n                font:12px/1.5 Helvetica,Arial,Verdana,sans-serif;\n            }\n            h1{\n                margin:0;\n                font-size:48px;\n                font-weight:normal;\n                line-height:48px;\n            }\n        </style>\n    </head>\n    <body>\n        <h1>Method not allowed</h1>\n        <p>Method not allowed. Must be one of: <strong>{{allow}}</strong></p>\n    </body>\n</html>";
+
+            private const ERROR_PAGE = "<html><head><meta http-equiv='Content-Type' content='text/html; charset=utf-8'><title>%s</title><style>body{margin:0;padding:30px;font:12px/1.5 Helvetica,Arial,Verdana,sans-serif;}h1{margin:0;font-size:48px;font-weight:normal;line-height:48px;}strong{display:inline-block;width:65px;}</style></head><body><h1>%s</h1>%s</body></html>";
+
+            /** The type Slim 3 answered in for this request's Accept header. */
+            private static function type(\Psr\Http\Message\ServerRequestInterface $request): string
+            {
+                $accept = $request->getHeaderLine('Accept');
+                $wanted = array_intersect(explode(',', $accept), self::TYPES);
+                if ($wanted !== []) {
+                    return (string) current($wanted);
+                }
+                if (preg_match('/\+(json|xml)/', $accept, $match) === 1) {
+                    return 'application/' . $match[1];
+                }
+
+                return 'text/html';
+            }
+
+            private static function page(\Psr\Http\Message\ResponseInterface $response, int $status, string $header, string $type, string $output): \Psr\Http\Message\ResponseInterface
+            {
+                return $response->withStatus($status)
+                    ->withHeader($header, $type)
+                    ->withBody((new \Slim\Psr7\Factory\StreamFactory())->createStream($output));
+            }
+
+            private static function htmlError(\Throwable $error): string
+            {
+                $html = sprintf('<div><strong>Type:</strong> %s</div>', get_class($error));
+                if ($error->getCode()) {
+                    $html .= sprintf('<div><strong>Code:</strong> %s</div>', $error->getCode());
+                }
+                if ($error->getMessage() !== '') {
+                    $html .= sprintf('<div><strong>Message:</strong> %s</div>', htmlentities($error->getMessage()));
+                }
+                if ($error->getFile() !== '') {
+                    $html .= sprintf('<div><strong>File:</strong> %s</div>', $error->getFile());
+                }
+                if ($error->getLine()) {
+                    $html .= sprintf('<div><strong>Line:</strong> %s</div>', $error->getLine());
+                }
+                if ($error->getTraceAsString() !== '') {
+                    $html .= '<h2>Trace</h2>' . sprintf('<pre>%s</pre>', htmlentities($error->getTraceAsString()));
+                }
+
+                return $html;
+            }
+
+            private static function textError(\Throwable $error): string
+            {
+                $text = sprintf('Type: %s' . PHP_EOL, get_class($error));
+                if ($error->getCode()) {
+                    $text .= sprintf('Code: %s' . PHP_EOL, $error->getCode());
+                }
+                if ($error->getMessage() !== '') {
+                    $text .= sprintf('Message: %s' . PHP_EOL, htmlentities($error->getMessage()));
+                }
+                $text .= sprintf('File: %s' . PHP_EOL, $error->getFile()) . sprintf('Line: %s' . PHP_EOL, $error->getLine());
+
+                return $text . sprintf('Trace: %s', $error->getTraceAsString());
+            }
+
+            private static function cdata(string $text): string
+            {
+                return sprintf('<![CDATA[%s]]>', str_replace(']]>', ']]]]><![CDATA[>', $text));
             }
         }
 
@@ -240,10 +911,22 @@ final class LegacyStubs
         return self::file($namespace, self::DOUBLE_PASS);
     }
 
-    /** LegacyApp (needs LegacyContainer in the same namespace). */
+    /** LegacyApp, LegacyRouting, LegacyRouteMiss and LegacyErrors (need the other glue files in the same namespace). */
     public static function app(string $namespace): string
     {
         return self::file($namespace, self::APP);
+    }
+
+    /** LegacyEnvironment, Slim 3's Environment. */
+    public static function environment(string $namespace): string
+    {
+        return self::file($namespace, self::ENVIRONMENT);
+    }
+
+    /** LegacyHttp: Slim 3's request and response factories and default pages. */
+    public static function http(string $namespace): string
+    {
+        return self::file($namespace, self::HTTP);
     }
 
     private static function file(string $namespace, string $body): string

@@ -392,7 +392,6 @@ final class SlimRouteRewriterTest extends TestCase
             "MANUAL: getAttribute('routeInfo') at line 6 has no Slim 4 equivalent; use RouteContext::fromRequest(\$request)->getRoutingResults().",
             'MANUAL: subRequest() at line 7 was removed in Slim 4; call $app->handle() with a new request instead.',
             'MANUAL: setArgument() at line 9: Route::setArgument exists in Slim 4; check the name.',
-            'MANUAL: line 8 uses Slim\\Http\\Environment, which Slim 4 removed; build requests with a PSR-17 ServerRequestFactory.',
             "MANUAL: line 10 reads Slim 3's router from the container; Slim 4 has no 'router' entry, use \$app->getRouteCollector() or RouteContext::fromRequest(\$request)->getRouteParser().",
             "MANUAL: line 11 reads Slim 3's router from the container; Slim 4 has no 'router' entry, use \$app->getRouteCollector() or RouteContext::fromRequest(\$request)->getRouteParser().",
             "MANUAL: line 12 reads Slim 3's router from the container; Slim 4 has no 'router' entry, use \$app->getRouteCollector() or RouteContext::fromRequest(\$request)->getRouteParser().",

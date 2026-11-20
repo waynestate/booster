@@ -4,6 +4,11 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Fixed: the Slim 3 to 4 hop keeps Slim 3's answers for a path with no route and a wrong method: the app's own middleware still runs, the page is Slim 3's (HTML, JSON or XML by Accept), a 405 carries Allow and an OPTIONS request gets a 200 (bug S2, slim-skeleton).
+- Fixed: the Slim 3 to 4 hop keeps the container's notFoundHandler, notAllowedHandler, errorHandler and phpErrorHandler keys working (an unset key lets the error through, as on Slim 3) and its environment, request and response entries, instead of listing them as MANUAL; an app served from a sub-folder keeps its base path (bug S3).
+- Fixed: the Slim 3 to 4 hop moves Slim 3 test harnesses: Environment::mock(), Request::createFromEnvironment(), new Response() and $app->process() go to the generated LegacyEnvironment, LegacyHttp and LegacyApp::process(), so the app's own tests run on Slim 4 (bug S1, slim-skeleton's tests).
+- Fixed: the Slim 3 to 4 hop always requires slim/http, so withJson(), write(), getParam() and isPost() keep working on routes that are not typed with Slim 3's classes (bug S4).
+- Fixed: the Slim 3 to 4 hop moves code typed with Slim 3's Slim\Container to the generated LegacyContainer and container-interop's ContainerInterface to PSR-11's; every page of a real app died on a TypeError without it (bug S7, testeval).
 - Fixed: the advisory unblock also answers a refusal through a package that requires the blocked one (Twig under slim/twig-view), and the final target drops an unblock an earlier step needed when composer update -W for that package passes the gate without it, instead of failing on the leftover entry (bug S6, testeval).
 - Fixed: a PHP hop also updates a locked release that allows the new PHP but misbehaves on it: Twig below 2.8 (1.x below 1.39) trims the whitespace before every {{ on PHP 7.4, which the replay caught on a real app (bug S5, testeval).
 - Fixed: the replay's csrf preset hides any hidden field whose name holds csrf or xsrf (an app's own CSRF_KEY, slim/csrf's csrf_name and csrf_value), not only the common names, so a fresh token per request is no longer a replay mismatch.

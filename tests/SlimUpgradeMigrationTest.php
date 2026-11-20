@@ -145,9 +145,9 @@ final class SlimUpgradeMigrationTest extends TestCase
 
         PHP;
 
-    private const HTTP_CHANGE = "Added slim/http ^1.3 to require (the decorators that keep withJson, write and getParam for the app's Slim\\Http\\Request and Response types).";
+    private const HTTP_CHANGE = "Added slim/http ^1.3 to require (the decorators that keep Slim 3's withJson, write, getParam and isPost on Slim 4's request and response).";
 
-    private const ERROR_HANDLER_LINE = "MANUAL: route exceptions now reach Slim's ErrorMiddleware before the app's own PHP error or exception handler; register that handler on the error middleware if you want the old page and logging.";
+    private const GLUE_CHANGE = 'Wrote the legacy container, double-pass adapter, app glue, environment and HTTP factories in src/Legacy.';
 
     private static function hop(): Hop
     {
@@ -325,7 +325,9 @@ final class SlimUpgradeMigrationTest extends TestCase
         self::assertSame(LegacyStubs::container('Acme\\Legacy'), file_get_contents($dir . '/src/Legacy/LegacyContainer.php'));
         self::assertSame(LegacyStubs::doublePass('Acme\\Legacy'), file_get_contents($dir . '/src/Legacy/LegacyDoublePass.php'));
         self::assertSame(LegacyStubs::app('Acme\\Legacy'), file_get_contents($dir . '/src/Legacy/LegacyApp.php'));
-        self::assertSame('Wrote the legacy container, double-pass adapter and app glue in src/Legacy.', $result->changes[0]);
+        self::assertSame(LegacyStubs::environment('Acme\\Legacy'), file_get_contents($dir . '/src/Legacy/LegacyEnvironment.php'));
+        self::assertSame(LegacyStubs::http('Acme\\Legacy'), file_get_contents($dir . '/src/Legacy/LegacyHttp.php'));
+        self::assertSame(self::GLUE_CHANGE, $result->changes[0]);
         self::assertDirectoryDoesNotExist($dir . '/tests/Legacy');
 
         // With no src/ entry, the first entry's folder and namespace are used.
@@ -344,7 +346,7 @@ final class SlimUpgradeMigrationTest extends TestCase
 
         self::assertSame($mine, file_get_contents($dir . '/src/Legacy/LegacyApp.php'));
         self::assertSame(LegacyStubs::container('Acme\\Legacy'), file_get_contents($dir . '/src/Legacy/LegacyContainer.php'));
-        self::assertContains('Wrote LegacyContainer, LegacyDoublePass in src/Legacy.', $result->changes);
+        self::assertContains('Wrote LegacyContainer, LegacyDoublePass, LegacyEnvironment, LegacyHttp in src/Legacy.', $result->changes);
         $lines = array_values(array_filter($result->manual, static fn(string $line): bool => str_starts_with($line, 'MANUAL: src/Legacy/LegacyApp.php exists and differs')));
         self::assertCount(1, $lines);
         self::assertNotContains('src/Legacy/LegacyApp.php', array_column($result->files, 'file'));
@@ -436,7 +438,7 @@ final class SlimUpgradeMigrationTest extends TestCase
         foreach ($result->changes as $line) {
             self::assertStringStartsWith('Dry run: would ', $line);
         }
-        self::assertContains('Dry run: would write the legacy container, double-pass adapter and app glue in src/Legacy.', $result->changes);
+        self::assertContains('Dry run: would write' . substr(self::GLUE_CHANGE, strlen('Wrote')), $result->changes);
         self::assertContains('Dry run: would rewrite the bootstrap in public/index.php.', $result->changes);
         self::assertContains('Dry run: would set slim/slim to ^4.15 in require.', $result->changes);
 
@@ -464,8 +466,9 @@ final class SlimUpgradeMigrationTest extends TestCase
         self::assertSame('^4.15', $require['slim/slim']);
         self::assertSame('^3', $require['pimple/pimple']);
         self::assertSame('^1.6', $require['slim/psr7']);
+        self::assertSame('^1.3', $require['slim/http']);
         self::assertArrayNotHasKey('php-di/php-di', $require);
-        self::assertSame(['slim/slim', 'pimple/pimple', 'slim/psr7'], $result->packages);
+        self::assertSame(['slim/slim', 'pimple/pimple', 'slim/psr7', 'slim/http'], $result->packages);
         self::assertContains('Set slim/slim to ^4.15 in require.', $result->changes);
 
         // A newer slim/psr7 the app already asks for is kept, and is not a package the gate updates.
@@ -503,7 +506,7 @@ final class SlimUpgradeMigrationTest extends TestCase
         self::assertNotContains('slim/twig-view', $plain->packages);
     }
 
-    public function test_manual_report_has_the_error_handler_line(): void
+    public function test_manual_report_lists_only_what_a_person_must_do(): void
     {
         $dir = $this->slimApp([
             'config/dependencies.php' => "<?php\n\n\$container['view'] = function (\$c) {\n    return new View(\$c->request->getUri(), \$c['response']);\n};\n",
@@ -511,8 +514,6 @@ final class SlimUpgradeMigrationTest extends TestCase
 
         $result = $this->migrateApp($dir);
 
-        self::assertContains(self::ERROR_HANDLER_LINE, $result->manual);
-        self::assertSame(self::ERROR_HANDLER_LINE, SlimUpgradeMigration::ERROR_HANDLER_LINE);
         foreach ($result->manual as $line) {
             self::assertStringStartsWith('MANUAL: ', $line);
         }
@@ -521,8 +522,12 @@ final class SlimUpgradeMigrationTest extends TestCase
             "MANUAL: templates/home.twig: 2 call(s) of path_for( or base_url(: Twig-View 3 has no path_for; use url_for from the Twig-View runtime extension (base_url is fine when it is the app's own global).",
             $result->manual,
         );
-        $reads = array_values(array_filter($result->manual, static fn(string $line): bool => str_starts_with($line, 'MANUAL: config/dependencies.php: 2 read(s)')));
-        self::assertCount(1, $reads);
+        // Bug S3: the glue holds Slim 3's request, response and environment
+        // entries and reads its handler keys, so neither is a MANUAL line.
+        self::assertSame([], array_values(array_filter(
+            $result->manual,
+            static fn(string $line): bool => str_contains($line, 'config/dependencies.php') || str_contains($line, 'ErrorMiddleware') || str_contains($line, 'handler'),
+        )));
         // The route rewriter's own MANUAL lines are listed with their file.
         self::assertNotSame([], array_filter($result->manual, static fn(string $line): bool => str_starts_with($line, 'MANUAL: src/Controller/Admin.php: line 7:')));
         // Reported, never edited.
@@ -543,7 +548,7 @@ final class SlimUpgradeMigrationTest extends TestCase
         self::assertSame([], $second->files);
         self::assertSame([], $second->packages);
         self::assertSame(['Nothing left to move: the app already runs on the Slim 4 glue.'], $second->changes);
-        self::assertContains(self::ERROR_HANDLER_LINE, $second->manual);
+        self::assertSame($first->manual, $second->manual);
     }
 
     public function test_slim_psr7_is_pinned_to_1_6(): void
@@ -565,7 +570,7 @@ final class SlimUpgradeMigrationTest extends TestCase
         self::assertNotContains('slim/psr7', $kept->packages);
     }
 
-    public function test_slim_http_is_required_when_the_app_uses_slim_3_request_or_response(): void
+    public function test_slim_http_is_required_for_the_slim_3_request_and_response_methods(): void
     {
         $dir = $this->slimApp(['src/routes.php' => self::SKELETON_ROUTES]);
 
@@ -575,9 +580,9 @@ final class SlimUpgradeMigrationTest extends TestCase
         self::assertContains('slim/http', $result->packages);
         self::assertContains(self::HTTP_CHANGE, $result->changes);
 
-        // A fully qualified Response type alone is enough, in app/ too, and the dry run says it would.
+        // An app that never names the classes still calls their methods (bug S4), and the dry run says it would.
         $response = $this->slimApp([
-            'app/Handlers/health.php' => "<?php\n\nfunction health(\$request, \\Slim\\Http\\Response \$response)\n{\n    return \$response->withJson(['ok' => true]);\n}\n",
+            'app/Handlers/health.php' => "<?php\n\nfunction health(\$request, \$response)\n{\n    return \$request->isPost() ? \$response->withJson(['ok' => true]) : \$response->write('ok');\n}\n",
         ]);
         $dry = $this->migrateApp($response, true);
         self::assertContains('Dry run: would add' . substr(self::HTTP_CHANGE, strlen('Added')), $dry->changes);
@@ -651,8 +656,9 @@ final class SlimUpgradeMigrationTest extends TestCase
         self::assertSame('^1.3', self::composer($dir)['require']['slim/http'] ?? null);
     }
 
-    public function test_environment_use_is_manual_with_line_numbers(): void
+    public function test_environment_moves_to_the_generated_glue(): void
     {
+        // Bug S1: Slim 3's Environment has no Slim 4 form, so it moves to LegacyEnvironment.
         $mock = <<<'PHP'
             <?php
 
@@ -671,26 +677,29 @@ final class SlimUpgradeMigrationTest extends TestCase
             PHP;
         // The routes file also goes through the route rewriter, which has its own Environment rule.
         $routes = self::ROUTES . "\$env = \\Slim\\Http\\Environment::mock();\n";
-        $dir = $this->slimApp(['src/Support/Mock.php' => $mock, 'src/routes.php' => $routes]);
+        $grouped = "<?php\n\nnamespace Acme\\Support;\n\nuse Slim\\Http\\{Environment, Request};\n\n\$env = Environment::mock();\n\$headers = new \\Slim\\Http\\Headers();\n";
+        $dir = $this->slimApp(['src/Support/Mock.php' => $mock, 'src/routes.php' => $routes, 'src/Support/grouped.php' => $grouped]);
 
         $result = $this->migrateApp($dir);
 
-        self::assertSame(
-            'Slim\\Http\\Environment is gone in Slim 4; build test requests with Slim\\Psr7\\Factory\\ServerRequestFactory or Slim\\Http\\Factory\\DecoratedServerRequestFactory.',
-            SlimUpgradeMigration::ENVIRONMENT_NOTE,
-        );
-        self::assertContains('MANUAL: src/Support/Mock.php: lines 5, 9, 11: ' . SlimUpgradeMigration::ENVIRONMENT_NOTE, $result->manual);
-        $routeLines = array_values(array_filter(
+        self::assertSame(str_replace('use Slim\\Http\\Environment;', 'use Acme\\Legacy\\LegacyEnvironment as Environment;', $mock), file_get_contents($dir . '/src/Support/Mock.php'));
+        self::assertStringContainsString("\$env = \\Acme\\Legacy\\LegacyEnvironment::mock();\n", (string) file_get_contents($dir . '/src/routes.php'));
+        self::assertContains("Rewrote Slim 3's Container, Environment, Request::createFromEnvironment() and new Response() to the generated LegacyContainer, LegacyEnvironment and LegacyHttp (and container-interop's ContainerInterface to PSR-11's) in src/Support/Mock.php.", $result->changes);
+        self::assertSame([], array_values(array_filter(
             $result->manual,
-            static fn(string $line): bool => str_starts_with($line, 'MANUAL: src/routes.php') && str_contains($line, 'Environment'),
-        ));
-        self::assertSame([sprintf('MANUAL: src/routes.php: line %d: %s', substr_count(self::ROUTES, "\n") + 1, SlimUpgradeMigration::ENVIRONMENT_NOTE)], $routeLines);
-        // Reported, never edited; and the class needs slim/http's line of Slim 4 messages.
-        self::assertSame($mock, file_get_contents($dir . '/src/Support/Mock.php'));
-        self::assertSame('^1.3', self::composer($dir)['require']['slim/http'] ?? null);
+            static fn(string $line): bool => str_starts_with($line, 'MANUAL: src/routes.php') || str_starts_with($line, 'MANUAL: src/Support/Mock.php'),
+        )));
+
+        // A group use cannot be split by itself, and Slim 3's Headers has no Slim 4 form: both are reported.
+        self::assertContains('MANUAL: src/Support/grouped.php: lines 5, 7: ' . SlimUpgradeMigration::ENVIRONMENT_NOTE, $result->manual);
+        self::assertContains('MANUAL: src/Support/grouped.php: line 8: ' . SlimUpgradeMigration::SLIM3_ONLY_NOTE, $result->manual);
+        self::assertStringContainsString('use Slim\\Http\\{Environment, ServerRequest as Request};', (string) file_get_contents($dir . '/src/Support/grouped.php'));
+
+        $second = $this->migrateApp($dir);
+        self::assertSame([], $second->files);
     }
 
-    public function test_environment_in_tests_folder_is_reported(): void
+    public function test_test_harness_moves_to_the_generated_glue(): void
     {
         $dir = $this->slimApp([
             'tests/Functional/BaseTestCase.php' => self::BASE_TEST_CASE,
@@ -700,16 +709,22 @@ final class SlimUpgradeMigrationTest extends TestCase
 
         $result = $this->migrateApp($dir);
 
-        self::assertContains('MANUAL: tests/Functional/BaseTestCase.php: lines 5, 13: ' . SlimUpgradeMigration::ENVIRONMENT_NOTE, $result->manual);
-        self::assertSame([], array_values(array_filter($result->manual, static fn(string $line): bool => str_contains($line, 'scripts/mock.php'))));
         $harness = (string) file_get_contents($dir . '/tests/Functional/BaseTestCase.php');
-        self::assertStringContainsString("use Slim\\Http\\Environment;\nuse Slim\\Http\\ServerRequest as Request;\nuse Slim\\Http\\Response;\n", $harness);
+        self::assertStringContainsString("use Acme\\Legacy\\LegacyEnvironment as Environment;\nuse Slim\\Http\\ServerRequest as Request;\nuse Slim\\Http\\Response;\n", $harness);
+        self::assertStringContainsString('$request = \\Acme\\Legacy\\LegacyHttp::createRequest($environment);', $harness);
+        self::assertStringContainsString('return $app->process($request, \\Acme\\Legacy\\LegacyHttp::createResponse());', $harness);
+        \PhpToken::tokenize($harness, TOKEN_PARSE);
         self::assertContains('Rewrote Slim\\Http\\Request to its slim/http decorator, Slim\\Http\\ServerRequest in tests/Functional/BaseTestCase.php.', $result->changes);
+        self::assertContains("Rewrote Slim 3's Container, Environment, Request::createFromEnvironment() and new Response() to the generated LegacyContainer, LegacyEnvironment and LegacyHttp (and container-interop's ContainerInterface to PSR-11's) in tests/Functional/BaseTestCase.php (3 times).", $result->changes);
+        self::assertSame([], array_values(array_filter($result->manual, static fn(string $line): bool => str_contains($line, 'BaseTestCase.php') || str_contains($line, 'scripts/mock.php'))));
+        self::assertSame((string) file_get_contents($dir . '/scripts/mock.php'), "<?php\n\n\$env = \\Slim\\Http\\Environment::mock();\n");
         self::assertContains(self::HTTP_CHANGE, $result->changes);
     }
 
-    public function test_no_slim_http_requirement_when_the_app_does_not_use_it(): void
+    public function test_slim_http_is_required_even_when_the_app_never_names_it(): void
     {
+        // Bug S4: Slim 3 apps call getParam(), isPost(), withJson() and write()
+        // on the request and response without naming their classes.
         $note = "<?php\n\n// Slim\\Http\\Request was Slim 3's request.\n\$name = 'Slim\\Http\\Response';\n";
         $dir = $this->slimApp([
             'src/note.php' => $note,
@@ -722,10 +737,55 @@ final class SlimUpgradeMigrationTest extends TestCase
 
         $require = self::composer($dir)['require'];
         self::assertIsArray($require);
-        self::assertArrayNotHasKey('slim/http', $require);
-        self::assertNotContains('slim/http', $result->packages);
-        self::assertSame([], array_values(array_filter([...$result->changes, ...$result->manual], static fn(string $line): bool => str_contains($line, 'Slim\\Http') || str_contains($line, 'slim/http'))));
+        self::assertSame('^1.3', $require['slim/http'] ?? null);
+        self::assertSame(['slim/slim', 'pimple/pimple', 'slim/psr7', 'slim/http'], $result->packages);
+        self::assertSame([self::HTTP_CHANGE], array_values(array_filter([...$result->changes, ...$result->manual], static fn(string $line): bool => str_contains($line, 'Slim\\Http') || str_contains($line, 'slim/http'))));
         self::assertSame($note, file_get_contents($dir . '/src/note.php'));
-        self::assertSame(['slim/slim', 'pimple/pimple', 'slim/psr7'], $result->packages);
+    }
+
+    public function test_slim_container_type_hints_move_to_the_generated_container(): void
+    {
+        // Bug S7 (testeval): controllers typed \Slim\Container died with a
+        // TypeError on every page once the app ran on the legacy container.
+        $controller = <<<'PHP'
+            <?php
+
+            namespace Acme\Controller;
+
+            use Slim\Container;
+            use Interop\Container\ContainerInterface;
+
+            /** @param \Slim\Container $container (comments stay) */
+            class Page
+            {
+                public function __construct(\Slim\Container $container, ?ContainerInterface $other = null, ?\Interop\Container\ContainerInterface $third = null)
+                {
+                }
+
+                public static function make(Container $c): self
+                {
+                    return new self($c);
+                }
+            }
+            PHP;
+        $grouped = "<?php\n\nnamespace Acme;\n\nuse Slim\\{App, Container};\n\nfunction box(Container \$c) {}\n";
+        $dir = $this->slimApp(['src/Controller/Page.php' => $controller, 'src/grouped.php' => $grouped]);
+
+        $result = $this->migrateApp($dir);
+
+        $page = (string) file_get_contents($dir . '/src/Controller/Page.php');
+        \PhpToken::tokenize($page, TOKEN_PARSE);
+        self::assertStringContainsString("use Acme\\Legacy\\LegacyContainer as Container;\nuse Psr\\Container\\ContainerInterface;\n", $page);
+        self::assertStringContainsString('public function __construct(\\Acme\\Legacy\\LegacyContainer $container, ?ContainerInterface $other = null, ?\\Psr\\Container\\ContainerInterface $third = null)', $page);
+        self::assertStringContainsString('public static function make(Container $c): self', $page);
+        self::assertStringContainsString('/** @param \\Slim\\Container $container (comments stay) */', $page);
+        self::assertContains("Rewrote Slim 3's Container, Environment, Request::createFromEnvironment() and new Response() to the generated LegacyContainer, LegacyEnvironment and LegacyHttp (and container-interop's ContainerInterface to PSR-11's) in src/Controller/Page.php (4 times).", $result->changes);
+        self::assertContains('MANUAL: src/grouped.php: lines 5, 7: ' . SlimUpgradeMigration::CONTAINER_NOTE, $result->manual);
+        self::assertSame($grouped, file_get_contents($dir . '/src/grouped.php'));
+
+        // A second run finds nothing left to move.
+        $again = $this->migrateApp($dir);
+        self::assertSame($page, file_get_contents($dir . '/src/Controller/Page.php'));
+        self::assertSame([], array_values(array_filter($again->changes, static fn(string $line): bool => str_contains($line, 'Page.php'))));
     }
 }
