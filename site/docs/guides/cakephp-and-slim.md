@@ -42,6 +42,8 @@ Two hops, `cakephp-4-to-4.6` then `cakephp-4.6-to-5`, with the PHP hops between 
 
 A CakePHP 4.3 app on PHP 8.1 therefore plans `cakephp-4-to-4.6`, `php-81-to-82`, `cakephp-4.6-to-5`, then `php-82-to-83`, `php-83-to-84` and `php-84-to-85`. The same app on PHP 7.3 plans `php-73-to-74` first, then `cakephp-4-to-4.6`, then the same course. Stop on 4.6 with `--to-cakephp 4`: it still runs on PHP 8.5, but 4.x is end of life, so treat it as a rest stop, not a home. A target PHP below 8.2 leaves the CakePHP 5 step out with a warning, `--skip cakephp-4.6-to-5` leaves it out too, and the PHP hops then stay within what 4.6 runs on.
 
+**Install first for a dry run.** The rules read the app's own `vendor/` (mounted read-only), so run `composer install` in the app before a `--dry-run`; a real run's baseline does it for you.
+
 **Fix deprecations first.** Run your tests with `error_reporting(E_ALL)` on CakePHP 4.6 and fix every deprecation notice before the 5 step. A deprecation on 4.6 is CakePHP 5 knocking politely; on 5 it stops knocking. Booster tells you; it does not fix them for you.
 
 **The sign-in move.** The 5 step moves the like-for-like AuthComponent calls (`$this->Auth->user('x')` reads the identity, `setUser()` becomes `setIdentity()`, `logout()` and `allow()` keep their names on `$this->Authentication`), swaps `loadComponent('Auth')` for `loadComponent('Authentication.Authentication')`, requires `cakephp/authentication ^3.0`, and wires `src/Application.php`: the provider interface, the plugin, the middleware after routing, and a service with the Session authenticator whose guests go to the old `loginAction`.

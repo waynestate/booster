@@ -98,6 +98,7 @@ final class CakeUpgradeMigrationTest extends TestCase
             'tests/TestCase/ApplicationTest.php' => "<?php\nnamespace App\\Test\\TestCase;\n\nclass ApplicationTest {}\n",
             'config/app.php' => "<?php\nreturn [];\n",
             'vendor/cakephp/cakephp/VERSION.txt' => "4.5.0\n",
+            'vendor/autoload.php' => "<?php\n// the installed app's autoloader\n",
             'tmp/cache/models/x' => 'cached',
         ];
         foreach (array_replace($defaults, $files) as $file => $contents) {
@@ -410,6 +411,38 @@ final class CakeUpgradeMigrationTest extends TestCase
         self::assertStringNotContainsString('output line 5', $refusal, 'only the last 15 lines are quoted');
         self::assertSame($before, self::snapshot($app), 'the app is as it was, composer.json included');
         self::assertSame([], self::callsFor(self::rectorCalls($fake), 'cakephp44'), 'nothing runs after the failure');
+    }
+
+    public function test_vendor_is_mounted_read_only_when_present(): void
+    {
+        $app = $this->cakeApp();
+        $fake = $this->docker();
+
+        $this->engine($fake)->migrate($app, true, '8.3', self::hop46());
+
+        $rector = array_values(array_filter($fake->calls, static fn(array $call): bool => in_array('rector', $call['command'], true)));
+        self::assertNotSame([], $rector);
+        foreach ($rector as $call) {
+            $command = $call['command'];
+            // The copy at /app, then the app's own vendor/ over /app/vendor, read-only, and named as the autoloader.
+            self::assertSame($app . '/vendor:/app/vendor:ro', $command[(int) array_search('-v', $command, true) + 3]);
+            self::assertSame('/app/vendor/autoload.php', $command[(int) array_search('--autoload', $command, true) + 1]);
+            self::assertStringStartsNotWith($app . ':', $command[(int) array_search('-v', $command, true) + 1], 'Rector writes the copy, never the app');
+        }
+    }
+
+    public function test_missing_vendor_is_a_stop_sign(): void
+    {
+        $app = $this->cakeApp(['vendor/autoload.php' => null]);
+        $before = self::snapshot($app);
+        $fake = $this->docker();
+
+        $result = $this->engine($fake)->migrate($app, true, '8.3', self::hop46());
+
+        self::assertSame([CakeUpgradeMigration::NO_VENDOR], $result->refusals);
+        self::assertSame("The CakePHP rule sets need the app's vendor/ folder; run composer install in the app first.", CakeUpgradeMigration::NO_VENDOR);
+        self::assertSame([], $fake->calls, 'no container runs');
+        self::assertSame($before, self::snapshot($app), 'nothing changed');
     }
 
     public function test_a_rule_set_that_prints_an_error_with_exit_0_refuses(): void

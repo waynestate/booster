@@ -88,6 +88,8 @@ Oracle driver if the app has it, and requires CakePHP 5.4 with the plugins that 
 <code>cakephp-4-to-4.6</code>, then the same course. Stop on 4.6 with <code>--to-cakephp 4</code>: it still runs on PHP 8.5, but 4.x is end
 of life, so treat it as a rest stop, not a home. A target PHP below 8.2 leaves the CakePHP 5 step out with a warning,
 <code>--skip cakephp-4.6-to-5</code> leaves it out too, and the PHP hops then stay within what 4.6 runs on.</p>
+<p><strong>Install first for a dry run.</strong> The rules read the app's own <code>vendor/</code> (mounted read-only), so run
+<code>composer install</code> in the app before a <code>--dry-run</code>; a real run's baseline does it for you.</p>
 <p><strong>Fix deprecations first.</strong> Run your tests with <code>error_reporting(E_ALL)</code> on CakePHP 4.6 and fix every deprecation
 notice before the 5 step. A deprecation on 4.6 is CakePHP 5 knocking politely; on 5 it stops knocking. Booster tells
 you; it does not fix them for you.</p>

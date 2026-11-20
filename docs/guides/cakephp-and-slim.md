@@ -63,6 +63,9 @@ A CakePHP 4.3 app on PHP 8.1 therefore plans `cakephp-4-to-4.6`, `php-81-to-82`,
 of life, so treat it as a rest stop, not a home. A target PHP below 8.2 leaves the CakePHP 5 step out with a warning,
 `--skip cakephp-4.6-to-5` leaves it out too, and the PHP hops then stay within what 4.6 runs on.
 
+**Install first for a dry run.** The rules read the app's own `vendor/` (mounted read-only), so run
+`composer install` in the app before a `--dry-run`; a real run's baseline does it for you.
+
 **Fix deprecations first.** Run your tests with `error_reporting(E_ALL)` on CakePHP 4.6 and fix every deprecation
 notice before the 5 step. A deprecation on 4.6 is CakePHP 5 knocking politely; on 5 it stops knocking. Booster tells
 you; it does not fix them for you.

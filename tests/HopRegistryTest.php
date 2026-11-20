@@ -24,7 +24,7 @@ final class HopRegistryTest extends PhpUnitTestCase
                     // A CakePHP hop's sets are cakephp/upgrade rule set names,
                     // run by its engine in the tool's own container, not
                     // Booster's Rector: the runner refuses a malformed name.
-                    $command = $runner->rectorCommand('/srv/app', $constant, 'src');
+                    $command = $runner->rectorCommand('/srv/app', $constant, 'src', '/srv/app/vendor');
                     self::assertSame($constant, $command[array_search('--rules', $command, true) + 1], $hop->id);
 
                     continue;

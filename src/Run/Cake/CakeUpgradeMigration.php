@@ -52,6 +52,9 @@ final class CakeUpgradeMigration implements FrameworkEngine
     /** The 4.6 step's line for the cakephp43 Socket rules the image drops (docker/cakephp-upgrade/Dockerfile). */
     public const SOCKET_HINT = 'MANUAL: CakePHP 4.3 renamed some Socket properties and Booster does not rewrite them; search your code for Cake\Network\Socket property uses ($socket->connected is isConnected(), ->encrypted is isEncrypted(), ->lastError is lastError()).';
 
+    /** The stop sign for an app with no installed vendor/ (a dry run before any composer install, say). */
+    public const NO_VENDOR = "The CakePHP rule sets need the app's vendor/ folder; run composer install in the app first.";
+
     /** How much of a failed tool run the refusal quotes. */
     private const TAIL_LINES = 15;
 
@@ -113,6 +116,10 @@ final class CakeUpgradeMigration implements FrameworkEngine
         if (!is_dir($appPath . '/src')) {
             $refusals[] = 'There is no src/ directory, so the app does not have the CakePHP layout the upgrade rules expect.';
         }
+        // Rector loads the app's classes through its autoloader; without one cakephp/upgrade runs no rule.
+        if (!is_file($appPath . '/vendor/autoload.php')) {
+            $refusals[] = self::NO_VENDOR;
+        }
         if ($hop->rectorSets === []) {
             $refusals[] = sprintf('The %s hop names no cakephp/upgrade rule sets, so there is nothing to run.', $hop->id);
         }
@@ -133,9 +140,11 @@ final class CakeUpgradeMigration implements FrameworkEngine
         }
 
         $subdirs = array_values(array_filter(self::SUBDIRS, static fn(string $dir): bool => is_dir($copy . '/' . $dir)));
+        // The mount point for the app's read-only vendor/, made here so Docker does not make it as root.
+        @mkdir($copy . '/vendor', 0775, true);
         foreach ($hop->rectorSets as $set) {
             foreach ($subdirs as $subdir) {
-                $result = $this->runner->run($this->runner->rectorCommand($copy, $set, $subdir));
+                $result = $this->runner->run($this->runner->rectorCommand($copy, $set, $subdir, $appPath . '/vendor'));
                 if (!$result->successful()) {
                     return self::refuse(self::failure(sprintf('The cakephp/upgrade rule set %s failed on %s/', $set, $subdir), $result));
                 }
