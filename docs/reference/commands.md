@@ -184,7 +184,7 @@ Usage: `booster scan [--path PATH] [--php PHP] [--removals] [--format FORMAT] [-
 | `-n`, `--no-interaction` | Do not ask any interactive question |  |
 <!-- /generated -->
 
-A real `booster run` (not `--dry-run`) also writes a slim machine-readable hop record, `booster-hop.json`, at the app root, overwriting any earlier one; dry runs write nothing. Its keys, in order:
+A real `booster run` (not `--dry-run`) also writes a slim machine-readable hop record, `booster-hop.json`, at the app root, overwriting any earlier one; dry runs write nothing, and neither does a run refused before its first hop (a red baseline or replay baseline), so the record of a stopped hop survives for the next run's re-gate. Its keys, in order:
 
 - `tool`: always `booster`.
 - `version`: the Booster version that ran.
