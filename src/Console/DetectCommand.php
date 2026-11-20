@@ -50,7 +50,7 @@ final class DetectCommand extends BaseCommand
             $output->writeln('Warning: ' . TextWriter::clean($warning), OutputInterface::OUTPUT_RAW);
             $output->writeln('', OutputInterface::OUTPUT_RAW);
         }
-        $stopSign = WayneAuthScan::stopSign($project->wayneAuthHits);
+        $stopSign = WayneAuthScan::stopSign($project->wayneAuthHits, $project->phpVersion);
         if ($stopSign !== []) {
             // Before the keys: a sign-in that dies on the first PHP hop
             // outranks everything detect has to say.

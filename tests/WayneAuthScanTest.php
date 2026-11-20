@@ -79,6 +79,22 @@ final class WayneAuthScanTest extends TestCase
         self::assertStringNotContainsString("\u{2014}", implode(' ', $lines));
     }
 
+    /** Bug 7 (proof run 2026-11-20): a Wayne Auth app already on PHP 8 was told about leaving PHP 5.6. */
+    public function test_an_app_already_on_php_7_or_later_gets_the_reason_that_fits_it(): void
+    {
+        $eight = WayneAuthScan::stopSign(['lib/WayneAuth.php:3 declares the Wayne Auth class'], '^8.1');
+
+        self::assertSame('Stop sign: the app signs people in through Wayne Auth (lib/WayneAuth.php:3 declares the Wayne Auth class).', $eight[0]);
+        self::assertStringContainsString('this app is on PHP 8.1, which verifies the service\'s TLS certificate by default', $eight[1]);
+        self::assertStringContainsString('in the same release as the next hop', $eight[1]);
+        self::assertStringNotContainsString('5.6', $eight[1]);
+        self::assertStringEndsWith(WayneAuthScan::GUIDE, $eight[1]);
+
+        foreach (['5.6', null, 'not a version'] as $php) {
+            self::assertStringContainsString('once the app leaves PHP 5.6 nobody can sign in', WayneAuthScan::stopSign(['a.php:1 one'], $php)[1]);
+        }
+    }
+
     public function test_detect_shows_the_stop_sign_and_the_key(): void
     {
         $project = (new ProjectDetector())->detect(self::FIXTURE);

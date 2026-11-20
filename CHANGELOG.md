@@ -4,6 +4,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Fixed: the Wayne Auth stop sign on an app already on PHP 7 or later no longer talks about leaving PHP 5.6: it says that PHP already checks the expired certificate, so the sign-in fails there unless the app turned the check off, and that the move to SESAME's bridge ships with the next hop.
 - Fixed: a run refused before its first hop (a red baseline or replay baseline) no longer writes `booster-hop.json`, so it cannot overwrite the record a stopped hop left for the re-gate, and instead of "Nothing was changed" it says Booster changed none of the code and names the `composer.lock` and `vendor/` the baseline's composer install left in an app that had neither.
 - Fixed: `replay init` drafts a CakePHP app from `config/routes.php` (scopes, prefixes, `connect()` and verb routes, the `/pages/*` templates and, behind `fallbacks()`, each public controller action) and serves it from `webroot/index.php` with its `tmp/` folders; it used to draft docroot `.`, the CLI script and the webroot folder. Slim routes now carry their group prefixes, also through a group that calls a class's `addRoutes($app)`, and a `phpinfo()` page is never drafted.
 - Fixed: `plan` now shows a stop sign up front when a Slim 3 app has no PSR-4 `autoload` entry for the Slim 4 glue (the official Slim 3 skeleton has only `autoload-dev`); before, only `run` refused it, at the Slim step.

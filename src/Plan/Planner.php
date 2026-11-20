@@ -622,7 +622,7 @@ final class Planner
 
         // Wayne Auth first: every other warning is about one hop, this one is
         // about whether anybody can sign in once the first hop ships.
-        $wayneAuth = WayneAuthScan::stopSign($project->wayneAuthHits);
+        $wayneAuth = WayneAuthScan::stopSign($project->wayneAuthHits, $fromPhp);
         if ($wayneAuth !== []) {
             array_unshift($warnings, implode(' ', $wayneAuth));
         }

@@ -223,7 +223,9 @@ An app that still signs people in through the old Wayne Auth service in its own 
 `plan`. PHP 5.6 never checked that service's TLS certificate; PHP 7 and later do, and it has expired, so sign-in breaks
 on the first PHP hop off 5.6. Ship the move to SESAME's Wayne Auth bridge (it needs PHP 8.3) in the same release as the
 PHP hops, and deploy no hop off 5.6 before it:
-[Moving off Wayne Auth](https://sesame.apps.wayne.edu/docs/guides/moving-off-wayne-auth.html).
+[Moving off Wayne Auth](https://sesame.apps.wayne.edu/docs/guides/moving-off-wayne-auth.html). An app already on PHP 7
+or later gets the stop sign worded for it: its PHP already checks the certificate, so the sign-in fails there unless the
+app turned the check off, and the move ships with the next hop.
 
 ## 13. Plan for a future date, or a different policy
 
