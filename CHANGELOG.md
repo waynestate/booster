@@ -4,6 +4,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Fixed: the Slim 3 to 4 hop raises dflydev/fig-cookies to ^3.0 when the app lists it; 2.x needs PHP below 8, so the PHP 8.0 hop could not install it (bug S9, testeval).
 - Fixed: the Slim 3 to 4 hop moves Twig 1 and 2's underscore class names (Twig_Environment, Twig_SimpleFilter, Twig_Extension), which Twig 3 removed, to the namespaced classes, using Rector's own Twig map, and new Slim\Views\Twig(...) to Twig-View 3's Twig::create(...) (bug S8, testeval).
 - Fixed: the Slim 3 to 4 hop keeps Slim 3's answers for a path with no route and a wrong method: the app's own middleware still runs, the page is Slim 3's (HTML, JSON or XML by Accept), a 405 carries Allow and an OPTIONS request gets a 200 (bug S2, slim-skeleton).
 - Fixed: the Slim 3 to 4 hop keeps the container's notFoundHandler, notAllowedHandler, errorHandler and phpErrorHandler keys working (an unset key lets the error through, as on Slim 3) and its environment, request and response entries, instead of listing them as MANUAL; an app served from a sub-folder keeps its base path (bug S3).

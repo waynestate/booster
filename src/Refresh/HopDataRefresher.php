@@ -234,6 +234,8 @@ final class HopDataRefresher
             'slim/psr7' => '^1.6',
             'slim/http' => '^1.0',
             'slim/twig-view' => '^3.4',
+            // fig-cookies 2.x needs php ^7.2, so a Slim 3 app that sets PSR-7 cookies stops at the PHP 8.0 hop; 3.x allows ^7.2 || ^8.0 with the same API (testeval, 2026-11-20).
+            'dflydev/fig-cookies' => '^3.0',
         ],
     ];
 

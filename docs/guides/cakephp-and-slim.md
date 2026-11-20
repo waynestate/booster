@@ -147,7 +147,8 @@ the PHP hop that lands on 7.4), then the PHP hops to 8.5. `--to-slim 3.13` is re
 - `composer.json` gets `slim/slim ^4.15`, `pimple/pimple ^3` and `slim/psr7 ^1.6` (the line that still installs on
   PHP 7.4), `slim/http ^1.3` (always: the container's request and response are its decorators, so `withJson()`,
   `write()`, `getParam()` and `isPost()` keep working however the route is typed), plus
-  `slim/twig-view ^3.4` and `twig/twig ^3.8` when the app already lists them.
+  `slim/twig-view ^3.4`, `twig/twig ^3.8` and `dflydev/fig-cookies ^3.0` when the app already lists them
+  (fig-cookies 2 needs PHP below 8, so the PHP 8.0 hop could not install it).
 - Twig below 2.8 (1.x below 1.39) allows PHP 7.4 but trims the whitespace before every `{{` there, so the PHP 7.4
   hop updates it inside the app's constraints; the replay caught it on a real app.
 
