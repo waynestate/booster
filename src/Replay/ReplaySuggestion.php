@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Replay;
 
+use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Run\BaselineResult;
 use Waynestate\Booster\Run\StockTests;
@@ -28,10 +29,31 @@ final readonly class ReplaySuggestion
         public string $reason,
         /** Whether booster-replay.json is already in the app, so only --replay is missing. */
         public bool $fileExists,
-        /** The plan step most likely to change an answer (the PHP 8.0 hop), or null when the plan has none. */
+        /** The first plan step most likely to change an answer (a hop marked for extra review), or null when the plan has none. */
         public ?int $riskiestStep = null,
         public ?string $riskiestHop = null,
+        /**
+         * Every such step, in plan order, with what makes it risky; the
+         * first is $riskiestStep.
+         *
+         * @var list<array{int, string}>
+         */
+        public array $riskySteps = [],
     ) {}
+
+    /**
+     * What makes a hop marked for extra review likely to change what a
+     * page answers (bug 9, proof run 2026-11-20: a CakePHP or Slim plan was
+     * given the PHP 8.0 reasons).
+     */
+    public static function why(string $hopId): string
+    {
+        return match ($hopId) {
+            HopRegistry::CAKEPHP_46_TO_5_ID => 'a framework major: sign-in moves from AuthComponent to the Authentication plugin, and CakePHP 5 changes what controllers, the ORM and the templates get and return.',
+            HopRegistry::SLIM_3_TO_4_ID => 'a framework major: the bootstrap, routes, request and response, error pages and middleware all move to Slim 4.',
+            default => 'loose comparisons of numbers and strings, and warnings that now throw.',
+        };
+    }
 
     /**
      * The suggestion for this run, or null when there is nothing to suggest:
@@ -51,19 +73,19 @@ final readonly class ReplaySuggestion
         if ($reason === null) {
             return null;
         }
-        $riskiest = null;
+        $risky = [];
         foreach ($plan->steps as $step) {
             if ($step->hop->extraReview) {
-                $riskiest = $step;
-                break;
+                $risky[] = [$step->number, $step->hop->id];
             }
         }
 
         return new self(
             $reason,
             is_file(ReplayFile::locate($appPath, null)),
-            $riskiest?->number,
-            $riskiest?->hop->id,
+            $risky[0][0] ?? null,
+            $risky[0][1] ?? null,
+            $risky,
         );
     }
 
@@ -82,8 +104,17 @@ final readonly class ReplaySuggestion
         $lines[] = $this->fileExists
             ? sprintf('%s is already in the app: run again with --replay to record its answers before the first hop and compare them after every hop.', ReplayFile::DEFAULT_NAME)
             : sprintf('Record the answers first: %s replay init --path=%s drafts %s from the routes; fill in its todo items, then run again with --replay.', $program, $pathArg, ReplayFile::DEFAULT_NAME);
-        if ($this->riskiestStep !== null && $this->riskiestHop !== null) {
-            $lines[] = sprintf('Step %d (%s) is the hop most likely to change an answer: loose comparisons of numbers and strings, and warnings that now throw.', $this->riskiestStep, $this->riskiestHop);
+        $risky = $this->riskySteps === [] && $this->riskiestStep !== null && $this->riskiestHop !== null
+            ? [[$this->riskiestStep, $this->riskiestHop]]
+            : $this->riskySteps;
+        foreach ($risky as [$step, $hop]) {
+            $lines[] = sprintf(
+                'Step %d (%s) is %s most likely to change an answer: %s',
+                $step,
+                $hop,
+                count($risky) === 1 ? 'the hop' : 'one of the hops',
+                self::why($hop),
+            );
         }
 
         return $lines;

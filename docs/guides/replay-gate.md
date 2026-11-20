@@ -21,8 +21,9 @@ Laravel's stock examples) and the run has no `--replay`, `booster run` says so u
     Record the answers first: booster replay init --path=<app> drafts booster-replay.json from the routes; fill in its todo items, then run again with --replay.
     Step 1 (php-74-to-80) is the hop most likely to change an answer: loose comparisons of numbers and strings, and warnings that now throw.
 
-The last line shows only when the plan has the PHP 8.0 hop, and the second one asks for just `--replay` when
-`booster-replay.json` is already there. The JSON report carries the same nudge as `replay_suggestion`. It is advice,
+The last line shows only when the plan has a hop marked for extra review, one line per such hop with its own reason:
+the PHP 8.0 hop as above, the CakePHP 5 and Slim 4 hops as framework majors (sign-in, routes, middleware). The second
+line asks for just `--replay` when `booster-replay.json` is already there. The JSON report carries the same nudge as `replay_suggestion`. It is advice,
 never a failure: the exit code is the same with or without it.
 
 ## In three commands
