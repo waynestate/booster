@@ -17,6 +17,8 @@
         "resources/sesame/config/sesame.php",
         "resources/sesame/ReadOnlyAttributes.php",
         "resources/slim1/slim1-bridge.php",
+        "resources/strangler/dispatcher.php",
+        "resources/strangler/install-legacy.php",
         "vendor/bin/phpcs",
         "vendor/bin/phpstan",
         "vendor/waynestate/creed/policy/policy.json"
