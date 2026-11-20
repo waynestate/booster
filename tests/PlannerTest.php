@@ -1140,4 +1140,178 @@ final class PlannerTest extends TestCase
         self::assertArrayNotHasKey('framework_before', $array);
         self::assertArrayNotHasKey('framework_after', $array);
     }
+
+    public function test_to_cakephp_resolves_major_only_input(): void
+    {
+        $project = new Project(
+            path: $this->tempDir(),
+            hasComposer: true,
+            phpVersion: '8.1',
+            laravelMajor: null,
+            phpunitMajor: null,
+            vueMajor: null,
+            type: AppType::RawPhp,
+            usesWayneCas: false,
+            hasTestScript: false,
+            framework: 'cakephp',
+            frameworkVersion: '4.5',
+        );
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(toCakephp: '5'), $this->today());
+
+        self::assertSame('5.4', $plan->frameworkTarget);
+    }
+
+    public function test_to_cakephp_rejects_a_slim_app(): void
+    {
+        $project = new Project(
+            path: $this->tempDir(),
+            hasComposer: true,
+            phpVersion: '8.3',
+            laravelMajor: null,
+            phpunitMajor: null,
+            vueMajor: null,
+            type: AppType::RawPhp,
+            usesWayneCas: false,
+            hasTestScript: false,
+            framework: 'slim',
+            frameworkVersion: '4.15',
+        );
+
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('--to-cakephp needs a CakePHP app, but this app is Slim.');
+        (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(toCakephp: '5'), $this->today());
+    }
+
+    public function test_to_cakephp_rejects_an_unknown_line(): void
+    {
+        $project = new Project(
+            path: $this->tempDir(),
+            hasComposer: true,
+            phpVersion: '8.1',
+            laravelMajor: null,
+            phpunitMajor: null,
+            vueMajor: null,
+            type: AppType::RawPhp,
+            usesWayneCas: false,
+            hasTestScript: false,
+            framework: 'cakephp',
+            frameworkVersion: '4.5',
+        );
+
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('CakePHP 6 is outside what Booster can plan (it plans to 4.6 or 5.4).');
+        (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(toCakephp: '6'), $this->today());
+    }
+
+    public function test_to_cakephp_older_than_current_errors(): void
+    {
+        $project = new Project(
+            path: $this->tempDir(),
+            hasComposer: true,
+            phpVersion: '8.2',
+            laravelMajor: null,
+            phpunitMajor: null,
+            vueMajor: null,
+            type: AppType::RawPhp,
+            usesWayneCas: false,
+            hasTestScript: false,
+            framework: 'cakephp',
+            frameworkVersion: '5.4',
+        );
+
+        $this->expectException(ToolError::class);
+        $this->expectExceptionMessage('Target CakePHP 4.6 is older than the current CakePHP 5.4.');
+        (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(toCakephp: '4.6'), $this->today());
+    }
+
+    public function test_to_slim_defaults_to_the_newest_line(): void
+    {
+        $project = new Project(
+            path: $this->tempDir(),
+            hasComposer: true,
+            phpVersion: '8.3',
+            laravelMajor: null,
+            phpunitMajor: null,
+            vueMajor: null,
+            type: AppType::RawPhp,
+            usesWayneCas: false,
+            hasTestScript: false,
+            framework: 'slim',
+            frameworkVersion: '3.12',
+        );
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(), $this->today());
+
+        self::assertSame('4.15', $plan->frameworkTarget);
+    }
+
+    public function test_framework_target_is_in_plan_json_only_for_framework_apps(): void
+    {
+        $frameworkProject = new Project(
+            path: $this->tempDir(),
+            hasComposer: true,
+            phpVersion: '8.3',
+            laravelMajor: null,
+            phpunitMajor: null,
+            vueMajor: null,
+            type: AppType::RawPhp,
+            usesWayneCas: false,
+            hasTestScript: false,
+            framework: 'slim',
+            frameworkVersion: '4.15',
+        );
+        $frameworkPlan = (new Planner($this->policy(), new HopRegistry()))->plan($frameworkProject, new PlanOptions(), $this->today());
+        $frameworkArray = $frameworkPlan->toArray();
+        self::assertArrayHasKey('framework_target', $frameworkArray);
+        self::assertSame('4.15', $frameworkArray['framework_target']);
+
+        $plainPlan = $this->plan('raw-php');
+        $plainArray = $plainPlan->toArray();
+        self::assertArrayNotHasKey('framework_target', $plainArray);
+    }
+
+    public function test_unknown_framework_holds_php_hops(): void
+    {
+        $project = new Project(
+            path: $this->tempDir(),
+            hasComposer: true,
+            phpVersion: '8.1',
+            laravelMajor: null,
+            phpunitMajor: null,
+            vueMajor: null,
+            type: AppType::RawPhp,
+            usesWayneCas: false,
+            hasTestScript: false,
+            framework: 'laravel-ish',
+            frameworkVersion: null,
+        );
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(toPhp: '8.5'), $this->today());
+
+        self::assertSame([], $this->ids($plan));
+        self::assertTrue($plan->stopsEarly);
+        self::assertContains(
+            'Booster has no hops for the laravel-ish framework yet, so it plans no PHP hop for this app; see docs/guides/framework-hops.md.',
+            $plan->warnings,
+        );
+    }
+
+    public function test_no_framework_keeps_planning_php_hops(): void
+    {
+        $project = new Project(
+            path: $this->tempDir(),
+            hasComposer: true,
+            phpVersion: '8.1',
+            laravelMajor: null,
+            phpunitMajor: null,
+            vueMajor: null,
+            type: AppType::RawPhp,
+            usesWayneCas: false,
+            hasTestScript: false,
+            framework: null,
+            frameworkVersion: null,
+        );
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(toPhp: '8.5'), $this->today());
+
+        self::assertNotSame([], $this->ids($plan));
+        self::assertStringStartsWith('php-', $this->ids($plan)[0]);
+    }
 }

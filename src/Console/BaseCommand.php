@@ -44,6 +44,8 @@ abstract class BaseCommand extends Command
         'from-laravel' => 'value',
         'to-laravel' => 'value',
         'to-phpunit' => 'value',
+        'to-cakephp' => 'value',
+        'to-slim' => 'value',
         'with-node' => 'flag',
         'node' => 'value',
         'sesame' => 'flag',
@@ -101,6 +103,8 @@ abstract class BaseCommand extends Command
             ->addOption('from-laravel', null, InputOption::VALUE_REQUIRED, 'The Laravel major the app runs on.')
             ->addOption('to-laravel', null, InputOption::VALUE_REQUIRED, 'Target Laravel major (default: the newest the policy supports).')
             ->addOption('to-phpunit', null, InputOption::VALUE_REQUIRED, 'Target PHPUnit major (default: the newest that runs on the target PHP).')
+            ->addOption('to-cakephp', null, InputOption::VALUE_REQUIRED, 'Target CakePHP line (default: the newest Booster supports, 5.4).')
+            ->addOption('to-slim', null, InputOption::VALUE_REQUIRED, 'Target Slim line (default: the newest Booster supports, 4.15).')
             ->addOption('with-node', null, InputOption::VALUE_NONE, 'Include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version')
             ->addOption('node', null, InputOption::VALUE_REQUIRED, "The Node major to pin (22, 24 or 26 today). Default: the Node the app's Citadel image ships, else the newest the policy supports. Implies --with-node")
             ->addOption('sesame', null, InputOption::VALUE_NONE, 'Include the wayne-cas to SESAME swap.')
@@ -165,6 +169,8 @@ abstract class BaseCommand extends Command
             toPhp: $toPhp,
             toLaravel: $this->stringOption($input, 'to-laravel'),
             toPhpunit: $this->stringOption($input, 'to-phpunit'),
+            toCakephp: $this->stringOption($input, 'to-cakephp'),
+            toSlim: $this->stringOption($input, 'to-slim'),
             sesame: (bool) $input->getOption('sesame'),
             wayneui: (bool) $input->getOption('wayneui'),
             withNode: (bool) $input->getOption('with-node') || $node !== null,

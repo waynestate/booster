@@ -96,6 +96,11 @@ final class Planner
                 $tableLow,
                 $tableHigh,
             );
+        } elseif ($framework !== null && $frameworkName === null && $frameworkRange === null) {
+            $warnings[] = sprintf(
+                'Booster has no hops for the %s framework yet, so it plans no PHP hop for this app; see docs/guides/framework-hops.md.',
+                $framework,
+            );
         } elseif ($frameworkName !== null && version_compare($fromPhp, $frameworkRange[1], '>')) {
             $warnings[] = sprintf(
                 '%s %s does not list PHP %s (it runs on %s to %s); the plan assumes the app really runs on that pair.',
@@ -124,6 +129,52 @@ final class Planner
         }
         if (version_compare($toPhp, $fromPhp, '<')) {
             throw new ToolError(sprintf('Target PHP %s is older than the current PHP %s.', $toPhp, $fromPhp));
+        }
+
+        // Resolve the framework target line: the flag wins, else the newest
+        // line Booster offers. A flag for the wrong framework (or none) is
+        // refused before any version arithmetic.
+        $frameworkTarget = null;
+        if ($options->toCakephp !== null || $options->toSlim !== null) {
+            if ($framework === null) {
+                $flag = $options->toCakephp !== null ? '--to-cakephp' : '--to-slim';
+                $wanted = $options->toCakephp !== null ? 'CakePHP' : 'Slim';
+                throw new ToolError(sprintf('%s needs a %s app, but no CakePHP or Slim framework was detected.', $flag, $wanted));
+            }
+            if ($options->toCakephp !== null && $framework !== 'cakephp') {
+                throw new ToolError(sprintf('--to-cakephp needs a CakePHP app, but this app is %s.', $frameworkName ?? $framework));
+            }
+            if ($options->toSlim !== null && $framework !== 'slim') {
+                throw new ToolError(sprintf('--to-slim needs a Slim app, but this app is %s.', $frameworkName ?? $framework));
+            }
+        }
+        if ($framework !== null && $frameworkName !== null) {
+            $targets = $this->registry->frameworkTargets($framework);
+            $input = $options->toCakephp ?? $options->toSlim;
+            if ($input !== null) {
+                if (preg_match('/^\d+$/', $input)) {
+                    $resolved = null;
+                    foreach ($targets as $t) {
+                        if (explode('.', $t)[0] === $input) {
+                            $resolved = $t;
+                        }
+                    }
+                    if ($resolved === null) {
+                        throw new ToolError(sprintf('%s %s is outside what Booster can plan (it plans to %s).', $frameworkName, $input, implode(' or ', $targets)));
+                    }
+                    $frameworkTarget = $resolved;
+                } else {
+                    if (!in_array($input, $targets, true)) {
+                        throw new ToolError(sprintf('%s %s is outside what Booster can plan (it plans to %s).', $frameworkName, $input, implode(' or ', $targets)));
+                    }
+                    $frameworkTarget = $input;
+                }
+                if ($frameworkLine !== null && version_compare($frameworkTarget, $frameworkLine, '<')) {
+                    throw new ToolError(sprintf('Target %s %s is older than the current %s %s.', $frameworkName, $frameworkTarget, $frameworkName, $frameworkLine));
+                }
+            } else {
+                $frameworkTarget = $targets[count($targets) - 1];
+            }
         }
 
         $fromPhpunit = $project->phpunitMajor;
@@ -472,7 +523,7 @@ final class Planner
         // The hand-copied libraries are reported by the writer as their own
         // block, so they travel on the plan without a warning entry of their
         // own.
-        return new Plan($project, $today->format('Y-m-d'), $this->policy->origin(), $toPhp, $toLaravel, $toPhpunit, $steps, $warnings, $packageChecks, $stopsEarly, $vendoredLibraries, $fromPhp);
+        return new Plan($project, $today->format('Y-m-d'), $this->policy->origin(), $toPhp, $toLaravel, $toPhpunit, $steps, $warnings, $packageChecks, $stopsEarly, $vendoredLibraries, $fromPhp, $frameworkTarget);
     }
 
     /**

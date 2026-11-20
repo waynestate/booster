@@ -32,6 +32,7 @@ final readonly class Plan
         public bool $stopsEarly = false,
         public array $vendoredLibraries = [],
         public ?string $fromPhp = null,
+        public ?string $frameworkTarget = null,
     ) {}
 
     /**
@@ -56,6 +57,9 @@ final readonly class Plan
         }
         if ($this->fromPhp !== null && $this->fromPhp !== $this->project->phpVersion) {
             $array['from_php'] = $this->fromPhp;
+        }
+        if ($this->frameworkTarget !== null) {
+            $array['framework_target'] = $this->frameworkTarget;
         }
 
         return $array;

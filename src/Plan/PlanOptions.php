@@ -33,5 +33,7 @@ final readonly class PlanOptions
         public ?string $only = null,
         public bool $vendored = false,
         public bool $strictSession = false,
+        public ?string $toCakephp = null,
+        public ?string $toSlim = null,
     ) {}
 }

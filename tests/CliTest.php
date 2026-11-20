@@ -1760,4 +1760,15 @@ final class CliTest extends TestCase
 
         self::assertSame(0, $exit, $out);
     }
+
+    public function test_cli_accepts_to_cakephp_and_to_slim(): void
+    {
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--to-cakephp' => '5', '--no-scan' => true, '--no-package-check' => true]);
+        self::assertSame(2, $exit);
+        self::assertStringContainsString('--to-cakephp needs a CakePHP app, but no CakePHP or Slim framework was detected.', $out);
+
+        [$exit, $out] = $this->booster(['command' => 'plan', '--path' => $this->example('raw-php'), '--today' => self::TODAY, '--to-slim' => '4', '--no-scan' => true, '--no-package-check' => true]);
+        self::assertSame(2, $exit);
+        self::assertStringContainsString('--to-slim needs a Slim app, but no CakePHP or Slim framework was detected.', $out);
+    }
 }
