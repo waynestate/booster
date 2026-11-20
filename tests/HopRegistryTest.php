@@ -270,6 +270,9 @@ final class HopRegistryTest extends PhpUnitTestCase
             'cakephp/authentication' => '^3.3',
             'cakephp/authorization' => '^3.5',
             'cakephp/chronos' => '^3.3',
+            'friendsofcake/bootstrap-ui' => '^5.1',
+            'friendsofcake/cakephp-csvview' => '^5.0',
+            'cakephp/cakephp-codesniffer' => '^5.2',
         ], $registry->frameworkCompanionPins('cakephp', '5.4'));
         self::assertSame([
             'slim/psr7' => '^1.6',
