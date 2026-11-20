@@ -20,6 +20,8 @@ use Waynestate\Booster\Report\HopRecord;
 use Waynestate\Booster\Report\JsonWriter;
 use Waynestate\Booster\Report\TextWriter;
 use Waynestate\Booster\Run\CacheMount;
+use Waynestate\Booster\Run\Cake\CakeUpgradeMigration;
+use Waynestate\Booster\Run\CakeUpgradeRunner;
 use Waynestate\Booster\Run\ComposerEditor;
 use Waynestate\Booster\Run\FrameworkEngine;
 use Waynestate\Booster\Run\GateImage;
@@ -115,7 +117,7 @@ final class RunCommand extends BaseCommand
             new NodeRunner($this->processes, (int) $registry->nodePinTarget(), npmCache: CacheMount::fromEnvironment(CacheMount::NPM)),
             $registry,
             new ProctorRunner($this->processes),
-            frameworkEngines: self::frameworkEngines($composerEditor),
+            frameworkEngines: self::frameworkEngines($this->processes, $composerEditor),
         );
         // The prompt only makes sense where a person is watching: text output on an interactive terminal. JSON and
         // --no-interaction runs stop at the threshold instead of asking nobody.
@@ -197,19 +199,6 @@ final class RunCommand extends BaseCommand
     }
 
     /**
-     * The framework engines the executor runs, by EngineId value. The
-     * vendored engine needs no entry (the executor always has it).
-     *
-     * @return array<string, FrameworkEngine>
-     */
-    public static function frameworkEngines(ComposerEditor $composerEditor): array
-    {
-        return [
-            EngineId::SlimUpgrade->value => new SlimUpgradeMigration($composerEditor),
-        ];
-    }
-
-    /**
      * The flags a dry run's "Next:" line hands to the real run: the plan's
      * own, plus the gate's (--replay, --test-command, --image and the rest),
      * as typed. --dry-run, --format and --allow-dirty stay behind (the real
@@ -243,6 +232,25 @@ final class RunCommand extends BaseCommand
         }
 
         return $flags;
+    }
+
+    /**
+     * The framework engines the executor picks from by Hop::$engine, keyed
+     * by EngineId value (the vendored engine is the executor's own default).
+     * One CakeUpgradeRunner serves both CakePHP hops, on the same process
+     * runner and opt-in Composer cache as the gate; the Slim engine needs
+     * only the Composer editor.
+     *
+     * @return array<string, FrameworkEngine>
+     */
+    public static function frameworkEngines(ProcessRunner $processes, ComposerEditor $composerEditor): array
+    {
+        $cakeUpgradeRunner = new CakeUpgradeRunner($processes, composerCache: CacheMount::fromEnvironment(CacheMount::COMPOSER));
+
+        return [
+            EngineId::CakeUpgrade->value => new CakeUpgradeMigration($cakeUpgradeRunner, $composerEditor),
+            EngineId::SlimUpgrade->value => new SlimUpgradeMigration($composerEditor),
+        ];
     }
 
     /**
