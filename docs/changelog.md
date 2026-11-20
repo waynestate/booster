@@ -12,6 +12,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 ## [Unreleased]
 
 - Fixed: the cakephp/upgrade image now includes the intl extension CakePHP requires; every CakePHP hop stopped at start without it.
+- Fixed: a cakephp/upgrade rule set that prints an error but exits 0 (Rector could not load it) is now a stop sign instead of a quiet "ran"; the cakephp41 rule set, which imported a missing file upstream, now loads.
 - Added: a guide for CakePHP and Slim apps (docs/guides/cakephp-and-slim.md): the commands, what each hop does and the MANUAL list.
 - Changed: the CakePHP and Slim playbooks (`booster init`) say the hop is a framework move with the replay as the real gate, and their Boost prompts point at the CakePHP and Slim upgrade guides (plus an Authentication plugin check on the CakePHP 5 step) instead of the Doctrine, Smarty and Slim 4 docs.
 - Fixed: the plan for a CakePHP 4 app on PHP below 7.4 now plans the 4.6 step, deferred to right after PHP reaches 7.4 (it used to drop it and stop at PHP 8.1).

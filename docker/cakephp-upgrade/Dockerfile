@@ -16,5 +16,9 @@ RUN apk add --no-cache icu-libs \
 RUN git clone https://github.com/cakephp/upgrade.git /upgrade \
  && git -C /upgrade checkout "${UPGRADE_REF}" \
  && composer install -d /upgrade --no-dev --no-interaction --no-progress --prefer-dist
+# At the pinned ref the cakephp41 rule set imports default-rector.php, a file
+# the tool no longer has; every other set imports defaults.php. Point it there
+# (a no-op once upstream fixes it) so the set loads instead of being skipped.
+RUN sed -i 's#/default-rector\.php#/defaults.php#' /upgrade/config/rector/cakephp41.php
 WORKDIR /upgrade
 ENTRYPOINT []

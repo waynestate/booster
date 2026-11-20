@@ -412,6 +412,34 @@ final class CakeUpgradeMigrationTest extends TestCase
         self::assertSame([], self::callsFor(self::rectorCalls($fake), 'cakephp44'), 'nothing runs after the failure');
     }
 
+    public function test_a_rule_set_that_prints_an_error_with_exit_0_refuses(): void
+    {
+        // What cakephp/upgrade really prints when Rector cannot load a set: the error, then a success line, exit 0.
+        $app = $this->cakeApp();
+        $before = self::snapshot($app);
+        $output = " [ERROR] The path \"/upgrade/config/rector/default-rector.php\" does not exist.\n\nRector applied successfully";
+        $fake = $this->docker(static fn(string $copy, string $set): ?ProcessResult => $set === 'cakephp41' ? new ProcessResult(0, $output, '') : null);
+
+        $result = $this->engine($fake)->migrate($app, false, '8.3', self::hop46());
+
+        self::assertTrue($result->refused());
+        self::assertStringStartsWith('The cakephp/upgrade rule set cakephp41 printed an error on src/ (exit 0), so nothing in the app changed.', $result->refusals[0]);
+        self::assertStringContainsString('default-rector.php', $result->refusals[0]);
+        self::assertSame($before, self::snapshot($app));
+        self::assertSame([], self::callsFor(self::rectorCalls($fake), 'cakephp42'), 'nothing runs after the error');
+    }
+
+    public function test_a_clean_rector_run_that_mentions_errors_in_a_diff_is_not_a_failure(): void
+    {
+        // A diff line that happens to say "[ERROR]" is indented code, not Rector's error block at the line start.
+        $output = "1 file with changes\n-    \$log = '[ERROR] disk full';\n+    \$log = '[ERROR] disk full!';\n [OK] Rector is done!\nRector applied successfully";
+        $fake = $this->docker(static fn(): ProcessResult => new ProcessResult(0, $output, ''));
+
+        $result = $this->engine($fake)->migrate($this->cakeApp(), true, '8.3', self::hop46());
+
+        self::assertFalse($result->refused());
+    }
+
     /**
      * @param list<array{0: string, 1: string}> $calls
      *

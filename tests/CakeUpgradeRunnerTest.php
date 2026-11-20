@@ -179,4 +179,12 @@ final class CakeUpgradeRunnerTest extends TestCase
         self::assertStringContainsString('docker-php-ext-install intl', $dockerfile);
         self::assertStringContainsString('icu-libs', $dockerfile);
     }
+
+    public function test_cakephp_upgrade_dockerfile_points_the_cakephp41_rule_set_at_defaults(): void
+    {
+        // Upstream's cakephp41 set imports a default-rector.php that does not exist, so Rector never loads it.
+        $dockerfile = (string) file_get_contents($this->dockerDir() . '/Dockerfile');
+
+        self::assertStringContainsString("sed -i 's#/default-rector\\.php#/defaults.php#' /upgrade/config/rector/cakephp41.php", $dockerfile);
+    }
 }

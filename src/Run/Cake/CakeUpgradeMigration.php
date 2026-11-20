@@ -136,6 +136,9 @@ final class CakeUpgradeMigration implements FrameworkEngine
                 if (!$result->successful()) {
                     return self::refuse(self::failure(sprintf('The cakephp/upgrade rule set %s failed on %s/', $set, $subdir), $result));
                 }
+                if (self::printedError($result)) {
+                    return self::refuse(self::failure(sprintf('The cakephp/upgrade rule set %s printed an error on %s/', $set, $subdir), $result));
+                }
             }
             $changes[] = sprintf('Ran %s on %s.', $set, implode(', ', $subdirs));
         }
@@ -620,6 +623,21 @@ final class CakeUpgradeMigration implements FrameworkEngine
         $tail = implode("\n", array_slice($lines, -self::TAIL_LINES));
 
         return sprintf("%s (exit %d), so nothing in the app changed. The last lines of its output:\n%s", $what, $result->exitCode, $tail);
+    }
+
+    /**
+     * cakephp/upgrade runs Rector as a child process and says "Rector applied
+     * successfully" with exit 0 even when Rector could not load the rule set
+     * (a missing config file, a Rector class that no longer exists). Rector's
+     * error block, a PHP fatal or the tool's own "Could not ..." line means
+     * the set never ran, so it is a failure, not a quiet success.
+     */
+    private static function printedError(ProcessResult $result): bool
+    {
+        return preg_match(
+            '/^\s*\[ERROR\]|^(PHP )?Fatal error:|^Could not (run|create) rector/mi',
+            $result->stdout . "\n" . $result->stderr,
+        ) === 1;
     }
 
     private static function refuse(string $reason): VendoredMigrationResult
