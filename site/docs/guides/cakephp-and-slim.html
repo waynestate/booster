@@ -101,6 +101,17 @@ identity, <code>setUser()</code> becomes <code>setIdentity()</code>, <code>logou
 swaps <code>loadComponent('Auth')</code> for <code>loadComponent('Authentication.Authentication')</code>, requires
 <code>cakephp/authentication ^3.0</code>, and wires <code>src/Application.php</code>: the provider interface, the plugin, the middleware
 after routing, and a service with the Session authenticator whose guests go to the old <code>loginAction</code>.</p>
+<p><strong>The skeleton's own files.</strong> The 5 step also makes the CakePHP 5 skeleton's moves no upgrade rule makes:
+<code>config/bootstrap.php</code> loads CakePHP's global functions (<code>require CAKE . 'functions.php';</code>, without which <code>env()</code> is
+undefined), <code>phpunit.xml</code> loads the fixture extension the PHPUnit 10 way and names the covered code in <code>&lt;source&gt;</code>,
+<code>loadComponent('RequestHandler')</code> goes when nothing reads the component (with a <code>viewClasses()</code> for JSON and XML on
+<code>AppController</code> when <code>config/routes.php</code> sets those extensions), log <code>'scopes' =&gt; false</code> becomes <code>null</code>, the core cache
+follows its <code>_cake_translations_</code> rename, and a template's <code>Connection::connect()</code> goes through the driver.</p>
+<p><strong>PHPUnit waits for CakePHP 5.</strong> CakePHP 4's <code>TestCase</code> does not load on PHPUnit 10, so a CakePHP 4 app on PHPUnit 9
+keeps it until the 5 step, which requires PHPUnit 11.5 with CakePHP 5.4; the PHPUnit 12 and 13 hops follow. A run
+that PHPUnit 12 fails only for the skeleton's <code>&lt;ini name=&quot;apc.enable_cli&quot;&gt;</code> (the gate image has no APCu) passes with a
+note, every test green. The replay switches on the <code>cakephp</code> normalizer from the 5 step, which hides only the extra
+<code>rel=&quot;shortcut icon&quot;</code> link CakePHP 4's <code>meta('icon')</code> printed.</p>
 <p><strong>What Booster does not do (the MANUAL list).</strong> Each run prints these as <code>MANUAL:</code> lines, with the file and the count
 where there is one:</p>
 <ul>
@@ -118,7 +129,9 @@ carried over as the redirect). Also an <code>'Auth'</code> entry with config in 
 <li><code>src/Application.php</code> that Booster could not wire: no such file or class, one that already provides an
 authentication service (check that it loads the Session authenticator), no <code>bootstrap()</code> or <code>middleware()</code>, no
 routing middleware, or no <code>loginAction</code> found (the redirect is the placeholder <code>/login</code>).</li>
-<li>Code no rule moves: <code>RequestHandlerComponent</code> (declare <code>viewClasses()</code> instead), <code>-&gt;withType()</code> calls,
+<li>Code no rule moves: <code>RequestHandlerComponent</code> where the app still reads <code>$this-&gt;RequestHandler</code> (declare
+<code>viewClasses()</code> instead), a check that the controllers that serialize still answer <code>.json</code> and <code>.xml</code> after
+Booster added <code>viewClasses()</code>, <code>-&gt;withType()</code> calls,
 <code>Cake\Mailer\Email</code> (use <code>Mailer</code>), <code>Cake\I18n\Time</code> and the mutable <code>Cake\I18n\Date</code> (use <code>DateTime</code> or the
 immutable <code>Date</code>, and check code that changed a date in place), and any <code>.ctp</code> template left over.</li>
 <li><code>cakedc/cakephp-oracle-driver</code> has no CakePHP 5 release. The 5 step swaps it for <code>ioigoume/cakephp5-oracle-driver</code>

@@ -54,14 +54,14 @@ final class PlannerTest extends TestCase
     }
 
     /** Plans a bare CakePHP or Slim app: an empty temp dir carrying only the given framework and PHP. */
-    private function frameworkPlan(string $framework, ?string $frameworkVersion, string $phpVersion, ?string $toPhp = null, ?PlanOptions $options = null): Plan
+    private function frameworkPlan(string $framework, ?string $frameworkVersion, string $phpVersion, ?string $toPhp = null, ?PlanOptions $options = null, ?string $phpunit = null): Plan
     {
         $project = new Project(
             path: $this->tempDir(),
             hasComposer: true,
             phpVersion: $phpVersion,
             laravelMajor: null,
-            phpunitMajor: null,
+            phpunitMajor: $phpunit,
             vueMajor: null,
             type: AppType::RawPhp,
             usesWayneCas: false,
@@ -1350,6 +1350,29 @@ final class PlannerTest extends TestCase
         self::assertSame('5.4', $plan->frameworkTarget);
         self::assertFalse($plan->stopsEarly);
         self::assertSame([], $plan->warnings);
+    }
+
+    // CAKE-2: CakePHP 4's TestCase cannot load on PHPUnit 10 (assertDirectoryDoesNotExist is final there).
+    public function test_cakephp_4_on_phpunit_9_holds_phpunit_until_the_5_step_moves_it_to_11(): void
+    {
+        $plan = $this->frameworkPlan('cakephp', '4.4', '8.1', '8.5', phpunit: '9');
+
+        self::assertSame([
+            'cakephp-4-to-4.6', 'php-81-to-82', 'cakephp-4.6-to-5', 'php-82-to-83',
+            'phpunit-11-to-12', 'php-83-to-84', 'phpunit-12-to-13', 'php-84-to-85',
+        ], $this->ids($plan));
+        self::assertNotContains('phpunit-9-to-10', $this->ids($plan));
+        self::assertNotContains('phpunit-10-to-11', $this->ids($plan));
+        $five = $plan->steps[2];
+        self::assertSame(['9', '11'], [$five->phpunitBefore, $five->phpunitAfter]);
+    }
+
+    public function test_cakephp_4_staying_on_4_keeps_phpunit_9_and_says_why(): void
+    {
+        $plan = $this->frameworkPlan('cakephp', '4.5', '8.1', options: new PlanOptions(toPhp: '8.5', toCakephp: '4'), phpunit: '9');
+
+        self::assertSame(['cakephp-4-to-4.6', 'php-81-to-82', 'php-82-to-83', 'php-83-to-84', 'php-84-to-85'], $this->ids($plan));
+        self::assertContains('CakePHP 4.5 tests run on PHPUnit 9 at most, so PHPUnit stays on 9 until the move to CakePHP 5.', $plan->warnings);
     }
 
     public function test_cakephp_45_on_81_to_cakephp_4_stops_on_4_6(): void

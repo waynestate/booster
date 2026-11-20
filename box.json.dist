@@ -10,6 +10,7 @@
         "data/versions.json",
         "docker/Dockerfile",
         "docker/cakephp-upgrade/Dockerfile",
+        "docker/cakephp-upgrade/app-autoload.php",
         "resources/policy.schema.json",
         "resources/replay/client.php",
         "resources/replay/router.php",

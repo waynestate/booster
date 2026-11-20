@@ -33,11 +33,13 @@ final class AuthRewriter
         'allow' => '$this->Auth->allow()',
     ];
 
-    /** Dropped config keys that need no more than "port it by hand". */
-    private const DROPPED_KEY_NOTES = [
-        'authError' => "MANUAL: Auth config 'authError' dropped: the Authentication plugin has no counterpart; flash a message on the login action if the app wants one.",
-        'loginAction' => "MANUAL: Auth config 'loginAction' dropped: it becomes the authentication service's unauthenticatedRedirect; scaffold getAuthenticationService() in src/Application.php.",
-    ];
+    /**
+     * Config keys Booster carries into src/Application.php's service
+     * (ApplicationScaffold: the guests' redirect and the message flashed to
+     * them), so they get no "dropped" line; the scaffold names its own MANUAL
+     * steps when it cannot carry one.
+     */
+    private const CARRIED_KEYS = ['loginAction', 'authError', 'flash'];
 
     /**
      * Rewrites `$this->Auth->...` calls (method names match case-insensitively).
@@ -94,11 +96,10 @@ final class AuthRewriter
             }
             foreach ($call['config'] ?? [] as $entry) {
                 $key = $entry['key'];
-                if ($key === null) {
+                if ($key === null || in_array($key, self::CARRIED_KEYS, true)) {
                     continue;
                 }
-                $manual[] = self::DROPPED_KEY_NOTES[$key]
-                    ?? sprintf("MANUAL: Auth config '%s' dropped: the Authentication plugin has no like-for-like; port it by hand.", $key);
+                $manual[] = sprintf("MANUAL: Auth config '%s' dropped: the Authentication plugin has no like-for-like; port it by hand.", $key);
             }
             $i = $call['close'];
         }
@@ -200,6 +201,15 @@ final class AuthRewriter
      */
     public function loginActionOf(string $php): ?string
     {
+        return $this->configValueOf($php, 'loginAction');
+    }
+
+    /**
+     * The source text of one key's value in a
+     * `$this->loadComponent('Auth', [...])` call, or null when it is not set.
+     */
+    public function configValueOf(string $php, string $key): ?string
+    {
         $tokens = PhpToken::tokenize($php);
         $count = count($tokens);
         for ($i = 0; $i < $count; $i++) {
@@ -208,7 +218,7 @@ final class AuthRewriter
                 continue;
             }
             foreach ($call['config'] ?? [] as $entry) {
-                if ($entry['key'] === 'loginAction') {
+                if ($entry['key'] === $key) {
                     return $entry['value'];
                 }
             }
@@ -216,6 +226,166 @@ final class AuthRewriter
         }
 
         return null;
+    }
+
+    /**
+     * The controller and action of a loginAction written as a plain array
+     * (`['controller' => 'Auth', 'action' => 'login']`, with `plugin` or
+     * `prefix` false or null at most), or null for any other shape: a string
+     * URL, a plugin or prefix route, a computed value.
+     *
+     * @return array{controller: string, action: string}|null
+     */
+    public function loginTarget(string $loginActionSource): ?array
+    {
+        $tokens = PhpToken::tokenize('<?php ' . trim($loginActionSource) . ';');
+        $start = self::nextSignificant($tokens, 0);
+        $open = $start === null ? null : self::arrayOpen($tokens, $start);
+        if ($open === null) {
+            return null;
+        }
+        $close = self::matchClose($tokens, $open);
+        $next = self::nextSignificant($tokens, $close);
+        if ($next === null || !self::isChar($tokens[$next], ';')) {
+            return null;
+        }
+        $target = [];
+        foreach (self::arrayEntries($tokens, $open, $close) as $entry) {
+            $key = $entry['key'];
+            if ($key === 'controller' || $key === 'action') {
+                if ($entry['valueName'] === null || $entry['valueName'] === '' || !preg_match('/^\w+$/', $entry['valueName'])) {
+                    return null;
+                }
+                $target[$key] = $entry['valueName'];
+            } elseif (($key === 'plugin' || $key === 'prefix') && in_array(strtolower($entry['value']), ['false', 'null'], true)) {
+                continue;
+            } else {
+                return null;
+            }
+        }
+        if (!isset($target['controller'], $target['action'])) {
+            return null;
+        }
+
+        return [
+            'controller' => str_replace(' ', '', ucwords(str_replace(['_', '-'], ' ', $target['controller']))),
+            'action' => $target['action'],
+        ];
+    }
+
+    /**
+     * AuthComponent always let guests reach its loginAction; the
+     * Authentication plugin asks for every guest action by name, so a sign-in
+     * action left out redirects to itself forever (CAKE-11; a fleet app's
+     * /auth/login answered with a redirect to /auth/login on 5). This adds
+     * `$this->Authentication->addUnauthenticatedActions(['<action>'])` at the end
+     * of the controller's initialize() (after parent::initialize() loaded the
+     * component), or adds an initialize() that does it. A controller that
+     * already opens the action, or switches the check off, is left alone.
+     *
+     * @return array{code: string, changed: bool, manual: ?string}
+     */
+    public function openLoginAction(string $controllerPhp, string $action): array
+    {
+        $quoted = preg_quote($action, '/');
+        if (preg_match('/->\s*disableIdentityCheck\s*\(|->\s*(?:addUnauthenticatedActions|allowUnauthenticated)\s*\(\s*(?:\[|array\s*\()[^;]*[\'"]' . $quoted . '[\'"]/i', $controllerPhp) === 1) {
+            return ['code' => $controllerPhp, 'changed' => false, 'manual' => null];
+        }
+        $manual = sprintf("MANUAL: AuthComponent let guests reach its loginAction (%s) without signing in, and the Authentication plugin does not; add \$this->Authentication->addUnauthenticatedActions(['%s']) to that controller by hand.", $action, $action);
+        $tokens = PhpToken::tokenize($controllerPhp);
+        $nl = str_contains($controllerPhp, "\r\n") ? "\r\n" : "\n";
+        $classOpen = null;
+        $count = count($tokens);
+        for ($i = 0; $i < $count; $i++) {
+            if ($tokens[$i]->id !== T_CLASS) {
+                continue;
+            }
+            $prev = $i > 0 ? $tokens[$i - 1] : null;
+            if ($prev !== null && $prev->id === T_DOUBLE_COLON) {
+                continue;
+            }
+            for ($j = $i + 1; $j < $count; $j++) {
+                if (self::isChar($tokens[$j], '{')) {
+                    $classOpen = $j;
+
+                    break 2;
+                }
+            }
+        }
+        if ($classOpen === null) {
+            return ['code' => $controllerPhp, 'changed' => false, 'manual' => $manual];
+        }
+        $classClose = self::matchClose($tokens, $classOpen);
+        $line = '$this->Authentication->addUnauthenticatedActions([' . var_export($action, true) . ']);';
+        $comment = '// AuthComponent let guests reach its loginAction; the Authentication plugin needs it named.';
+
+        $depth = 0;
+        for ($i = $classOpen + 1; $i < $classClose; $i++) {
+            $t = $tokens[$i];
+            if (self::opens($t)) {
+                $depth++;
+            } elseif (self::closes($t)) {
+                $depth--;
+            }
+            if ($depth !== 0 || $t->id !== T_FUNCTION) {
+                continue;
+            }
+            $name = self::nextSignificant($tokens, $i);
+            if ($name === null || strcasecmp($tokens[$name]->text, 'initialize') !== 0) {
+                continue;
+            }
+            $bodyOpen = null;
+            for ($j = $name + 1; $j < $classClose; $j++) {
+                if (self::isChar($tokens[$j], ';')) {
+                    break;
+                }
+                if (self::isChar($tokens[$j], '{')) {
+                    $bodyOpen = $j;
+
+                    break;
+                }
+            }
+            if ($bodyOpen === null) {
+                return ['code' => $controllerPhp, 'changed' => false, 'manual' => $manual];
+            }
+            $bodyClose = self::matchClose($tokens, $bodyOpen);
+            if (!preg_match('/\bparent\s*::\s*initialize\s*\(/i', self::text($tokens, $bodyOpen, $bodyClose))) {
+                return ['code' => $controllerPhp, 'changed' => false, 'manual' => $manual];
+            }
+            $pos = $tokens[$bodyClose]->pos;
+            $lineStart = $pos;
+            while ($lineStart > 0 && $controllerPhp[$lineStart - 1] !== "\n") {
+                $lineStart--;
+            }
+            $before = substr($controllerPhp, $lineStart, $pos - $lineStart);
+            if (trim($before) === '') {
+                $inner = $before . '    ';
+                $insert = $inner . $comment . $nl . $inner . $line . $nl;
+                $code = substr($controllerPhp, 0, $lineStart) . $insert . substr($controllerPhp, $lineStart);
+            } else {
+                $code = substr($controllerPhp, 0, $pos) . $line . ' ' . substr($controllerPhp, $pos);
+            }
+
+            return ['code' => $code, 'changed' => true, 'manual' => null];
+        }
+
+        // No initialize(): add one, when the parent is the AppController that loads the component.
+        if (preg_match('/\bextends\s+\\\\?(?:App\\\\Controller\\\\)?AppController\b/', $controllerPhp) !== 1) {
+            return ['code' => $controllerPhp, 'changed' => false, 'manual' => $manual];
+        }
+        $method = implode($nl, [
+            '',
+            '    public function initialize(): void',
+            '    {',
+            '        parent::initialize();',
+            '        ' . $comment,
+            '        ' . $line,
+            '    }',
+            '',
+        ]);
+        $pos = $tokens[$classOpen]->pos + 1;
+
+        return ['code' => substr($controllerPhp, 0, $pos) . $method . substr($controllerPhp, $pos), 'changed' => true, 'manual' => null];
     }
 
     /**
@@ -266,14 +436,11 @@ final class AuthRewriter
                 'user' => $this->userRead($argTokens, $args),
                 'setuser' => self::RECEIVER . '->setIdentity(' . $args . ')',
                 'logout' => self::RECEIVER . '->logout(' . $args . ')',
-                default => self::RECEIVER . '->allowUnauthenticated(' . $args . ')',
+                default => $this->allowCall($argTokens, $args, $manual),
             };
             $counts[$rule]++;
             if ($rule === 'logout') {
                 $manual['logout'] = 'MANUAL: $this->Authentication->logout() returns the redirect URL or null (AuthComponent returned its logoutRedirect); check what the action does with it.';
-            }
-            if ($rule === 'allow' && !$this->startsWithArray($argTokens)) {
-                $manual['allow'] = "MANUAL: allowUnauthenticated() takes an array of action names, and AuthComponent's allow() also took one name or none (every action); check each converted call.";
             }
             $i = $close;
         }
@@ -296,6 +463,36 @@ final class AuthRewriter
         }
 
         return '\Cake\Utility\Hash::get(' . self::IDENTITY . '?->getOriginalData() ?? [], ' . trim($args) . ')';
+    }
+
+    /**
+     * AuthComponent's allow() added to the actions it let guests reach (CAKE-10):
+     * allowUnauthenticated() replaces the list, so a later call (or the login
+     * action Booster opens) would be dropped. addUnauthenticatedActions() is the
+     * like-for-like; one name goes in an array, and allow() with no argument
+     * (every action) is disableIdentityCheck().
+     *
+     * @param list<PhpToken> $argTokens the argument tokens as written
+     * @param array<string, string> $manual
+     */
+    private function allowCall(array $argTokens, string $args, array &$manual): string
+    {
+        $significant = array_values(array_filter(
+            $argTokens,
+            static fn(PhpToken $t): bool => !in_array($t->id, [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true),
+        ));
+        if ($significant === []) {
+            return self::RECEIVER . '->disableIdentityCheck()';
+        }
+        if ($this->startsWithArray($argTokens)) {
+            return self::RECEIVER . '->addUnauthenticatedActions(' . $args . ')';
+        }
+        if (count($significant) === 1 && $significant[0]->id === T_CONSTANT_ENCAPSED_STRING) {
+            return self::RECEIVER . '->addUnauthenticatedActions([' . trim($args) . '])';
+        }
+        $manual['allow'] = "MANUAL: addUnauthenticatedActions() takes an array of action names, and AuthComponent's allow() also took one name or null (every action); check each converted call.";
+
+        return self::RECEIVER . '->addUnauthenticatedActions((array) ' . trim($args) . ')';
     }
 
     /**

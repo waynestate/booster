@@ -8,9 +8,9 @@ use Waynestate\Booster\Run\Cake\ApplicationScaffold;
 
 final class CakeApplicationScaffoldTest extends TestCase
 {
-    private const SERVICE_CHANGE = "Added getAuthenticationService(): the Session authenticator, unauthenticatedRedirect from the old loginAction, queryParam 'redirect'.";
+    private const SERVICE_CHANGE = "Added getAuthenticationService(): the Session authenticator, and AuthComponent's guest redirect to the old loginAction (a full URL, queryParam 'redirect' except for the home page, the authError flashed).";
 
-    private const IMPORTS_CHANGE = 'Added use imports: Authentication\AuthenticationService, Authentication\AuthenticationServiceInterface, Authentication\AuthenticationServiceProviderInterface, Authentication\Middleware\AuthenticationMiddleware, Psr\Http\Message\ServerRequestInterface.';
+    private const IMPORTS_CHANGE = 'Added use imports: Authentication\AuthenticationService, Authentication\AuthenticationServiceInterface, Authentication\AuthenticationServiceProviderInterface, Authentication\Middleware\AuthenticationMiddleware, Cake\Http\ServerRequest, Cake\Routing\Router, Psr\Http\Message\ServerRequestInterface.';
 
     public function test_full_scaffold_wires_the_authentication_plugin(): void
     {
@@ -31,6 +31,7 @@ final class CakeApplicationScaffoldTest extends TestCase
             'use Cake\Http\BaseApplication;',
             'use Cake\Http\Middleware\BodyParserMiddleware;',
             'use Cake\Http\MiddlewareQueue;',
+            'use Cake\Http\ServerRequest;',
             'use Cake\Routing\Middleware\AssetMiddleware;',
             'use Cake\Routing\Middleware\RoutingMiddleware;',
             'use Cake\Routing\Router;',
@@ -75,14 +76,31 @@ final class CakeApplicationScaffoldTest extends TestCase
             '',
             '    /**',
             '     * The authentication service: the session keeps the identity the app',
-            '     * sets when it signs someone in, and guests go to the old login action.',
+            '     * sets when it signs someone in, and guests go to the old login action',
+            '     * the way the CakePHP 4 Auth component sent them: a full URL, no way back',
+            '     * when they asked for the home page, and its message flashed first.',
             '     */',
             '    public function getAuthenticationService(ServerRequestInterface $request): AuthenticationServiceInterface',
             '    {',
-            '        $service = new AuthenticationService([',
-            "            'unauthenticatedRedirect' => Router::url(['controller' => 'Users', 'action' => 'login']),",
+            '        $service = new class ([',
+            "            'unauthenticatedRedirect' => Router::url(['controller' => 'Users', 'action' => 'login'], true),",
             "            'queryParam' => 'redirect',",
-            '        ]);',
+            '        ]) extends AuthenticationService {',
+            '            public function getUnauthenticatedRedirectUrl(ServerRequestInterface $request): ?string',
+            '            {',
+            "                if (\$request instanceof ServerRequest && !\$request->is('ajax')) {",
+            "                    \$request->getFlash()->set(__d('cake', 'You are not authorized to access that location.'), ['element' => 'error', 'key' => 'flash', 'params' => ['class' => 'error']]);",
+            '                }',
+            '',
+            "                \$url = \$this->getConfig('unauthenticatedRedirect');",
+            '                $back = $request->getRequestTarget();',
+            "                if (\$request->getMethod() !== 'GET' || \$back === '/') {",
+            '                    return $url;',
+            '                }',
+            '',
+            "                return \$url . (str_contains(\$url, '?') ? '&' : '?') . urlencode(\$this->getConfig('queryParam')) . '=' . urlencode(\$back);",
+            '            }',
+            '        };',
             "        \$service->loadAuthenticator('Authentication.Session');",
             '',
             '        return $service;',
@@ -91,7 +109,7 @@ final class CakeApplicationScaffoldTest extends TestCase
         ), $result['code']);
         $this->assertSame([
             'Added AuthenticationServiceProviderInterface to the Application class.',
-            'Added use imports: Authentication\AuthenticationService, Authentication\AuthenticationServiceInterface, Authentication\AuthenticationServiceProviderInterface, Authentication\Middleware\AuthenticationMiddleware, Cake\Routing\Router, Psr\Http\Message\ServerRequestInterface.',
+            self::IMPORTS_CHANGE,
             "Added \$this->addPlugin('Authentication') to bootstrap().",
             'Added AuthenticationMiddleware after BodyParserMiddleware in middleware().',
             self::SERVICE_CHANGE,
@@ -99,22 +117,61 @@ final class CakeApplicationScaffoldTest extends TestCase
         $this->assertSame([], $result['manual']);
     }
 
-    public function test_string_login_action_is_used_as_written(): void
+    // CAKE-12: AuthComponent's controller redirect made the loginAction a full URL, a string one included.
+    public function test_string_login_action_becomes_a_full_url(): void
     {
         $result = (new ApplicationScaffold())->scaffold(self::application(), " '/auth/login' ");
 
-        $this->assertStringContainsString("            'unauthenticatedRedirect' => '/auth/login',\n", $result['code']);
-        $this->assertStringNotContainsString('use Cake\Routing\Router;', $result['code']);
+        $this->assertStringContainsString("            'unauthenticatedRedirect' => Router::url('/auth/login', true),\n", $result['code']);
         $this->assertSame(self::IMPORTS_CHANGE, $result['changes'][1]);
         $this->assertSame([], $result['manual']);
+    }
+
+    // CAKE-12: the guest message AuthComponent flashed, from the app's authError.
+    public function test_auth_error_is_flashed_as_auth_component_did(): void
+    {
+        $scaffold = new ApplicationScaffold();
+        $own = $scaffold->scaffold(self::application(), "'/login'", "__('Please sign in.')");
+        $this->assertStringContainsString("\$request->getFlash()->set(__('Please sign in.'), ['element' => 'error', 'key' => 'flash', 'params' => ['class' => 'error']]);", $own['code']);
+        $this->assertSame([], $own['manual']);
+
+        $empty = $scaffold->scaffold(self::application(), "'/login'", "''");
+        $this->assertStringContainsString("\$request->getFlash()->set('', [", $empty['code']);
+
+        $off = $scaffold->scaffold(self::application(), "'/login'", 'false');
+        $this->assertStringNotContainsString('getFlash', $off['code']);
+        $this->assertStringNotContainsString('use Cake\Http\ServerRequest;', $off['code']);
+        $this->assertStringContainsString("     * when they asked for the home page.\n", $off['code']);
+        $this->assertSame([], $off['manual']);
+
+        $computed = $scaffold->scaffold(self::application(), "'/login'", '$this->message');
+        $this->assertStringNotContainsString('getFlash', $computed['code']);
+        $this->assertSame(["MANUAL: the Auth config's authError is not a plain string, so getAuthenticationService() flashes no message to guests; flash it in getUnauthenticatedRedirectUrl() by hand."], $computed['manual']);
+
+        $flash = $scaffold->scaffold(self::application(), "'/login'", null, true);
+        $this->assertStringContainsString("__d('cake', 'You are not authorized to access that location.')", $flash['code']);
+        $this->assertSame(["MANUAL: the Auth config set its own 'flash' options; the guest message in getAuthenticationService() uses AuthComponent's default ones, so check it."], $flash['manual']);
+    }
+
+    // CAKE-12: AuthComponent checked inside every middleware, so the CSRF cookie reached a guest's redirect.
+    public function test_middleware_goes_after_csrf_protection(): void
+    {
+        $source = str_replace(
+            "            ->add(new BodyParserMiddleware());\n",
+            "            ->add(new BodyParserMiddleware())\n            ->add(new CsrfProtectionMiddleware([\n                'httponly' => true,\n            ]));\n",
+            self::application(),
+        );
+        $result = (new ApplicationScaffold())->scaffold($source, "'/login'");
+
+        $this->assertStringContainsString("            ->add(new CsrfProtectionMiddleware([\n                'httponly' => true,\n            ]))\n            ->add(new AuthenticationMiddleware(\$this));\n", $result['code']);
+        $this->assertContains('Added AuthenticationMiddleware after CsrfProtectionMiddleware in middleware().', $result['changes']);
     }
 
     public function test_missing_login_action_uses_the_placeholder_and_a_manual_note(): void
     {
         $result = (new ApplicationScaffold())->scaffold(self::application(), null);
 
-        $this->assertStringContainsString("            'unauthenticatedRedirect' => '/login',\n", $result['code']);
-        $this->assertStringNotContainsString('Router', $result['code']);
+        $this->assertStringContainsString("            'unauthenticatedRedirect' => Router::url('/login', true),\n", $result['code']);
         $this->assertSame(
             ["MANUAL: no loginAction was found, so unauthenticatedRedirect in getAuthenticationService() is the placeholder '/login'; set it to the app's sign-in URL."],
             $result['manual'],
@@ -128,13 +185,13 @@ final class CakeApplicationScaffoldTest extends TestCase
         $result = (new ApplicationScaffold())->scaffold(self::application(), $loginAction);
 
         $this->assertStringContainsString(self::lines(
-            '        $service = new AuthenticationService([',
+            '        $service = new class ([',
             "            'unauthenticatedRedirect' => Router::url([",
             "                'controller' => 'Users',",
             "                'action' => 'login',",
-            '            ]),',
+            '            ], true),',
             "            'queryParam' => 'redirect',",
-            '        ]);',
+            '        ]) extends AuthenticationService {',
         ), $result['code']);
     }
 
@@ -255,6 +312,8 @@ final class CakeApplicationScaffoldTest extends TestCase
             'use Authentication\AuthenticationServiceProviderInterface;',
             'use Authentication\Middleware\AuthenticationMiddleware;',
             'use Cake\Http\BaseApplication;',
+            'use Cake\Http\ServerRequest;',
+            'use Cake\Routing\Router;',
             'use Psr\Http\Message\ServerRequestInterface;',
             '',
             'class Application extends BaseApplication implements AuthenticationServiceProviderInterface',
@@ -286,7 +345,7 @@ final class CakeApplicationScaffoldTest extends TestCase
         $this->assertSame(1, substr_count($result['code'], 'use Cake\Routing\Router;'));
         $this->assertSame(1, substr_count($result['code'], 'use Psr\Http\Message\ServerRequestInterface;'));
         $this->assertSame(
-            'Added use imports: Authentication\AuthenticationService, Authentication\AuthenticationServiceInterface, Authentication\AuthenticationServiceProviderInterface, Authentication\Middleware\AuthenticationMiddleware.',
+            'Added use imports: Authentication\AuthenticationService, Authentication\AuthenticationServiceInterface, Authentication\AuthenticationServiceProviderInterface, Authentication\Middleware\AuthenticationMiddleware, Cake\Http\ServerRequest.',
             $result['changes'][1],
         );
     }

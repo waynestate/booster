@@ -74,13 +74,37 @@ notice before the 5 step. A deprecation on 4.6 is CakePHP 5 knocking politely; o
 you; it does not fix them for you.
 
 **The sign-in move.** The 5 step moves the like-for-like AuthComponent calls (`$this->Auth->user('x')` reads the
-identity, `setUser()` becomes `setIdentity()`, `logout()` and `allow()` keep their names on `$this->Authentication`),
-swaps `loadComponent('Auth')` for `loadComponent('Authentication.Authentication')`, requires
-`cakephp/authentication ^3.0`, and wires `src/Application.php`: the provider interface, the plugin, the middleware
-after routing, and a service with the Session authenticator whose guests go to the old `loginAction`.
+identity, `setUser()` becomes `setIdentity()`, `logout()` keeps its name on `$this->Authentication`, `allow()` becomes
+`addUnauthenticatedActions()`), swaps `loadComponent('Auth')` for `loadComponent('Authentication.Authentication')`,
+requires `cakephp/authentication ^3.0`, and wires `src/Application.php`: the provider interface, the plugin, the
+middleware (after CSRF protection, else body parsing, else routing: AuthComponent checked inside the controller, so
+inside every middleware), and a service with the Session authenticator whose guests go to the old `loginAction`.
+AuthComponent never asked for a sign-in on its own `loginAction`; the plugin does, so the page would redirect to
+itself. Booster names that action in `addUnauthenticatedActions()` at the end of its controller's `initialize()` (or
+adds an `initialize()`), and says MANUAL when the `loginAction` is not a plain controller and action array.
+
+The guests' redirect stays AuthComponent's, so the replay sees the same answer: the service's
+`getUnauthenticatedRedirectUrl()` sends a full URL (`Router::url($loginAction, true)`), adds `?redirect=` with the
+page the guest asked for except the home page, and flashes the app's `authError` first (AuthComponent's default
+message when the app set none, nothing for `false`), with AuthComponent's flash options. The plugin alone would send a
+path, always add the way back, and flash nothing.
+
+**The skeleton's own files.** The 5 step also makes the CakePHP 5 skeleton's moves no upgrade rule makes:
+`config/bootstrap.php` loads CakePHP's global functions (`require CAKE . 'functions.php';`, without which `env()` is
+undefined), `phpunit.xml` loads the fixture extension the PHPUnit 10 way and names the covered code in `<source>`,
+`loadComponent('RequestHandler')` goes when nothing reads the component (with a `viewClasses()` for JSON and XML on
+`AppController` when `config/routes.php` sets those extensions), log `'scopes' => false` becomes `null`, the core cache
+follows its `_cake_translations_` rename, and a template's `Connection::connect()` goes through the driver.
+
+**PHPUnit waits for CakePHP 5.** CakePHP 4's `TestCase` does not load on PHPUnit 10, so a CakePHP 4 app on PHPUnit 9
+keeps it until the 5 step, which requires PHPUnit 11.5 with CakePHP 5.4; the PHPUnit 12 and 13 hops follow. A run
+that PHPUnit 12 fails only for the skeleton's `<ini name="apc.enable_cli">` (the gate image has no APCu) passes with a
+note, every test green. The replay switches on the `cakephp` normalizer from the 5 step, which hides only the extra
+`rel="shortcut icon"` link CakePHP 4's `meta('icon')` printed.
 
 **What Booster does not do (the MANUAL list).** Each run prints these as `MANUAL:` lines, with the file and the count
-where there is one:
+where there is one. The scan reads code, not `//` or `/* */` comments, so code the app commented out is not a step;
+doc blocks still count (an `@property` that names `AuthComponent` is a stale type to update):
 
 - On the 4.6 step: the reminder to fix every deprecation with `E_ALL` before the 5 step.
 - On the 4.6 step: the `Cake\Network\Socket` properties CakePHP 4.3 turned into methods (`connected` is
@@ -89,14 +113,20 @@ where there is one:
 - On both steps: `View::loadHelper()` calls the rules could not type (it is `addHelper()` since 4.5).
 - Sign-in that is not a plain session: `isAuthorized()` (move it to Authorization plugin policies or plain controller
   code), and any Auth config the plugin has no like-for-like for (`authenticate` with a custom authenticator such as
-  CAS, an SSO cookie or an LTI launch, `authorize`, `loginRedirect`, `logoutRedirect`, `authError`; `loginAction` is
-  carried over as the redirect). Also an `'Auth'` entry with config in a `$components` list, any other
+  CAS, an SSO cookie or an LTI launch, `authorize`, `loginRedirect`, `logoutRedirect`; `loginAction` and `authError`
+  are carried over into the guests' redirect). An `authError` that is not a string or a `__()` call on strings
+  (Booster flashes no message then), and a custom `flash` config (Booster uses AuthComponent's default flash options).
+  Also an `'Auth'` entry with config in a `$components` list, any other
   `$this->Auth->...()` call, what the action does with `logout()`'s return value (now the redirect URL or null), and
-  `allow()` calls that passed one name or none, since `allowUnauthenticated()` takes an array.
+  `allow()` calls that passed a variable (it could hold one name or null, every action). `allow()` added to the
+  actions guests may reach, so it becomes `addUnauthenticatedActions()`, never `allowUnauthenticated()`, which
+  replaces the list; one name goes in an array, and `allow()` with nothing is `disableIdentityCheck()`.
 - `src/Application.php` that Booster could not wire: no such file or class, one that already provides an
   authentication service (check that it loads the Session authenticator), no `bootstrap()` or `middleware()`, no
   routing middleware, or no `loginAction` found (the redirect is the placeholder `/login`).
-- Code no rule moves: `RequestHandlerComponent` (declare `viewClasses()` instead), `->withType()` calls,
+- Code no rule moves: `RequestHandlerComponent` where the app still reads `$this->RequestHandler` (declare
+  `viewClasses()` instead), a check that the controllers that serialize still answer `.json` and `.xml` after
+  Booster added `viewClasses()`, `->withType()` calls,
   `Cake\Mailer\Email` (use `Mailer`), `Cake\I18n\Time` and the mutable `Cake\I18n\Date` (use `DateTime` or the
   immutable `Date`, and check code that changed a date in place), and any `.ctp` template left over.
 - `cakedc/cakephp-oracle-driver` has no CakePHP 5 release. The 5 step swaps it for `ioigoume/cakephp5-oracle-driver`

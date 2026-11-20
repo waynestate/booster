@@ -224,6 +224,14 @@ final class HopDataRefresher
             'cakephp/authentication' => '^3.3',
             'cakephp/authorization' => '^3.5',
             'cakephp/chronos' => '^3.3',
+            // The plugins a fleet app (attendance) locked at their CakePHP 4
+            // majors, which composer update -W could not move (CAKE-8);
+            // checked against Packagist 2026-11-20: bootstrap-ui 5.1 needs
+            // cakephp ^5.1.4, csvview 5.0 needs ^5.0, codesniffer 5 is the
+            // CakePHP 5 standard.
+            'friendsofcake/bootstrap-ui' => '^5.1',
+            'friendsofcake/cakephp-csvview' => '^5.0',
+            'cakephp/cakephp-codesniffer' => '^5.2',
         ],
     ];
 

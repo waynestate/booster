@@ -100,6 +100,47 @@ final class TargetImageRunnerTest extends TestCase
             @rmdir($dir);
         }
     }
+
+    // CAKE-6: PHPUnit 12 failed the CakePHP skeleton's green suite on its
+    // <ini name="apc.enable_cli"/>, an extension the gate image does not load.
+    public function test_a_green_suite_failed_only_by_an_unknown_ini_setting_passes_with_a_note(): void
+    {
+        if (DIRECTORY_SEPARATOR === '\\' || !is_executable('/bin/sh')) {
+            self::markTestSkipped('Needs a POSIX shell.');
+        }
+        $dir = sys_get_temp_dir() . '/booster-ini-' . bin2hex(random_bytes(4));
+        mkdir($dir);
+        $printer = $dir . '/fake-phpunit.sh';
+        $run = static function (string $summary, string $warning) use ($dir, $printer): array {
+            file_put_contents($printer, "printf '%s\\n' 'There was 1 PHPUnit test runner warning:' '' '1) Failed to set \"" . $warning . "=1\": ' '' 'OK, but there were issues!' '" . $summary . "'\nexit 1\n");
+            $script = TargetImageRunner::containerScript('sh ' . $printer, null);
+            $process = proc_open(['/bin/sh', '-c', $script], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $dir, ['PATH' => (string) getenv('PATH')]);
+            self::assertIsResource($process);
+            $out = (string) stream_get_contents($pipes[1]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $outcome = TargetImageRunner::gateOutcome(new ProcessResult(proc_close($process), $out, ''));
+
+            return [$outcome->exitCode, $outcome->notes];
+        };
+        try {
+            [$exit, $notes] = $run('Tests: 10, Assertions: 23, PHPUnit Warnings: 1, PHPUnit Notices: 1.', 'booster_no_such_ext.enable_cli');
+            self::assertSame(0, $exit);
+            self::assertSame(['Every test passed; PHPUnit failed the run only because phpunit.xml sets booster_no_such_ext.enable_cli, which belongs to an extension this gate image does not load. Where that extension is installed the warning goes away.'], $notes);
+
+            // A setting PHP knows (a real ini problem), another PHPUnit warning
+            // on top, or an app that asked to fail on warnings: still failed.
+            self::assertSame([1, []], $run('Tests: 10, Assertions: 23, PHPUnit Warnings: 1.', 'memory_limit'));
+            self::assertSame([1, []], $run('Tests: 10, Assertions: 23, PHPUnit Warnings: 2.', 'booster_no_such_ext.enable_cli'));
+            file_put_contents($dir . '/phpunit.xml', '<phpunit failOnPhpunitWarning="true"/>');
+            self::assertSame([1, []], $run('Tests: 10, Assertions: 23, PHPUnit Warnings: 1.', 'booster_no_such_ext.enable_cli'));
+        } finally {
+            @unlink($dir . '/phpunit.xml');
+            @unlink($printer);
+            @rmdir($dir);
+        }
+    }
+
     public function test_gate_outcome_reads_an_install_failure_from_the_markers(): void
     {
         $stdout = "Problem 1 of 1\n- The lock file is not up to date with the latest changes in composer.json.\nBOOSTER_GATE_PHASE=install\nBOOSTER_GATE_EXIT=4\n";

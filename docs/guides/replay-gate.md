@@ -140,6 +140,7 @@ A normalizer rewrites the volatile parts of an answer before it is compared and 
 | `asset-hash` | content hashes in built asset names (`app.3f9a1c2b.js`, Vite's `app-L1fqnEWe.js`, `app.js?id=3f9a1c`) |
 | `preload-hints` | `<link rel="modulepreload">` tags, which list the chunks the bundler split out and change with any build; the tags that load the page stay compared |
 | `inertia` | the Inertia page object's asset `version`, the fields Inertia 3 changed (`clearHistory` and `encryptHistory` when false, `sharedProps`) and its devtools id; component, props and url stay compared |
+| `cakephp` | markup CakePHP 5's helpers print differently from CakePHP 4's (the extra `rel="shortcut icon"` link `meta('icon')` printed on 4); the `cakephp-4.6-to-5` step switches it on by itself, from that step on |
 
 `booster replay init` lists `asset-hash` and `preload-hints` when the app builds with Vite, and `inertia` when it
 requires `inertiajs/inertia-laravel`. Without them the first front-end hop fails the replay on a sound change: on WELD,

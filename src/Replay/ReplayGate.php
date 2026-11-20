@@ -27,7 +27,7 @@ final class ReplayGate
 
     public function __construct(
         private readonly ReplayRunner $runner,
-        private readonly ReplayFile $file,
+        private ReplayFile $file,
         private readonly string $appPath,
         private readonly string $outDir,
         private readonly ?GateImage $image = null,
@@ -138,6 +138,26 @@ final class ReplayGate
         $lines[] = 'Transcripts: ' . $this->outDir;
 
         return new ReplayOutcome(ReplayOutcome::RECORDED, $php, $lines, $name, $this->outDir, $transcript, count($run->answers));
+    }
+
+    /**
+     * Adds a framework preset to every later comparison, for a hop that
+     * moves a framework whose own markup then changes (the CakePHP 5 hop
+     * adds "cakephp"). The baseline answers are kept; both sides are
+     * normalized at compare time, so this hides only what the preset names.
+     * Returns the line for the report, or null when the file already lists it.
+     */
+    public function addPreset(string $preset): ?string
+    {
+        foreach ($this->file->normalizers as $normalizer) {
+            if ($normalizer->name === $preset) {
+                return null;
+            }
+        }
+        $f = $this->file;
+        $this->file = new ReplayFile($f->path, $f->requests, $f->sequences, [...$f->normalizers, ReplayNormalizer::preset($preset)], $f->docroot, $f->frontController, $f->setup, $f->env, $f->ini, $f->services, $f->compareJson, $f->compareWhitespace, $f->todos, $f->fingerprint, $f->requestsFingerprint, $f->serveFingerprint);
+
+        return sprintf('Replay: the "%s" normalizer is on from this step (%s).', $preset, ReplayNormalizer::PRESETS[$preset][0]);
     }
 
     /**

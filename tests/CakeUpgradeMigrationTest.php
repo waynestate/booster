@@ -424,9 +424,9 @@ final class CakeUpgradeMigrationTest extends TestCase
         self::assertNotSame([], $rector);
         foreach ($rector as $call) {
             $command = $call['command'];
-            // The copy at /app, then the app's own vendor/ over /app/vendor, read-only, and named as the autoloader.
+            // The copy at /app, then the app's own vendor/ over /app/vendor, read-only, read through the image's class-map autoloader.
             self::assertSame($app . '/vendor:/app/vendor:ro', $command[(int) array_search('-v', $command, true) + 3]);
-            self::assertSame('/app/vendor/autoload.php', $command[(int) array_search('--autoload', $command, true) + 1]);
+            self::assertSame('/booster/app-autoload.php', $command[(int) array_search('--autoload', $command, true) + 1]);
             self::assertStringStartsNotWith($app . ':', $command[(int) array_search('-v', $command, true) + 1], 'Rector writes the copy, never the app');
         }
     }
@@ -522,7 +522,10 @@ final class CakeUpgradeMigrationTest extends TestCase
         self::assertNotNull($calls);
         self::assertStringContainsString('src/Controller/UsersController.php (2)', $calls);
         self::assertNotNull(self::lineStartingWith($result->manual, 'MANUAL: isAuthorized()'));
-        self::assertStringContainsString('src/Controller/ApiController.php (1)', (string) self::lineStartingWith($result->manual, 'MANUAL: RequestHandlerComponent'));
+        // Nothing reads $this->RequestHandler, so the load goes (CAKE-4) and no MANUAL line is left for it.
+        self::assertNull(self::lineStartingWith($result->manual, 'MANUAL: RequestHandlerComponent'));
+        self::assertContains("Removed loadComponent('RequestHandler') from src/Controller/ApiController.php (CakePHP 5 has no RequestHandlerComponent).", $result->changes);
+        self::assertStringNotContainsString('RequestHandler', (string) file_get_contents($app . '/src/Controller/ApiController.php'));
         self::assertNotNull(self::lineStartingWith($result->manual, 'MANUAL: no upgrade rule checks ->withType()'));
         self::assertStringContainsString('src/Controller/ApiController.php (1)', (string) self::lineStartingWith($result->manual, 'MANUAL: Cake\I18n\Time'));
         foreach ($result->manual as $line) {
@@ -674,12 +677,14 @@ final class CakeUpgradeMigrationTest extends TestCase
         $controller = (string) file_get_contents($app . '/src/Controller/AppController.php');
         self::assertStringNotContainsString('$this->Auth->', $controller);
         self::assertStringContainsString("\$this->loadComponent('Authentication.Authentication');", $controller);
-        self::assertStringContainsString("\$this->Authentication->allowUnauthenticated(['display']);", $controller);
+        self::assertStringContainsString("\$this->Authentication->addUnauthenticatedActions(['display']);", $controller);
         self::assertStringContainsString("return \$this->Authentication->getIdentity()?->get('ROLE');", $controller);
         self::assertStringContainsString('$this->Authentication->setIdentity($profile);', $controller);
         self::assertContains('Moved 3 AuthComponent calls to the Authentication plugin.', $result->changes);
         self::assertContains("Replaced loadComponent('Auth') with loadComponent('Authentication.Authentication') in src/Controller/AppController.php.", $result->changes);
-        self::assertContains("MANUAL: Auth config 'authError' dropped: the Authentication plugin has no counterpart; flash a message on the login action if the app wants one.", $result->manual);
+        // CAKE-12: the authError moves to the guest redirect in src/Application.php.
+        self::assertNull(self::lineStartingWith($result->manual, "MANUAL: Auth config 'authError'"));
+        self::assertStringContainsString("\$request->getFlash()->set('', [", (string) file_get_contents($app . '/src/Application.php'));
         self::assertSame(array_values(array_unique($result->manual)), $result->manual, 'each MANUAL line once');
         self::assertNull(self::lineStartingWith($result->manual, 'MANUAL: AuthComponent is removed'), 'nothing left for a person once the calls moved');
         self::assertContains('src/Controller/AppController.php', array_column($result->files, 'file'));
@@ -701,6 +706,36 @@ final class CakeUpgradeMigrationTest extends TestCase
         self::assertArrayNotHasKey('cakephp/authorization', self::composerJson($app)['require']);
         self::assertContains('cakephp/authentication', $result->packages);
         self::assertContains('Required cakephp/authentication ^3.0 for the Authentication plugin.', $result->changes);
+    }
+
+    // CAKE-11: AuthComponent let guests reach the loginAction; on 5 a fleet app's sign-in page redirected to itself.
+    public function test_the_login_action_stays_open_to_guests(): void
+    {
+        $authController = "<?php\nnamespace App\\Controller;\n\nclass AuthController extends AppController\n{\n    public function initialize(): void\n    {\n        parent::initialize();\n    }\n\n    public function login()\n    {\n        return \$this->redirect('https://sso.example.invalid/');\n    }\n}\n";
+        $app = $this->authApp(false, ['src/Controller/AuthController.php' => $authController]);
+
+        $result = $this->engine($this->docker())->migrate($app, false, '8.3', self::hop5());
+
+        $code = (string) file_get_contents($app . '/src/Controller/AuthController.php');
+        self::assertStringContainsString("        parent::initialize();\n        // AuthComponent let guests reach its loginAction; the Authentication plugin needs it named.\n        \$this->Authentication->addUnauthenticatedActions(['login']);\n    }", $code);
+        self::assertContains('Opened login() to guests in src/Controller/AuthController.php, as AuthComponent did for its loginAction.', $result->changes);
+        self::assertNull(self::lineStartingWith($result->manual, "MANUAL: the loginAction's controller"));
+
+        $missing = $this->engine($this->docker())->migrate($this->authApp(), false, '8.3', self::hop5());
+        self::assertNotNull(self::lineStartingWith($missing->manual, "MANUAL: the loginAction's controller (src/Controller/AuthController.php) was not found"));
+    }
+
+    // CAKE-13: a fleet app got MANUAL lines for $this->Auth calls that lived only in commented-out code.
+    public function test_commented_out_auth_code_is_not_a_manual_step(): void
+    {
+        $dashboard = "<?php\nnamespace App\\Controller;\n\nclass DashboardController extends AppController\n{\n    public function index()\n    {\n        // if (array_key_exists('admin', \$this->Auth->User('ROLES'))) {\n        /* \$this->loadComponent('Auth'); uses AuthComponent */\n    }\n}\n";
+        $app = $this->authApp(false, ['src/Controller/DashboardController.php' => $dashboard]);
+
+        $result = $this->engine($this->docker())->migrate($app, false, '8.3', self::hop5());
+
+        self::assertNull(self::lineStartingWith($result->manual, 'MANUAL: AuthComponent is removed'), implode("\n", $result->manual));
+        self::assertNull(self::lineStartingWith($result->manual, 'MANUAL: the $this->Auth calls go'), implode("\n", $result->manual));
+        self::assertStringContainsString("// if (array_key_exists('admin', \$this->Auth->User('ROLES'))) {", (string) file_get_contents($app . '/src/Controller/DashboardController.php'), 'comments are left as written');
     }
 
     public function test_no_auth_means_no_authentication_plugin_or_scaffold(): void

@@ -1360,6 +1360,8 @@ final class HopExecutor
                 $php,
             )]);
         }
+        // CakePHP 5's helpers print some markup differently; the preset hides only that.
+        $presetLine = $step->hop->id === HopRegistry::CAKEPHP_46_TO_5_ID ? $this->replayGate->addPreset('cakephp') : null;
         try {
             $outcome = $this->replayGate->check($php, sprintf('step-%d-%s-php%s', $step->number, $step->hop->id, $php));
         } catch (ToolError $e) {
@@ -1368,13 +1370,14 @@ final class HopExecutor
         if ($outcome->failed()) {
             return new GateReport(false, [
                 ...$gate->lines,
+                ...($presetLine === null ? [] : [$presetLine]),
                 ...$outcome->lines,
                 'The tests (or syntax check) passed, but an answer changed. The working copy keeps the changes so you can read them.',
                 $this->undoHint($path),
             ]);
         }
 
-        return new GateReport(true, [...$gate->lines, ...$outcome->lines]);
+        return new GateReport(true, [...$gate->lines, ...($presetLine === null ? [] : [$presetLine]), ...$outcome->lines]);
     }
 
     /**
@@ -1604,7 +1607,7 @@ final class HopExecutor
             }
         }
         if ($outcome->successful()) {
-            return new GateReport(true, $unblock);
+            return new GateReport(true, [...$unblock, ...$outcome->notes]);
         }
 
         // A Composer-phase failure is never reported as the test command

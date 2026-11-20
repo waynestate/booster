@@ -81,6 +81,7 @@ final class CakeUpgradeMigration implements FrameworkEngine
         private readonly ComposerEditor $composer,
         private readonly AuthRewriter $auth = new AuthRewriter(),
         private readonly ApplicationScaffold $scaffold = new ApplicationScaffold(),
+        private readonly SkeletonRewriter $skeleton = new SkeletonRewriter(),
     ) {}
 
     public function migrate(string $appPath, bool $dryRun, string $php, ?Hop $hop = null): VendoredMigrationResult
@@ -180,6 +181,9 @@ final class CakeUpgradeMigration implements FrameworkEngine
                 self::renameOracleNamespace($copy);
                 $stepManual[] = 'MANUAL: check that the Oracle driver for CakePHP 5 covers the Oracle calls the app makes.';
             }
+            [$skeletonChanges, $skeletonManual] = $this->rewriteSkeleton($copy);
+            $changes = [...$changes, ...$skeletonChanges];
+            $stepManual = [...$stepManual, ...$skeletonManual];
         }
 
         [$files, $written, $deleted] = self::compare($appPath, $copy);
@@ -243,7 +247,10 @@ final class CakeUpgradeMigration implements FrameworkEngine
     {
         // Read before the rewrite drops the loadComponent config it sits in.
         $appController = $copy . '/src/Controller/AppController.php';
-        $loginAction = is_file($appController) ? $this->auth->loginActionOf(self::read($appController)) : null;
+        $appControllerPhp = is_file($appController) ? self::read($appController) : '';
+        $loginAction = $this->auth->loginActionOf($appControllerPhp);
+        $authError = $this->auth->configValueOf($appControllerPhp, 'authError');
+        $customFlash = $this->auth->configValueOf($appControllerPhp, 'flash') !== null;
 
         $used = false;
         $moved = 0;
@@ -288,11 +295,14 @@ final class CakeUpgradeMigration implements FrameworkEngine
             $changes[] = sprintf("Replaced loadComponent('Auth') with loadComponent('Authentication.Authentication') in %s.", $file);
         }
         $changes = [...$changes, ...$propertyChanges];
+        [$opened, $loginManual] = $this->openLoginAction($copy, $loginAction);
+        $changes = [...$changes, ...$opened];
+        $manual = [...$manual, ...$loginManual];
 
         $application = $copy . '/src/Application.php';
         if (is_file($application)) {
             $before = self::read($application);
-            $scaffold = $this->scaffold->scaffold($before, $loginAction);
+            $scaffold = $this->scaffold->scaffold($before, $loginAction, $authError, $customFlash);
             $manual = [...$manual, ...$scaffold['manual']];
             if ($scaffold['code'] !== $before) {
                 self::write($application, $scaffold['code']);
@@ -303,6 +313,119 @@ final class CakeUpgradeMigration implements FrameworkEngine
         }
 
         return [true, $changes, array_values(array_unique($manual))];
+    }
+
+    /**
+     * Opens the old loginAction to guests in its controller (CAKE-11):
+     * AuthComponent never asked for a sign-in on its own login page, the
+     * Authentication plugin does, and the page then redirects to itself.
+     *
+     * @return array{0: list<string>, 1: list<string>} the changes, the MANUAL lines
+     */
+    private function openLoginAction(string $copy, ?string $loginAction): array
+    {
+        if ($loginAction === null || trim($loginAction) === '') {
+            return [[], []];
+        }
+        $target = $this->auth->loginTarget($loginAction);
+        if ($target === null) {
+            return [[], ["MANUAL: AuthComponent let guests reach its loginAction without signing in, and the Authentication plugin does not; name the sign-in action in addUnauthenticatedActions() in its controller."]];
+        }
+        $file = 'src/Controller/' . $target['controller'] . 'Controller.php';
+        if (!is_file($copy . '/' . $file)) {
+            return [[], [sprintf("MANUAL: the loginAction's controller (%s) was not found; add \$this->Authentication->addUnauthenticatedActions(['%s']) to it by hand, or guests cannot reach the sign-in page.", $file, $target['action'])]];
+        }
+        $result = $this->auth->openLoginAction(self::read($copy . '/' . $file), $target['action']);
+        if (!$result['changed']) {
+            return [[], $result['manual'] === null ? [] : [$result['manual'] . ' (' . $file . ')']];
+        }
+        self::write($copy . '/' . $file, $result['code']);
+
+        return [[sprintf("Opened %s() to guests in %s, as AuthComponent did for its loginAction.", $target['action'], $file)], []];
+    }
+
+    /**
+     * The CakePHP 5 skeleton lines no rule writes (SkeletonRewriter), in the
+     * copy: the global functions in config/bootstrap.php and the PHPUnit 10
+     * shape of phpunit.xml.dist and phpunit.xml.
+     *
+     * @return array{0: list<string>, 1: list<string>} the changes, the MANUAL lines
+     */
+    private function rewriteSkeleton(string $copy): array
+    {
+        $changes = [];
+        $manual = [];
+        $bootstrap = $copy . '/config/bootstrap.php';
+        if (is_file($bootstrap)) {
+            $result = $this->skeleton->bootstrap(self::read($bootstrap));
+            if ($result['changes'] !== []) {
+                self::write($bootstrap, $result['code']);
+            }
+            [$changes, $manual] = [[...$changes, ...$result['changes']], [...$manual, ...$result['manual']]];
+        }
+        foreach (['phpunit.xml.dist', 'phpunit.xml'] as $name) {
+            if (!is_file($copy . '/' . $name)) {
+                continue;
+            }
+            $result = $this->skeleton->phpunitXml(self::read($copy . '/' . $name), $name);
+            if ($result['changes'] !== []) {
+                self::write($copy . '/' . $name, $result['code']);
+            }
+            [$changes, $manual] = [[...$changes, ...$result['changes']], [...$manual, ...$result['manual']]];
+        }
+
+        // The config and template strings cakephp50 leaves behind.
+        $appConfig = is_file($copy . '/config/app.php') ? self::read($copy . '/config/app.php') : '';
+        $cacheRenamed = str_contains($appConfig, "'_cake_translations_'") && !str_contains($appConfig, "'_cake_core_'");
+        $edited = 0;
+        foreach (['config/app.php', 'config/app_local.php', 'config/bootstrap.php'] as $file) {
+            if (is_file($copy . '/' . $file)) {
+                $result = $this->skeleton->config(self::read($copy . '/' . $file), $cacheRenamed);
+                if ($result['changes'] > 0) {
+                    self::write($copy . '/' . $file, $result['code']);
+                    $edited += $result['changes'];
+                }
+            }
+        }
+        foreach (self::filesWithExtension($copy, 'php') as $file) {
+            if (!str_starts_with($file, 'templates/')) {
+                continue;
+            }
+            $result = $this->skeleton->template(self::read($copy . '/' . $file), $cacheRenamed);
+            if ($result['changes'] > 0) {
+                self::write($copy . '/' . $file, $result['code']);
+                $edited += $result['changes'];
+            }
+        }
+        if ($edited > 0) {
+            $changes[] = sprintf("Moved %d CakePHP 4 config and template %s to CakePHP 5 (log 'scopes' => null, the _cake_translations_ cache, Connection::getDriver()->connect(), WebExceptionRenderer).", $edited, $edited === 1 ? 'line' : 'lines');
+        }
+
+        // RequestHandlerComponent: drop the loads when nothing reads the component.
+        $sources = array_filter(
+            self::phpSources($copy),
+            static fn(string $file): bool => str_starts_with($file, 'src/') || str_starts_with($file, 'plugins/'),
+            ARRAY_FILTER_USE_KEY,
+        );
+        $readsIt = self::matches($sources, '/->\s*RequestHandler\s*->/') !== [];
+        $routes = is_file($copy . '/config/routes.php') ? self::read($copy . '/config/routes.php') : '';
+        $extensions = preg_match('/setExtensions\s*\(\s*\[[^\]]*[\'"](?:json|xml)[\'"]/', $routes) === 1;
+        if (!$readsIt) {
+            foreach ($sources as $file => $source) {
+                $result = $this->skeleton->requestHandler($source, $extensions && str_ends_with($file, 'src/Controller/AppController.php'));
+                if (!$result['removed']) {
+                    continue;
+                }
+                self::write($copy . '/' . $file, $result['code']);
+                $changes[] = sprintf("Removed loadComponent('RequestHandler') from %s (CakePHP 5 has no RequestHandlerComponent).", $file);
+                if ($result['viewClasses']) {
+                    $changes[] = sprintf('Added viewClasses() with JsonView and XmlView to %s for the .json and .xml extensions config/routes.php sets.', $file);
+                    $manual[] = sprintf('MANUAL: %s now picks JsonView or XmlView through viewClasses(), as RequestHandlerComponent did; check the controllers that serialize (setOption(\'serialize\')) still answer .json and .xml.', $file);
+                }
+            }
+        }
+
+        return [$changes, $manual];
     }
 
     /** The `$this->Auth->name(` calls in $php. */
@@ -494,13 +617,30 @@ final class CakeUpgradeMigration implements FrameworkEngine
     {
         $counts = [];
         foreach ($sources as $file => $source) {
-            $n = preg_match_all($pattern, $source);
+            $n = preg_match_all($pattern, self::withoutComments($source));
             if ($n !== false && $n > 0) {
                 $counts[$file] = $n;
             }
         }
 
         return $counts;
+    }
+
+    /**
+     * The source with its line and block comments blanked (CAKE-13): code an app commented
+     * out, and the comments Booster writes next to its own moves, are not
+     * calls a person has to port; a fleet app got two MANUAL lines for
+     * $this->Auth calls that lived only in comments. Doc blocks stay: a
+     * property tag naming AuthComponent is a stale type a person updates.
+     */
+    private static function withoutComments(string $source): string
+    {
+        $code = '';
+        foreach (\PhpToken::tokenize($source) as $token) {
+            $code .= $token->is(T_COMMENT) ? str_repeat("\n", substr_count($token->text, "\n")) . ' ' : $token->text;
+        }
+
+        return $code;
     }
 
     /**
@@ -617,7 +757,7 @@ final class CakeUpgradeMigration implements FrameworkEngine
         $verbs = [
             'Ran' => 'run', 'Renamed' => 'rename', 'Set' => 'set', 'Removed' => 'remove', 'Added' => 'add',
             'Moved' => 'move', 'Wired' => 'wire', 'Swapped' => 'swap', 'Replaced' => 'replace', 'Rewrote' => 'rewrite',
-            'Changed' => 'change', 'Required' => 'require',
+            'Changed' => 'change', 'Required' => 'require', 'Loaded' => 'load',
         ];
         $space = strpos($line, ' ');
         $first = $space === false ? $line : substr($line, 0, $space);

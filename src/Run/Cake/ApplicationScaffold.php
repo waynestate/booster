@@ -13,11 +13,15 @@ use PhpToken;
  *
  * - the class implements AuthenticationServiceProviderInterface,
  * - bootstrap() loads the plugin,
- * - middleware() adds AuthenticationMiddleware after routing and body parsing,
+ * - middleware() adds AuthenticationMiddleware last of CSRF, body parsing and
+ *   routing (AuthComponent checked inside the controller, so inside every
+ *   middleware: the CSRF cookie still reaches a guest's redirect),
  * - getAuthenticationService() builds a service whose guests go to the app's
  *   old AuthComponent loginAction, with only the Session authenticator: the
  *   apps sign people in by hand (setUser, now setIdentity), and a service with
- *   no authenticator would never keep that identity past the request.
+ *   no authenticator would never keep that identity past the request. The
+ *   guest redirect is AuthComponent's (CAKE-12): a full URL, no way back when
+ *   the guest asked for the home page, and its authError flashed first.
  *
  * Pure: it edits the source string it is given and reports what it did. A
  * class that already implements the interface is left alone and only
@@ -36,17 +40,25 @@ final class ApplicationScaffold
         'Authentication\AuthenticationServiceInterface',
         'Authentication\AuthenticationServiceProviderInterface',
         'Authentication\Middleware\AuthenticationMiddleware',
+        'Cake\Http\ServerRequest',
+        'Cake\Routing\Router',
         'Psr\Http\Message\ServerRequestInterface',
     ];
 
-    private const ROUTER = 'Cake\Routing\Router';
+    /** AuthComponent's message for a guest, when the app set no authError. */
+    private const DEFAULT_AUTH_ERROR = "__d('cake', 'You are not authorized to access that location.')";
+
+    /** AuthComponent's default `flash` config. */
+    private const FLASH_OPTIONS = "['element' => 'error', 'key' => 'flash', 'params' => ['class' => 'error']]";
 
     /**
      * @param string $applicationPhp the app's src/Application.php
      * @param ?string $loginActionSource the source text of the old AuthComponent loginAction (AuthRewriter::loginActionOf), or null
+     * @param ?string $authErrorSource the source text of the old authError (AuthRewriter::configValueOf), or null when the app set none
+     * @param bool $customFlash whether the old Auth config set its own `flash` options
      * @return array{code: string, changes: list<string>, manual: list<string>}
      */
-    public function scaffold(string $applicationPhp, ?string $loginActionSource): array
+    public function scaffold(string $applicationPhp, ?string $loginActionSource, ?string $authErrorSource = null, bool $customFlash = false): array
     {
         $tokens = PhpToken::tokenize($applicationPhp);
         $class = $this->applicationClass($tokens);
@@ -77,20 +89,25 @@ final class ApplicationScaffold
         self::insertAfter($inserts, $tokens[$after], $class['lastInterface'] !== null ? ', ' . self::INTERFACE : ' implements ' . self::INTERFACE);
         $changes[] = 'Added AuthenticationServiceProviderInterface to the Application class.';
 
-        // The service method, built first because it decides whether Router is imported.
+        // The service method, built first because it decides whether Router and ServerRequest are imported.
         $imports = self::IMPORTS;
         $method = null;
         if (isset($methods['getauthenticationservice'])) {
             $manual[] = 'MANUAL: Application already has a getAuthenticationService(); check that it loads the Authentication.Session authenticator.';
+            $imports = array_values(array_diff($imports, ['Cake\Http\ServerRequest', 'Cake\Routing\Router']));
         } else {
-            [$redirect, $needsRouter] = $this->redirectExpression($loginActionSource, $nl);
-            if ($needsRouter) {
-                $imports[] = self::ROUTER;
-            }
+            $redirect = $this->redirectExpression($loginActionSource, $nl);
             if ($loginActionSource === null || trim($loginActionSource) === '') {
                 $manual[] = "MANUAL: no loginAction was found, so unauthenticatedRedirect in getAuthenticationService() is the placeholder '/login'; set it to the app's sign-in URL.";
             }
-            $method = $this->serviceMethod($redirect, $nl);
+            $message = $this->flashMessage($authErrorSource, $manual);
+            if ($message !== null && $customFlash) {
+                $manual[] = "MANUAL: the Auth config set its own 'flash' options; the guest message in getAuthenticationService() uses AuthComponent's default ones, so check it.";
+            }
+            $method = $this->serviceMethod($redirect, $message, $nl);
+            if ($message === null) {
+                $imports = array_values(array_diff($imports, ['Cake\Http\ServerRequest']));
+            }
         }
 
         $added = $this->addImports($tokens, $class['class'], $imports, $inserts, $nl);
@@ -117,7 +134,7 @@ final class ApplicationScaffold
 
         if ($method !== null) {
             $inserts[$tokens[$class['close']]->pos] = ($inserts[$tokens[$class['close']]->pos] ?? '') . $nl . $method . $nl;
-            $changes[] = "Added getAuthenticationService(): the Session authenticator, unauthenticatedRedirect from the old loginAction, queryParam 'redirect'.";
+            $changes[] = "Added getAuthenticationService(): the Session authenticator, and AuthComponent's guest redirect to the old loginAction (a full URL, queryParam 'redirect' except for the home page, the authError flashed).";
         }
 
         krsort($inserts);
@@ -362,8 +379,9 @@ final class ApplicationScaffold
     }
 
     /**
-     * Adds AuthenticationMiddleware right after the BodyParserMiddleware (else
-     * the RoutingMiddleware) entry of middleware(). Returns the anchor's class
+     * Adds AuthenticationMiddleware right after the CsrfProtectionMiddleware
+     * (else the BodyParserMiddleware, else the RoutingMiddleware) entry of
+     * middleware(). Returns the anchor's class
      * name, null when the queue already has the middleware, or '' when there
      * is no anchor.
      *
@@ -388,7 +406,14 @@ final class ApplicationScaffold
                 $found[strtolower(self::lastSegment($tokens[$class]->text))] ??= $i;
             }
         }
-        $anchorName = isset($found['bodyparsermiddleware']) ? 'BodyParserMiddleware' : 'RoutingMiddleware';
+        $anchorName = 'RoutingMiddleware';
+        foreach (['CsrfProtectionMiddleware', 'BodyParserMiddleware'] as $candidate) {
+            if (isset($found[strtolower($candidate)])) {
+                $anchorName = $candidate;
+
+                break;
+            }
+        }
         $new = $found[strtolower($anchorName)] ?? null;
         $call = $new === null ? null : $this->enclosingCall($tokens, $body['open'], $new);
         if ($call === null) {
@@ -441,17 +466,16 @@ final class ApplicationScaffold
     }
 
     /**
-     * The value for unauthenticatedRedirect and whether it needs Router: an
-     * array URL goes through Router::url(), a string is used as written, and
-     * a multi-line value is re-indented to sit in the service's config array.
-     *
-     * @return array{0: string, 1: bool}
+     * The value for unauthenticatedRedirect: the loginAction through
+     * Router::url(..., true), as AuthComponent's controller redirect made it
+     * a full URL; a multi-line value is re-indented to sit in the service's
+     * config array.
      */
-    private function redirectExpression(?string $loginAction, string $nl): array
+    private function redirectExpression(?string $loginAction, string $nl): string
     {
         $source = trim((string) $loginAction);
         if ($source === '') {
-            return [self::PLACEHOLDER, false];
+            $source = self::PLACEHOLDER;
         }
         $lines = preg_split('/\r\n|\n/', $source) ?: [$source];
         if (count($lines) > 1) {
@@ -466,24 +490,74 @@ final class ApplicationScaffold
             }
             $source = $lines[0] . $nl . implode($nl, $rest);
         }
-        $isArray = str_starts_with($source, '[') || preg_match('/^array\s*\(/i', $source) === 1;
 
-        return $isArray ? ['Router::url(' . $source . ')', true] : [$source, false];
+        return 'Router::url(' . $source . ', true)';
     }
 
-    private function serviceMethod(string $redirect, string $nl): string
+    /**
+     * The message AuthComponent flashed to a guest it sent to sign in: its
+     * default when the app set no authError, none for false, the app's own
+     * when it is a string or a __() / __d() call on strings; anything else
+     * (a variable, a method call) cannot move out of the controller, so it
+     * is a MANUAL line and no message.
+     *
+     * @param list<string> $manual
+     */
+    private function flashMessage(?string $authErrorSource, array &$manual): ?string
     {
+        if ($authErrorSource === null) {
+            return self::DEFAULT_AUTH_ERROR;
+        }
+        $source = trim($authErrorSource);
+        if (strcasecmp($source, 'false') === 0) {
+            return null;
+        }
+        $literal = "(?:'(?:[^'\\\\]|\\\\.)*'|\"(?:[^\"\\\\$]|\\\\.)*\")";
+        if (preg_match('/^' . $literal . '$/s', $source) === 1
+            || preg_match('/^__d?\(\s*' . $literal . '(?:\s*,\s*' . $literal . ')?\s*\)$/s', $source) === 1) {
+            return $source;
+        }
+        $manual[] = "MANUAL: the Auth config's authError is not a plain string, so getAuthenticationService() flashes no message to guests; flash it in getUnauthenticatedRedirectUrl() by hand.";
+
+        return null;
+    }
+
+    private function serviceMethod(string $redirect, ?string $message, string $nl): string
+    {
+        $flash = $message === null ? [] : [
+            "                if (\$request instanceof ServerRequest && !\$request->is('ajax')) {",
+            '                    $request->getFlash()->set(' . $message . ', ' . self::FLASH_OPTIONS . ');',
+            '                }',
+            '',
+        ];
+
         return implode($nl, [
             '    /**',
             '     * The authentication service: the session keeps the identity the app',
-            '     * sets when it signs someone in, and guests go to the old login action.',
+            '     * sets when it signs someone in, and guests go to the old login action',
+            '     * the way the CakePHP 4 Auth component sent them: a full URL, no way back',
+            $message === null
+                ? '     * when they asked for the home page.'
+                : '     * when they asked for the home page, and its message flashed first.',
             '     */',
             '    public function getAuthenticationService(ServerRequestInterface $request): AuthenticationServiceInterface',
             '    {',
-            '        $service = new AuthenticationService([',
+            '        $service = new class ([',
             "            'unauthenticatedRedirect' => " . $redirect . ',',
             "            'queryParam' => 'redirect',",
-            '        ]);',
+            '        ]) extends AuthenticationService {',
+            '            public function getUnauthenticatedRedirectUrl(ServerRequestInterface $request): ?string',
+            '            {',
+            ...$flash,
+            "                \$url = \$this->getConfig('unauthenticatedRedirect');",
+            '                $back = $request->getRequestTarget();',
+            "                if (\$request->getMethod() !== 'GET' || \$back === '/') {",
+            '                    return $url;',
+            '                }',
+            '',
+            "                return \$url . (str_contains(\$url, '?') ? '&' : '?') . urlencode(\$this->getConfig('queryParam')) . '=' . urlencode(\$back);",
+            '            }',
+            '        };',
             "        \$service->loadAuthenticator('Authentication.Session');",
             '',
             '        return $service;',

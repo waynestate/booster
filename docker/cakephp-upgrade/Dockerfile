@@ -27,5 +27,11 @@ RUN git clone https://github.com/cakephp/upgrade.git /upgrade \
 RUN sed -i 's#/default-rector\.php#/defaults.php#' /upgrade/config/rector/cakephp41.php \
  && sed -i '/ruleWithConfiguration(PropertyFetchToMethodCallRector::class/,/^    \]);$/d' /upgrade/config/rector/sets/cakephp43.php \
  && php -l /upgrade/config/rector/sets/cakephp43.php
+# Rector reads the app's classes through this file instead of the app's
+# vendor/autoload.php, whose files autoloads can die on this newer PHP
+# (CakePHP 4's Chronos does); the file says why. Booster passes it as
+# --autoload.
+COPY app-autoload.php /booster/app-autoload.php
+RUN php -l /booster/app-autoload.php
 WORKDIR /upgrade
 ENTRYPOINT []

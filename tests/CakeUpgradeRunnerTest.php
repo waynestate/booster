@@ -26,7 +26,7 @@ final class CakeUpgradeRunnerTest extends TestCase
 
         self::assertTrue($result->successful());
         self::assertSame(
-            ['docker', 'run', '--rm', '-v', '/srv/my app:/app', '-v', '/srv/my app/vendor:/app/vendor:ro', CakeUpgradeRunner::imageTag(), 'bin/cake', 'upgrade', 'rector', '--rules', 'cakephp45', '--autoload', '/app/vendor/autoload.php', '/app/src'],
+            ['docker', 'run', '--rm', '-v', '/srv/my app:/app', '-v', '/srv/my app/vendor:/app/vendor:ro', CakeUpgradeRunner::imageTag(), 'bin/cake', 'upgrade', 'rector', '--rules', 'cakephp45', '--autoload', CakeUpgradeRunner::APP_AUTOLOAD, '/app/src'],
             $fake->calls[0]['command'],
         );
         self::assertNull($fake->calls[0]['cwd']);
@@ -158,7 +158,7 @@ final class CakeUpgradeRunnerTest extends TestCase
             ->rectorCommand('/srv/app', 'cakephp45', 'src', '/srv/app/vendor');
 
         self::assertSame(
-            ['docker', 'run', '--rm', '-v', '/srv/app:/app', '-v', '/srv/app/vendor:/app/vendor:ro', '-v', 'stack-composer-cache:/tmp/composer-cache', '-e', 'COMPOSER_CACHE_DIR=/tmp/composer-cache', CakeUpgradeRunner::imageTag(), 'bin/cake', 'upgrade', 'rector', '--rules', 'cakephp45', '--autoload', '/app/vendor/autoload.php', '/app/src'],
+            ['docker', 'run', '--rm', '-v', '/srv/app:/app', '-v', '/srv/app/vendor:/app/vendor:ro', '-v', 'stack-composer-cache:/tmp/composer-cache', '-e', 'COMPOSER_CACHE_DIR=/tmp/composer-cache', CakeUpgradeRunner::imageTag(), 'bin/cake', 'upgrade', 'rector', '--rules', 'cakephp45', '--autoload', CakeUpgradeRunner::APP_AUTOLOAD, '/app/src'],
             $command,
         );
     }
@@ -170,6 +170,66 @@ final class CakeUpgradeRunnerTest extends TestCase
 
         self::assertNotContains('-e', $command);
         self::assertNotContains('COMPOSER_CACHE_DIR=/tmp/composer-cache', $command);
+    }
+
+    public function test_the_image_autoloader_finds_app_classes_without_running_files_autoloads(): void
+    {
+        // CAKE-1 (Chronos): CakePHP 4's vendor/autoload.php runs chronos/src/carbon_compat.php at load,
+        // and Chronos 2 dies on PHP 8.4 and up, so Rector died before any rule. The image's autoloader
+        // registers the class maps only.
+        $vendor = sys_get_temp_dir() . '/booster-app-autoload-' . bin2hex(random_bytes(4)) . '/vendor';
+        $app = dirname($vendor);
+        mkdir($vendor . '/composer', 0777, true);
+        mkdir($app . '/src/Controller', 0777, true);
+        mkdir($vendor . '/acme/old-lib', 0777, true);
+        file_put_contents($app . '/src/Controller/AppController.php', "<?php\nnamespace BoosterAutoloadFixture\\Controller;\nclass AppController {}\n");
+        file_put_contents($vendor . '/acme/old-lib/Mapped.php', "<?php\nclass BoosterAutoloadFixtureMapped {}\n");
+        file_put_contents($vendor . '/acme/old-lib/compat.php', "<?php\nthrow new \\RuntimeException('a files autoload ran');\n");
+        file_put_contents($vendor . '/composer/autoload_psr4.php', "<?php\nreturn ['BoosterAutoloadFixture\\\\' => [dirname(__DIR__, 2) . '/src']];\n");
+        file_put_contents($vendor . '/composer/autoload_classmap.php', "<?php\nreturn ['BoosterAutoloadFixtureMapped' => dirname(__DIR__) . '/acme/old-lib/Mapped.php'];\n");
+        file_put_contents($vendor . '/composer/autoload_files.php', "<?php\nreturn ['x' => dirname(__DIR__) . '/acme/old-lib/compat.php'];\n");
+        file_put_contents($vendor . '/autoload.php', "<?php\nforeach (require __DIR__ . '/composer/autoload_files.php' as \$f) { require \$f; }\n");
+
+        putenv('BOOSTER_APP_VENDOR=' . $vendor);
+        try {
+            $loader = require $this->dockerDir() . '/' . CakeUpgradeRunner::APP_AUTOLOAD_FILE;
+        } finally {
+            putenv('BOOSTER_APP_VENDOR');
+        }
+
+        try {
+            self::assertInstanceOf(\Composer\Autoload\ClassLoader::class, $loader);
+            self::assertTrue(class_exists('BoosterAutoloadFixture\\Controller\\AppController'), 'the PSR-4 map is read');
+            self::assertTrue(class_exists('BoosterAutoloadFixtureMapped'), 'the class map is read');
+            // No PSR-0 map in this vendor: a missing map file is skipped, not an error.
+        } finally {
+            $loader->unregister();
+            self::removeDir($app);
+        }
+
+        $dockerfile = (string) file_get_contents($this->dockerDir() . '/Dockerfile');
+        self::assertStringContainsString('COPY app-autoload.php ' . CakeUpgradeRunner::APP_AUTOLOAD, $dockerfile);
+        self::assertStringNotContainsString('autoload_files', (string) file_get_contents($this->dockerDir() . '/' . CakeUpgradeRunner::APP_AUTOLOAD_FILE));
+    }
+
+    public function test_the_image_tag_changes_with_the_autoloader(): void
+    {
+        // The tag hashes the Dockerfile and the file it copies, so an edited autoloader gets a new image.
+        $dockerfile = (string) file_get_contents($this->dockerDir() . '/Dockerfile');
+        $autoload = (string) file_get_contents($this->dockerDir() . '/' . CakeUpgradeRunner::APP_AUTOLOAD_FILE);
+
+        self::assertSame(
+            'booster-cakephp-upgrade:' . substr(hash('sha256', $dockerfile . $autoload . CakeUpgradeRunner::UPGRADE_REF), 0, 12),
+            CakeUpgradeRunner::imageTag(),
+        );
+    }
+
+    private static function removeDir(string $dir): void
+    {
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST) as $item) {
+            $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+        }
+        rmdir($dir);
     }
 
     public function test_cakephp_upgrade_dockerfile_installs_intl(): void

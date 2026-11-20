@@ -52,6 +52,16 @@ final class Planner
      */
     private const FRAMEWORK_HOPS_AT_CURRENT_PHP = [HopRegistry::CAKEPHP_4_TO_46_ID];
 
+    /**
+     * The PHPUnit majors a framework's test classes run on, by framework and
+     * major line: [newest PHPUnit the line runs, PHPUnit its next major
+     * needs]. CakePHP 4's TestCase overrides assertions PHPUnit 10 made
+     * final, so a CakePHP 4 app stays on PHPUnit 9 until the CakePHP 5 hop,
+     * which moves PHPUnit to 11 in the same Composer update (CakePHP 5.4's
+     * test suite needs 11).
+     */
+    private const FRAMEWORK_PHPUNIT = ['cakephp' => ['4' => ['9', '11']]];
+
     public function __construct(
         private readonly Policy $policy,
         private readonly HopRegistry $registry,
@@ -229,6 +239,19 @@ final class Planner
             if ($laravelFloor !== null && version_compare($toPhpunit, $laravelFloor, '<')) {
                 $toPhpunit = $laravelFloor;
             }
+            // A framework line whose tests cap PHPUnit (CakePHP 4 at 9): a
+            // plan that stays on the line stops PHPUnit there, and one that
+            // crosses to the next major lands on the PHPUnit that major needs.
+            $frameworkPhpunit = self::frameworkPhpunit($framework, $frameworkLine);
+            if ($frameworkPhpunit !== null && $frameworkTarget !== null) {
+                $crosses = (int) explode('.', $frameworkTarget)[0] > (int) explode('.', (string) $frameworkLine)[0];
+                if (!$crosses && version_compare($toPhpunit, $frameworkPhpunit[0], '>')) {
+                    $toPhpunit = version_compare($fromPhpunit, $frameworkPhpunit[0], '>') ? $fromPhpunit : $frameworkPhpunit[0];
+                    $warnings[] = sprintf('%s %s tests run on PHPUnit %s at most, so PHPUnit stays on %s until the move to %s %d.', $frameworkName, $frameworkLine, $frameworkPhpunit[0], $toPhpunit, $frameworkName, (int) explode('.', (string) $frameworkLine)[0] + 1);
+                } elseif ($crosses && version_compare($toPhpunit, $frameworkPhpunit[1], '<')) {
+                    $toPhpunit = $frameworkPhpunit[1];
+                }
+            }
             $phpunitPhp = $this->registry->phpunitPhp();
             if (version_compare($toPhp, $phpunitPhp[$toPhpunit], '<')) {
                 throw new ToolError(sprintf('PHPUnit %s needs PHP %s or newer, but the target PHP is %s.', $toPhpunit, $phpunitPhp[$toPhpunit], $toPhp));
@@ -345,7 +368,15 @@ final class Planner
             if ($frameworkHop !== null) {
                 $range = $this->registry->frameworkPhpRange($framework, $frameworkHop->to);
                 if ($range !== null && version_compare($php, $range[0], '>=')) {
-                    $steps[] = $this->step(++$n, $frameworkHop, $php, $php, $laravel, $laravel, $phpunit, $phpunit, $line, $frameworkHop->to);
+                    // Crossing a major that needs a newer PHPUnit moves PHPUnit in the same step (the hop pins it).
+                    $lineFloor = self::frameworkPhpunit($framework, $line);
+                    $phpunitAfter = $phpunit !== null && $lineFloor !== null
+                        && explode('.', $frameworkHop->to)[0] !== explode('.', (string) $line)[0]
+                        && version_compare($phpunit, $lineFloor[1], '<')
+                        ? $lineFloor[1]
+                        : $phpunit;
+                    $steps[] = $this->step(++$n, $frameworkHop, $php, $php, $laravel, $laravel, $phpunit, $phpunitAfter, $line, $frameworkHop->to);
+                    $phpunit = $phpunitAfter;
                     $line = $frameworkHop->to;
                     $frameworkRange = $range;
                     $newest = $this->registry->frameworkTargets($framework);
@@ -410,7 +441,9 @@ final class Planner
                 $laravel = $nextLaravel;
                 continue;
             }
-            if ($nextPhpunit !== null && $this->registry->has(HopRegistry::phpunitHopId($phpunit, $nextPhpunit)) && version_compare($php, $this->registry->phpunitPhp()[$nextPhpunit], '>=')) {
+            $lineCap = self::frameworkPhpunit($framework, $line);
+            $phpunitHeld = $nextPhpunit !== null && $lineCap !== null && version_compare($nextPhpunit, $lineCap[0], '>');
+            if ($nextPhpunit !== null && !$phpunitHeld && $this->registry->has(HopRegistry::phpunitHopId($phpunit, $nextPhpunit)) && version_compare($php, $this->registry->phpunitPhp()[$nextPhpunit], '>=')) {
                 $hop = $this->registry->get(HopRegistry::phpunitHopId($phpunit, $nextPhpunit));
                 $steps[] = $this->step(++$n, $hop, $php, $php, $laravel, $laravel, $phpunit, $nextPhpunit, $line);
                 $phpunit = $nextPhpunit;
@@ -445,6 +478,12 @@ final class Planner
                     // framework hop moves it here (none exists, or it was
                     // skipped or left out): the plan stops instead of
                     // throwing, with the hold warning after the loop.
+                    $stoppedByFramework = true;
+                    break;
+                }
+                if ($phpunitHeld && $nextPhp === null && $nextLaravel === null) {
+                    // PHPUnit waits for a framework hop that is not in this
+                    // plan (skipped): it stays where the line allows.
                     $stoppedByFramework = true;
                     break;
                 }
@@ -1001,6 +1040,21 @@ final class Planner
     private function componentName(string $component): string
     {
         return $component === 'php' ? 'PHP' : ucfirst($component);
+    }
+
+    /**
+     * FRAMEWORK_PHPUNIT's [ceiling, next major's floor] for a framework line,
+     * or null when the line puts no limit on PHPUnit.
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    private static function frameworkPhpunit(?string $framework, ?string $line): ?array
+    {
+        if ($framework === null || $line === null) {
+            return null;
+        }
+
+        return self::FRAMEWORK_PHPUNIT[$framework][explode('.', $line)[0]] ?? null;
     }
 
     private function phpunitMeetsLaravelFloor(?string $phpunit, string $laravel): bool
