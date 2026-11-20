@@ -170,4 +170,13 @@ final class CakeUpgradeRunnerTest extends TestCase
         self::assertNotContains('-e', $command);
         self::assertNotContains('COMPOSER_CACHE_DIR=/tmp/composer-cache', $command);
     }
+
+    public function test_cakephp_upgrade_dockerfile_installs_intl(): void
+    {
+        // CakePHP's upgrade tool dies at start without intl, and the composer base image lacks it.
+        $dockerfile = (string) file_get_contents($this->dockerDir() . '/Dockerfile');
+
+        self::assertStringContainsString('docker-php-ext-install intl', $dockerfile);
+        self::assertStringContainsString('icu-libs', $dockerfile);
+    }
 }
