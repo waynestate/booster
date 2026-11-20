@@ -74,10 +74,17 @@ you; it does not fix them for you.
 identity, `setUser()` becomes `setIdentity()`, `logout()` keeps its name on `$this->Authentication`, `allow()` becomes
 `addUnauthenticatedActions()`), swaps `loadComponent('Auth')` for `loadComponent('Authentication.Authentication')`,
 requires `cakephp/authentication ^3.0`, and wires `src/Application.php`: the provider interface, the plugin, the
-middleware after routing, and a service with the Session authenticator whose guests go to the old `loginAction`.
+middleware (after CSRF protection, else body parsing, else routing: AuthComponent checked inside the controller, so
+inside every middleware), and a service with the Session authenticator whose guests go to the old `loginAction`.
 AuthComponent never asked for a sign-in on its own `loginAction`; the plugin does, so the page would redirect to
 itself. Booster names that action in `addUnauthenticatedActions()` at the end of its controller's `initialize()` (or
 adds an `initialize()`), and says MANUAL when the `loginAction` is not a plain controller and action array.
+
+The guests' redirect stays AuthComponent's, so the replay sees the same answer: the service's
+`getUnauthenticatedRedirectUrl()` sends a full URL (`Router::url($loginAction, true)`), adds `?redirect=` with the
+page the guest asked for except the home page, and flashes the app's `authError` first (AuthComponent's default
+message when the app set none, nothing for `false`), with AuthComponent's flash options. The plugin alone would send a
+path, always add the way back, and flash nothing.
 
 **The skeleton's own files.** The 5 step also makes the CakePHP 5 skeleton's moves no upgrade rule makes:
 `config/bootstrap.php` loads CakePHP's global functions (`require CAKE . 'functions.php';`, without which `env()` is
@@ -102,8 +109,10 @@ where there is one:
 - On both steps: `View::loadHelper()` calls the rules could not type (it is `addHelper()` since 4.5).
 - Sign-in that is not a plain session: `isAuthorized()` (move it to Authorization plugin policies or plain controller
   code), and any Auth config the plugin has no like-for-like for (`authenticate` with a custom authenticator such as
-  CAS, an SSO cookie or an LTI launch, `authorize`, `loginRedirect`, `logoutRedirect`, `authError`; `loginAction` is
-  carried over as the redirect). Also an `'Auth'` entry with config in a `$components` list, any other
+  CAS, an SSO cookie or an LTI launch, `authorize`, `loginRedirect`, `logoutRedirect`; `loginAction` and `authError`
+  are carried over into the guests' redirect). An `authError` that is not a string or a `__()` call on strings
+  (Booster flashes no message then), and a custom `flash` config (Booster uses AuthComponent's default flash options).
+  Also an `'Auth'` entry with config in a `$components` list, any other
   `$this->Auth->...()` call, what the action does with `logout()`'s return value (now the redirect URL or null), and
   `allow()` calls that passed a variable (it could hold one name or null, every action). `allow()` added to the
   actions guests may reach, so it becomes `addUnauthenticatedActions()`, never `allowUnauthenticated()`, which

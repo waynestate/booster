@@ -293,12 +293,11 @@ final class CakeAuthRewriterTest extends TestCase
             ["Replaced \$this->loadComponent('Auth') with \$this->loadComponent('Authentication.Authentication')."],
             $result['changes'],
         );
+        // loginAction and authError move to src/Application.php's service (CAKE-12), so they get no line here.
         $this->assertSame([
-            "MANUAL: Auth config 'loginAction' dropped: it becomes the authentication service's unauthenticatedRedirect; scaffold getAuthenticationService() in src/Application.php.",
             "MANUAL: Auth config 'authorize' dropped: the Authentication plugin has no like-for-like; port it by hand.",
             "MANUAL: Auth config 'logoutRedirect' dropped: the Authentication plugin has no like-for-like; port it by hand.",
             "MANUAL: Auth config 'storage' dropped: the Authentication plugin has no like-for-like; port it by hand.",
-            "MANUAL: Auth config 'authError' dropped: the Authentication plugin has no counterpart; flash a message on the login action if the app wants one.",
         ], $result['manual']);
 
         $again = (new AuthRewriter())->rewriteLoadComponent($result['code']);

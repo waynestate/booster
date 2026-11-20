@@ -247,7 +247,10 @@ final class CakeUpgradeMigration implements FrameworkEngine
     {
         // Read before the rewrite drops the loadComponent config it sits in.
         $appController = $copy . '/src/Controller/AppController.php';
-        $loginAction = is_file($appController) ? $this->auth->loginActionOf(self::read($appController)) : null;
+        $appControllerPhp = is_file($appController) ? self::read($appController) : '';
+        $loginAction = $this->auth->loginActionOf($appControllerPhp);
+        $authError = $this->auth->configValueOf($appControllerPhp, 'authError');
+        $customFlash = $this->auth->configValueOf($appControllerPhp, 'flash') !== null;
 
         $used = false;
         $moved = 0;
@@ -299,7 +302,7 @@ final class CakeUpgradeMigration implements FrameworkEngine
         $application = $copy . '/src/Application.php';
         if (is_file($application)) {
             $before = self::read($application);
-            $scaffold = $this->scaffold->scaffold($before, $loginAction);
+            $scaffold = $this->scaffold->scaffold($before, $loginAction, $authError, $customFlash);
             $manual = [...$manual, ...$scaffold['manual']];
             if ($scaffold['code'] !== $before) {
                 self::write($application, $scaffold['code']);

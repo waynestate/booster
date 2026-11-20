@@ -33,11 +33,13 @@ final class AuthRewriter
         'allow' => '$this->Auth->allow()',
     ];
 
-    /** Dropped config keys that need no more than "port it by hand". */
-    private const DROPPED_KEY_NOTES = [
-        'authError' => "MANUAL: Auth config 'authError' dropped: the Authentication plugin has no counterpart; flash a message on the login action if the app wants one.",
-        'loginAction' => "MANUAL: Auth config 'loginAction' dropped: it becomes the authentication service's unauthenticatedRedirect; scaffold getAuthenticationService() in src/Application.php.",
-    ];
+    /**
+     * Config keys Booster carries into src/Application.php's service
+     * (ApplicationScaffold: the guests' redirect and the message flashed to
+     * them), so they get no "dropped" line; the scaffold names its own MANUAL
+     * steps when it cannot carry one.
+     */
+    private const CARRIED_KEYS = ['loginAction', 'authError', 'flash'];
 
     /**
      * Rewrites `$this->Auth->...` calls (method names match case-insensitively).
@@ -94,11 +96,10 @@ final class AuthRewriter
             }
             foreach ($call['config'] ?? [] as $entry) {
                 $key = $entry['key'];
-                if ($key === null) {
+                if ($key === null || in_array($key, self::CARRIED_KEYS, true)) {
                     continue;
                 }
-                $manual[] = self::DROPPED_KEY_NOTES[$key]
-                    ?? sprintf("MANUAL: Auth config '%s' dropped: the Authentication plugin has no like-for-like; port it by hand.", $key);
+                $manual[] = sprintf("MANUAL: Auth config '%s' dropped: the Authentication plugin has no like-for-like; port it by hand.", $key);
             }
             $i = $call['close'];
         }
@@ -200,6 +201,15 @@ final class AuthRewriter
      */
     public function loginActionOf(string $php): ?string
     {
+        return $this->configValueOf($php, 'loginAction');
+    }
+
+    /**
+     * The source text of one key's value in a
+     * `$this->loadComponent('Auth', [...])` call, or null when it is not set.
+     */
+    public function configValueOf(string $php, string $key): ?string
+    {
         $tokens = PhpToken::tokenize($php);
         $count = count($tokens);
         for ($i = 0; $i < $count; $i++) {
@@ -208,7 +218,7 @@ final class AuthRewriter
                 continue;
             }
             foreach ($call['config'] ?? [] as $entry) {
-                if ($entry['key'] === 'loginAction') {
+                if ($entry['key'] === $key) {
                     return $entry['value'];
                 }
             }

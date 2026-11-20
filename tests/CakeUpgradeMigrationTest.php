@@ -682,7 +682,9 @@ final class CakeUpgradeMigrationTest extends TestCase
         self::assertStringContainsString('$this->Authentication->setIdentity($profile);', $controller);
         self::assertContains('Moved 3 AuthComponent calls to the Authentication plugin.', $result->changes);
         self::assertContains("Replaced loadComponent('Auth') with loadComponent('Authentication.Authentication') in src/Controller/AppController.php.", $result->changes);
-        self::assertContains("MANUAL: Auth config 'authError' dropped: the Authentication plugin has no counterpart; flash a message on the login action if the app wants one.", $result->manual);
+        // CAKE-12: the authError moves to the guest redirect in src/Application.php.
+        self::assertNull(self::lineStartingWith($result->manual, "MANUAL: Auth config 'authError'"));
+        self::assertStringContainsString("\$request->getFlash()->set('', [", (string) file_get_contents($app . '/src/Application.php'));
         self::assertSame(array_values(array_unique($result->manual)), $result->manual, 'each MANUAL line once');
         self::assertNull(self::lineStartingWith($result->manual, 'MANUAL: AuthComponent is removed'), 'nothing left for a person once the calls moved');
         self::assertContains('src/Controller/AppController.php', array_column($result->files, 'file'));
