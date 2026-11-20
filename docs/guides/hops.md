@@ -72,9 +72,13 @@ report, and the entry stays in `composer.json`.
 The unblock is temporary by name, and Booster enforces that. When a gated step passes, Booster re-reads
 `config.policy.advisories.ignore` and reports every entry whose reason carries its own prefix (`Booster temporary
 unblock`; older runs wrote `BOOSTER temporary unblock`, which it still recognizes). A step that is not the plan's
-last one applies with a warning; the plan's last step fails until the entry is out of `composer.json`, so the
-final target never ships with the unblock still in place. Removing the entry is the app's job once it is off the
-blocked versions.
+last one applies with a warning. On the plan's last step, an unblock an earlier step needed is tried once more:
+Booster drops it and runs the step's gate (and the replay) again with `composer update -W` for those packages, which
+on the new PHP can often move past the blocked releases (Twig, unblocked on PHP 7.4, moves to a fixed 3.x on 8.5).
+If that passes and nothing had to be unblocked again, the entry is gone and the step applies; otherwise
+`composer.json` and `composer.lock` go back and the step fails until the entry is out, so the final target never
+ships with the unblock still in place. An unblock the last step itself needed is not retried. The refusal can be the
+root's own requirement or one a locked package carries (`slim/twig-view 2.4.0 requires twig/twig ...`).
 
 The `--image` value names the image the baseline and every gate run in, and it takes three shapes:
 

@@ -394,10 +394,6 @@ final class RouteRewriter
         }
 
         foreach ($this->tokens as $i => $token) {
-            if ($token->is([T_NAME_FULLY_QUALIFIED, T_NAME_QUALIFIED]) && strtolower(ltrim($token->text, '\\')) === 'slim\\http\\environment') {
-                $this->manual[] = sprintf('MANUAL: line %d uses Slim\\Http\\Environment, which Slim 4 removed; build requests with a PSR-17 ServerRequestFactory.', $token->line);
-                continue;
-            }
             if ($this->readsRouter($i)) {
                 $this->manual[] = sprintf("MANUAL: line %d reads Slim 3's router from the container; Slim 4 has no 'router' entry, use \$app->getRouteCollector() or RouteContext::fromRequest(\$request)->getRouteParser().", $token->line);
             }

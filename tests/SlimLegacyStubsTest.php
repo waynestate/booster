@@ -36,7 +36,7 @@ final class SlimLegacyStubsTest extends TestCase
         self::$namespace = 'BoosterSlimStubs' . bin2hex(random_bytes(4)) . '\\Legacy';
         $dir = sys_get_temp_dir() . '/booster-slim-stubs-' . bin2hex(random_bytes(4));
         mkdir($dir);
-        foreach (['container', 'doublePass', 'app'] as $stub) {
+        foreach (['container', 'doublePass', 'app', 'environment', 'http'] as $stub) {
             $file = $dir . '/' . $stub . '.php';
             file_put_contents($file, LegacyStubs::$stub(self::$namespace));
             require $file;
@@ -70,7 +70,7 @@ final class SlimLegacyStubsTest extends TestCase
 
     public function test_every_stub_is_valid_php(): void
     {
-        foreach (['container', 'doublePass', 'app'] as $stub) {
+        foreach (['container', 'doublePass', 'app', 'environment', 'http'] as $stub) {
             $code = LegacyStubs::$stub('App\\Slim4');
 
             self::assertStringStartsWith("<?php\n", $code, $stub);
@@ -84,6 +84,8 @@ final class SlimLegacyStubsTest extends TestCase
         self::assertStringContainsString('final class LegacyNotFound extends \\RuntimeException implements \\Psr\\Container\\NotFoundExceptionInterface', LegacyStubs::container('App'));
         self::assertStringContainsString('final class LegacyDoublePass implements \\Psr\\Http\\Server\\MiddlewareInterface', LegacyStubs::doublePass('App'));
         self::assertStringContainsString('final class LegacyApp', LegacyStubs::app('App'));
+        self::assertStringContainsString('final class LegacyEnvironment extends \\ArrayObject', LegacyStubs::environment('App'));
+        self::assertStringContainsString('final class LegacyHttp', LegacyStubs::http('App'));
         self::assertStringContainsString("namespace App\\Slim4;\n", LegacyStubs::app('\\App\\Slim4\\'));
     }
 
@@ -274,9 +276,173 @@ final class SlimLegacyStubsTest extends TestCase
         self::assertSame($bare, self::call('LegacyApp', 'finish', $bare));
     }
 
+    public function test_a_route_miss_runs_the_app_middleware_and_answers_with_slim_3_pages(): void
+    {
+        // Bug S2: Slim 3 answered a path with no route inside the app's own
+        // middleware, with its own pages; Slim 4 throws before the middleware runs.
+        $app = self::call('LegacyApp', 'create');
+        $app->get('/page', function ($request, $response) {
+            $response->getBody()->write('page');
+
+            return $response;
+        });
+        $app->add(function (ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface {
+            return $handler->handle($request)->withHeader('X-App-Middleware', 'ran');
+        });
+        self::call('LegacyApp', 'finish', $app);
+
+        $missing = $app->handle(self::request('GET', '/nowhere'));
+        self::assertSame(404, $missing->getStatusCode());
+        self::assertSame('ran', $missing->getHeaderLine('X-App-Middleware'));
+        self::assertSame('text/html', $missing->getHeaderLine('Content-Type'));
+        self::assertStringContainsString('<title>Page Not Found</title>', (string) $missing->getBody());
+        self::assertStringContainsString("<a href='http://localhost/'>Visit the Home Page</a>", (string) $missing->getBody());
+
+        $json = $app->handle(self::request('GET', '/nowhere')->withHeader('Accept', 'application/json'));
+        self::assertSame('{"message":"Not found"}', (string) $json->getBody());
+        self::assertSame('application/json', $json->getHeaderLine('Content-Type'));
+
+        $wrong = $app->handle(self::request('POST', '/page'));
+        self::assertSame(405, $wrong->getStatusCode());
+        self::assertSame('GET', $wrong->getHeaderLine('Allow'));
+        self::assertSame('ran', $wrong->getHeaderLine('X-App-Middleware'));
+        self::assertStringContainsString('<p>Method not allowed. Must be one of: <strong>GET</strong></p>', (string) $wrong->getBody());
+
+        $options = $app->handle(self::request('OPTIONS', '/page'));
+        self::assertSame(200, $options->getStatusCode());
+        self::assertSame('Allowed methods: GET', (string) $options->getBody());
+
+        self::assertSame('page', (string) $app->handle(self::request('GET', '/page'))->getBody());
+    }
+
+    public function test_the_container_holds_slim_3_services_and_its_handlers_answer(): void
+    {
+        // Bug S3: the container's handler keys answer errors as Slim 3's did,
+        // and its request, response and environment entries exist.
+        $app = self::call('LegacyApp', 'create', [
+            'settings' => ['httpVersion' => '1.0'],
+            'notFoundHandler' => static fn(): \Closure => static function (ServerRequestInterface $request, ResponseInterface $response): ResponseInterface {
+                $response->getBody()->write('custom 404');
+
+                return $response->withStatus(404);
+            },
+            'notAllowedHandler' => static fn(): \Closure => static function (ServerRequestInterface $request, ResponseInterface $response, array $methods): ResponseInterface {
+                $response->getBody()->write('use ' . implode('/', $methods));
+
+                return $response->withStatus(405);
+            },
+            'errorHandler' => static fn(): \Closure => static function (ServerRequestInterface $request, ResponseInterface $response, \Throwable $e): ResponseInterface {
+                $response->getBody()->write('custom error: ' . $e->getMessage());
+
+                return $response->withStatus(503);
+            },
+        ]);
+        $app->get('/boom', function () {
+            throw new \RuntimeException('route failed');
+        });
+        $app->get('/php', function () {
+            return intdiv(1, 0);
+        });
+        self::call('LegacyApp', 'finish', $app);
+
+        self::assertSame('custom 404', (string) $app->handle(self::request('GET', '/nowhere'))->getBody());
+        self::assertSame('use GET', (string) $app->handle(self::request('PUT', '/boom'))->getBody());
+        $failed = $app->handle(self::request('GET', '/boom'));
+        self::assertSame(503, $failed->getStatusCode());
+        self::assertSame('custom error: route failed', (string) $failed->getBody(), 'each answer starts from an empty body');
+        self::assertSame('1.0', $failed->getProtocolVersion());
+        // A PHP error goes to phpErrorHandler, here Slim 3's own page.
+        $php = $app->handle(self::request('GET', '/php'));
+        self::assertSame(500, $php->getStatusCode());
+        self::assertStringContainsString('<title>Slim Application Error</title>', (string) $php->getBody());
+        self::assertStringContainsString('Division by zero', (string) file_get_contents($this->errorLog), 'without displayErrorDetails the error is logged, as Slim 3 did');
+
+        $container = $app->getContainer();
+        self::assertSame(self::$namespace . '\\LegacyEnvironment', $container['environment']::class);
+        self::assertInstanceOf(ServerRequestInterface::class, $container['request']);
+        self::assertSame('text/html; charset=UTF-8', $container['response']->getHeaderLine('Content-Type'));
+
+        // With a handler unset, the error goes on to PHP's own handler, as on Slim 3.
+        unset($container['errorHandler'], $container['notFoundHandler']);
+        try {
+            $app->handle(self::request('GET', '/boom'));
+            self::fail('an unset errorHandler must let the exception through');
+        } catch (\RuntimeException $e) {
+            self::assertSame('route failed', $e->getMessage());
+        }
+        $this->expectException(\Slim\Exception\HttpNotFoundException::class);
+        $app->handle(self::request('GET', '/nowhere'));
+    }
+
+    public function test_a_slim_3_test_harness_runs_through_process(): void
+    {
+        // Bug S1: slim-skeleton's BaseTestCase: Environment::mock(),
+        // Request::createFromEnvironment(), new Response() and $app->process().
+        $environment = self::call('LegacyEnvironment', 'mock', ['REQUEST_METHOD' => 'POST', 'REQUEST_URI' => '/form?x=1', 'HTTP_COOKIE' => 'theme=dark; seen=1']);
+        self::assertSame('POST', $environment['REQUEST_METHOD']);
+        self::assertSame('localhost', $environment->get('HTTP_HOST'));
+        self::assertSame('fallback', $environment->get('MISSING', 'fallback'));
+        self::assertTrue($environment->has('REQUEST_TIME'));
+        $environment->set('HTTP_X_TRACE', 'abc');
+        self::assertSame('abc', $environment->all()['HTTP_X_TRACE']);
+
+        $request = self::call('LegacyHttp', 'createRequest', $environment)->withParsedBody(['name' => 'Ada']);
+        self::assertSame('http://localhost/form?x=1', (string) $request->getUri());
+        self::assertSame('abc', $request->getHeaderLine('X-Trace'));
+        self::assertSame(['theme' => 'dark', 'seen' => '1'], $request->getCookieParams());
+        self::assertSame(['x' => '1'], $request->getQueryParams());
+
+        $app = self::call('LegacyApp', 'create');
+        $app->post('/form', function ($request, $response) {
+            $response->getBody()->write($request->getParsedBody()['name'] . ' ' . $request->getQueryParams()['x']);
+
+            return $response;
+        });
+        $app->add(function (ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface {
+            $response = $handler->handle($request);
+
+            return $response->withHeader('X-Count', $response->getHeaderLine('X-Count') . '1');
+        });
+        $response = self::call('LegacyApp', 'process', $app, $request, self::call('LegacyHttp', 'createResponse'));
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('Ada 1', (string) $response->getBody());
+
+        // finish() runs once however often process() is called, and a later run() would find it done.
+        $again = self::call('LegacyApp', 'process', $app, $request);
+        self::assertSame('1', $again->getHeaderLine('X-Count'));
+        self::assertSame($app, self::call('LegacyApp', 'finish', $app));
+        self::assertSame('Ada 1', (string) $app->handle($request)->getBody());
+
+        $made = self::call('LegacyHttp', 'createResponse', 201, ['X-Made' => 'yes']);
+        self::assertSame(201, $made->getStatusCode());
+        self::assertSame('yes', $made->getHeaderLine('X-Made'));
+
+        $host = self::call('LegacyHttp', 'createRequest', ['REQUEST_METHOD' => 'GET', 'HTTP_HOST' => 'example.edu:8443', 'HTTPS' => 'on', 'REQUEST_URI' => '/a%20b', 'CONTENT_TYPE' => 'text/plain']);
+        self::assertSame('https://example.edu:8443/a%20b', (string) $host->getUri());
+        self::assertSame('text/plain', $host->getHeaderLine('Content-Type'));
+    }
+
+    public function test_create_takes_a_container_the_app_built_first(): void
+    {
+        // `new \Slim\Container($settings)` became `new LegacyContainer($settings)`.
+        $container = self::make('LegacyContainer', ['settings' => ['site' => 'Booster']]);
+        $app = self::call('LegacyApp', 'create', $container);
+        self::assertSame($container, $app->getContainer());
+        self::assertSame('Booster', $container['settings']['site']);
+        self::assertSame('append', $container['settings']['outputBuffering']);
+    }
+
+    public function test_the_base_path_follows_slim_3s_rule(): void
+    {
+        self::assertSame('/sub', self::call('LegacyApp', 'basePath', ['SCRIPT_NAME' => '/sub/index.php', 'REQUEST_URI' => '/sub/hello']));
+        self::assertSame('/sub/index.php', self::call('LegacyApp', 'basePath', ['SCRIPT_NAME' => '/sub/index.php', 'REQUEST_URI' => '/sub/index.php/hello']));
+        self::assertSame('', self::call('LegacyApp', 'basePath', ['SCRIPT_NAME' => '/index.php', 'REQUEST_URI' => '/hello']));
+        self::assertSame('', self::call('LegacyApp', 'basePath', ['SCRIPT_NAME' => '/sub/index.php', 'REQUEST_URI' => '/other']));
+        self::assertSame('', self::call('LegacyApp', 'basePath', []));
+    }
     public function test_generated_glue_is_php_74_syntax(): void
     {
-        foreach (['container', 'doublePass', 'app'] as $stub) {
+        foreach (['container', 'doublePass', 'app', 'environment', 'http'] as $stub) {
             self::assertSame([], self::php8Syntax(LegacyStubs::$stub('App\\Legacy')), $stub . ' must parse on PHP 7.4, the PHP the hop runs on');
         }
 
@@ -477,6 +643,11 @@ final class SlimLegacyStubsTest extends TestCase
                     {
                         $this->values[$id] = $value;
                         unset($this->resolved[$id]);
+                    }
+
+                    public function raw(string $id): mixed
+                    {
+                        return $this->values[$id];
                     }
 
                     public function offsetUnset(mixed $id): void

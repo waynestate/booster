@@ -19,9 +19,11 @@ use Waynestate\Booster\ToolError;
  * root, rewrites the bootstrap (BootstrapRewriter) and the route and
  * middleware code (RouteRewriter, then AdderWidener for route adders a group
  * calls), moves Slim 3's own request and response types onto slim/http
+ * and Slim 3's environment and message factories onto slim/http and the glue
  * (SlimHttpRewriter), applies the hop's Composer pins plus Pimple, slim/psr7
- * and, when the app needs it, slim/http, and lists what only a person can do
- * as MANUAL lines. A dry run writes nothing
+ * and slim/http, and lists what only a person can do as MANUAL lines. The glue
+ * keeps Slim 3's behavior (default services, handler keys, where a route miss
+ * is answered), so there is no MANUAL line for it. A dry run writes nothing
  * and says what it would do; a second run changes nothing.
  *
  * Slim 3 to 4 is the difficult second album: same band, new label, and the
@@ -46,11 +48,16 @@ final class SlimUpgradeMigration implements FrameworkEngine
 
     public const NO_PSR4 = 'The app has no PSR-4 autoload entry to put the Slim 4 glue in.';
 
-    public const ERROR_HANDLER_LINE = "MANUAL: route exceptions now reach Slim's ErrorMiddleware before the app's own PHP error or exception handler;"
-        . ' register that handler on the error middleware if you want the old page and logging.';
+    public const ENVIRONMENT_NOTE = 'Slim\\Http\\Environment is gone in Slim 4, and a group use cannot be moved by itself;'
+        . ' import the generated LegacyEnvironment (Slim 3\'s Environment, mock() included) in its own use statement.';
 
-    public const ENVIRONMENT_NOTE = 'Slim\\Http\\Environment is gone in Slim 4; build test requests with Slim\\Psr7\\Factory\\ServerRequestFactory'
-        . ' or Slim\\Http\\Factory\\DecoratedServerRequestFactory.';
+    public const CONTAINER_NOTE = 'Slim\\Container is gone in Slim 4, and a group use cannot be moved by itself;'
+        . ' import the generated LegacyContainer (a Pimple container, as Slim 3\'s was) in its own use statement.';
+
+    public const SLIM3_ONLY_NOTE = "Slim 3's Slim\\Http Headers, Body, RequestBody, Stream, UploadedFile and Cookies classes, and its Request"
+        . ' constructor, have no Slim 4 form; build these with Slim\\Psr7 or the PSR-17 factories (the generated LegacyHttp shows how).';
+
+    public const TWIG_NAMES_NOTE = "a Twig 1 or 2 underscore class name Booster has no Twig 3 name for (Twig 3 removed them); use the namespaced class from Twig's documentation.";
 
     public const TWIG_NOTE = 'Twig-View 3 has no path_for; use url_for from the Twig-View runtime extension';
 
@@ -63,18 +70,9 @@ final class SlimUpgradeMigration implements FrameworkEngine
     private const EXTRA_PINS = [
         'pimple/pimple' => ['^3', false, 'Slim 4 ships no container; the legacy container is Pimple'],
         'slim/psr7' => ['^1.6', false, 'the PSR-7 messages the glue builds'],
+        'slim/http' => ['^1.3', false, "the decorators that keep Slim 3's withJson, write, getParam and isPost on Slim 4's request and response"],
         'slim/twig-view' => ['^3.4', true, 'Twig-View 3 is the Slim 4 line'],
         'twig/twig' => ['^3.8', true, 'Twig-View 3 needs Twig 3'],
-    ];
-
-    /**
-     * The pin for an app whose code names Slim 3's Slim\Http\Request,
-     * Response or Environment.
-     *
-     * @var array<string, array{string, bool, string}>
-     */
-    private const HTTP_PIN = [
-        'slim/http' => ['^1.3', false, "the decorators that keep withJson, write and getParam for the app's Slim\\Http\\Request and Response types"],
     ];
 
     /** Past-tense first words of change lines and their dry-run form. */
@@ -83,7 +81,10 @@ final class SlimUpgradeMigration implements FrameworkEngine
         'Removed' => 'remove', 'Wrapped' => 'wrap', 'Widened' => 'widen',
     ];
 
-    public function __construct(private readonly ComposerEditor $composer) {}
+    /**
+     * @param array<string, string>|null $twigNames lower-case Twig underscore name to namespaced class; Rector's Twig set when null
+     */
+    public function __construct(private readonly ComposerEditor $composer, private readonly ?array $twigNames = null) {}
 
     public function migrate(string $appPath, bool $dryRun, string $php, ?Hop $hop = null): VendoredMigrationResult
     {
@@ -139,8 +140,8 @@ final class SlimUpgradeMigration implements FrameworkEngine
                 $manual[] = sprintf('MANUAL: %s exists and differs from the glue this hop writes, so it was left as is; compare it with the generated %s by hand.', $file, $class);
             }
         }
-        if (count($written) === 3) {
-            $changes[] = sprintf('Wrote the legacy container, double-pass adapter and app glue in %s.', $glueDir);
+        if (count($written) === 5) {
+            $changes[] = sprintf('Wrote the legacy container, double-pass adapter, app glue, environment and HTTP factories in %s.', $glueDir);
         } elseif ($written !== []) {
             $changes[] = sprintf('Wrote %s in %s.', implode(', ', $written), $glueDir);
         }
@@ -212,22 +213,47 @@ final class SlimUpgradeMigration implements FrameworkEngine
         }
 
         // 5. Slim 3's own request, response and environment classes.
-        $usesHttp = false;
         $httpRewriter = new SlimHttpRewriter();
         foreach (array_keys($sources) as $file) {
             if (!in_array($file, $bootstraps, true) && !in_array(explode('/', $file)[0], self::HTTP_DIRS, true)) {
                 continue;
             }
             $current = $after[$file] ?? $sources[$file];
-            if (!self::containsAny(strtolower($current), ['request', 'response', 'environment'])) {
+            if (!self::containsAny(strtolower($current), ['request', 'response', 'environment', 'container'])) {
                 continue;
             }
-            $result = $httpRewriter->rewrite($current);
-            $usesHttp = $usesHttp || $result['uses'];
+            $result = $httpRewriter->rewrite($current, $namespace);
             if ($result['code'] !== $current) {
                 $before[$file] ??= $sources[$file];
                 $after[$file] = $result['code'];
-                $changes[] = self::inFile('Rewrote Slim\\Http\\Request to its slim/http decorator, Slim\\Http\\ServerRequest.', $file, $result['renamed']);
+                if ($result['renamed'] > 0) {
+                    $changes[] = self::inFile('Rewrote Slim\\Http\\Request to its slim/http decorator, Slim\\Http\\ServerRequest.', $file, $result['renamed']);
+                }
+                if ($result['helpers'] > 0) {
+                    $changes[] = self::inFile(
+                        "Rewrote Slim 3's Container, Environment, Request::createFromEnvironment() and new Response() to the generated LegacyContainer, LegacyEnvironment and LegacyHttp (and container-interop's ContainerInterface to PSR-11's).",
+                        $file,
+                        $result['helpers'],
+                    );
+                }
+            }
+            if ($result['legacy'] !== []) {
+                $manual[] = sprintf(
+                    'MANUAL: %s: %s %s: %s',
+                    $file,
+                    count($result['legacy']) === 1 ? 'line' : 'lines',
+                    implode(', ', $result['legacy']),
+                    self::SLIM3_ONLY_NOTE,
+                );
+            }
+            if ($result['container'] !== []) {
+                $manual[] = sprintf(
+                    'MANUAL: %s: %s %s: %s',
+                    $file,
+                    count($result['container']) === 1 ? 'line' : 'lines',
+                    implode(', ', $result['container']),
+                    self::CONTAINER_NOTE,
+                );
             }
             if ($result['environment'] !== []) {
                 $manual[] = sprintf(
@@ -240,8 +266,42 @@ final class SlimUpgradeMigration implements FrameworkEngine
             }
         }
 
+        // 5b. Twig 1 and 2's underscore class names and Twig-View 2's
+        // constructor, when the hop moves Twig-View and Twig to 3.
+        $twig = false;
+        foreach (['require', 'require-dev'] as $section) {
+            $twig = $twig || isset($composerData[$section]['slim/twig-view']) || isset($composerData[$section]['twig/twig']);
+        }
+        if ($twig) {
+            $twigRewriter = new TwigNameRewriter($this->twigNames);
+            foreach (array_keys($sources) as $file) {
+                if (!in_array($file, $bootstraps, true) && !in_array(explode('/', $file)[0], self::HTTP_DIRS, true)) {
+                    continue;
+                }
+                $current = $after[$file] ?? $sources[$file];
+                if (!str_contains(strtolower($current), 'twig')) {
+                    continue;
+                }
+                $result = $twigRewriter->rewrite($current);
+                if ($result['code'] !== $current) {
+                    $before[$file] ??= $sources[$file];
+                    $after[$file] = $result['code'];
+                    $changes[] = self::inFile("Rewrote Twig 1 and 2's underscore class names and new Slim\\Views\\Twig(...) to Twig 3's namespaced classes and Twig::create(...).", $file, $result['renamed']);
+                }
+                if ($result['unknown'] !== []) {
+                    $manual[] = sprintf(
+                        'MANUAL: %s: %s %s: %s',
+                        $file,
+                        count($result['unknown']) === 1 ? 'line' : 'lines',
+                        implode(', ', $result['unknown']),
+                        self::TWIG_NAMES_NOTE,
+                    );
+                }
+            }
+        }
+
         // 6. Composer.
-        [$composerNew, $composerChanges, $packages] = $this->composerJson($hop, $composerRaw, $composerData, $usesHttp);
+        [$composerNew, $composerChanges, $packages] = $this->composerJson($hop, $composerRaw, $composerData);
         if ($composerNew !== null) {
             $before['composer.json'] = $composerRaw;
             $after['composer.json'] = $composerNew;
@@ -249,8 +309,7 @@ final class SlimUpgradeMigration implements FrameworkEngine
         }
 
         // 7. What only a person can do.
-        $manual = [...$manual, ...self::twigManual($appPath), ...self::containerReadManual($sources, $after)];
-        $manual[] = self::ERROR_HANDLER_LINE;
+        $manual = [...$manual, ...self::twigManual($appPath)];
         $manual = array_values(array_unique($manual));
 
         $files = [];
@@ -334,19 +393,20 @@ final class SlimUpgradeMigration implements FrameworkEngine
             $dir . '/LegacyContainer.php' => ['LegacyContainer', LegacyStubs::container($namespace)],
             $dir . '/LegacyDoublePass.php' => ['LegacyDoublePass', LegacyStubs::doublePass($namespace)],
             $dir . '/LegacyApp.php' => ['LegacyApp', LegacyStubs::app($namespace)],
+            $dir . '/LegacyEnvironment.php' => ['LegacyEnvironment', LegacyStubs::environment($namespace)],
+            $dir . '/LegacyHttp.php' => ['LegacyHttp', LegacyStubs::http($namespace)],
         ];
     }
 
     /**
      * The hop's pins through ComposerEditor (on a scratch copy, so a dry run
-     * writes nothing), then Pimple, slim/psr7, the Twig-View line and, when
-     * the app names Slim 3's HTTP classes, slim/http.
+     * writes nothing), then Pimple, slim/psr7, slim/http and the Twig-View line.
      *
      * @param array<mixed> $data
      *
      * @return array{?string, list<string>, list<string>} the new composer.json (null when unchanged), the lines, the packages touched
      */
-    private function composerJson(Hop $hop, string $raw, array $data, bool $needsHttp): array
+    private function composerJson(Hop $hop, string $raw, array $data): array
     {
         $scratch = RunScratch::dir('slim-upgrade/' . bin2hex(random_bytes(6)));
         self::write($scratch . '/composer.json', $raw);
@@ -360,8 +420,7 @@ final class SlimUpgradeMigration implements FrameworkEngine
         }
 
         $extra = [];
-        $pins = $needsHttp ? [...self::EXTRA_PINS, ...self::HTTP_PIN] : self::EXTRA_PINS;
-        foreach ($pins as $package => [$constraint, $onlyIfPresent, $why]) {
+        foreach (self::EXTRA_PINS as $package => [$constraint, $onlyIfPresent, $why]) {
             $section = isset($new['require'][$package]) ? 'require' : (isset($new['require-dev'][$package]) ? 'require-dev' : null);
             if ($section === null) {
                 if ($onlyIfPresent) {
@@ -454,37 +513,6 @@ final class SlimUpgradeMigration implements FrameworkEngine
             $count = substr_count($text, 'path_for(') + substr_count($text, 'base_url(');
             if ($count > 0) {
                 $manual[] = sprintf('MANUAL: %s: %d call(s) of path_for( or base_url(: %s (base_url is fine when it is the app\'s own global).', $file, $count, self::TWIG_NOTE);
-            }
-        }
-
-        return $manual;
-    }
-
-    /**
-     * Code that reads Slim 3's built-in request, response or environment
-     * entries from the container; Slim 4's container has none.
-     *
-     * @param array<string, string> $sources
-     * @param array<string, string> $after
-     *
-     * @return list<string>
-     */
-    private static function containerReadManual(array $sources, array $after): array
-    {
-        $pattern = '/(?:\$(?:c|container)\b|->container\b|getContainer\(\))\s*'
-            . '(?:\[\s*[\'"](?:request|response|environment)[\'"]\s*\]'
-            . '|->(?:request|response|environment)\b(?!\s*\()'
-            . '|->get\(\s*[\'"](?:request|response|environment)[\'"]\s*\))/';
-        $manual = [];
-        foreach ($sources as $file => $source) {
-            $count = preg_match_all($pattern, $after[$file] ?? $source);
-            if ($count > 0) {
-                $manual[] = sprintf(
-                    "MANUAL: %s: %d read(s) of the container's request, response or environment entry; Slim 4's container has none,"
-                    . ' so register a factory for it (request: ServerRequestCreatorFactory::create()->createServerRequestFromGlobals()) or use the route\'s own $request and $response.',
-                    $file,
-                    $count,
-                );
             }
         }
 

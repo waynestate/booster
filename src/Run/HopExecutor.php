@@ -630,7 +630,7 @@ final class HopExecutor
                 );
             }
         }
-        $refusing = LockRefusals::find($path, $php);
+        $refusing = LockRefusals::find($path, $php, false);
         if ($refusing !== []) {
             return sprintf(
                 'The lock holds packages that do not install on PHP %s: %s. Run composer update -W %s on PHP %s, commit composer.lock, then run again.',
@@ -963,6 +963,16 @@ final class HopExecutor
                             : sprintf('The gate refreshed composer.lock (%s): %s.', self::lockCommand($update), $lockReason);
                     }
                     $unblocked = $this->composer->temporaryUnblocks($path);
+                    $addedHere = array_filter($gate->lines, static fn(string $line): bool => str_contains($line, 'Booster added a temporary, scoped unblock')) !== [];
+                    if ($unblocked !== [] && !$addedHere && $step->number === count($plan->steps) && !$plan->stopsEarly) {
+                        // The final target, with an unblock an earlier step
+                        // (or run) needed: try to move the lock off the
+                        // blocked releases and drop the unblock, so a run
+                        // that needed one on an old PHP still lands.
+                        $cleared = $this->clearUnblocks($step, $path, $options, $baseline, $unblocked);
+                        $messages = [...$messages, ...$cleared];
+                        $unblocked = $this->composer->temporaryUnblocks($path);
+                    }
                     if ($unblocked !== []) {
                         // The unblock is temporary by name: the final target
                         // ships without it, so the last step of the full plan
@@ -1260,11 +1270,19 @@ final class HopExecutor
             return null;
         }
         $held = [];
+        $broken = [];
         foreach ($refusing as $name => $package) {
-            $held[] = sprintf('%s %s, which needs php %s', $name, $package['version'], $package['constraint']);
+            if (isset($package['reason'])) {
+                $broken[] = sprintf('the lock held %s %s, which allows PHP %s but misbehaves on it: %s', $name, $package['version'], $step->phpAfter, $package['reason']);
+            } else {
+                $held[] = sprintf('%s %s, which needs php %s', $name, $package['version'], $package['constraint']);
+            }
+        }
+        if ($held !== []) {
+            array_unshift($broken, sprintf('the lock held %s, not PHP %s', implode(', and ', $held), $step->phpAfter));
         }
 
-        return sprintf('the lock held %s, not PHP %s', implode(', and ', $held), $step->phpAfter);
+        return implode('; ', $broken);
     }
 
     /**
@@ -1357,6 +1375,58 @@ final class HopExecutor
         }
 
         return new GateReport(true, [...$gate->lines, ...$outcome->lines]);
+    }
+
+    /**
+     * On the final target, drops Booster's temporary advisory unblocks and
+     * runs the step's whole gate again with `composer update -W` for those
+     * packages, which can now move past the blocked releases on the new PHP.
+     * Found on testeval (2026-11-20): Twig had to be unblocked on PHP 7.4,
+     * where every release it could install is flagged, and the final target
+     * failed on the leftover entry although PHP 8.5 installs a fixed Twig.
+     * When the gate passes and nothing was unblocked again, the entry is
+     * gone; otherwise composer.json and composer.lock are put back and the
+     * caller fails the target as before.
+     *
+     * @param list<string> $unblocked
+     *
+     * @return list<string>
+     */
+    private function clearUnblocks(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, array $unblocked): array
+    {
+        $files = [];
+        foreach (['composer.json', 'composer.lock'] as $name) {
+            $file = rtrim($path, '/\\') . '/' . $name;
+            $files[$file] = is_file($file) ? file_get_contents($file) : false;
+        }
+        try {
+            $this->composer->dropTemporaryUnblocks($path);
+        } catch (ToolError $e) {
+            return ['Could not drop the temporary advisory unblock: ' . $e->getMessage()];
+        }
+        $gate = $this->runGate($step, $path, $options, $baseline, $unblocked);
+        if ($gate->passed && $this->composer->temporaryUnblocks($path) === []) {
+            $locked = self::lockedVersions($path);
+
+            return [sprintf(
+                'Removed Booster\'s temporary advisory unblock for %s: composer update -W %s moved the lock to %s on PHP %s, and the gate passed again without it.',
+                implode(', ', $unblocked),
+                implode(' ', $unblocked),
+                implode(', ', array_map(static fn(string $package): string => $package . ' ' . ($locked[$package] ?? '(not in the lock)'), $unblocked)),
+                $step->phpAfter ?? '?',
+            )];
+        }
+        foreach ($files as $file => $content) {
+            if ($content !== false) {
+                file_put_contents($file, $content);
+            }
+        }
+
+        return [sprintf(
+            'Tried composer update -W %s without the unblock on PHP %s; it still needs it, so composer.json and composer.lock were put back (run composer install before the next try).',
+            implode(' ', $unblocked),
+            $step->phpAfter ?? '?',
+        )];
     }
 
     /**
@@ -1576,7 +1646,8 @@ final class HopExecutor
     private static function advisoryBlock(array $output): ?array
     {
         $text = implode("\n", $output);
-        if (preg_match('#Root composer\.json requires ([A-Za-z0-9_./~-]+) (\S+), found .*?affected by security advisories \(([^)]*)\)#', $text, $m) !== 1) {
+        // The root's own requirement, or one a locked package carries (Twig under slim/twig-view).
+        if (preg_match('#(?:Root composer\.json|[A-Za-z0-9_./~-]+ \S+) requires ([A-Za-z0-9_./~-]+) (\S+?),? (?:-> )?found .*?affected by security advisories \(([^)]*)\)#', $text, $m) !== 1) {
             return null;
         }
         if (preg_match_all('/"([^"]+)"/', $m[3], $ids) === 0 || $ids[1] === []) {

@@ -126,68 +126,64 @@ final class SlimBootstrapRewriterTest extends TestCase
         self::assertSame([], self::rewrite($console)['manual']);
     }
 
-    public function test_error_handler_keys_are_manual(): void
+    public function test_handler_keys_and_app_settings_need_no_manual_line(): void
     {
+        // Bug S3: the glue reads Slim 3's handler keys and leaves the app's own
+        // settings in the container, so neither is a MANUAL line any more.
         $php = <<<'PHP'
             <?php
+            $settings = [
+                'displayErrorDetails' => true,
+                'db' => ['host' => 'localhost'],
+            ];
+            $app = new \Slim\App(['settings' => array(
+                'logger' => ['name' => 'app'],
+            )]);
             $container = $app->getContainer();
             $container['errorHandler'] = function ($c) {
                 return new \App\Handlers\Error($c->logger);
             };
             $container["phpErrorHandler"] = fn ($c) => $c['errorHandler'];
-            $container['notFoundHandler'] = function ($c) {
-                return fn ($request, $response) => $response->withStatus(404);
-            };
-            unset($this->container['notAllowedHandler']);
-            if ($container['errorHandler'] === null) {
-            }
-
-            PHP;
-
-        $result = self::rewrite($php);
-
-        self::assertSame($php, $result['code']);
-        $manual = implode("\n", $result['manual']);
-        self::assertCount(4, $result['manual']);
-        self::assertStringContainsString("MANUAL: line 3: ['errorHandler'] Slim 4 has no such container keys; register the handler with the error middleware's setDefaultErrorHandler()/setErrorHandler() by hand", $manual);
-        self::assertStringContainsString("MANUAL: line 6: ['phpErrorHandler'] Slim 4 has no such container keys", $manual);
-        self::assertStringContainsString("MANUAL: line 7: ['notFoundHandler'] Slim 4 has no such container keys", $manual);
-        self::assertStringContainsString("route exceptions now reach Slim's ErrorMiddleware before the app's own PHP error or exception handler", $manual);
-        self::assertStringContainsString("MANUAL: line 10: unset(...['notAllowedHandler']) left as is; Slim 4's default handler applies", $manual);
-        self::assertStringNotContainsString('line 11', $manual);
-    }
-
-    public function test_unknown_settings_key_is_manual(): void
-    {
-        $php = <<<'PHP'
-            <?php
-            $settings = [
-                'displayErrorDetails' => true,
-                'addContentLengthHeader' => false,
-                'db' => ['host' => 'localhost', 'determineRouteBeforeAppMiddleware' => 1],
-                'httpVersion' => '1.1',
-            ];
-            $app = new \Slim\App(['settings' => array(
-                'routerCacheFile' => false,
-                'logger' => ['name' => 'app'],
-            )]);
-            $container = $app->getContainer();
             $container['settings']['renderer'] = ['path' => 'templates/'];
-            $settings['responseChunkSize'] = 8192;
+            unset($this->container['notAllowedHandler']);
             $debug = $container->settings->get('displayErrorDetails');
 
             PHP;
 
         $manual = self::rewrite($php)['manual'];
 
-        self::assertContains("MANUAL: settings key 'db' has no Slim 4 equivalent (line 5).", $manual);
-        self::assertContains("MANUAL: settings key 'logger' has no Slim 4 equivalent (line 10).", $manual);
-        self::assertContains("MANUAL: settings key 'renderer' has no Slim 4 equivalent (line 13).", $manual);
-        self::assertContains("MANUAL: line 15: settings is a plain array on Slim 4; replace ->get('k') with ['k'].", $manual);
-        $joined = implode("\n", $manual);
-        foreach (['displayErrorDetails', 'addContentLengthHeader', 'httpVersion', 'routerCacheFile', 'responseChunkSize', 'host'] as $known) {
-            self::assertStringNotContainsString("settings key '" . $known . "'", $joined);
-        }
+        self::assertSame(["MANUAL: line 16: settings is a plain array on Slim 4; replace ->get('k') with ['k']."], $manual);
+    }
+
+    public function test_process_moves_to_legacy_app_process(): void
+    {
+        // Bug S1: the slim-skeleton test harness runs the app with $app->process($request, $response).
+        $php = <<<'PHP'
+            <?php
+            use Slim\App;
+
+            class BaseTestCase
+            {
+                public function runApp($request, $response)
+                {
+                    $app = new App(['settings' => []]);
+                    $response = $app->process($request, $response);
+                    $other->process($request, $response);
+
+                    return $response;
+                }
+            }
+
+            PHP;
+
+        $result = self::rewrite($php);
+
+        self::assertStringContainsString('$response = \\App\\Slim4\\LegacyApp::process($app, $request, $response);', $result['code']);
+        self::assertStringContainsString('$other->process($request, $response);', $result['code']);
+        self::assertContains('Replaced $app->process(...) with LegacyApp::process($app, ...).', $result['changes']);
+        \PhpToken::tokenize($result['code'], TOKEN_PARSE);
+
+        self::assertSame($result['code'], self::rewrite($result['code'])['code'], 'a second run changes nothing');
     }
 
     public function test_strings_and_comments_untouched(): void

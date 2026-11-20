@@ -29,8 +29,8 @@ final readonly class ReplayNormalizer
      */
     public const PRESETS = [
         'csrf' => ['CSRF tokens in hidden form fields and meta tags', [
-            ['/((?:name|id)\s*=\s*["\'](?:_token|csrf_token|_csrf|csrf|csrfmiddlewaretoken|authenticity_token|__RequestVerificationToken)["\'][^>]*?\bvalue\s*=\s*["\'])[^"\']*/i', '$1<CSRF>'],
-            ['/(\bvalue\s*=\s*["\'])[^"\']*(["\'][^>]*?(?:name|id)\s*=\s*["\'](?:_token|csrf_token|_csrf|csrf|csrfmiddlewaretoken|authenticity_token|__RequestVerificationToken)["\'])/i', '$1<CSRF>$2'],
+            ['/((?:name|id)\s*=\s*["\'](?:_token|[\w.\-]*(?:csrf|xsrf)[\w.\-]*|authenticity_token|__RequestVerificationToken)["\'][^>]*?\bvalue\s*=\s*["\'])[^"\']*/i', '$1<CSRF>'],
+            ['/(\bvalue\s*=\s*["\'])[^"\']*(["\'][^>]*?(?:name|id)\s*=\s*["\'](?:_token|[\w.\-]*(?:csrf|xsrf)[\w.\-]*|authenticity_token|__RequestVerificationToken)["\'])/i', '$1<CSRF>$2'],
             ['/(<meta\s+name\s*=\s*["\'](?:csrf-token|_csrf|csrf)["\']\s+content\s*=\s*["\'])[^"\']*/i', '$1<CSRF>'],
             ['/("(?:_token|csrf_token|csrfToken|_csrf)"\s*:\s*")[^"]*/', '$1<CSRF>'],
         ]],

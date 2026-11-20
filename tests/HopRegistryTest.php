@@ -275,6 +275,7 @@ final class HopRegistryTest extends PhpUnitTestCase
             'slim/psr7' => '^1.6',
             'slim/http' => '^1.0',
             'slim/twig-view' => '^3.4',
+            'dflydev/fig-cookies' => '^3.0',
         ], $registry->frameworkCompanionPins('slim', '4.15'));
         self::assertSame([], $registry->frameworkCompanionPins('slim', '3.13'));
         self::assertSame([], $registry->frameworkCompanionPins('laminas', '4.6'));

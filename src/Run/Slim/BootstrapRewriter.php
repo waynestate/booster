@@ -9,40 +9,21 @@ use PhpToken;
 /**
  * Rewrites a Slim 3 bootstrap file for Slim 4 through the generated LegacyApp
  * glue (see LegacyStubs): `new \Slim\App(ARGS)` becomes
- * `LegacyApp::create(ARGS)` and `LegacyApp::finish($app)` goes in before
- * `$app->run()`. Everything it cannot move by itself (Slim 3 handler keys,
- * settings with no Slim 4 form) becomes a MANUAL line. It works on tokens, so
- * strings and comments are never touched, and running it twice changes nothing
- * the second time.
+ * `LegacyApp::create(ARGS)`, `LegacyApp::finish($app)` goes in before
+ * `$app->run()`, and a test's `$app->process($request, $response)` becomes
+ * `LegacyApp::process($app, $request, $response)`. Slim 3's handler keys and
+ * settings need no edit: the glue reads them as Slim 3 did. What it cannot
+ * move by itself (Slim 3's settings Collection methods) becomes a MANUAL line.
+ * It works on tokens, so strings and comments are never touched, and running
+ * it twice changes nothing the second time.
  *
  * Slim 3 told the app "I'll handle it". Slim 4 hands it a factory and says
  * "handle it yourself". This class is the couples counsellor.
  */
 final class BootstrapRewriter
 {
-    /** The Slim 3 settings LegacyApp::finish() maps or Slim 4 does not need. */
-    private const KNOWN_SETTINGS = [
-        'outputBuffering',
-        'determineRouteBeforeAppMiddleware',
-        'displayErrorDetails',
-        'addContentLengthHeader',
-        'routerCacheFile',
-        'httpVersion',
-        'responseChunkSize',
-    ];
-
-    /** Slim 3 container keys for handlers, which Slim 4 does not read. */
-    private const HANDLER_KEYS = ['errorHandler', 'phpErrorHandler', 'notFoundHandler', 'notAllowedHandler'];
-
     /** The app expressions whose run() is expected to need LegacyApp::finish(). */
     private const APP_EXPRESSIONS = ['$app', '$this->app', '$this->slim'];
-
-    private const HANDLER_NOTE = "Slim 4 has no such container keys; register the handler with the error middleware's"
-        . ' setDefaultErrorHandler()/setErrorHandler() by hand, and note route exceptions now reach Slim\'s'
-        . " ErrorMiddleware before the app's own PHP error or exception handler.";
-
-    private const UNSET_NOTE = "left as is; Slim 4's default handler applies, and route exceptions now reach Slim's"
-        . " ErrorMiddleware before the app's own PHP error or exception handler.";
 
     /**
      * @return array{code: string, changes: list<string>, manual: list<string>}
@@ -55,10 +36,9 @@ final class BootstrapRewriter
 
         $code = $this->replaceNewApp($php, $legacyApp, $changes);
         $code = $this->addFinish($code, $legacyApp, $changes, $manual);
+        $code = $this->moveProcess($code, $legacyApp, $changes);
 
         $tokens = PhpToken::tokenize($php);
-        $this->handlerKeys($tokens, $manual);
-        $this->settingsKeys($tokens, $manual);
         $this->settingsGet($tokens, $manual);
 
         return ['code' => $code, 'changes' => $changes, 'manual' => array_values(array_unique($manual))];
@@ -152,104 +132,44 @@ final class BootstrapRewriter
     }
 
     /**
-     * Rule 3: Slim 3 handler keys, set or unset.
+     * Rule 3: Slim 3's `X->process($request, $response)` (a test running the app
+     * on one request) becomes `\NS\LegacyApp::process(X, $request, $response)`
+     * where X was assigned the LegacyApp::create() result.
      *
-     * @param array<int, PhpToken> $tokens
-     * @param list<string> $manual
+     * @param list<string> $changes
      */
-    private function handlerKeys(array $tokens, array &$manual): void
+    private function moveProcess(string $code, string $legacyApp, array &$changes): string
     {
-        $inUnset = [];
+        $tokens = PhpToken::tokenize($code);
+        $assigned = $this->createAssignments($tokens, $legacyApp);
+        $edits = [];
+
         foreach ($tokens as $i => $token) {
-            if (!$token->is(T_UNSET)) {
+            if (!$token->is(T_OBJECT_OPERATOR)) {
                 continue;
             }
-            $open = $this->nextSignificant($tokens, $i);
+            $method = $this->nextSignificant($tokens, $i);
+            if ($method === null || !$tokens[$method]->is(T_STRING) || strtolower($tokens[$method]->text) !== 'process') {
+                continue;
+            }
+            $open = $this->nextSignificant($tokens, $method);
             if ($open === null || $tokens[$open]->text !== '(') {
                 continue;
             }
-            $close = $this->matching($tokens, $open);
-            for ($j = $open + 1; $j < $close; $j++) {
-                $key = $this->stringValue($tokens[$j]);
-                if ($key !== null && in_array($key, self::HANDLER_KEYS, true)) {
-                    $inUnset[$j] = true;
-                    $manual[] = sprintf("MANUAL: line %d: unset(...['%s']) %s", $tokens[$j]->line, $key, self::UNSET_NOTE);
-                }
+            $receiver = $this->receiverBefore($tokens, $i);
+            if ($receiver === null || !in_array($receiver[1], $assigned, true)) {
+                continue;
             }
+            [$receiverStart, $expression] = $receiver;
+            $first = $this->nextSignificant($tokens, $open);
+            $separator = $first !== null && $tokens[$first]->text === ')' ? '' : ', ';
+            $start = $tokens[$receiverStart]->pos;
+            $end = $tokens[$open]->pos + 1;
+            $edits[] = [$start, $end - $start, $legacyApp . '::process(' . $expression . $separator];
+            $changes[] = 'Replaced $app->process(...) with LegacyApp::process($app, ...).';
         }
 
-        foreach ($tokens as $i => $token) {
-            $key = $this->stringValue($token);
-            if ($key === null || !in_array($key, self::HANDLER_KEYS, true) || isset($inUnset[$i])) {
-                continue;
-            }
-            $after = $this->nextSignificant($tokens, $i);
-            if ($after === null) {
-                continue;
-            }
-            $isKeyed = $tokens[$after]->is(T_DOUBLE_ARROW);
-            if (!$isKeyed && $tokens[$after]->text === ']') {
-                $before = $this->previousSignificant($tokens, $i);
-                $assign = $this->nextSignificant($tokens, $after);
-                $isKeyed = $before !== null && $tokens[$before]->text === '['
-                    && $assign !== null && ($tokens[$assign]->text === '=' || $tokens[$assign]->is(T_COALESCE_EQUAL));
-            }
-            if ($isKeyed) {
-                $manual[] = sprintf("MANUAL: line %d: ['%s'] %s", $token->line, $key, self::HANDLER_NOTE);
-            }
-        }
-    }
-
-    /**
-     * Rule 3: top-level settings keys with no Slim 4 form, wherever the
-     * settings array is written: `'settings' => [...]`, `$settings = [...]`,
-     * `->settings = [...]`, `['settings'] = [...]`, `['settings']['k'] =` and
-     * `$settings['k'] =`.
-     *
-     * @param array<int, PhpToken> $tokens
-     * @param list<string> $manual
-     */
-    private function settingsKeys(array $tokens, array &$manual): void
-    {
-        foreach ($tokens as $i => $token) {
-            $isSettings = $this->stringValue($token) === 'settings'
-                || ($token->is(T_VARIABLE) && $token->text === '$settings')
-                || ($token->is(T_STRING) && $token->text === 'settings' && $this->previousIs($tokens, $i, [T_OBJECT_OPERATOR]));
-            if (!$isSettings) {
-                continue;
-            }
-
-            $after = $i;
-            if ($this->stringValue($token) !== null) {
-                $next = $this->nextSignificant($tokens, $i);
-                $before = $this->previousSignificant($tokens, $i);
-                if ($next !== null && $tokens[$next]->is(T_DOUBLE_ARROW)) {
-                    $this->arrayKeys($tokens, $this->nextSignificant($tokens, $next), $manual);
-                    continue;
-                }
-                if ($next === null || $tokens[$next]->text !== ']' || $before === null || $tokens[$before]->text !== '[') {
-                    continue;
-                }
-                $after = $next;
-            }
-
-            $next = $this->nextSignificant($tokens, $after);
-            if ($next === null) {
-                continue;
-            }
-            if ($tokens[$next]->text === '=') {
-                $this->arrayKeys($tokens, $this->nextSignificant($tokens, $next), $manual);
-                continue;
-            }
-            if ($tokens[$next]->text === '[') {
-                $key = $this->nextSignificant($tokens, $next);
-                $close = $key === null ? null : $this->nextSignificant($tokens, $key);
-                $assign = $close === null ? null : $this->nextSignificant($tokens, $close);
-                if ($key !== null && $close !== null && $assign !== null && $tokens[$close]->text === ']' && $tokens[$assign]->text === '=') {
-                    $this->settingsKey($tokens[$key], $manual);
-                }
-            }
-        }
+        return $this->apply($code, $edits);
     }
 
     /**
@@ -273,60 +193,6 @@ final class BootstrapRewriter
             if ($tokens[$arrow]->is([T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR]) && strtolower($tokens[$get]->text) === 'get' && $tokens[$open]->text === '(') {
                 $manual[] = sprintf("MANUAL: line %d: settings is a plain array on Slim 4; replace ->get('k') with ['k'].", $token->line);
             }
-        }
-    }
-
-    /**
-     * The top-level string keys of the array literal starting at $start.
-     *
-     * @param array<int, PhpToken> $tokens
-     * @param list<string> $manual
-     */
-    private function arrayKeys(array $tokens, ?int $start, array &$manual): void
-    {
-        if ($start === null) {
-            return;
-        }
-        $open = $start;
-        if ($tokens[$start]->is(T_ARRAY)) {
-            $open = $this->nextSignificant($tokens, $start);
-            if ($open === null || $tokens[$open]->text !== '(') {
-                return;
-            }
-        } elseif ($tokens[$start]->text !== '[') {
-            return;
-        }
-
-        $close = $this->matching($tokens, $open);
-        $depth = 0;
-        for ($j = $open + 1; $j < $close; $j++) {
-            $text = $tokens[$j]->text;
-            if (in_array($text, ['(', '[', '{'], true) || $tokens[$j]->is([T_CURLY_OPEN, T_DOLLAR_OPEN_CURLY_BRACES])) {
-                $depth++;
-                continue;
-            }
-            if (in_array($text, [')', ']', '}'], true)) {
-                $depth--;
-                continue;
-            }
-            if ($depth !== 0 || $this->stringValue($tokens[$j]) === null) {
-                continue;
-            }
-            $next = $this->nextSignificant($tokens, $j);
-            if ($next !== null && $tokens[$next]->is(T_DOUBLE_ARROW)) {
-                $this->settingsKey($tokens[$j], $manual);
-            }
-        }
-    }
-
-    /**
-     * @param list<string> $manual
-     */
-    private function settingsKey(PhpToken $token, array &$manual): void
-    {
-        $key = $this->stringValue($token);
-        if ($key !== null && !in_array($key, self::KNOWN_SETTINGS, true)) {
-            $manual[] = sprintf("MANUAL: settings key '%s' has no Slim 4 equivalent (line %d).", $key, $token->line);
         }
     }
 
@@ -477,30 +343,6 @@ final class BootstrapRewriter
     }
 
     /**
-     * Index of the bracket that closes the one at $open (or the last token).
-     *
-     * @param array<int, PhpToken> $tokens
-     */
-    private function matching(array $tokens, int $open): int
-    {
-        $depth = 0;
-        $count = count($tokens);
-        for ($j = $open; $j < $count; $j++) {
-            $text = $tokens[$j]->text;
-            if (in_array($text, ['(', '[', '{'], true) || $tokens[$j]->is([T_CURLY_OPEN, T_DOLLAR_OPEN_CURLY_BRACES])) {
-                $depth++;
-            } elseif (in_array($text, [')', ']', '}'], true)) {
-                $depth--;
-                if ($depth === 0) {
-                    return $j;
-                }
-            }
-        }
-
-        return $count - 1;
-    }
-
-    /**
      * @param array<int, PhpToken> $tokens
      */
     private function nextSignificant(array $tokens, int $i): ?int
@@ -527,16 +369,6 @@ final class BootstrapRewriter
         }
 
         return null;
-    }
-
-    /** The value of a plain single- or double-quoted string token, else null. */
-    private function stringValue(PhpToken $token): ?string
-    {
-        if (!$token->is(T_CONSTANT_ENCAPSED_STRING) || strlen($token->text) < 2) {
-            return null;
-        }
-
-        return substr($token->text, 1, -1);
     }
 
     /**

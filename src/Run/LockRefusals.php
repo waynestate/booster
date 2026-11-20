@@ -18,9 +18,25 @@ use Composer\Semver\Semver;
  * (php ^7.1.3), and the 8.0 hop's plain install refused it every time. A
  * whole lock for 7.4 through 8.5 does not exist without hand-picked
  * constraints, so the lock follows the hops instead, one package at a time.
+ *
+ * A few releases allow a PHP they do not work on; those are listed in BROKEN
+ * and updated the same way. Found on testeval (2026-11-20): Twig 2.5.0 says
+ * php ^7.0, but on PHP 7.4 its lexer trims the whitespace before every
+ * `{{`, so the 7.4 hop's replay caught "Slimapp - Login" turning into
+ * "Slimapp -Login" on every page.
  */
 final class LockRefusals
 {
+    /**
+     * Releases that allow a PHP they misbehave on: package, the first PHP
+     * they break on, the fixed release per major, and what goes wrong.
+     *
+     * @var array<string, array{string, array<int, string>, string}>
+     */
+    private const BROKEN = [
+        'twig/twig' => ['7.4', ['1' => '1.39.0', '2' => '2.8.0'], 'its lexer trims the whitespace before every {{ on PHP 7.4 and later'],
+    ];
+
     /**
      * The locked packages (packages and packages-dev) whose require.php does
      * not allow $minor, keyed by name, with the locked version and the
@@ -32,9 +48,12 @@ final class LockRefusals
      * Without a pin it checks the newest patch of $minor, which is what the
      * gate image runs.
      *
-     * @return array<string, array{version: string, constraint: string}>
+     * A release listed in BROKEN for $minor is included too, with a reason,
+     * unless $broken is false (a failed install names only what refused it).
+     *
+     * @return array<string, array{version: string, constraint: string, reason?: string}>
      */
-    public static function find(string $appPath, string $minor): array
+    public static function find(string $appPath, string $minor, bool $broken = true): array
     {
         $appPath = rtrim($appPath, '/\\');
         $lock = self::json($appPath . '/composer.lock');
@@ -47,6 +66,12 @@ final class LockRefusals
             $packages = is_array($lock[$section] ?? null) ? $lock[$section] : [];
             foreach ($packages as $package) {
                 if (!is_array($package) || !is_string($package['name'] ?? null)) {
+                    continue;
+                }
+                $misbehaves = $broken ? self::broken($package, $version) : null;
+                if ($misbehaves !== null) {
+                    $refusing[$package['name']] = $misbehaves;
+
                     continue;
                 }
                 $constraint = $package['require']['php'] ?? null;
@@ -76,16 +101,49 @@ final class LockRefusals
      * One clause naming each refusing package, for a report line:
      * "symfony/service-contracts v1.1.2 needs php ^7.1.3".
      *
-     * @param array<string, array{version: string, constraint: string}> $refusing
+     * @param array<string, array{version: string, constraint: string, reason?: string}> $refusing
      */
     public static function describe(array $refusing): string
     {
         $parts = [];
         foreach ($refusing as $name => $package) {
-            $parts[] = sprintf('%s %s needs php %s', $name, $package['version'], $package['constraint']);
+            $parts[] = isset($package['reason'])
+                ? sprintf('%s %s: %s', $name, $package['version'], $package['reason'])
+                : sprintf('%s %s needs php %s', $name, $package['version'], $package['constraint']);
         }
 
         return implode(', ', $parts);
+    }
+
+    /**
+     * The entry for a locked release BROKEN lists on $phpVersion, else null.
+     *
+     * @param array<mixed> $package
+     *
+     * @return array{version: string, constraint: string, reason: string}|null
+     */
+    private static function broken(array $package, string $phpVersion): ?array
+    {
+        $name = $package['name'] ?? null;
+        $version = $package['version'] ?? null;
+        if (!is_string($name) || !is_string($version) || !isset(self::BROKEN[$name])) {
+            return null;
+        }
+        [$from, $fixed, $what] = self::BROKEN[$name];
+        $bare = ltrim($version, 'vV');
+        $major = explode('.', $bare)[0];
+        if (!isset($fixed[$major]) || preg_match('/^\d+(\.\d+)*$/', $bare) !== 1 || version_compare($phpVersion, $from, '<')) {
+            return null;
+        }
+        if (version_compare($bare, $fixed[$major], '>=')) {
+            return null;
+        }
+
+        return [
+            'version' => $version,
+            'constraint' => '>=' . $fixed[$major],
+            'reason' => sprintf('%s (fixed in %s)', $what, $fixed[$major]),
+        ];
     }
 
     /** The PHP version Composer checks the lock against on $minor. */

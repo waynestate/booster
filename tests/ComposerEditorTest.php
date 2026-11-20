@@ -571,4 +571,28 @@ final class ComposerEditorTest extends TestCase
         self::assertCount(1, $ignore['laravel/framework']);
         self::assertSame('^13.0', $ignore['laravel/framework'][0]['constraint']);
     }
+
+    public function test_drop_temporary_unblocks_keeps_the_apps_own_rules(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir . '/composer.json', (string) json_encode(['require' => ['php' => '^8.3'], 'config' => ['sort-packages' => true, 'policy' => ['advisories' => ['ignore' => ['acme/own' => [['constraint' => '^1.0', 'reason' => 'ours, reviewed']]]]]]]));
+        $editor = new ComposerEditor();
+        self::assertSame([], $editor->dropTemporaryUnblocks($dir));
+        $editor->advisoryUnblock($dir, 'twig/twig', '^1.18|^2.0', ['PKSA-1']);
+        $editor->advisoryUnblock($dir, 'twig/twig', '^3.4', ['PKSA-2']);
+        $editor->advisoryUnblock($dir, 'acme/own', '^2.0', []);
+
+        self::assertSame(['acme/own', 'twig/twig'], $editor->dropTemporaryUnblocks($dir));
+        $data = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertSame(['acme/own' => [['constraint' => '^1.0', 'reason' => 'ours, reviewed']]], $data['config']['policy']['advisories']['ignore']);
+        self::assertSame([], $editor->temporaryUnblocks($dir));
+
+        // With only Booster's entries, the emptied policy and config go too.
+        $bare = $this->tempDir();
+        file_put_contents($bare . '/composer.json', (string) json_encode(['require' => ['php' => '^8.3']]));
+        $editor->advisoryUnblock($bare, 'twig/twig', '^3.4', ['PKSA-2']);
+        self::assertSame(['twig/twig'], $editor->dropTemporaryUnblocks($bare));
+        self::assertSame(['require' => ['php' => '^8.3']], json_decode((string) file_get_contents($bare . '/composer.json'), true));
+        self::assertSame([], $editor->dropTemporaryUnblocks($this->tempDir()));
+    }
 }
