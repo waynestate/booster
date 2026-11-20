@@ -154,9 +154,20 @@ final class RouteTable
      *
      * Everything else is literal. The path is matched whole and is case
      * sensitive, like both legacy routers.
+     *
+     * $wheres maps a placeholder name to its regex, as the Laravel route's
+     * ->where() gives it, so the dispatcher matches exactly as narrowly as
+     * Laravel. An inline `{name:regex}` wins over a where for the same name.
+     *
+     * @param array<array-key, mixed> $wheres name => regex; checked here, since callers read them from code
      */
-    public static function compile(string $laravelUri): string
+    public static function compile(string $laravelUri, array $wheres = []): string
     {
+        foreach ($wheres as $name => $where) {
+            if (!is_string($name) || preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name) !== 1 || !is_string($where) || $where === '' || @preg_match('#' . str_replace('#', '\#', $where) . '#', '') === false) {
+                throw new ToolError(sprintf('The route "%s" has a where() constraint the route table cannot compile: %s => %s.', $laravelUri, (string) $name, is_string($where) ? $where : gettype($where)));
+            }
+        }
         $uri = trim($laravelUri);
         $optionalSlash = false;
         if (str_ends_with($uri, '[/]')) {
@@ -197,6 +208,9 @@ final class RouteTable
             }
             if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $inner) !== 1) {
                 throw new ToolError(sprintf('The route "%s" has a placeholder the route table cannot compile: {%s}.', $laravelUri, $inner));
+            }
+            if ($colon === false && isset($wheres[$inner])) {
+                $pattern = str_replace('#', '\#', (string) $wheres[$inner]);
             }
             if ($optional) {
                 if ($offset !== $length || !str_ends_with($literal, '/')) {

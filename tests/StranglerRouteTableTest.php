@@ -53,6 +53,27 @@ final class StranglerRouteTableTest extends TestCase
         }
     }
 
+    public function test_compile_takes_the_laravel_routes_wheres(): void
+    {
+        $regex = RouteTable::compile('users/{id}/{slug?}', ['id' => '[0-9]+', 'slug' => '[a-z-]+']);
+        self::assertSame(1, preg_match($regex, '/users/7'));
+        self::assertSame(1, preg_match($regex, '/users/7/hello-there'));
+        self::assertSame(0, preg_match($regex, '/users/abc'));
+        self::assertSame(0, preg_match($regex, '/users/7/Hello'));
+        self::assertSame(1, preg_match(RouteTable::compile('files/{path}', ['path' => '.*']), '/files/a/b'), 'a where can span segments, as in Laravel');
+        self::assertSame(1, preg_match(RouteTable::compile('tags/{t}', ['t' => 'a#b']), '/tags/a#b'));
+        self::assertSame(1, preg_match(RouteTable::compile('x/{id:\d+}', ['id' => '[a-z]+']), '/x/12'), 'an inline constraint wins');
+        self::assertSame(RouteTable::compile('users/{id:[0-9]+}'), RouteTable::compile('users/{id}', ['id' => '[0-9]+']), 'a where and the inline form compile alike');
+        foreach ([['id' => '('], ['id' => ''], [3 => '\d+'], ['id' => ['\d+']]] as $bad) {
+            try {
+                RouteTable::compile('users/{id}', $bad);
+                self::fail('compile accepted the wheres ' . json_encode($bad));
+            } catch (ToolError $e) {
+                self::assertStringContainsString('where()', $e->getMessage());
+            }
+        }
+    }
+
     public function test_compile_refuses_what_it_cannot_express(): void
     {
         foreach (['posts/{slug?}/edit', 'users/{id', 'users/{1x}', 'users/{id:(}'] as $uri) {
