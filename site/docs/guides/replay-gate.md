@@ -108,6 +108,7 @@ A normalizer rewrites the volatile parts of an answer before it is compared and 
 | `asset-hash` | content hashes in built asset names (`app.3f9a1c2b.js`, Vite's `app-L1fqnEWe.js`, `app.js?id=3f9a1c`) |
 | `preload-hints` | `<link rel="modulepreload">` tags, which list the chunks the bundler split out and change with any build; the tags that load the page stay compared |
 | `inertia` | the Inertia page object's asset `version`, the fields Inertia 3 changed (`clearHistory` and `encryptHistory` when false, `sharedProps`) and its devtools id; component, props and url stay compared |
+| `cakephp` | markup CakePHP 5's helpers print differently from CakePHP 4's (the extra `rel="shortcut icon"` link `meta('icon')` printed on 4); the `cakephp-4.6-to-5` step switches it on by itself, from that step on |
 
 `booster replay init` lists `asset-hash` and `preload-hints` when the app builds with Vite, and `inertia` when it requires `inertiajs/inertia-laravel`. Without them the first front-end hop fails the replay on a sound change: on WELD, `inertia-2-to-3` changed only these parts of every page.
 
@@ -147,6 +148,19 @@ It is a warning, not a stop: the replay still gates every hop. To make it prove 
 - **An app on Wayne Auth** cannot sign in at all in the replay: the old service checks its cookie, and nothing fakes that. Move it to SESAME's Wayne Auth bridge first; `booster plan` names it as a stop sign.
 
 Keep the guest's redirect as one request either way: it is the honest answer for a visitor who is not signed in.
+
+## A baseline of errors [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#a-baseline-of-errors)
+
+A baseline where every answer is an error proves nothing either: the same fatal answers the same way on every PHP, so every hop would "pass". That happens more often than it sounds, for example when the app needs a folder that git does not keep (`var/logs`, `tmp`) or a config file the checkout lacks. Booster refuses such a baseline and stops the run before the first hop:
+
+```
+Replay baseline on PHP 7.2 is not usable: all 5 recorded answers are errors, before any change. A replay of it would only prove the app fails the same way after each hop.
+  01 pages: GET / answered 200 with a PHP error: Fatal error: Uncaught Exception: Required '/app/var/logs/' is not a directory in /app/config/init.php:41
+```
+
+An answer counts as an error when its body shows a PHP fatal or parse error (an app that turns `display_errors` on answers its fatals with a 200), or when it is a 5xx the request file does not `expect`. Two or more answers that are the same 4xx page, byte for byte, count too, unless the file expects each of those statuses. Make the app answer on fake data first (the `setup` command can create the folders it needs), or pass `--allow-failing-baseline` (to `run`, or to `replay record`) to record the errors anyway, with a warning.
+
+When only some answers are errors, or PHP's log shows a fatal error while the baseline was served, Booster records the baseline and warns, naming the requests, so you can tell a page that replays an error from one that works.
 
 ## When a hop changes how the app is served [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#when-a-hop-changes-how-the-app-is-served)
 

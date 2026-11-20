@@ -90,7 +90,10 @@ final class CakeSkeletonRewriterTest extends TestCase
 
         $this->assertTrue($result['removed']);
         $this->assertTrue($result['viewClasses']);
-        $this->assertStringNotContainsString('RequestHandler', $result['code']);
+        $this->assertStringNotContainsString('loadComponent(\'RequestHandler\'', $result['code']);
+        $this->assertStringNotContainsString('enableBeforeRedirect', $result['code']);
+        // The MANUAL scan looks for the class name; the new docblock must not trip it.
+        $this->assertStringNotContainsString('RequestHandlerComponent', $result['code']);
         $this->assertStringContainsString("\$this->loadComponent('Flash');", $result['code']);
         $this->assertStringContainsString("public function viewClasses(): array\n    {\n        return [\\Cake\\View\\JsonView::class, \\Cake\\View\\XmlView::class];\n    }\n}\n", $result['code']);
         $this->assertSame(1, preg_match('/^<\?php\n.*\}\n$/s', $result['code']));

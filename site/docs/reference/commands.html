@@ -305,7 +305,7 @@
 </table></div>
 <h3 id="booster-replay"><span class="docs-heading-tail"><code>booster replay</code><a class="docs-heading-link" aria-label="Link to this section" href="#booster-replay">#</a></span></h3>
 <p>The replay gate on its own: init drafts booster-replay.json, record saves how the app answers now, check fails when an answer changed.</p>
-<p>Usage: <code>booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recording RECORDING] [--php PHP] [--image IMAGE] [--out OUT] [--no-install] [--serve-changed] [--force] [--] &lt;action&gt;</code></p>
+<p>Usage: <code>booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recording RECORDING] [--php PHP] [--image IMAGE] [--out OUT] [--no-install] [--allow-failing-baseline] [--serve-changed] [--force] [--] &lt;action&gt;</code></p>
 <div class="docs-table" role="region" aria-label="Table" tabindex="0"><table>
 <thead>
 <tr>
@@ -369,6 +369,11 @@
 <tr>
 <td><code>--no-install</code></td>
 <td>Do not run composer install first; use the vendor/ the app already has.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>--allow-failing-baseline</code></td>
+<td>record only: keep a baseline whose every answer is an error (a PHP fatal, a 5xx, one error page for every path), with a warning; by default such a baseline is refused.</td>
 <td></td>
 </tr>
 <tr>

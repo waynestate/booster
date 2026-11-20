@@ -75,7 +75,8 @@ final class FrameworkHopsTest extends TestCase
 
         $to5 = $registry->get(HopRegistry::CAKEPHP_46_TO_5_ID);
         self::assertSame(['cakephp/cakephp' => '^5.4'], $to5->composerSet);
-        self::assertSame($registry->frameworkCompanionPins('cakephp', '5.4'), $to5->composerSetIfPresent);
+        // CakePHP 5.4 tests need PHPUnit 11.5 or later (CAKE-2).
+        self::assertSame([...$registry->frameworkCompanionPins('cakephp', '5.4'), 'phpunit/phpunit' => HopRegistry::CAKEPHP_5_PHPUNIT], $to5->composerSetIfPresent);
         self::assertSame('^3.3', $to5->composerSetIfPresent['cakephp/authentication']);
 
         $slim = $registry->get(HopRegistry::SLIM_3_TO_4_ID);

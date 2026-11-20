@@ -188,6 +188,10 @@ difference. <code>&quot;compare&quot;: {&quot;whitespace&quot;: &quot;exact&quot
 <td><code>inertia</code></td>
 <td>the Inertia page object's asset <code>version</code>, the fields Inertia 3 changed (<code>clearHistory</code> and <code>encryptHistory</code> when false, <code>sharedProps</code>) and its devtools id; component, props and url stay compared</td>
 </tr>
+<tr>
+<td><code>cakephp</code></td>
+<td>markup CakePHP 5's helpers print differently from CakePHP 4's (the extra <code>rel=&quot;shortcut icon&quot;</code> link <code>meta('icon')</code> printed on 4); the <code>cakephp-4.6-to-5</code> step switches it on by itself, from that step on</td>
+</tr>
 </tbody>
 </table></div>
 <p><code>booster replay init</code> lists <code>asset-hash</code> and <code>preload-hints</code> when the app builds with Vite, and <code>inertia</code> when it
@@ -249,6 +253,21 @@ its ID (<code>&quot;cookies&quot;: {&quot;PHPSESSID&quot;: &quot;replay-user&quo
 that. Move it to SESAME's Wayne Auth bridge first; <code>booster plan</code> names it as a stop sign.</li>
 </ul>
 <p>Keep the guest's redirect as one request either way: it is the honest answer for a visitor who is not signed in.</p>
+<h2 id="a-baseline-of-errors">A baseline of <span class="docs-heading-tail"><span>errors</span><a class="docs-heading-link" aria-label="Link to this section" href="#a-baseline-of-errors">#</a></span></h2>
+<p>A baseline where every answer is an error proves nothing either: the same fatal answers the same way on every PHP,
+so every hop would &quot;pass&quot;. That happens more often than it sounds, for example when the app needs a folder that git
+does not keep (<code>var/logs</code>, <code>tmp</code>) or a config file the checkout lacks. Booster refuses such a baseline and stops the
+run before the first hop:</p>
+<pre tabindex="0"><code>Replay baseline on PHP 7.2 is not usable: all 5 recorded answers are errors, before any change. A replay of it would only prove the app fails the same way after each hop.
+  01 pages: GET / answered 200 with a PHP error: Fatal error: Uncaught Exception: Required '/app/var/logs/' is not a directory in /app/config/init.php:41
+</code></pre>
+<p>An answer counts as an error when its body shows a PHP fatal or parse error (an app that turns <code>display_errors</code> on
+answers its fatals with a 200), or when it is a 5xx the request file does not <code>expect</code>. Two or more answers that are
+the same 4xx page, byte for byte, count too, unless the file expects each of those statuses. Make the app answer on
+fake data first (the <code>setup</code> command can create the folders it needs), or pass <code>--allow-failing-baseline</code> (to <code>run</code>,
+or to <code>replay record</code>) to record the errors anyway, with a warning.</p>
+<p>When only some answers are errors, or PHP's log shows a fatal error while the baseline was served, Booster records
+the baseline and warns, naming the requests, so you can tell a page that replays an error from one that works.</p>
 <h2 id="when-a-hop-changes-how-the-app-is-served">When a hop changes how the app is <span class="docs-heading-tail"><span>served</span><a class="docs-heading-link" aria-label="Link to this section" href="#when-a-hop-changes-how-the-app-is-served">#</a></span></h2>
 <p>Some hops change more than the PHP: a strangler's mount step moves the docroot or the front controller, a new
 <code>setup</code> command builds the fake data a different way. The <code>serve</code> section is part of the recording's fingerprint, so
@@ -291,7 +310,7 @@ queue. A follow-up request that reads the saved record back (like <code>read bac
     </main>
     <nav class="docs-pager" aria-label="Pages"><a class="docs-pager__link" href="../../docs/guides/hops.html"><span class="docs-pager__dir">Previous</span><span class="docs-pager__title">What a hop does</span></a><a class="docs-pager__link docs-pager__link--next" href="../../docs/guides/framework-hops.html"><span class="docs-pager__dir">Next</span><span class="docs-pager__title">Hand-copied libraries to Composer</span></a></nav>
   </div>
-  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#in-three-commands">In three commands</a></li><li class="docs-toc__item"><a href="#what-a-run-does-with-it">What a run does with it</a></li><li class="docs-toc__item"><a href="#the-request-file">The request file</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-is-compared">What is compared</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#normalizers">Normalizers</a></li><li class="docs-toc__item"><a href="#design">Design</a></li><li class="docs-toc__item"><a href="#drafting-the-file">Drafting the file</a></li><li class="docs-toc__item"><a href="#pages-behind-sign-in">Pages behind sign-in</a></li><li class="docs-toc__item"><a href="#when-a-hop-changes-how-the-app-is-served">When a hop changes how the app is served</a></li><li class="docs-toc__item"><a href="#limits-honestly">Limits, honestly</a></li></ul></nav>
+  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#in-three-commands">In three commands</a></li><li class="docs-toc__item"><a href="#what-a-run-does-with-it">What a run does with it</a></li><li class="docs-toc__item"><a href="#the-request-file">The request file</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-is-compared">What is compared</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#normalizers">Normalizers</a></li><li class="docs-toc__item"><a href="#design">Design</a></li><li class="docs-toc__item"><a href="#drafting-the-file">Drafting the file</a></li><li class="docs-toc__item"><a href="#pages-behind-sign-in">Pages behind sign-in</a></li><li class="docs-toc__item"><a href="#a-baseline-of-errors">A baseline of errors</a></li><li class="docs-toc__item"><a href="#when-a-hop-changes-how-the-app-is-served">When a hop changes how the app is served</a></li><li class="docs-toc__item"><a href="#limits-honestly">Limits, honestly</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
   <span>Documents Booster <span data-docs-version>1.19.0</span></span>

@@ -76,6 +76,19 @@ swaps `loadComponent('Auth')` for `loadComponent('Authentication.Authentication'
 `cakephp/authentication ^3.0`, and wires `src/Application.php`: the provider interface, the plugin, the middleware
 after routing, and a service with the Session authenticator whose guests go to the old `loginAction`.
 
+**The skeleton's own files.** The 5 step also makes the CakePHP 5 skeleton's moves no upgrade rule makes:
+`config/bootstrap.php` loads CakePHP's global functions (`require CAKE . 'functions.php';`, without which `env()` is
+undefined), `phpunit.xml` loads the fixture extension the PHPUnit 10 way and names the covered code in `<source>`,
+`loadComponent('RequestHandler')` goes when nothing reads the component (with a `viewClasses()` for JSON and XML on
+`AppController` when `config/routes.php` sets those extensions), log `'scopes' => false` becomes `null`, the core cache
+follows its `_cake_translations_` rename, and a template's `Connection::connect()` goes through the driver.
+
+**PHPUnit waits for CakePHP 5.** CakePHP 4's `TestCase` does not load on PHPUnit 10, so a CakePHP 4 app on PHPUnit 9
+keeps it until the 5 step, which requires PHPUnit 11.5 with CakePHP 5.4; the PHPUnit 12 and 13 hops follow. A run
+that PHPUnit 12 fails only for the skeleton's `<ini name="apc.enable_cli">` (the gate image has no APCu) passes with a
+note, every test green. The replay switches on the `cakephp` normalizer from the 5 step, which hides only the extra
+`rel="shortcut icon"` link CakePHP 4's `meta('icon')` printed.
+
 **What Booster does not do (the MANUAL list).** Each run prints these as `MANUAL:` lines, with the file and the count
 where there is one:
 
@@ -93,7 +106,9 @@ where there is one:
 - `src/Application.php` that Booster could not wire: no such file or class, one that already provides an
   authentication service (check that it loads the Session authenticator), no `bootstrap()` or `middleware()`, no
   routing middleware, or no `loginAction` found (the redirect is the placeholder `/login`).
-- Code no rule moves: `RequestHandlerComponent` (declare `viewClasses()` instead), `->withType()` calls,
+- Code no rule moves: `RequestHandlerComponent` where the app still reads `$this->RequestHandler` (declare
+  `viewClasses()` instead), a check that the controllers that serialize still answer `.json` and `.xml` after
+  Booster added `viewClasses()`, `->withType()` calls,
   `Cake\Mailer\Email` (use `Mailer`), `Cake\I18n\Time` and the mutable `Cake\I18n\Date` (use `DateTime` or the
   immutable `Date`, and check code that changed a date in place), and any `.ctp` template left over.
 - `cakedc/cakephp-oracle-driver` has no CakePHP 5 release. The 5 step swaps it for `ioigoume/cakephp5-oracle-driver`

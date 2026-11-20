@@ -218,7 +218,7 @@ Not for: a real run on a faked date. Dates are for planning; run on the real one
 
 ## 14. After a stop [#](https://booster.apps.wayne.edu/docs/recipes.html#14-after-a-stop)
 
-A run stops at the first hop that fails (a red gate, a hop over the file cap, a Composer error) and reports the rest as "not run". The report names the hop, the phase (Composer or tests), and the last lines of output. The failed hop's changes stay in place so you can read them; `git checkout .` undoes them.
+A run stops at the first hop that fails (a red gate, a hop over the file cap, a Composer error) and reports the rest as "not run". The report names the hop, the phase (Composer or tests), and the last lines of output. The failed hop's changes stay in place so you can read them. The report's "Undo with:" line (`git checkout .`, plus `git clean` for files the run created, with paths relative to the app folder) runs inside the app folder and undoes everything the run changed, the steps that passed included, because Booster commits nothing between steps; commit after each passed step to keep them.
 
 The usual loop:
 
@@ -234,7 +234,7 @@ The stopped hop is neither redone nor skipped: its gate runs again, and the run 
 
 A dry run and `--skip-gate` never re-gate. The record of a rerun whose re-gate went red keeps the hop's name (`regate` in `booster-hop.json`), so the run after it re-gates again.
 
-If you would rather throw the failed hop away, `git checkout .`, fix the cause, and run again. To get the hop's edits and keep working in the same tree, pass `--allow-dirty`.
+If you would rather throw the run away, `git checkout .` (it takes back every step of the run, not only the failed one), fix the cause, and run again. To get the hop's edits and keep working in the same tree, pass `--allow-dirty`.
 
 If you keep a stopped PHP hop's edits, the app has already moved: that hop raised `php` in `composer.json`. So run again without `--from-php` (or with the PHP the stopped hop landed on), not with the PHP you started from. Booster then starts where the app is, and the baseline on that PHP checks the stopped hop's work before the next hop. A rerun from the old PHP cannot install, and Booster says so: its baseline names the `php` constraint and the rerun to type. When the baseline's install fails because a locked package refuses that PHP, it names the `composer update -W` to run instead.
 

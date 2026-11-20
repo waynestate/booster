@@ -522,7 +522,10 @@ final class CakeUpgradeMigrationTest extends TestCase
         self::assertNotNull($calls);
         self::assertStringContainsString('src/Controller/UsersController.php (2)', $calls);
         self::assertNotNull(self::lineStartingWith($result->manual, 'MANUAL: isAuthorized()'));
-        self::assertStringContainsString('src/Controller/ApiController.php (1)', (string) self::lineStartingWith($result->manual, 'MANUAL: RequestHandlerComponent'));
+        // Nothing reads $this->RequestHandler, so the load goes (CAKE-4) and no MANUAL line is left for it.
+        self::assertNull(self::lineStartingWith($result->manual, 'MANUAL: RequestHandlerComponent'));
+        self::assertContains("Removed loadComponent('RequestHandler') from src/Controller/ApiController.php (CakePHP 5 has no RequestHandlerComponent).", $result->changes);
+        self::assertStringNotContainsString('RequestHandler', (string) file_get_contents($app . '/src/Controller/ApiController.php'));
         self::assertNotNull(self::lineStartingWith($result->manual, 'MANUAL: no upgrade rule checks ->withType()'));
         self::assertStringContainsString('src/Controller/ApiController.php (1)', (string) self::lineStartingWith($result->manual, 'MANUAL: Cake\I18n\Time'));
         foreach ($result->manual as $line) {

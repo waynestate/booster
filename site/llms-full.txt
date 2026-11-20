@@ -704,8 +704,10 @@ current PHP before the first hop (PHP's built-in server in the gate image, no ne
 command), replays them after every hop, and fails the hop on a changed answer, showing the first difference. A PHP 8
 hop that turns `0 == "abc"` from true to false fails there even when no test visits that page. `booster replay init`
 drafts the request file from the app's routes, with `todo` items for what only a person knows; normalizers hide CSRF
-tokens, session ids, timestamps and asset hashes. The file format, the design and the honest limits (no real
-Oracle, SSO or JavaScript-driven pages) are in [the replay gate guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/replay-gate.md).
+tokens, session ids, timestamps and asset hashes. A baseline where every answer is an error (a PHP fatal, an
+unexpected 5xx, or one error page for every path) stops the run before the first hop, since replaying it would only
+prove the app fails the same way; `--allow-failing-baseline` records it anyway. The file format, the design and the
+honest limits (no real Oracle, SSO or JavaScript-driven pages) are in [the replay gate guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/replay-gate.md).
 
 #### Hand-copied libraries to Composer
 
@@ -771,7 +773,7 @@ under `Pre-pass fixes:`.
    ldap, soap, zip, gd, pdo_mysql, mysqli, bcmath, pcntl, exif, redis, imagick and oci8. The first build downloads
     Oracle Instant Client for oci8, so it takes a few minutes; later hops reuse the image. Pass `--image` to run the
     gate in your own image instead (below). A red gate stops the run and leaves the changes in place so you can read
-    them (`git checkout .` undoes them). To check the image itself,
+    them (`git checkout .` in the app folder undoes them, with every earlier step of the run). To check the image itself,
     `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`, PowerShell 7.3 or later) builds it for each PHP version and
     verifies its extension list, that Composer runs and, on the archived Debian releases, that apt can verify the
     archive; it needs Docker and a few minutes per version, so it is not part of `composer ci` (a unit test reads
@@ -1560,7 +1562,14 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### \[Unreleased\] [#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Fixed: the replay gate no longer fails the CakePHP 5 step on markup CakePHP's own helpers print differently on 5: a new `cakephp` normalizer preset (the extra rel="shortcut icon" link CakePHP 4's meta('icon') printed) is switched on from that step, and the step report says so (CAKE-7).
+- Fixed: a green PHPUnit 12 or 13 suite is no longer failed by phpunit.xml's for an extension the gate image does not load (the CakePHP skeleton's apc.enable_cli): when every PHPUnit warning is such a setting, PHP in the gate does not know it at all and the app asks for no failOn rule, the step passes with a note that names the setting (CAKE-6).
+- Fixed: the CakePHP 5 step makes the skeleton moves no upgrade rule makes, each of which failed the CakePHP 4 skeleton's tests on 5: config/bootstrap.php loads CakePHP's global functions (CAKE-3, env() was undefined) and phpunit.xml loads the fixture extension the PHPUnit 10 way with for coverage; loadComponent('RequestHandler') goes, with a viewClasses() for apps that route .json or .xml (CAKE-4, every request was a 500); log 'scopes' => false becomes null, the core cache follows its *cake_translations* rename and the home page connects through the driver (CAKE-5).
+- Fixed: a CakePHP 4 app on PHPUnit 9 keeps PHPUnit 9 until the CakePHP 5 step, which moves it to PHPUnit 11.5 with CakePHP (CakePHP 4's TestCase cannot load on PHPUnit 10, so the phpunit-9-to-10 step failed every such app); a plan that stays on CakePHP 4 says why PHPUnit stays (CAKE-2).
+- Fixed: the CakePHP rule sets no longer die on PHP 8.4 and later while loading a CakePHP 4 app: Rector reads the app's classes through Composer's class maps only (the image's app-autoload.php), so the app's own files autoloads, such as Chronos 2 on PHP 8.5, never run (CAKE-1).
+- Fixed: a replay baseline where every answer is an error (a PHP fatal or parse error in the body, even under a 200; a 5xx the request file does not expect; or one identical 4xx page for every request) now stops the run before the first hop instead of "passing" after every hop; `--allow-failing-baseline` (on `run`, and on `replay record`) records it anyway with a warning. A baseline with only some error answers, or a fatal in PHP's log, gets a warning that names them.
 - Fixed: the Slim 3 to 4 hop runs on PHP 7.4 (slim/psr7 ^1.6, glue files in PHP 7.4 syntax) and moves apps typed with Slim 3's request and response classes onto slim/http.
+- Fixed: the undo hint after a failed step says it undoes the whole run and gives paths relative to the app folder; the Slim 4 message no longer claims Booster has no Slim hop.
 - Fixed: the cakephp/upgrade image now includes the intl extension CakePHP requires; every CakePHP hop stopped at start without it.
 - Fixed: a cakephp/upgrade rule set that prints an error but exits 0 (Rector could not load it) is now a stop sign instead of a quiet "ran"; the cakephp41 rule set, which imported a missing file upstream, now loads.
 - Fixed: the cakephp43 rule set loads again (its fetchTable() rule included) with its three Cake\\Network\\Socket property rules cut, since they need a Rector class that is gone; the 4.6 step lists the Socket properties as a MANUAL line.
@@ -2257,6 +2266,10 @@ A CakePHP 4.3 app on PHP 8.1 therefore plans `cakephp-4-to-4.6`, `php-81-to-82`,
 
 **The sign-in move.** The 5 step moves the like-for-like AuthComponent calls (`$this->Auth->user('x')` reads the identity, `setUser()` becomes `setIdentity()`, `logout()` and `allow()` keep their names on `$this->Authentication`), swaps `loadComponent('Auth')` for `loadComponent('Authentication.Authentication')`, requires `cakephp/authentication ^3.0`, and wires `src/Application.php`: the provider interface, the plugin, the middleware after routing, and a service with the Session authenticator whose guests go to the old `loginAction`.
 
+**The skeleton's own files.** The 5 step also makes the CakePHP 5 skeleton's moves no upgrade rule makes: `config/bootstrap.php` loads CakePHP's global functions (`require CAKE . 'functions.php';`, without which `env()` is undefined), `phpunit.xml` loads the fixture extension the PHPUnit 10 way and names the covered code in `<source>`, `loadComponent('RequestHandler')` goes when nothing reads the component (with a `viewClasses()` for JSON and XML on `AppController` when `config/routes.php` sets those extensions), log `'scopes' => false` becomes `null`, the core cache follows its `_cake_translations_` rename, and a template's `Connection::connect()` goes through the driver.
+
+**PHPUnit waits for CakePHP 5.** CakePHP 4's `TestCase` does not load on PHPUnit 10, so a CakePHP 4 app on PHPUnit 9 keeps it until the 5 step, which requires PHPUnit 11.5 with CakePHP 5.4; the PHPUnit 12 and 13 hops follow. A run that PHPUnit 12 fails only for the skeleton's `<ini name="apc.enable_cli">` (the gate image has no APCu) passes with a note, every test green. The replay switches on the `cakephp` normalizer from the 5 step, which hides only the extra `rel="shortcut icon"` link CakePHP 4's `meta('icon')` printed.
+
 **What Booster does not do (the MANUAL list).** Each run prints these as `MANUAL:` lines, with the file and the count where there is one:
 
 - On the 4.6 step: the reminder to fix every deprecation with `E_ALL` before the 5 step.
@@ -2264,7 +2277,7 @@ A CakePHP 4.3 app on PHP 8.1 therefore plans `cakephp-4-to-4.6`, `php-81-to-82`,
 - On both steps: `View::loadHelper()` calls the rules could not type (it is `addHelper()` since 4.5).
 - Sign-in that is not a plain session: `isAuthorized()` (move it to Authorization plugin policies or plain controller code), and any Auth config the plugin has no like-for-like for (`authenticate` with a custom authenticator such as CAS, an SSO cookie or an LTI launch, `authorize`, `loginRedirect`, `logoutRedirect`, `authError`; `loginAction` is carried over as the redirect). Also an `'Auth'` entry with config in a `$components` list, any other `$this->Auth->...()` call, what the action does with `logout()`'s return value (now the redirect URL or null), and `allow()` calls that passed one name or none, since `allowUnauthenticated()` takes an array.
 - `src/Application.php` that Booster could not wire: no such file or class, one that already provides an authentication service (check that it loads the Session authenticator), no `bootstrap()` or `middleware()`, no routing middleware, or no `loginAction` found (the redirect is the placeholder `/login`).
-- Code no rule moves: `RequestHandlerComponent` (declare `viewClasses()` instead), `->withType()` calls, `Cake\Mailer\Email` (use `Mailer`), `Cake\I18n\Time` and the mutable `Cake\I18n\Date` (use `DateTime` or the immutable `Date`, and check code that changed a date in place), and any `.ctp` template left over.
+- Code no rule moves: `RequestHandlerComponent` where the app still reads `$this->RequestHandler` (declare `viewClasses()` instead), a check that the controllers that serialize still answer `.json` and `.xml` after Booster added `viewClasses()`, `->withType()` calls, `Cake\Mailer\Email` (use `Mailer`), `Cake\I18n\Time` and the mutable `Cake\I18n\Date` (use `DateTime` or the immutable `Date`, and check code that changed a date in place), and any `.ctp` template left over.
 - `cakedc/cakephp-oracle-driver` has no CakePHP 5 release. The 5 step swaps it for `ioigoume/cakephp5-oracle-driver` and renames its namespace; check that it covers the Oracle calls your app makes.
 - App bugs the move exposes are reported, never fixed: the hop moves the framework, not the app's own logic.
 
@@ -2293,7 +2306,7 @@ One hop, `slim-3-to-4`, at the lowest PHP Slim 4.15 runs on (7.4: first when the
 
 ### What has no hop yet [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html#what-has-no-hop-yet)
 
-CakePHP 3 and Slim 2 (and anything older): `booster plan` says Booster has no hop for them yet and keeps PHP where the framework still runs, instead of planning a break. Moving a CakePHP or Slim app to Laravel is coming next; nothing in this release does it.
+CakePHP 3 and Slim 2 (and anything older): `booster plan` says Booster has no hop for them yet and keeps PHP where the framework still runs, instead of planning a break. A Slim 4 app below 4.15 is held the same way: `slim-3-to-4` moves Slim 3 only, so the plan says to move Slim to 4.15 by hand. Moving a CakePHP or Slim app to Laravel is coming next; nothing in this release does it.
 
 See also: [What a hop does](https://booster.apps.wayne.edu/docs/guides/hops.html), [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html), and every hop's notes in [Hops](https://booster.apps.wayne.edu/docs/reference/hops.html).
 
@@ -2502,7 +2515,7 @@ On PHP hops a pre-pass runs first: PHP 4 era `$a = &new Foo();` becomes a plain 
 1. Rector runs as a dry run. If it reports errors, the run stops before anything is written. So does a hop that would change more than 200 files, unless an interactive run confirms it after showing the per-rule summary; an explicit `--max-changes` is a hard limit that never asks. An empty Rector report usually means the process ran out of memory, and the message points at `--memory-limit`.
 2. Rector runs for real, with only that hop's rules. A rule that would change what the code does is never applied: the PHP 8.0 set's switch-to-match rewrite is skipped, because `match` compares strictly and would stop a `case 1:` from matching the string `"1"` a query string carries. Every run keeps Rector's and PHPStan's caches in its own temp directory, removed at exit, so one run never reads another's.
 3. `composer.json` is edited: the `php` or `laravel/framework` constraint is raised, and `config.platform.php` moves with it when the app already pins it, to the first released patch of the new PHP (8.4.1 for 8.4, because 8.4.0 never shipped; x.y.0 otherwise). Booster never creates that key.
-4. The gate runs the app's tests inside `booster-target:<php>-<stamp>`, a container built from `docker/Dockerfile` on the PHP the hop moves to. The stamp is a short hash of the recipe, so an edited `docker/Dockerfile` rebuilds the image instead of reusing a stale one. The image carries the extension set Citadel's apps run with: intl, ldap, soap, zip, gd, pdo_mysql, mysqli, bcmath, pcntl, exif, redis, imagick and oci8. The first build downloads Oracle Instant Client for oci8, so it takes a few minutes; later hops reuse the image. Pass `--image` to run the gate in your own image instead (below). A red gate stops the run and leaves the changes in place so you can read them (`git checkout .` undoes them). With `--replay`, the gate also replays the requests recorded before the first hop and fails on a changed answer: see [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html). To check the image itself, `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`, PowerShell 7.3 or later) builds it for each PHP version and verifies its extension list, that Composer runs and, on the archived Debian releases, that apt can verify the archive; it needs Docker and a few minutes per version, so it is not part of `composer ci` (a unit test reads the recipe instead).
+4. The gate runs the app's tests inside `booster-target:<php>-<stamp>`, a container built from `docker/Dockerfile` on the PHP the hop moves to. The stamp is a short hash of the recipe, so an edited `docker/Dockerfile` rebuilds the image instead of reusing a stale one. The image carries the extension set Citadel's apps run with: intl, ldap, soap, zip, gd, pdo_mysql, mysqli, bcmath, pcntl, exif, redis, imagick and oci8. The first build downloads Oracle Instant Client for oci8, so it takes a few minutes; later hops reuse the image. Pass `--image` to run the gate in your own image instead (below). A red gate stops the run and leaves the changes in place so you can read them (`git checkout .` in the app folder undoes them, with every earlier step of the run). With `--replay`, the gate also replays the requests recorded before the first hop and fails on a changed answer: see [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html). To check the image itself, `scripts/check-target-image.sh` (or its Windows twin `check-target-image.ps1`, PowerShell 7.3 or later) builds it for each PHP version and verifies its extension list, that Composer runs and, on the archived Debian releases, that apt can verify the archive; it needs Docker and a few minutes per version, so it is not part of `composer ci` (a unit test reads the recipe instead).
 5. On Laravel and PHPUnit hops the gate refreshes the lock before the tests: `composer update -W` for the package the hop moved, so `composer.lock` lands on the new major version next to `composer.json`. A PHP hop reads the lock first: a locked package whose own `require.php` leaves out the hop's PHP makes a plain `composer install` refuse the whole lock, so the gate runs `composer update -W` for just those packages, inside `composer.json`'s constraints, and the report names each one (`the lock held symfony/service-contracts v1.1.2, which needs php ^7.1.3, not PHP 8.0`). The lock follows the app up one PHP at a time, and each hop's diff moves only what had to move. Otherwise, a PHP hop on an app with a `composer.lock` runs `composer update --lock`: no package moves, but the lock's content hash catches up with the raised `php` constraint, so no hop leaves "The lock file is not up to date" behind, and on an app that pins `config.platform.php` (every Sourdough app does) the lock's `platform-overrides` catch up with the new pin, which a plain `composer install` would otherwise check the raised `php` constraint against and refuse. Every other hop, and the baseline, run a plain `composer install`. The two phases report separately: a Composer failure names the Composer phase and Composer's own output, because the tests never ran.
 
 When the run raised the app's PHP floor, its report ends with a list of the other places that still name an older PHP, each with its file and line: PHP versions in the CI matrix (Preflight's `php_versions`, a GitHub workflow's `php:` matrix, a `PHP_VERSIONS` list) and PHP images (`php:8.3-cli` in a CI job, `citadel/php-apache:8.4r5` in the Squire kit's `.env.squire.example` or `docker-compose.squire.yml`, the `image` in Parity's `parity.json`, a `FROM` line in the app's own `Dockerfile`, an `image:` in its `docker-compose.yml` or `compose.yaml`), and Laravel Sail's runtime (`vendor/laravel/sail/runtimes/8.3` and `sail-8.3/app` in a Sail app's `docker-compose.yml`). Booster never edits CI or deploy files, so it lists them instead: a matrix entry below the floor fails on the first push, because Composer refuses to install below it, and an image below it can no longer run the app. A Citadel tag also carries a build revision (`8.5r3`) that Booster cannot know; for `parity.json`, `parity image list` shows the Citadel images Parity can run. A dry run lists them too, from the floor its last PHP step would set. The JSON report carries them as `floor_follow_ups`.
@@ -2817,6 +2830,7 @@ A normalizer rewrites the volatile parts of an answer before it is compared and 
 | `asset-hash` | content hashes in built asset names (`app.3f9a1c2b.js`, Vite's `app-L1fqnEWe.js`, `app.js?id=3f9a1c`) |
 | `preload-hints` | `<link rel="modulepreload">` tags, which list the chunks the bundler split out and change with any build; the tags that load the page stay compared |
 | `inertia` | the Inertia page object's asset `version`, the fields Inertia 3 changed (`clearHistory` and `encryptHistory` when false, `sharedProps`) and its devtools id; component, props and url stay compared |
+| `cakephp` | markup CakePHP 5's helpers print differently from CakePHP 4's (the extra `rel="shortcut icon"` link `meta('icon')` printed on 4); the `cakephp-4.6-to-5` step switches it on by itself, from that step on |
 
 `booster replay init` lists `asset-hash` and `preload-hints` when the app builds with Vite, and `inertia` when it requires `inertiajs/inertia-laravel`. Without them the first front-end hop fails the replay on a sound change: on WELD, `inertia-2-to-3` changed only these parts of every page.
 
@@ -2856,6 +2870,19 @@ It is a warning, not a stop: the replay still gates every hop. To make it prove 
 - **An app on Wayne Auth** cannot sign in at all in the replay: the old service checks its cookie, and nothing fakes that. Move it to SESAME's Wayne Auth bridge first; `booster plan` names it as a stop sign.
 
 Keep the guest's redirect as one request either way: it is the honest answer for a visitor who is not signed in.
+
+### A baseline of errors [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#a-baseline-of-errors)
+
+A baseline where every answer is an error proves nothing either: the same fatal answers the same way on every PHP, so every hop would "pass". That happens more often than it sounds, for example when the app needs a folder that git does not keep (`var/logs`, `tmp`) or a config file the checkout lacks. Booster refuses such a baseline and stops the run before the first hop:
+
+```
+Replay baseline on PHP 7.2 is not usable: all 5 recorded answers are errors, before any change. A replay of it would only prove the app fails the same way after each hop.
+  01 pages: GET / answered 200 with a PHP error: Fatal error: Uncaught Exception: Required '/app/var/logs/' is not a directory in /app/config/init.php:41
+```
+
+An answer counts as an error when its body shows a PHP fatal or parse error (an app that turns `display_errors` on answers its fatals with a 200), or when it is a 5xx the request file does not `expect`. Two or more answers that are the same 4xx page, byte for byte, count too, unless the file expects each of those statuses. Make the app answer on fake data first (the `setup` command can create the folders it needs), or pass `--allow-failing-baseline` (to `run`, or to `replay record`) to record the errors anyway, with a warning.
+
+When only some answers are errors, or PHP's log shows a fatal error while the baseline was served, Booster records the baseline and warns, naming the requests, so you can tell a page that replays an error from one that works.
 
 ### When a hop changes how the app is served [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#when-a-hop-changes-how-the-app-is-served)
 
@@ -3562,7 +3589,7 @@ Not for: a real run on a faked date. Dates are for planning; run on the real one
 
 ### 14. After a stop [#](https://booster.apps.wayne.edu/docs/recipes.html#14-after-a-stop)
 
-A run stops at the first hop that fails (a red gate, a hop over the file cap, a Composer error) and reports the rest as "not run". The report names the hop, the phase (Composer or tests), and the last lines of output. The failed hop's changes stay in place so you can read them; `git checkout .` undoes them.
+A run stops at the first hop that fails (a red gate, a hop over the file cap, a Composer error) and reports the rest as "not run". The report names the hop, the phase (Composer or tests), and the last lines of output. The failed hop's changes stay in place so you can read them. The report's "Undo with:" line (`git checkout .`, plus `git clean` for files the run created, with paths relative to the app folder) runs inside the app folder and undoes everything the run changed, the steps that passed included, because Booster commits nothing between steps; commit after each passed step to keep them.
 
 The usual loop:
 
@@ -3578,7 +3605,7 @@ The stopped hop is neither redone nor skipped: its gate runs again, and the run 
 
 A dry run and `--skip-gate` never re-gate. The record of a rerun whose re-gate went red keeps the hop's name (`regate` in `booster-hop.json`), so the run after it re-gates again.
 
-If you would rather throw the failed hop away, `git checkout .`, fix the cause, and run again. To get the hop's edits and keep working in the same tree, pass `--allow-dirty`.
+If you would rather throw the run away, `git checkout .` (it takes back every step of the run, not only the failed one), fix the cause, and run again. To get the hop's edits and keep working in the same tree, pass `--allow-dirty`.
 
 If you keep a stopped PHP hop's edits, the app has already moved: that hop raised `php` in `composer.json`. So run again without `--from-php` (or with the PHP the stopped hop landed on), not with the PHP you started from. Booster then starts where the app is, and the baseline on that PHP checks the stopped hop's work before the next hop. A rerun from the old PHP cannot install, and Booster says so: its baseline names the `php` constraint and the rerun to type. When the baseline's install fails because a locked package refuses that PHP, it names the `composer update -W` to run instead.
 
@@ -3677,7 +3704,7 @@ Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today 
 
 The replay gate on its own: init drafts booster-replay.json, record saves how the app answers now, check fails when an answer changed.
 
-Usage: `booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recording RECORDING] [--php PHP] [--image IMAGE] [--out OUT] [--no-install] [--serve-changed] [--force] [--] <action>`
+Usage: `booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recording RECORDING] [--php PHP] [--image IMAGE] [--out OUT] [--no-install] [--allow-failing-baseline] [--serve-changed] [--force] [--] <action>`
 
 | Argument | Required | Meaning |
 | --- | --- | --- |
@@ -3693,6 +3720,7 @@ Usage: `booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recordin
 | `--image=VALUE` | Serve the app in this Docker image instead of booster-target, in the same three forms as run --image. |  |
 | `--out=VALUE` | Folder for the transcripts (default: a new booster-replay-- folder in the system temp folder). |  |
 | `--no-install` | Do not run composer install first; use the vendor/ the app already has. |  |
+| `--allow-failing-baseline` | record only: keep a baseline whose every answer is an error (a PHP fatal, a 5xx, one error page for every path), with a warning; by default such a baseline is refused. |  |
 | `--serve-changed` | check only: the hop changed how the app is served (docroot, front controller, setup); compare answers anyway, as long as the requests are the same. |  |
 | `--force` | init only: overwrite an existing request file. |  |
 | `--silent` | Do not output any message |  |
