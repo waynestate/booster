@@ -291,6 +291,12 @@ move safe, so the strangler refuses every move without a usable one: no `booster
 items, or a baseline whose every answer is the same redirect or an error. The mount step may still run, with the
 usual warning. Its rewrite of the request file turns on what follows.
 
+Step 0, which moves the legacy half's sign-in onto SESAME before the mount, changes one kind of answer on purpose:
+the sign-in hand-off now sends the browser to CAS. Its check accepts exactly that on the request paths Step 0 names,
+when the baseline answered a redirect, the answer now is a redirect to sign-in, and nothing but the `Location`
+changed; the report lists each one (`02 requests: GET /auth/login: Location <old> -> <CAS login>`). Every other
+request is compared as always, and a new cookie on a listed path is still a difference.
+
 ### Which half answered
 
 While a replay runs, the container sets `BOOSTER_REPLAY=1`, and the mounted app's dispatcher answers every request

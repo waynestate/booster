@@ -173,8 +173,17 @@ final class ReplayGate
      * With $serveChanged, a hop that changed how the app is served may still
      * pass when the answers match; the change is named in the transcript and
      * the report.
+     *
+     * $signInChanges lists the request paths whose sign-in hand-off a step
+     * changes on purpose (the strangler's Step 0 moving the legacy half onto
+     * SESAME, SignInResult->replayChanges): a difference there is accepted
+     * when the baseline answered a redirect and the answer now is a redirect
+     * to sign-in, and nothing but the Location changed. Each accepted one is
+     * named in the report; every other request is compared as always.
+     *
+     * @param list<string> $signInChanges request paths, as the request file writes them (or with their query)
      */
-    public function check(string $php, string $label, bool $install = false, bool $serveChanged = false): ReplayOutcome
+    public function check(string $php, string $label, bool $install = false, bool $serveChanged = false, array $signInChanges = []): ReplayOutcome
     {
         $recording = $this->recording ?? throw new ToolError('There is no replay baseline to compare against: record one first.');
         $name = basename($this->file->path);
@@ -200,9 +209,13 @@ final class ReplayGate
         $errorLine = $errors === null ? [] : [sprintf('PHP logged %d distinct message%s while serving (%s).', count($run->phpErrors), count($run->phpErrors) === 1 ? '' : 's', $errors)];
         $halves = self::halves($this->file->requests, $run->answers);
         $halfLine = self::halfLine($halves);
+        [$differences, $accepted] = $this->acceptSignInChanges($differences, $recording->answers, $run->answers, $signInChanges);
         if ($differences === []) {
             return new ReplayOutcome(ReplayOutcome::PASSED, $php, [
-                sprintf('Replay passed: all %d answer%s match the baseline from PHP %s.', $total, $total === 1 ? '' : 's', $recording->php),
+                $accepted === []
+                    ? sprintf('Replay passed: all %d answer%s match the baseline from PHP %s.', $total, $total === 1 ? '' : 's', $recording->php)
+                    : sprintf('Replay passed: %d of %d answers match the baseline from PHP %s, and %d changed only where this step moves the sign-in on purpose:', $total - count($accepted), $total, $recording->php, count($accepted)),
+                ...self::indent($accepted),
                 ...($serveLine === null ? [] : [$serveLine]),
                 ...($halfLine === null ? [] : [$halfLine]),
                 ...$errorLine,
@@ -224,11 +237,56 @@ final class ReplayGate
             ...self::indent($diff),
             ...($others === [] ? [] : ['Also different: request' . (count($others) === 1 ? ' ' : 's ') . implode(', ', $others) . (count($differences) > 13 ? ', ...' : '') . '.']),
             ...self::signInLines($this->file, $differences, $recording->answers, $run->answers),
+            ...($accepted === [] ? [] : ['Changed only where this step moves the sign-in on purpose (accepted):', ...self::indent($accepted)]),
             ...($halfLine === null ? [] : [$halfLine]),
             sprintf('Every difference: diff %s %s', $baselineTranscript, $transcript),
             'A value that changes on every request (a token, a time) is not a real difference: hide it with a normalizer in ' . $name . '.',
             ...$errorLine,
         ], $name, $this->outDir, $transcript, $total, count($differences), $halves);
+    }
+
+    /**
+     * Splits the differences into the ones that stay and the sign-in
+     * hand-offs this step changed on purpose (see check()). A listed request
+     * is accepted only when the baseline answered a 3xx, the answer now is a
+     * redirect to sign-in, and the two views are the same once the Location
+     * line is left out.
+     *
+     * @param list<array{request: ReplayRequest, diff: list<string>}> $differences
+     * @param list<ReplayAnswer>                                       $baseline
+     * @param list<ReplayAnswer>                                       $replay
+     * @param list<string>                                             $paths
+     *
+     * @return array{list<array{request: ReplayRequest, diff: list<string>}>, list<string>}
+     */
+    private function acceptSignInChanges(array $differences, array $baseline, array $replay, array $paths): array
+    {
+        if ($paths === [] || $differences === []) {
+            return [$differences, []];
+        }
+        $index = [];
+        foreach ($this->file->requests as $i => $request) {
+            $index[$request->number] = $i;
+        }
+        $withoutLocation = fn(ReplayAnswer $a): array => array_values(array_filter(ReplayComparison::view($a, $this->file), static fn(string $l): bool => !str_starts_with($l, 'location: ')));
+        $kept = [];
+        $accepted = [];
+        foreach ($differences as $difference) {
+            $request = $difference['request'];
+            $i = $index[$request->number] ?? null;
+            $before = $i === null ? null : ($baseline[$i] ?? null);
+            $after = $i === null ? null : ($replay[$i] ?? null);
+            $listed = in_array($request->path, $paths, true) || in_array($request->target(), $paths, true);
+            if ($listed && $before !== null && $after !== null && $before->status >= 300 && $before->status <= 399
+                && self::isSignInRedirect($after) && $withoutLocation($before) === $withoutLocation($after)) {
+                $clean = static fn(?string $l): string => (string) preg_replace('/[\x00-\x1F\x7F]/', '', str_replace(ReplayComparison::APP_ORIGIN, '<app>', (string) $l));
+                $accepted[] = sprintf('%s: Location %s -> %s', $request->label(), $clean($before->header('Location')), $clean($after->header('Location')));
+                continue;
+            }
+            $kept[] = $difference;
+        }
+
+        return [$kept, $accepted];
     }
 
     /**

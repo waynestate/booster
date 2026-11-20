@@ -216,6 +216,28 @@ final class ReplayStranglerTest extends TestCase
         self::assertStringContainsString('compare.silent_sign_in', $text);
     }
 
+    public function test_step_0_may_move_a_listed_sign_in_hand_off_to_cas_and_everything_else_is_compared(): void
+    {
+        $file = ReplayFile::fromArray(['requests' => [['path' => '/'], ['path' => '/auth/login'], ['path' => '/reports']]]);
+        $baseline = [[200, 'home'], [302, '', [['Location', 'https://login.wayne.edu/?need_validuser=1']]], [302, '', [['Location', 'https://login.wayne.edu/?need_validuser=1']]]];
+        $cas = [['Location', 'https://cas.replay.invalid/cas/login?service=http%3A%2F%2F127.0.0.1%3A8765%2Fauth%2Flogin']];
+        $gate = $this->gate([$baseline, [[200, 'home'], [302, '', $cas], [302, '', $cas]], [[200, 'home'], [302, '', $cas], [302, '', [...$cas, ['Set-Cookie', 'PHPSESSID=x; path=/']]]], [[200, 'home'], [302, '', $cas], [302, '', $cas]]], $file);
+        $gate->record('8.5');
+
+        $both = $gate->check('8.5', 'step-0', signInChanges: ['/auth/login', '/reports']);
+        self::assertSame(ReplayOutcome::PASSED, $both->status, implode("\n", $both->lines));
+        self::assertSame('Replay passed: 1 of 3 answers match the baseline from PHP 8.5, and 2 changed only where this step moves the sign-in on purpose:', $both->lines[0]);
+        self::assertSame('  02 requests: GET /auth/login: Location https://login.wayne.edu/?need_validuser=1 -> https://cas.replay.invalid/cas/login?service=http%3A%2F%2F127.0.0.1%3A8765%2Fauth%2Flogin', $both->lines[1]);
+
+        $cookie = $gate->check('8.5', 'step-0b', signInChanges: ['/auth/login', '/reports']);
+        self::assertSame(ReplayOutcome::DIFFERS, $cookie->status, 'a new cookie is more than the Location');
+        self::assertStringContainsString('1 of 3 answers differ', $cookie->lines[0]);
+        self::assertContains('Changed only where this step moves the sign-in on purpose (accepted):', $cookie->lines);
+
+        $unlisted = $gate->check('8.5', 'step-0c', signInChanges: ['/auth/login']);
+        self::assertSame(ReplayOutcome::DIFFERS, $unlisted->status, 'a path the step did not list is compared as always');
+    }
+
     public function test_sign_in_redirects_are_told_from_other_redirects(): void
     {
         foreach (['/_laravel/login', '/users/login?redirect=%2F', '/auth/login', 'https://cas.example.edu/cas/login?service=x', '/sign-in', '/login'] as $to) {
