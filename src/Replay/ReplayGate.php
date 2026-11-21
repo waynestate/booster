@@ -185,7 +185,7 @@ final class ReplayGate
      * SESAME" instead of failing. Each accepted one is named in the report;
      * every other request is compared as always.
      *
-     * @param list<string> $signInChanges request paths, as the request file writes them (or with their query)
+     * @param list<string> $signInChanges request paths, as the request file writes them (or with their query); "*" for every path
      */
     public function check(string $php, string $label, bool $install = false, bool $serveChanged = false, array $signInChanges = []): ReplayOutcome
     {
@@ -307,7 +307,8 @@ final class ReplayGate
             return $lines;
         };
         $clean = static fn(?string $l): string => (string) preg_replace('/[\x00-\x1F\x7F]/', '', str_replace(ReplayComparison::APP_ORIGIN, '<app>', (string) $l));
-        $listedPath = static fn(ReplayRequest $r): bool => in_array($r->path, $paths, true) || in_array($r->target(), $paths, true);
+        // "*" is every path: a Slim app whose middleware answers every guest page with its login page (testeval).
+        $listedPath = static fn(ReplayRequest $r): bool => in_array('*', $paths, true) || in_array($r->path, $paths, true) || in_array($r->target(), $paths, true);
         $formLines = ['status: ', 'content-type: ', 'location: '];
         $kept = [];
         $accepted = [];

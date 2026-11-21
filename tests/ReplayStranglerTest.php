@@ -250,7 +250,7 @@ final class ReplayStranglerTest extends TestCase
         $moved = [[200, 'home'], [302, '', [$cas, $session]], [302, '', [$cas, $session]], [200, 'list']];
         $cookie = [[200, 'home'], [302, '', [$cas]], [302, '', [$cas, $session]], [200, 'list']];
         $lost = [[200, 'home'], [302, '', [$cas, $session]], [405, 'no', [$session]], [302, '', [$cas]]];
-        $gate = $this->gate([$baseline, $moved, $cookie, $lost, $moved], $file);
+        $gate = $this->gate([$baseline, $moved, $cookie, $lost, $moved, $moved], $file);
         $gate->record('8.5');
 
         $passed = $gate->check('8.5', 'step-0', signInChanges: ['/users/login']);
@@ -274,6 +274,10 @@ final class ReplayStranglerTest extends TestCase
         $unlisted = $gate->check('8.5', 'step-0d', signInChanges: ['/auth/login']);
         self::assertSame(ReplayOutcome::DIFFERS, $unlisted->status, 'a form page the step did not list is compared as always');
         self::assertStringContainsString('2 of 4 answers differ', $unlisted->lines[0]);
+
+        $every = $gate->check('8.5', 'step-0e', signInChanges: ['*']);
+        self::assertSame(ReplayOutcome::PASSED, $every->status, 'a step that hands every guest page to sign-in lists "*"');
+        self::assertSame($passed->lines[0], $every->lines[0]);
     }
 
     public function test_only_requests_that_posted_the_moved_form_are_reported_moved(): void
