@@ -19,7 +19,7 @@
 #
 # Configuration is environment variables, all optional, or the same names in ./.env.squire in the app root. On Citadel
 # add that file as a configuration file (the configuration-files step after the wizard; the wizard has no environment
-# field) and keep it out of git. A variable already in the environment wins over the file. See .env.squire.example.
+# field) and keep it out of git. A variable already in the environment wins over the file. Every option is below.
 #   SQUIRE_APP_DIR=                  app root (default: the parent of this script's directory)
 #   SQUIRE_FRAMEWORK=auto            auto | laravel | raw
 #   SQUIRE_ALLOW_ROOT=0              1 allows running as root (S19)

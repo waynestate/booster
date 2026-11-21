@@ -50,7 +50,7 @@ under `Pre-pass fixes:`.
 When the run raised the app's PHP floor, its report ends with a list of the other places that still name an older
 PHP, each with its file and line: PHP versions in the CI matrix (Preflight's `php_versions`, a GitHub workflow's
 `php:` matrix, a `PHP_VERSIONS` list) and PHP images (`php:8.3-cli` in a CI job, `citadel/php-apache:8.4r5` in the
-Squire kit's `.env.squire.example` or `docker-compose.squire.yml`, the `image` in Parity's `parity.json`, a `FROM`
+app's Squire kit, the `image` in Parity's `parity.json`, a `FROM`
 line in the app's own `Dockerfile`, an `image:` in its `docker-compose.yml` or `compose.yaml`), and Laravel Sail's
 runtime (`vendor/laravel/sail/runtimes/8.3` and `sail-8.3/app` in a Sail app's `docker-compose.yml`). Booster never
 edits CI or deploy files, so it lists them instead: a matrix entry below the floor fails on the first push, because

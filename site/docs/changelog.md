@@ -13,6 +13,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 ## \[Unreleased\] [#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
 - Changed: the Slim 1 bridge that the vendored-to-composer hop writes defaults to debug off, so a migrated app no longer shows Slim's debug pages unless its settings turn them on. Bridges written by earlier versions are left as they are.
+- Removed: Squire's local-running kit files (docker-compose.squire.yml, haproxy.cfg, parity scripts, env example; D-095). Parity runs the app locally: `parity up` in `deploy/`.
 
 ## \[1.21.0\] - 2026-11-20 [#](https://booster.apps.wayne.edu/docs/changelog.html#1-21-0-2026-11-20)
 
