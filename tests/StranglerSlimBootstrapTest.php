@@ -132,22 +132,68 @@ final class StranglerSlimBootstrapTest extends TestCase
         self::assertStringContainsString("Route::match(['GET'], 'staff', ", $web);
     }
 
-    public function testEveryUnitOfAnAppTheAdapterCannotRunIsSlimHostedWithItsReasons(): void
+    /** @return list<string> the SLIM-HOSTED: lines of a move */
+    private static function hostedLines(MoveResult $result): array
+    {
+        return array_values(array_filter($result->manual, static fn(string $m): bool => str_starts_with($m, SlimMover::HOSTED_PREFIX)));
+    }
+
+    public function testAnAppBuiltByItsOwnClassRunsAPlainUnitBehindTheAdapterInItsOwnSetup(): void
     {
         $login = $this->move('FORM /login');
+
+        self::assertSame([], self::hostedLines($login), 'the app class, its Pimple container and its CSRF middleware no longer force hosting');
+        self::assertSame([], SlimMover::hostedUnits($this->app));
+        $web = $this->read('routes/web.php');
+        self::assertStringContainsString("->defaults('booster_slim', 'class:App\\\\Http\\\\Controllers\\\\Legacy\\\\App\\\\Controller\\\\Login@Login')", $web);
+        self::assertStringContainsString("->defaults('booster_slim', 'class:App\\\\Http\\\\Controllers\\\\Legacy\\\\App\\\\Controller\\\\Login@PostLogin')", $web);
+        self::assertStringNotContainsString("'bootstrap'", $web);
+        $manifest = require $this->app . '/' . self::LEGACY . 'booster-slim.php';
+        self::assertSame('app', $manifest['container']);
+        self::assertSame(self::LEGACY . 'boot/public/index.php', $manifest['hosted']['front'], 'the adapter runs the copied setup');
+        $routes = $this->read(self::LEGACY . 'routes/config/routes.php');
+        self::assertStringContainsString("\$booster_app->get('/[login[/]]', ", $routes, 'the setup registers the moved route, so its routing decides');
+        self::assertStringContainsString("\$booster_app->post('/[login[/]]', ", $routes);
+        self::assertStringContainsString('recording every $app->add() middleware, then answers with the moved handler at their center (Slim never dispatches)', implode("\n", $login->manual));
+        self::assertStringContainsString('reading and writing the legacy session token', implode("\n", $login->manual));
+        foreach (['LegacyDispatch.php', 'LegacyDispatched.php'] as $support) {
+            self::assertFileExists($this->app . '/' . self::LEGACY . 'Support/' . $support);
+        }
+    }
+
+    public function testARoleCheckedUnitIsAnsweredOnlyWhileItsCheckHoldsWithoutHosting(): void
+    {
+        $staff = $this->move('GET /staff');
+
+        self::assertSame([], self::hostedLines($staff));
+        self::assertStringContainsString("legacy/config/routes.php:10 GET /staff/ is answered only while `in_array('staff', \$app->getContainer()['user']->roles)` holds", implode("\n", $staff->manual));
+        self::assertStringContainsString("if (in_array('staff', \$app->getContainer()['user']->roles)) {", $this->read(self::LEGACY . 'routes/config/routes.php'));
+        self::assertStringContainsString("->defaults('booster_slim', 'class:", $this->read('routes/web.php'));
+    }
+
+    public function testRouteMiddlewareStillHostsTheUnitWithItsReason(): void
+    {
+        $this->move('FORM /login');
         $logout = $this->move('GET /logout');
 
-        $hosted = static fn(array $manual): array => array_values(array_filter($manual, static fn(string $m): bool => str_starts_with($m, SlimMover::HOSTED_PREFIX)));
-        [$loginLine] = $hosted($login->manual);
-        self::assertStringStartsWith('SLIM-HOSTED: FORM /login runs through Slim inside Laravel because of the container the front controller builds, which the PSR-7 adapter cannot rebuild (it rebuilds PHP-DI definitions or none), at legacy/public/index.php:1; ', $loginLine);
-        self::assertStringContainsString('the legacy CSRF check App\Middleware\CheckCsrf at legacy/config/middleware.php:5', $loginLine);
-        self::assertStringEndsWith('; port the check to Laravel middleware before finish', $loginLine);
-        self::assertStringNotContainsString('role if', $loginLine);
+        [$line] = self::hostedLines($logout);
+        self::assertSame('SLIM-HOSTED: GET /logout runs through Slim inside Laravel because of middleware new \App\Middleware\NoCache() at legacy/app/Controller/Login.php:15; port the check to Laravel middleware before finish', $line);
+        self::assertSame(['GET /logout'], SlimMover::hostedUnits($this->app));
+        $routes = $this->read(self::LEGACY . 'routes/config/routes.php');
+        self::assertStringContainsString("\$booster_app->get('/[login[/]]', ", $routes, 'the earlier unit stays registered');
+        self::assertStringContainsString("\$booster_app->get('/logout/', ", $routes);
+    }
 
-        [$logoutLine] = $hosted($logout->manual);
-        self::assertStringContainsString("role if `\$app->getContainer()['user']->isAuth()` at legacy/app/Controller/Login.php:14", $logoutLine);
-        self::assertStringContainsString('middleware new \App\Middleware\NoCache() at legacy/app/Controller/Login.php:15', $logoutLine);
-        self::assertSame(['FORM /login', 'GET /logout'], SlimMover::hostedUnits($this->app));
+    public function testAnAppThatBuildsSlimAppWithNewIsSlimHostedWithTheSite(): void
+    {
+        $file = $this->app . '/legacy/app/App.php';
+        $code = (string) file_get_contents($file);
+        file_put_contents($file, str_replace('\Slim\Factory\AppFactory::create(null, new \Pimple\Psr11\Container($container))', 'new \Slim\App(new \Slim\Psr7\Factory\ResponseFactory(), new \Pimple\Psr11\Container($container))', $code));
+
+        [$line] = self::hostedLines($this->move('FORM /login'));
+        self::assertStringContainsString('the app builds its Slim app with new \Slim\App; Booster runs moved handlers in the app\'s own middleware only when the Slim app comes from AppFactory::create', $line);
+        self::assertStringContainsString('at legacy/app/App.php:12', $line);
+        self::assertStringContainsString('the legacy CSRF check App\Middleware\CheckCsrf at legacy/config/middleware.php:5', $line);
     }
 
     public function testComposerAddsKeepTheLegacyConstraintWidenSlimAndSkipAConflict(): void

@@ -43,7 +43,7 @@ final class SlimMover implements AddsComposerPackages, Mover
     public const HOSTED_PREFIX = 'SLIM-HOSTED:';
 
     /** The runtime files every Slim move needs, from resources/strangler/slim/. */
-    private const SUPPORT = ['SlimAdapter.php', 'LegacyClosure.php', 'LegacyContainer.php', 'CapturingEmitter.php', 'LegacyResponse.php', 'LegacyTwigExtension.php'];
+    private const SUPPORT = ['SlimAdapter.php', 'LegacyClosure.php', 'LegacyContainer.php', 'CapturingEmitter.php', 'LegacyResponse.php', 'LegacyTwigExtension.php', 'LegacyDispatch.php', 'LegacyDispatched.php'];
 
     /** Paths the Laravel half always owns (section 10.6); a legacy route there cannot move. */
     private const LARAVEL_OWNED = ['_laravel', 'build', 'up'];
@@ -107,9 +107,13 @@ final class SlimMover implements AddsComposerPackages, Mover
         // or an app the adapter cannot run (its container or CSRF check).
         $hostReasons = isset($scan['sources']['public/index.php']) ? $this->hostReasons($routes, $front, $csrf, $scan['sources']) : [];
         $bootstrap = $hostReasons !== [];
-        $movedIds = $bootstrap ? self::hostedIds($webCode, $unit->id) : [];
+        $inApp = $front['container'] === 'app';
+        // In an app that builds its own container every moved unit is
+        // registered in the copied setup (its routing and role checks
+        // decide what reaches the handler); otherwise only the hosted ones.
+        $movedIds = $inApp ? self::idsInWeb($webCode, $unit->id) : ($bootstrap ? self::hostedIds($webCode, $unit->id) : []);
         foreach ($routes as $route) {
-            $refusals = array_merge($refusals, $this->routeRefusals($route, $appRoot, $bootstrap));
+            $refusals = array_merge($refusals, $this->routeRefusals($route, $appRoot, $bootstrap || $inApp));
         }
         $refusals = array_merge($refusals, $this->shadowRefusals($unit, $scan, $ledger));
         if ($front['refusal'] !== null && !$bootstrap) {
@@ -120,8 +124,8 @@ final class SlimMover implements AddsComposerPackages, Mover
         }
 
         $copier = new SlimCodeCopier($appRoot, $scan['sources']);
-        if ($bootstrap) {
-            return $this->moveBootstrap($unit, $appRoot, $scan, $routes, $movedIds, $copier, $csrf === null ? null : $csrf[0], $webCode, $web, $hostReasons);
+        if ($bootstrap || $inApp) {
+            return $this->moveBootstrap($unit, $appRoot, $scan, $routes, $movedIds, $copier, $csrf === null ? null : $csrf[0], $webCode, $web, $hostReasons, $inApp);
         }
         $manual = [];
         $blocks = [];
@@ -190,19 +194,39 @@ final class SlimMover implements AddsComposerPackages, Mover
      * @param list<SlimRoute> $routes
      * @param list<string>    $movedIds
      * @param list<string>    $hostReasons why the unit is Slim-hosted, each with its file and line
+     * @param bool            $inApp       the app builds its own container: an unhosted unit's handler runs in the copied setup's middleware (LegacyDispatch)
      */
-    private function moveBootstrap(Unit $unit, string $appRoot, array $scan, array $routes, array $movedIds, SlimCodeCopier $copier, ?string $csrf, string $webCode, string $web, array $hostReasons): MoveResult
+    private function moveBootstrap(Unit $unit, string $appRoot, array $scan, array $routes, array $movedIds, SlimCodeCopier $copier, ?string $csrf, string $webCode, string $web, array $hostReasons, bool $inApp = false): MoveResult
     {
         $manual = [];
+        $hosted = $hostReasons !== [];
         $scripts = $this->bootstrapScripts($copier, $scan, $movedIds);
         $blocks = [];
         foreach ($routes as $route) {
-            $blocks[] = $this->routeLine($route, 'bootstrap');
+            $spec = 'bootstrap';
+            if (!$hosted) {
+                $spec = $this->handler($route, $copier, $scan['sources'], $appRoot);
+                if ($spec === null) {
+                    $copier->refusals[] = ['file' => 'legacy/' . $route->file, 'line' => $route->handlerLine, 'reason' => 'the handler ' . trim($route->handlerText) . ' is not a class in the app\'s own code'];
+
+                    continue;
+                }
+                foreach ($route->links as [$file, $call, $from]) {
+                    $src = $scan['sources'][$file] ?? null;
+                    if ($src === null) {
+                        continue;
+                    }
+                    foreach ($src->guardSitesAt($call, $from) as $site) {
+                        $manual[] = 'legacy/' . $file . ':' . $src->t[$site][2] . ' ' . implode('|', $route->methods) . ' ' . $route->written() . ' is answered only while `' . self::condition($src, $site) . '` holds: the copied setup registers the route inside the same check, so otherwise the legacy not-found answer comes, after the app\'s middleware, as in legacy; port the check to Laravel middleware before finish';
+                    }
+                }
+            }
+            $blocks[] = $this->routeLine($route, $spec);
             if (array_diff($route->methods, ['GET', 'HEAD', 'OPTIONS']) === []) {
                 continue;
             }
             $manual[] = $csrf !== null
-                ? 'legacy/' . $route->file . ':' . $route->line . ' ' . implode('|', $route->methods) . ' ' . $route->written() . ' still has the legacy CSRF check (' . $csrf . '): it runs in the copied pipeline, and Laravel\'s PreventRequestForgery stays off on the route because the legacy form posts the legacy token'
+                ? 'legacy/' . $route->file . ':' . $route->line . ' ' . implode('|', $route->methods) . ' ' . $route->written() . ' still has the legacy CSRF check (' . $csrf . '): it runs in the ' . ($hosted ? 'copied pipeline' : 'legacy app\'s middleware around the moved handler, reading and writing the legacy session token') . ', and Laravel\'s PreventRequestForgery stays off on the route because the legacy form posts the legacy token'
                 : 'legacy/' . $route->file . ':' . $route->line . ' ' . implode('|', $route->methods) . ' ' . $route->written() . ' had no CSRF check in Slim and has none in Laravel either (the route skips PreventRequestForgery so the legacy form still posts); add one when its form is ported';
         }
         if ($copier->refusals !== []) {
@@ -222,6 +246,9 @@ final class SlimMover implements AddsComposerPackages, Mover
             'csrf' => $csrf,
         ];
         $manifest['twig'] = self::twigManifest($scan);
+        if ($inApp) {
+            $manifest['container'] = 'app';
+        }
         $generated = $scripts + [self::MANIFEST => "<?php\n\n// Written by Booster's strangler (slim-to-laravel): how the moved Slim handlers run. App-owned.\n\nreturn " . self::export($manifest) . ";\n"];
         foreach ($generated as $relative => $code) {
             $file = $appRoot . '/' . $relative;
@@ -245,8 +272,12 @@ final class SlimMover implements AddsComposerPackages, Mover
         if ($this->requirePackages($appRoot, $copier, $front, $manual)) {
             $changed[] = 'composer.json';
         }
-        $manual[] = self::HOSTED_PREFIX . ' ' . $unit->id . ' runs through Slim inside Laravel because of ' . implode('; ', $hostReasons) . '; port the check to Laravel middleware before finish';
-        $manual[] = 'the slim-hosted routes run in a copy of legacy/public/index.php and what it loads (' . SlimCodeCopier::BOOT . '); its routes script registers only the moved routes, inside the same role checks and with the same middleware, so a guest gets what legacy answers';
+        if ($hosted) {
+            $manual[] = self::HOSTED_PREFIX . ' ' . $unit->id . ' runs through Slim inside Laravel because of ' . implode('; ', $hostReasons) . '; port the check to Laravel middleware before finish';
+            $manual[] = 'the slim-hosted routes run in a copy of legacy/public/index.php and what it loads (' . SlimCodeCopier::BOOT . '); its routes script registers only the moved routes, inside the same role checks and with the same middleware, so a guest gets what legacy answers';
+        } else {
+            $manual[] = $unit->id . ' runs its handler behind the PSR-7 adapter inside the legacy app\'s own setup and middleware: the adapter runs a copy of legacy/public/index.php and what it loads (' . SlimCodeCopier::BOOT . ') up to the app\'s run(), recording every $app->add() middleware, then answers with the moved handler at their center (Slim never dispatches); port each app middleware to Laravel middleware before finish';
+        }
         $manual = array_merge($manual, $copier->manual);
         sort($changed);
 
@@ -333,6 +364,18 @@ final class SlimMover implements AddsComposerPackages, Mover
     }
 
     /**
+     * Every unit id routes/web.php already holds, and this one.
+     *
+     * @return list<string>
+     */
+    private static function idsInWeb(string $webCode, string $unitId): array
+    {
+        preg_match_all('#^// booster:strangler (.+?) from #m', $webCode, $m);
+
+        return array_values(array_unique(array_merge($m[1], [$unitId])));
+    }
+
+    /**
      * The units routes/web.php sends through the copied front controller
      * (each block's routes carry `->defaults('booster_slim', 'bootstrap')`).
      *
@@ -381,17 +424,21 @@ final class SlimMover implements AddsComposerPackages, Mover
     private function hostReasons(array $routes, array $front, ?array $csrf, array $sources): array
     {
         $out = [];
+        // An app that builds its own container runs its setup and middleware
+        // (CSRF check included) around the moved handler, and its role
+        // checks decide whether the route is registered, as in legacy.
+        $app = ($front['container'] ?? 'none') === 'app';
         $refusal = $front['refusal'] ?? null;
         if (is_array($refusal)) {
-            $out[] = 'the container the front controller builds, which the PSR-7 adapter cannot rebuild (it rebuilds PHP-DI definitions or none), at ' . $refusal['file'] . ':' . $refusal['line'];
-        } elseif (!in_array($front['container'] ?? 'none', ['php-di', 'none'], true)) {
+            $out[] = 'the container the front controller builds, which the PSR-7 adapter cannot rebuild (' . $refusal['reason'] . '), at ' . $refusal['file'] . ':' . $refusal['line'];
+        } elseif (!in_array($front['container'] ?? 'none', ['php-di', 'none', 'app'], true)) {
             $out[] = 'the legacy container (' . $front['container'] . ') at legacy/public/index.php:1';
         }
-        if ($csrf !== null) {
+        if ($csrf !== null && !$app) {
             $out[] = 'the legacy CSRF check ' . $csrf[0] . ' at ' . $csrf[1];
         }
         foreach ($routes as $route) {
-            foreach ($route->links as [$file, $call, $from]) {
+            foreach ($app ? [] : $route->links as [$file, $call, $from]) {
                 $src = $sources[$file] ?? null;
                 if ($src === null) {
                     continue;
@@ -663,7 +710,15 @@ final class SlimMover implements AddsComposerPackages, Mover
                 $out['refusal'] = ['file' => 'legacy/' . $path, 'line' => self::lineOf($code, 'addDefinitions'), 'reason' => 'the front controller adds PHP-DI definitions inline; Booster rebuilds the container only from definition files the front controller requires'];
             }
         } elseif (preg_match('/setContainer\s*\(|new\s+\\\\?Pimple|new\s+\\\\?Slim\\\\Container|LegacyApp::create|new\s+\\\\?Slim\\\\App\s*\(/', $code) === 1 || !str_contains($code, 'AppFactory::create')) {
-            $out['refusal'] = ['file' => 'legacy/' . $path, 'line' => 1, 'reason' => 'the app builds its Slim app or container in a shape Booster does not rebuild in Laravel yet (it rebuilds PHP-DI definition files, or no container); bind the services in app/Providers/LegacyServiceProvider.php and port the unit, then run the --hand move'];
+            // Built by the app's own code (an app class, Pimple, the Slim 3
+            // to 4 hop): the adapter runs that setup and records its
+            // middleware, when the Slim app comes from AppFactory::create.
+            $out['refusal'] = self::appBuildRefusal($path, $code, $sources);
+            if ($out['refusal'] === null) {
+                $out['container'] = 'app';
+
+                return $out;
+            }
         }
         $out['body_parsing'] = str_contains($code, 'addBodyParsingMiddleware');
         if (preg_match('/OutputBufferingMiddleware\s*\([^;]*PREPEND/', $all) === 1) {
@@ -689,6 +744,55 @@ final class SlimMover implements AddsComposerPackages, Mover
         }
 
         return $out;
+    }
+
+    /**
+     * Why the adapter cannot run an app that builds its own Slim app and
+     * container, or null when it can: LegacyDispatch records the app's
+     * middleware by handing AppFactory::create its middleware dispatcher, so
+     * the app must build its Slim app there and nowhere else, and the front
+     * controller must run it. Whatever else the setup does (sessions, role
+     * checks, output, exit) it does once per request, as in legacy.
+     *
+     * @param array<string, SlimSource> $sources
+     *
+     * @return array{file: string, line: int, reason: string}|null
+     */
+    private static function appBuildRefusal(string $front, string $frontCode, array $sources): ?array
+    {
+        $created = false;
+        foreach ($sources as $path => $src) {
+            if (str_starts_with($path, 'vendor/')) {
+                continue;
+            }
+            $names = [T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED];
+            foreach ($src->t as $i => [$id, $text, $line]) {
+                $next = $src->next($i);
+                if ($next === null) {
+                    continue;
+                }
+                $built = null;
+                if ($id === T_NEW && in_array($src->t[$next][0], $names, true) && strtolower($src->resolveClass($src->t[$next][1], $next)) === 'slim\\app') {
+                    $built = 'new \\Slim\\App';
+                } elseif (in_array($id, $names, true) && $src->t[$next][0] === T_DOUBLE_COLON && strtolower($src->resolveClass($text, $i)) === 'slim\\factory\\appfactory') {
+                    $call = $src->next($next);
+                    $method = $call === null ? '' : $src->t[$call][1];
+                    $created = $created || strtolower($method) === 'create';
+                    $built = in_array(strtolower($method), ['createfromcontainer', 'setmiddlewaredispatcher'], true) ? 'AppFactory::' . $method : null;
+                }
+                if ($built !== null) {
+                    return ['file' => 'legacy/' . $path, 'line' => $line, 'reason' => 'the app builds its Slim app with ' . $built . '; Booster runs moved handlers in the app\'s own middleware only when the Slim app comes from AppFactory::create, where it records that middleware; move the unit with --hand'];
+                }
+            }
+        }
+        if (!$created) {
+            return ['file' => 'legacy/' . $front, 'line' => 1, 'reason' => 'the app builds its Slim app or container in a shape Booster does not rebuild in Laravel yet (PHP-DI definition files, no container, or an app built through AppFactory::create); bind the services in app/Providers/LegacyServiceProvider.php and port the unit, then run the --hand move'];
+        }
+        if (preg_match('/->\s*(?:run|handle)\s*\(/', $frontCode) !== 1) {
+            return ['file' => 'legacy/' . $front, 'line' => 1, 'reason' => 'the front controller never calls run() or handle() on the app, so Booster cannot tell where its setup ends and its dispatch begins'];
+        }
+
+        return null;
     }
 
     /**
