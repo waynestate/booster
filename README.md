@@ -204,6 +204,11 @@ copies Rector, its `config/rector.php` and `docker/` out of the phar into a temp
 `docker build` are child processes that cannot be pointed at a `phar://` path; the temp directory is removed when the
 command exits.
 
+Booster checks once a day whether a newer stable release exists and, if so, prints one line to standard error after
+the command finishes, with the command that updates however you installed it (PHAR, source checkout, Composer global
+or project dependency). Set `WAYNE_NO_UPDATE_CHECK=1` to turn the check off; it is also skipped on CI and with
+`--quiet`.
+
 ## Quick start
 
 ```

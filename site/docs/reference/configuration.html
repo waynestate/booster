@@ -111,6 +111,18 @@ export BOOSTER_NPM_CACHE=~/.cache/booster-npm         # or a folder on your mach
 </code></pre>
 <p>The Node containers run as root, so on Linux a host folder fills with files root owns; a Docker volume keeps them out
 of your way.</p>
+<h2 id="update-notice">Update <span class="docs-heading-tail"><span>notice</span><a class="docs-heading-link" aria-label="Link to this section" href="#update-notice">#</a></span></h2>
+<p>Two variables steer the update notice, the one line Booster prints to standard error after a command when a newer
+stable release exists. They do not appear in the table above, which lists only Booster's own <code>BOOSTER_*</code> variables:</p>
+<ul>
+<li><code>WAYNE_NO_UPDATE_CHECK</code> set to <code>1</code> turns the check off entirely; any other value leaves it on.</li>
+<li><code>CI</code> set to anything other than empty, <code>0</code> or <code>false</code> (as CI systems set it) also turns it off, so pipelines see
+no extra line.</li>
+</ul>
+<p>The check reads Packagist at most once a day and caches its answer in your user cache folder
+(<code>~/.cache/waynestate/booster/update-check.json</code>, <code>$XDG_CACHE_HOME/waynestate/booster/</code> when set, or
+<code>%LOCALAPPDATA%\waynestate\booster\</code> on Windows); delete the file to force a fresh check. <code>--quiet</code> skips the line
+too. The <a href="../install.html">Install</a> page's &quot;Update notice&quot; section has the full behaviour.</p>
 <p><code>.env.example</code> holds the placeholders. Booster reads no secrets and talks to no Citadel host. Its own network calls
 only read: the dependency check asks Packagist (and any composer-type repository the app declares) about the app's
 direct dependencies, which <code>--no-package-check</code> turns off, and a plan for an app on <code>wayne-cas</code> with no <code>vendor/</code>
@@ -121,7 +133,7 @@ They are internal; do not set them.</p>
     </main>
     <nav class="docs-pager" aria-label="Pages"><a class="docs-pager__link" href="../../docs/reference/commands.html"><span class="docs-pager__dir">Previous</span><span class="docs-pager__title">Commands</span></a><a class="docs-pager__link docs-pager__link--next" href="../../docs/reference/hops.html"><span class="docs-pager__dir">Next</span><span class="docs-pager__title">Hops</span></a></nav>
   </div>
-  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#download-caches">Download caches</a></li></ul></nav>
+  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#download-caches">Download caches</a></li><li class="docs-toc__item"><a href="#update-notice">Update notice</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
   <span>Documents Booster <span data-docs-version>1.21.0</span></span>
