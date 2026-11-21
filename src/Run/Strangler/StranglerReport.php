@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Run\Strangler;
 
 use Waynestate\Booster\Strangler\Ledger;
+use Waynestate\Booster\Strangler\SlimMover;
 use Waynestate\Booster\Strangler\Unit;
 
 /**
  * The strangler's part of a run report (design section 6, "Report"), in
  * text and JSON: the units moved this run with their replay line, the units
  * left (hand ones marked), the refusals with file:line, the MANUAL checklist
- * grouped as in section 4, and the next command.
+ * grouped as in section 4, the Slim-hosted units (design 9.5) apart, and
+ * the next command.
  */
 final class StranglerReport
 {
@@ -45,6 +47,12 @@ final class StranglerReport
 
     public ?string $next = null;
 
+    /** @var list<string> the Slim-hosted units still in routes/web.php (SlimMover::hostedUnits) */
+    public array $slimHosted = [];
+
+    /** @var list<string> the SLIM-HOSTED: MANUAL lines, without the prefix */
+    public array $hostedNotes = [];
+
     public function __construct(
         public readonly string $phase,
         public readonly string $framework,
@@ -62,6 +70,14 @@ final class StranglerReport
     {
         foreach ($lines as $line) {
             $line = preg_replace('/^MANUAL:\s*/', '', $line) ?? $line;
+            if (str_starts_with($line, SlimMover::HOSTED_PREFIX)) {
+                $note = ltrim(substr($line, strlen(SlimMover::HOSTED_PREFIX)));
+                if (!in_array($note, $this->hostedNotes, true)) {
+                    $this->hostedNotes[] = $note;
+                }
+
+                continue;
+            }
             if (!in_array($line, $this->manual[$group] ?? [], true)) {
                 $this->manual[$group][] = $line;
             }
@@ -142,6 +158,32 @@ final class StranglerReport
         return $lines;
     }
 
+    /**
+     * The Slim-hosted section: the units that still run a copy of the
+     * legacy front controller inside their Laravel route, so they are still
+     * Slim, and why each one is. --finish refuses while any remain.
+     *
+     * @return list<string>
+     */
+    public function hostedLines(): array
+    {
+        if ($this->slimHosted === [] && $this->hostedNotes === []) {
+            return [];
+        }
+        $count = count($this->slimHosted);
+        $lines = [$count === 0
+            ? 'Slim-hosted: none left in routes/web.php.'
+            : sprintf('Slim-hosted: %d unit%s on Laravel still run%s through Slim inside the Laravel route; port each one\'s check to Laravel middleware before --finish.', $count, $count === 1 ? '' : 's', $count === 1 ? 's' : '')];
+        foreach ($this->slimHosted as $id) {
+            $lines[] = '  ' . $id;
+        }
+        foreach ($this->hostedNotes as $note) {
+            $lines[] = 'SLIM-HOSTED: ' . $note;
+        }
+
+        return $lines;
+    }
+
     /** @return list<string> the MANUAL checklist, grouped */
     public function manualLines(): array
     {
@@ -185,6 +227,7 @@ final class StranglerReport
             'failed' => $this->failed,
             'stop_signs' => $this->stopSigns,
             'manual' => $manual === [] ? new \stdClass() : $manual,
+            'slim_hosted' => ['count' => count($this->slimHosted), 'units' => $this->slimHosted, 'notes' => $this->hostedNotes],
             'next' => $this->next,
         ];
     }

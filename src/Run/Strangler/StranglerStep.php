@@ -13,6 +13,7 @@ use Waynestate\Booster\Run\StepResult;
 use Waynestate\Booster\Strangler\AddsComposerPackages;
 use Waynestate\Booster\Strangler\Ledger;
 use Waynestate\Booster\Strangler\MoveResult;
+use Waynestate\Booster\Strangler\SlimMover;
 use Waynestate\Booster\Strangler\Unit;
 use Waynestate\Booster\ToolError;
 
@@ -54,6 +55,9 @@ final class StranglerStep
         private readonly ?Closure $composerUpdate = null,
     ) {}
 
+    /** The app this run works on, so every report can list its Slim-hosted units. */
+    private ?string $appPath = null;
+
     /**
      * @param string|null $line        the framework line the app is on now (from detect)
      * @param string      $newestMajor the latest major of that framework Booster moves to
@@ -62,6 +66,7 @@ final class StranglerStep
     public function run(PlanStep $step, string $path, RunOptions $options, ?string $line, string $newestMajor, string $next): StepResult
     {
         $hop = $step->hop;
+        $this->appPath = $path;
         $framework = HopRegistry::stranglerFramework($hop->id) ?? throw new ToolError(sprintf('%s is not a strangler hop.', $hop->id));
         $ledger = Ledger::load($path);
         if ($ledger !== null && $ledger->framework !== $framework) {
@@ -444,6 +449,10 @@ final class StranglerStep
 
             return $this->refused($step, [sprintf('%d unit%s still answer%s from legacy (%s). Move them first; --finish deletes legacy/.', count($left), count($left) === 1 ? '' : 's', count($left) === 1 ? 's' : '', implode(', ', array_slice($left, 0, 12)) . (count($left) > 12 ? ', ...' : ''))], $report->withNext($next . ' --moves ' . count($left)));
         }
+        $hosted = $framework === 'slim' ? SlimMover::hostedUnits($path) : [];
+        if ($hosted !== []) {
+            return $this->refused($step, [sprintf('%d unit%s on Laravel still run%s through Slim inside the Laravel route (%s), and --finish deletes the legacy code %s. Port each one\'s check to Laravel middleware first (the SLIM-HOSTED: lines say what to port) and replace its route, then run --finish again.', count($hosted), count($hosted) === 1 ? '' : 's', count($hosted) === 1 ? 's' : '', implode(', ', array_slice($hosted, 0, 12)) . (count($hosted) > 12 ? ', ...' : ''), count($hosted) === 1 ? 'it runs' : 'they run')], $report);
+        }
         if ($options->dryRun) {
             return $this->result($step, StepResult::PREVIEWED, [], ['Would delete legacy/, the route table and the install hook, put back Laravel\'s stock public/index.php, move /login to Laravel, and gate it with the replay (--serve-changed).'], $report);
         }
@@ -557,7 +566,10 @@ final class StranglerStep
     private function result(PlanStep $step, string $status, array $files, array $messages, StranglerReport $report): StepResult
     {
         $report->status = $status;
-        $tail = $report->manualLines();
+        if ($report->framework === 'slim' && $this->appPath !== null) {
+            $report->slimHosted = SlimMover::hostedUnits($this->appPath);
+        }
+        $tail = [...$report->hostedLines(), ...$report->manualLines()];
         if ($report->next !== null && $status !== StepResult::ERROR && $status !== StepResult::GATE_FAILED) {
             $tail[] = 'Next: ' . $report->next;
         } elseif ($report->next !== null) {

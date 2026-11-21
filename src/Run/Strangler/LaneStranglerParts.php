@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Run\Strangler;
 
 use Waynestate\Booster\Replay\ReplayFile;
-use Waynestate\Booster\Strangler\AddsComposerPackages;
 use Waynestate\Booster\Strangler\CakeMover;
 use Waynestate\Booster\Strangler\CakeUnitSource;
 use Waynestate\Booster\Strangler\Mount;
@@ -103,25 +102,7 @@ final class LaneStranglerParts implements StranglerParts
             return new CakeMover();
         }
         if ($framework === 'slim') {
-            // SlimMover names its additions as lastComposerAdds(); the engine reads AddsComposerPackages.
-            return new class (new SlimMover()) implements Mover, AddsComposerPackages {
-                public function __construct(private readonly SlimMover $inner) {}
-
-                public function framework(): string
-                {
-                    return $this->inner->framework();
-                }
-
-                public function move(Unit $unit, string $appRoot): MoveResult
-                {
-                    return $this->inner->move($unit, $appRoot);
-                }
-
-                public function composerAdds(): array
-                {
-                    return $this->inner->lastComposerAdds();
-                }
-            };
+            return new SlimMover();
         }
 
         throw new ToolError(sprintf('The strangler has no mover for "%s".', $framework));
