@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f8c1cff24438783a30dedf8bd2444a5e",
+    "content-hash": "c0751674de4923cfd1e21c7677847813",
     "packages": [
         {
             "name": "composer/semver",
@@ -81,7 +81,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-29T09:13:34+00:00"
+            "time": "2026-10-29T09:13:34+00:00",
+            "published-time": "2026-10-29T09:14:11+00:00"
         },
         {
             "name": "dealerdirect/phpcodesniffer-composer-installer",
@@ -900,7 +901,8 @@
                 "issues": "https://github.com/php-fig/container/issues",
                 "source": "https://github.com/php-fig/container/tree/2.0.2"
             },
-            "time": "2021-11-05T16:47:00+00:00"
+            "time": "2021-11-05T16:47:00+00:00",
+            "published-time": "2021-11-05T16:53:27+00:00"
         },
         {
             "name": "rector/rector",
@@ -1202,7 +1204,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-11-03T21:47:07+00:00"
+            "time": "2026-11-03T21:47:07+00:00",
+            "published-time": "2026-11-04T11:27:31+00:00"
         },
         {
             "name": "symfony/deprecation-contracts",
@@ -1440,7 +1443,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-10-15T09:18:53+00:00"
+            "time": "2026-10-15T09:18:53+00:00",
+            "published-time": "2026-10-28T10:07:44+00:00"
         },
         {
             "name": "symfony/polyfill-intl-normalizer",
@@ -1525,7 +1529,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-09-23T22:02:09+00:00"
+            "time": "2026-09-23T22:02:09+00:00",
+            "published-time": "2026-09-30T10:23:47+00:00"
         },
         {
             "name": "symfony/polyfill-mbstring",
@@ -1610,7 +1615,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-10-28T09:35:49+00:00"
+            "time": "2026-10-28T09:35:49+00:00",
+            "published-time": "2026-10-28T10:07:45+00:00"
         },
         {
             "name": "symfony/process",
@@ -1762,7 +1768,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-10-20T17:38:25+00:00"
+            "time": "2026-10-20T17:38:25+00:00",
+            "published-time": "2026-11-04T11:25:33+00:00"
         },
         {
             "name": "symfony/string",
@@ -1853,7 +1860,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-10-23T16:51:52+00:00"
+            "time": "2026-10-23T16:51:52+00:00",
+            "published-time": "2026-10-28T18:21:18+00:00"
         },
         {
             "name": "symfony/yaml",
@@ -2110,16 +2118,16 @@
         },
         {
             "name": "waynestate/proctor",
-            "version": "0.16.1",
+            "version": "0.17.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/proctor.git",
-                "reference": "324e8b260ee18dd46735f3416e4ae6183dd39b5a"
+                "reference": "fb1dc3ebfc0a9cc665b17a10a8fc1832df8e3776"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/proctor/zipball/324e8b260ee18dd46735f3416e4ae6183dd39b5a",
-                "reference": "324e8b260ee18dd46735f3416e4ae6183dd39b5a",
+                "url": "https://api.github.com/repos/waynestate/proctor/zipball/fb1dc3ebfc0a9cc665b17a10a8fc1832df8e3776",
+                "reference": "fb1dc3ebfc0a9cc665b17a10a8fc1832df8e3776",
                 "shasum": ""
             },
             "require": {
@@ -2136,7 +2144,7 @@
                 "phpstan/phpstan": "^2.1",
                 "phpunit/phpunit": "^11.5",
                 "waynestate/advisor": "^0.3",
-                "waynestate/pinstripe": "^0.3"
+                "waynestate/pinstripe": "^0.4"
             },
             "suggest": {
                 "waynestate/advisor": "ADVISOR module: lets your coding agent read proctor_rules and proctor_check, read-only."
@@ -2170,8 +2178,8 @@
                 "issues": "https://git.wayne.edu/enterprise-apps/proctor/-/issues",
                 "source": "https://github.com/waynestate/proctor"
             },
-            "time": "2026-11-14T20:42:29+00:00",
-            "published-time": "2026-11-14T20:43:43+00:00"
+            "time": "2026-11-19T07:12:45+00:00",
+            "published-time": "2026-11-19T07:17:50+00:00"
         },
         {
             "name": "webmozart/assert",

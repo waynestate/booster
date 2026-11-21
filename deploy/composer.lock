@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "94d77feb29516a1fa552bd009bb1a611",
+    "content-hash": "7b456721af48e844d8f9efc429df9cb5",
     "packages": [
         {
             "name": "composer/semver",
@@ -1956,16 +1956,16 @@
         },
         {
             "name": "waynestate/proctor",
-            "version": "0.16.1",
+            "version": "0.17.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/proctor.git",
-                "reference": "324e8b260ee18dd46735f3416e4ae6183dd39b5a"
+                "reference": "fb1dc3ebfc0a9cc665b17a10a8fc1832df8e3776"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/proctor/zipball/324e8b260ee18dd46735f3416e4ae6183dd39b5a",
-                "reference": "324e8b260ee18dd46735f3416e4ae6183dd39b5a",
+                "url": "https://api.github.com/repos/waynestate/proctor/zipball/fb1dc3ebfc0a9cc665b17a10a8fc1832df8e3776",
+                "reference": "fb1dc3ebfc0a9cc665b17a10a8fc1832df8e3776",
                 "shasum": ""
             },
             "require": {
@@ -1982,7 +1982,7 @@
                 "phpstan/phpstan": "^2.1",
                 "phpunit/phpunit": "^11.5",
                 "waynestate/advisor": "^0.3",
-                "waynestate/pinstripe": "^0.3"
+                "waynestate/pinstripe": "^0.4"
             },
             "suggest": {
                 "waynestate/advisor": "ADVISOR module: lets your coding agent read proctor_rules and proctor_check, read-only."
@@ -2016,8 +2016,8 @@
                 "issues": "https://git.wayne.edu/enterprise-apps/proctor/-/issues",
                 "source": "https://github.com/waynestate/proctor"
             },
-            "time": "2026-11-14T20:42:29+00:00",
-            "published-time": "2026-11-14T20:43:43+00:00"
+            "time": "2026-11-19T07:12:45+00:00",
+            "published-time": "2026-11-19T07:17:50+00:00"
         }
     ],
     "packages-dev": [],
