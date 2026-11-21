@@ -15,6 +15,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 - Changed: PROCTOR is `^0.17` in Booster and its `deploy/` layer (was `^0.16`, which does not allow 0.17); 0.17.0 adds three warn-only Oracle checks (`raw-oci`, `oracle-sql-interpolation`, `oracle-credentials-literal`).
 - Changed: the Slim 1 bridge that the vendored-to-composer hop writes defaults to debug off, so a migrated app no longer shows Slim's debug pages unless its settings turn them on. Bridges written by earlier versions are left as they are.
 - Removed: Squire's local-running kit files (docker-compose.squire.yml, haproxy.cfg, parity scripts, env example; D-095). Parity runs the app locally: `parity up` in `deploy/`.
+- Docs: SECURITY.md says how to report a vulnerability privately.
 - Docs: comments, tests and past CHANGELOG entries describe the apps the hops were tuned on by framework, not by name.
 
 ## \[1.21.0\] - 2026-11-20 [#](https://booster.apps.wayne.edu/docs/changelog.html#1-21-0-2026-11-20)
