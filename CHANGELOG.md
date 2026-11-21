@@ -5,6 +5,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 ## [Unreleased]
 
 - Changed: the Slim 1 bridge that the vendored-to-composer hop writes defaults to debug off, so a migrated app no longer shows Slim's debug pages unless its settings turn them on. Bridges written by earlier versions are left as they are.
+- Docs: SECURITY.md says how to report a vulnerability privately.
 
 ## [1.21.0] - 2026-11-20
 
