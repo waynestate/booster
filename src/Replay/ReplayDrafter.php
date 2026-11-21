@@ -153,7 +153,7 @@ final class ReplayDrafter
         $signIn = [];
         foreach ($pages as $k => $page) {
             if (preg_match(self::SIGN_IN_PAGE, $page['path'] . '/') === 1) {
-                $signIn[] = ['name' => 'sign-in page: ' . $page['name'], 'requests' => [$page]];
+                $signIn[] = ['name' => 'sign-in ' . (count($signIn) + 1), 'requests' => [$page]];
                 unset($pages[$k]);
             }
         }

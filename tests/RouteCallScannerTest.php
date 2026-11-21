@@ -201,8 +201,8 @@ final class RouteCallScannerTest extends TestCase
 
         self::assertSame([
             'pages' => ['/', '/pages/home', '/student-rosters', '/student-rosters/view-all', '/student-rosters/edit/{id}', '/users', '/booster-replay-no-such-page'],
-            'sign-in page: GET /users/login' => ['/users/login'],
-            'sign-in page: GET /users/logout' => ['/users/logout'],
+            'sign-in 1' => ['/users/login'],
+            'sign-in 2' => ['/users/logout'],
         ], $bySequence);
     }
 
