@@ -9,7 +9,8 @@ Two public apps, as `before/` trees, that `prove.sh` mounts and replays:
   `InMemoryUserRepository`, and `{$userId}` for the `${userId}` string in `ViewUserAction`. Its OPTIONS
   catch-all route makes every unknown path a 405, which the request file expects. Its `public/.htaccess` adds
   a redirect behind a file test, a `[F]` rule and a deny-only `<FilesMatch>` block (with `public/settings.ini`
-  for it to deny), which the mount moves into the new `public/.htaccess`; `prove.sh`'s opt-in Apache step
+  for it to deny), which the mount moves into the new `public/.htaccess`, and two legacy folders, `public/docs/`
+  (no index: Apache's 403) and `public/manual/` (its own `index.html`); `prove.sh`'s opt-in Apache step
   (`BOOSTER_PROVE_APACHE_IMAGE`) checks they answer the same before and after (php -S never reads them).
 - `cake5/before/`: the CakePHP CMS tutorial (`cakephp/cms-tutorial`, MIT) without its web font files, plus
   `bin/booster-fixture-db.php` (a fixture SQLite database with fixed rows and one fixture user) and

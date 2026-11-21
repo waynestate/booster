@@ -25,7 +25,11 @@
                 {"name": "a query string", "path": "/users", "query": {"page": "2"}},
                 {"name": "a path .htaccess redirects (under Apache; php -S has no .htaccess, so the skeleton's 405)", "path": "/old-users", "expect": 405},
                 {"name": "a path .htaccess denies (under Apache; 405 here)", "path": "/private/notes", "expect": 405},
-                {"name": "a file .htaccess denies (under Apache; php -S serves it)", "path": "/settings.ini"}
+                {"name": "a file .htaccess denies (under Apache; php -S serves it)", "path": "/settings.ini"},
+                {"name": "a folder with no index (Apache: 403; the router: the skeleton's 405)", "path": "/docs/", "expect": 405},
+                {"name": "the same folder without the slash (Apache: 301 to add it)", "path": "/docs", "expect": 405},
+                {"name": "a folder with an index.html (Apache serves it; the router: 405)", "path": "/manual/", "expect": 405},
+                {"name": "that folder without the slash (Apache: 301)", "path": "/manual", "expect": 405}
             ]
         }
     ]

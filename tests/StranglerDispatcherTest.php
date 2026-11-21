@@ -39,6 +39,11 @@ final class StranglerDispatcherTest extends TestCase
         $this->app = $app;
         $dispatcher = (string) file_get_contents(dirname(__DIR__) . '/resources/strangler/dispatcher.php');
         $dispatcher = str_replace("\$legacyDocroot = 'legacy/public';", "\$legacyDocroot = 'legacy/webroot';", $dispatcher);
+        if ($router === 'plain') {
+            // The legacy run was plain php -S (no serve.front_controller); the mounted run still has REPLAY's router.
+            $dispatcher = str_replace('$legacyRouter = true;', '$legacyRouter = false;', $dispatcher);
+            $router = 'replay';
+        }
         $files = [
             'public/index.php' => $dispatcher,
             // Laravel's half: its autoloader, and an app whose handleRequest reports.
@@ -77,6 +82,8 @@ final class StranglerDispatcherTest extends TestCase
                 PHP,
             'legacy/webroot/raw.php' => "<?php\necho json_encode(['half' => 'raw', 'script' => \$_SERVER['SCRIPT_NAME'], 'cwd' => getcwd()]);\n",
             'legacy/webroot/css/app.css' => "body { color: #0c5449; }\n",
+            'legacy/webroot/docs/index.html' => "docs index\n",
+            'legacy/webroot/tools/index.php' => "<?php\necho json_encode(['half' => 'tools', 'script' => \$_SERVER['SCRIPT_NAME'], 'self' => \$_SERVER['PHP_SELF']]);\n",
             'legacy/webroot/build/legacy.js' => "console.log('legacy');\n",
             'legacy/webroot/data.blob' => "blob\n",
             'legacy/webroot/.env' => "SECRET=1\n",
@@ -344,6 +351,54 @@ final class StranglerDispatcherTest extends TestCase
         self::assertSame("console.log('legacy');\n", $this->request('GET', '/build/legacy.js', ['X-Test-File' => '1'])['body'], 'a pass-through serves the legacy file at the path');
         self::assertSame(404, $this->request('GET', '/users/7', ['X-Test-File' => '1'])['status'], 'a pass-through never reaches a front controller');
         self::assertOnlyLaravel($this->request('GET', '/users/7'), 'without the rule, the moved route');
+    }
+
+    public function test_a_legacy_folder_goes_where_the_router_sent_it(): void
+    {
+        // The legacy run had REPLAY's router (serve.front_controller): no file, so the front controller.
+        $this->mountedApp();
+        self::assertOnlyLegacy($this->request('GET', '/css/'), 'a folder with no index');
+        self::assertOnlyLegacy($this->request('GET', '/css'), 'the same folder without the slash');
+        self::assertOnlyLegacy($this->request('GET', '/docs/'), 'a folder with an index: the router never served it');
+    }
+
+    public function test_a_legacy_folder_under_plain_php_s_answers_as_plain_php_s_did(): void
+    {
+        $paths = ['/css/?a=1&b=2', '/css', '/css/', '/docs/', '/docs', '/tools', '/tools/'];
+        $this->mountedApp('plain');
+        $mounted = [];
+        foreach ($paths as $path) {
+            $answer = $this->request('GET', $path);
+            $mounted[$path] = [$answer['status'], $answer['headers']['content-type'] ?? null, $answer['body']];
+            self::assertSame('legacy', $answer['headers']['x-booster-half'] ?? null, $path);
+        }
+        $head = $this->request('HEAD', '/css/');
+        self::assertSame([404, ''], [$head['status'], $head['body']]);
+
+        // The legacy run itself: plain php -S on the legacy docroot.
+        proc_terminate($this->server);
+        proc_close($this->server);
+        $this->port = random_int(20000, 45000);
+        $this->server = proc_open([PHP_BINARY, '-S', '127.0.0.1:' . $this->port, '-t', $this->app . '/legacy/webroot'], [0 => ['pipe', 'r'], 1 => ['file', $this->app . '/plain.log', 'a'], 2 => ['file', $this->app . '/plain.log', 'a']], $pipes, $this->app . '/legacy/webroot', ['PATH' => (string) getenv('PATH')]);
+        for ($wait = 0; $wait < 50 && !is_resource(@fsockopen('127.0.0.1', $this->port, $errno, $errstr, 0.1)); $wait++) {
+            usleep(50000);
+        }
+        $legacy = [];
+        foreach ($paths as $path) {
+            $answer = $this->request('GET', $path);
+            $legacy[$path] = [$answer['status'], $answer['headers']['content-type'] ?? null, $answer['body']];
+        }
+        self::assertSame($legacy, $mounted, 'status, type and body as plain php -S gave them: its 404 page for a folder with no index, the index with or without the slash');
+        self::assertSame(404, $legacy['/css/?a=1&b=2'][0]);
+    }
+
+    public function test_a_folder_rule_in_public_htaccess_gets_the_folders_index(): void
+    {
+        $this->mountedApp('apache');
+        self::assertSame("docs index\n", $this->request('GET', '/docs/', ['X-Test-File' => '1'])['body'], 'the folder rule marks a folder with an index');
+        self::assertSame('/tools/index.php', $this->request('GET', '/tools/', ['X-Test-File' => '1'])['json']['script'] ?? null);
+        self::assertSame(404, $this->request('GET', '/css/', ['X-Test-File' => '1'])['status'], 'a folder with no index never gets here: Apache\'s [F] answers it');
+        self::assertOnlyLegacy($this->request('GET', '/docs/'), 'unmarked, a folder goes where the legacy front rule sent it');
     }
 
     public function test_without_the_replay_flag_no_half_header_is_sent(): void

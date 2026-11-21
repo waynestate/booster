@@ -174,7 +174,9 @@ final class Mount
         }
 
         // 4. Dispatcher, route table, install hook, composer scripts.
-        $this->writeDispatcher($root, self::LEGACY . '/' . $legacyDocroot, $legacyFront);
+        // REPLAY's router served the legacy run when the file named a front controller (or there is no file).
+        $legacyRouter = !is_array($replayData['serve'] ?? null) || is_string($replayData['serve']['front_controller'] ?? null);
+        $this->writeDispatcher($root, self::LEGACY . '/' . $legacyDocroot, $legacyFront, $legacyRouter);
         RouteTable::load($root)->save();
         $this->changed[] = RouteTable::FILE;
         $this->writeFile($root, 'bin/install-legacy.php', $this->resource('install-legacy.php'));
@@ -451,7 +453,7 @@ final class Mount
         }
     }
 
-    private function writeDispatcher(string $root, string $legacyDocroot, string $legacyFront): void
+    private function writeDispatcher(string $root, string $legacyDocroot, string $legacyFront, bool $legacyRouter): void
     {
         $source = $this->resource('dispatcher.php');
         $source = (string) preg_replace_callback(
@@ -468,8 +470,15 @@ final class Mount
             1,
             $front,
         );
-        if ($docroot !== 1 || $front !== 1) {
-            throw new ToolError('The dispatcher template lost its booster:legacy-docroot or booster:legacy-front line.');
+        $source = (string) preg_replace_callback(
+            '/^(\s*\$legacyRouter = )(?:true|false);( \/\/ booster:legacy-router)$/m',
+            static fn(array $m): string => $m[1] . ($legacyRouter ? 'true' : 'false') . ';' . $m[2],
+            $source,
+            1,
+            $router,
+        );
+        if ($docroot !== 1 || $front !== 1 || $router !== 1) {
+            throw new ToolError('The dispatcher template lost its booster:legacy-docroot, booster:legacy-front or booster:legacy-router line.');
         }
         $this->writeFile($root, 'public/index.php', $source);
     }

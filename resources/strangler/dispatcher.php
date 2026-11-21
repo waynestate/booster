@@ -31,9 +31,10 @@
  */
 
 $booster_route = (static function (): array {
-    // The mount writes these two lines; keep their shape.
+    // The mount writes these three lines; keep their shape.
     $legacyDocroot = 'legacy/public'; // booster:legacy-docroot
     $legacyFront = 'index.php'; // booster:legacy-front
+    $legacyRouter = true; // booster:legacy-router
     $laravelPrefixes = ['/_laravel'];
 
     $root = dirname(__DIR__);
@@ -72,33 +73,53 @@ $booster_route = (static function (): array {
     $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 
     $legacyRoot = realpath($root . '/' . $legacyDocroot);
-    // A real file under the legacy docroot, never a dotfile (but
+    // A real file or folder under the legacy docroot, never a dotfile (but
     // .well-known/), confined to that docroot. Null when there is none.
-    $legacyFile = static function (string $path) use ($legacyRoot): ?string {
-        if ($legacyRoot === false || $path === '/' || strpos($path, "\0") !== false) {
+    $legacyPath = static function (string $path, bool $isRoot = false) use ($legacyRoot): ?string {
+        if ($legacyRoot === false || strpos($path, "\0") !== false) {
             return null;
+        }
+        if ($path === '/') {
+            return $isRoot ? $legacyRoot : null;
         }
         foreach (explode('/', trim($path, '/')) as $i => $segment) {
             if ($segment === '' || ($segment[0] === '.' && !($i === 0 && $segment === '.well-known'))) {
                 return null;
             }
         }
-        $candidate = $legacyRoot . $path;
-        if (substr($path, -1) === '/') {
-            foreach (['index.php', 'index.html'] as $index) {
-                if (is_file($candidate . $index)) {
-                    $candidate .= $index;
-                    break;
-                }
-            }
-        }
-        $real = realpath($candidate);
-        if ($real === false || !is_file($real) || strncmp($real, $legacyRoot . DIRECTORY_SEPARATOR, strlen($legacyRoot) + 1) !== 0) {
+        $real = realpath($legacyRoot . $path);
+        if ($real === false || strncmp($real, $legacyRoot . DIRECTORY_SEPARATOR, strlen($legacyRoot) + 1) !== 0) {
             return null;
         }
 
         return $real;
     };
+    // A real file under the legacy docroot; with $index, a folder gives its
+    // index.php or index.html (php -S looks in that order, and so does
+    // Apache's DirectoryIndex on Citadel). Null when there is none.
+    $legacyFile = static function (string $path, bool $index) use ($legacyPath, $legacyRoot): ?string {
+        $real = $legacyPath($path, $index);
+        if ($real !== null && $index && is_dir($real)) {
+            foreach (['index.php', 'index.html'] as $name) {
+                $found = realpath($real . DIRECTORY_SEPARATOR . $name);
+                if ($found !== false && is_file($found) && strncmp($found, $legacyRoot . DIRECTORY_SEPARATOR, strlen((string) $legacyRoot) + 1) === 0) {
+                    return $found;
+                }
+            }
+
+            return null;
+        }
+
+        return $real !== null && is_file($real) ? $real : null;
+    };
+    // Folders answer as they did before the mount. Under Apache the folder
+    // rules in public/.htaccess answer them (a marked request gets its index
+    // here); any other folder request went to the legacy front controller and
+    // still does. Under php -S (the replay) the legacy run either had REPLAY's
+    // router (serve.front_controller: a folder went to the front controller,
+    // as here) or plain php -S, which serves a folder's index with or without
+    // the slash and answers its own 404 for a folder with none.
+    $plainPhpServer = PHP_SAPI === 'cli-server' && !$legacyRouter;
 
     // A legacy rewrite rule the mount moved into public/.htaccess sent this
     // request to a legacy file (BOOSTER_LEGACY_FILE: the path itself, a
@@ -123,7 +144,7 @@ $booster_route = (static function (): array {
             return ['laravel'];
         }
     }
-    if ($target === null && strncmp($path, '/build/', 7) === 0 && $legacyFile($path) === null) {
+    if ($target === null && strncmp($path, '/build/', 7) === 0 && $legacyPath($path) === null) {
         $half('laravel');
 
         return ['laravel'];
@@ -156,9 +177,29 @@ $booster_route = (static function (): array {
 
     // 5. A real file under the legacy docroot, or the moved rule's target
     // (a missing target is a 404, as Apache answered it before).
-    $file = $legacyFile($target ?? $path);
+    $file = $legacyFile($target ?? $path, $target !== null ? substr($target, -1) === '/' : $plainPhpServer && $path !== '/');
     if ($target !== null && $file === null) {
         http_response_code(404);
+
+        return ['done'];
+    }
+    $folder = $file === null && $plainPhpServer ? $legacyPath($path) : null;
+    if ($folder !== null && is_dir($folder)) {
+        // A legacy folder with no index under plain php -S: its own 404 page
+        // (PHP 8.5's, the request URI as sent), not the front controller.
+        http_response_code(404);
+        header('Content-Type: text/html; charset=UTF-8');
+        if ($method !== 'HEAD') {
+            echo '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>404 Not Found</title><style>' . "\n"
+                . 'body { background-color: #fcfcfc; color: #333333; margin: 0; padding:0; }' . "\n"
+                . 'h1 { font-size: 1.5em; font-weight: normal; background-color: #9999cc; min-height:2em; line-height:2em; border-bottom: 1px inset black; margin: 0; }' . "\n"
+                . 'h1, p { padding-left: 10px; }' . "\n"
+                . 'code.url { background-color: #eeeeee; font-family:monospace; padding:0 2px;}' . "\n"
+                . '</style>' . "\n"
+                . '</head><body><h1>Not Found</h1><p>The requested resource <code class="url">'
+                . htmlspecialchars((string) ($_SERVER['REQUEST_URI'] ?? $path), ENT_QUOTES, 'UTF-8', false)
+                . '</code> was not found on this server.</p></body></html>';
+        }
 
         return ['done'];
     }

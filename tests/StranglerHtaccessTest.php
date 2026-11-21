@@ -65,6 +65,7 @@ final class StranglerHtaccessTest extends TestCase
             . "    RewriteCond %{REQUEST_FILENAME} -f\n    RewriteRule ^(css|js|images|assets|build) - [L]\n"
             . self::FILE_TEST . "    RewriteCond %1/../legacy/public%2 -f\n"
             . "    RewriteRule ^(css|js|images|assets|build) index.php [END,E=BOOSTER_LEGACY_FILE:1]\n"
+            . self::folders('^(css|js|images|assets|build)')
             . "    RewriteRule ^(css|js|images|assets|build) - [L]\n\n"
             . "    # Add a trailing slash to any non-files\n"
             . self::FILE_TEST . "    RewriteCond %1/../legacy/public%2 !-f\n"
@@ -203,7 +204,26 @@ final class StranglerHtaccessTest extends TestCase
         $cake = LegacyHtaccess::move((string) file_get_contents($fixtures . '/cake5/before/webroot/.htaccess'), 'legacy/webroot');
         self::assertSame([[], [], []], [$cake->top(), $cake->rewrite(), $cake->manual()]);
         $laravelLike = LegacyHtaccess::move("<IfModule mod_rewrite.c>\n    <IfModule mod_negotiation.c>\n        Options -MultiViews -Indexes\n    </IfModule>\n    RewriteEngine On\n    RewriteCond %{HTTP:Authorization} .\n    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]\n    RewriteCond %{REQUEST_FILENAME} !-d\n    RewriteCond %{REQUEST_FILENAME} !-f\n    RewriteRule ^ index.php [L]\n</IfModule>\n", 'legacy/public');
-        self::assertSame([[], [], []], [$laravelLike->top(), $laravelLike->rewrite(), $laravelLike->manual()]);
+        self::assertSame([[], []], [$laravelLike->top(), $laravelLike->manual()]);
+        self::assertSame(
+            "    # Laravel's own prefix never meets the legacy rules below.\n    RewriteRule ^_laravel(?:/|$) index.php [END]\n\n" . self::folders('^') . "\n",
+            implode("\n", $laravelLike->rewrite()) . "\n",
+            'its front rule skipped folders (!-d), so Apache answered them: the folder rules follow the moved ones',
+        );
+        self::assertSame([], $laravelLike->moved());
+    }
+
+    /** The folder rules the mount writes for a pass-through pattern (or ^ after the moved rules). */
+    private static function folders(string $pattern): string
+    {
+        $folder = "    RewriteCond %{CONTEXT_DOCUMENT_ROOT}::%{REQUEST_FILENAME}%{PATH_INFO} ^(.*?)/?::\\1(/[^/].*)$\n"
+            . "    RewriteCond %1/../legacy/public%2 -d\n";
+
+        return "    # A legacy folder: a 301 that adds the slash, its index file (the dispatcher), or Apache's 403.\n"
+            . $folder . "    RewriteCond %{REQUEST_URI} !/$\n    RewriteRule {$pattern} %{REQUEST_URI}/ [R=301,END]\n"
+            . $folder . "    RewriteCond %1/../legacy/public%2/index.php -f [OR]\n    RewriteCond %1/../legacy/public%2/index.html -f\n"
+            . "    RewriteRule {$pattern} index.php [END,E=BOOSTER_LEGACY_FILE:1]\n"
+            . $folder . "    RewriteRule {$pattern} - [F]\n";
     }
 
     public function test_a_php_module_block_moves_as_written(): void

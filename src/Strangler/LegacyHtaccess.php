@@ -20,10 +20,13 @@ namespace Waynestate\Booster\Strangler;
  *   at CONTEXT_DOCUMENT_ROOT (public/), and the test runs on
  *   public/../legacy/<docroot> plus the rest. A PATH_INFO URL to a real
  *   legacy script (/report.php/7) tests the whole path, not the script.
- * - A pass-through (`RewriteRule ^assets - [L]`) becomes three rules: a file
- *   in public/ is served by Apache, a file in the legacy docroot by the
- *   dispatcher (BOOSTER_LEGACY_FILE), and anything else stops rewriting, so
- *   Apache answers its own 404, as before.
+ * - A pass-through (`RewriteRule ^assets - [L]`) becomes: a file in public/
+ *   is served by Apache, a file in the legacy docroot by the dispatcher
+ *   (BOOSTER_LEGACY_FILE), a legacy folder as Apache answered it (folderRules:
+ *   301 to add the slash, its index, or Apache's 403), and anything else
+ *   stops rewriting, so Apache answers its own 404, as before. When the
+ *   legacy front rule skipped folders (`!-d`), the folder rules also follow
+ *   the moved rules, with no pattern.
  * - A rule that rewrote to another legacy file goes through the dispatcher,
  *   which runs or serves that file (BOOSTER_LEGACY_TARGET); one that rewrote
  *   to the legacy front controller now rewrites to the dispatcher, which
@@ -87,6 +90,9 @@ final class LegacyHtaccess
     /** @var list<array{line: int, text: string}> Denials from <Files> blocks: they go first, as Apache checks them before any rule. */
     private array $denials = [];
 
+    /** The legacy front rule skipped folders (`!-d`): they get folderRules() after the moved rules. */
+    private bool $folders = false;
+
     private function __construct(
         private readonly string $legacyDocroot,
         private readonly string $legacyFront,
@@ -113,9 +119,10 @@ final class LegacyHtaccess
     /** @return list<string> lines for the rewrite block, above FRONT_MARKER (empty when nothing moved) */
     public function rewrite(): array
     {
-        if ($this->rewrite === [] && $this->denials === []) {
+        if ($this->rewrite === [] && $this->denials === [] && !$this->folders) {
             return [];
         }
+        $folders = $this->folders ? [...$this->folderRules('^', [], ''), ''] : [];
         $lines = [
             '    # Laravel\'s own prefix never meets the legacy rules below.',
             '    RewriteRule ^_laravel(?:/|$) index.php [END]',
@@ -125,7 +132,7 @@ final class LegacyHtaccess
             $lines = [...$lines, ...explode("\n", $deny['text']), ''];
         }
 
-        return [...$lines, ...$this->rewrite];
+        return [...$lines, ...$this->rewrite, ...$folders];
     }
 
     /** @return list<int> the source lines that moved */
@@ -405,6 +412,9 @@ final class LegacyHtaccess
         $front = preg_match('/^\/?(index\.php|' . preg_quote($this->legacyFront, '/') . ')$/', $subst) === 1;
         if ($front && $fileTests === count($parsed) && array_diff($names, ['l', 'end', 'qsa', 'nc', 'ns']) === []
             && array_filter($parsed, static fn(array $c): bool => preg_match('/^!-[fdl]$/', $c['op']) !== 1) === []) {
+            // With `!-d` a legacy folder never reached the front controller: Apache answered it.
+            $this->folders = $this->folders || in_array('!-d', array_column($parsed, 'op'), true);
+
             return;
         }
         if ($subst === '-' && count($flags) === 1 && preg_match('/^E=(BASE:%1|HTTP_AUTHORIZATION:%\{HTTP:Authorization\})$/i', $flags[0]['raw']) === 1) {
@@ -454,6 +464,7 @@ final class LegacyHtaccess
                 '    RewriteCond %{CONTEXT_DOCUMENT_ROOT}::%{REQUEST_FILENAME}%{PATH_INFO} ^(.*?)/?::\1(.*)$',
                 sprintf('    RewriteCond %%1/../%s%%2 -f', $this->legacyDocroot),
                 sprintf('    RewriteRule %s index.php [%sEND,E=BOOSTER_LEGACY_FILE:1]', $pattern, $kept),
+                ...$this->folderRules($pattern, $condLines, $kept),
                 ...$condLines,
                 '    ' . $line,
             ];
@@ -466,6 +477,42 @@ final class LegacyHtaccess
         }
         $this->rewrite = [...$this->rewrite, ...$out, ''];
         array_push($this->moved, ...$lines);
+    }
+
+    /**
+     * A folder in the legacy docroot, answered as Apache's own folder handling
+     * answered it before (mod_dir and Options -Indexes): a 301 that adds the
+     * slash, its index file through the dispatcher, or Apache's 403. The folder
+     * sits outside public/ now, so Apache cannot reach it; [F] gives the same
+     * 403 page it gave for a folder with no index.
+     *
+     * @param list<string> $condLines
+     * @return list<string>
+     */
+    private function folderRules(string $pattern, array $condLines, string $kept): array
+    {
+        // Not the docroot itself: its index is the front controller, and a
+        // moved route at / must still reach the dispatcher's table.
+        $folder = [
+            '    RewriteCond %{CONTEXT_DOCUMENT_ROOT}::%{REQUEST_FILENAME}%{PATH_INFO} ^(.*?)/?::\1(/[^/].*)$',
+            sprintf('    RewriteCond %%1/../%s%%2 -d', $this->legacyDocroot),
+        ];
+
+        return [
+            '    # A legacy folder: a 301 that adds the slash, its index file (the dispatcher), or Apache\'s 403.',
+            ...$condLines,
+            ...$folder,
+            '    RewriteCond %{REQUEST_URI} !/$',
+            sprintf('    RewriteRule %s %%{REQUEST_URI}/ [%sR=301,END]', $pattern, $kept),
+            ...$condLines,
+            ...$folder,
+            sprintf('    RewriteCond %%1/../%s%%2/index.php -f [OR]', $this->legacyDocroot),
+            sprintf('    RewriteCond %%1/../%s%%2/index.html -f', $this->legacyDocroot),
+            sprintf('    RewriteRule %s index.php [%sEND,E=BOOSTER_LEGACY_FILE:1]', $pattern, $kept),
+            ...$condLines,
+            ...$folder,
+            sprintf('    RewriteRule %s - [%sF]', $pattern, $kept),
+        ];
     }
 
     /**

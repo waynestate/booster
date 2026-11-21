@@ -155,6 +155,7 @@ final class StranglerMountTest extends TestCase
         $dispatcher = (string) file_get_contents($dir . '/public/index.php');
         self::assertStringContainsString("\$legacyDocroot = 'legacy/public'; // booster:legacy-docroot", $dispatcher);
         self::assertStringContainsString("\$legacyFront = 'index.php'; // booster:legacy-front", $dispatcher);
+        self::assertStringContainsString('$legacyRouter = true; // booster:legacy-router', $dispatcher, 'the replay file named a front controller: REPLAY\'s router served the legacy run');
         self::assertSame([], RouteTable::load($dir)->rows());
         self::assertSame([], require $dir . '/bootstrap/booster-moved.php');
         self::assertFileExists($dir . '/bin/install-legacy.php');
@@ -245,7 +246,8 @@ final class StranglerMountTest extends TestCase
             'src/config/app_local.example.php' => "<?php\nreturn [];\n",
             'src/.htaccess' => "<IfModule mod_rewrite.c>\n    RewriteEngine on\n    RewriteRule    ^$    webroot/    [L]\n    RewriteRule    (.*) webroot/$1    [L]\n</IfModule>\nphp_value upload_max_filesize 64M\n",
             'src/webroot/.htaccess' => "<IfModule mod_rewrite.c>\n    RewriteEngine On\n    RewriteCond %{REQUEST_FILENAME} !-f\n    RewriteRule ^ index.php [L]\n</IfModule>\nHeader set X-Frame-Options DENY\n<FilesMatch \"\.(ttf|woff2?)$\">\n    Header set Access-Control-Allow-Origin \"*\"\n</FilesMatch>\n",
-            'src/booster-replay.json' => json_encode(['version' => 1, 'serve' => ['docroot' => 'webroot', 'front_controller' => 'index.php', 'setup' => 'mkdir -p tmp logs'], 'requests' => [['path' => '/']]]),
+            // No front_controller: the legacy run was plain php -S, so the dispatcher answers folders as it did.
+            'src/booster-replay.json' => json_encode(['version' => 1, 'serve' => ['docroot' => 'webroot', 'setup' => 'mkdir -p tmp logs'], 'requests' => [['path' => '/']]]),
         ];
         foreach ($files as $path => $contents) {
             @mkdir(dirname($dir . '/' . $path), 0775, true);
@@ -270,6 +272,7 @@ final class StranglerMountTest extends TestCase
         self::assertStringContainsString("# The Laravel half (added by Booster's strangler mount)\n/node_modules\n.env\n/storage/*.key\n", $gitignore);
 
         $after = ReplayFile::load($dir . '/booster-replay.json');
+        self::assertStringContainsString('$legacyRouter = false; // booster:legacy-router', (string) file_get_contents($dir . '/public/index.php'));
         self::assertSame('public', $after->docroot);
         self::assertStringEndsWith('(cd legacy && mkdir -p tmp logs)', (string) $after->setup);
         self::assertSame(['ATTEND', 'csrfToken', 'laravel_session', 'XSRF-TOKEN'], $result->ignoreCookies);
