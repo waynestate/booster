@@ -15,9 +15,9 @@ To take a new Booster, download the PHAR again (the same `curl` line as on [Inst
 
 ## 1.21.0
 
-Not released yet: this section follows the Changelog's Unreleased list. A CakePHP 5 or Slim 4 app can move onto
-Laravel 13 one unit at a time (the strangler). Two hops were added and none removed; `plan` and `run` take a bare
-`--to-laravel`, and `run` gains `--moves`, `--route`, `--hand` and `--finish`. No exit code changed.
+A CakePHP 5 or Slim 4 app can move onto Laravel 13 one unit at a time (the strangler). Two hops were added and none
+removed; `plan` and `run` take a bare `--to-laravel`, and `run` gains `--moves`, `--route`, `--hand` and `--finish`.
+No exit code changed.
 
 ### What you see
 

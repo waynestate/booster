@@ -4,6 +4,10 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-11-20
+
+CakePHP 5 and Slim 4 apps move onto Laravel 13 one unit at a time with a bare --to-laravel (the strangler): sign-in on SESAME first, the old app in legacy/, and the replay gating every run.
+
 - Added: `cakephp-to-laravel` and `slim-to-laravel`, the strangler (one hop, two faces): a bare `--to-laravel` plans it last for a CakePHP 5 or Slim 4 app on PHP 8.3 or newer. Run 1 moves the old sign-in onto SESAME (Step 0), mounts Laravel 13 at the root with the old app unchanged in `legacy/`, and stops; later runs move units (a route, or a form's GET and POST) with `--moves N` or `--route "<id>"`, flip a hand-ported unit with `--hand --route`, and `--finish` deletes `legacy/` and puts back the stock `public/index.php`. Every run is gated by the replay, which the hop requires. The guide is docs/guides/cakephp-and-slim-to-laravel.md.
 - Added: a strangler move that adds packages to the Laravel half's `composer.json` gets `composer update -W` for them in the gate image before the gate; a failed update marks the unit failed with Composer's first error line (`failed` in the JSON report's `strangler` section).
 - Added: `booster-strangler.json`, the strangler's ledger at the app root (framework, mount time, Step 0, and each unit's state: legacy, laravel, hand or failed). An app with a ledger plans only the strangler until `--finish`.

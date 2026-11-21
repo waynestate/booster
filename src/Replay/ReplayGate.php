@@ -223,7 +223,7 @@ final class ReplayGate
                     ? sprintf('Replay passed: all %d answer%s match the baseline from PHP %s.', $total, $total === 1 ? '' : 's', $recording->php)
                     : ($accepted !== []
                         ? sprintf('Replay passed: %d of %d answers match the baseline from PHP %s, and %d changed only where this step moves the sign-in on purpose:', $matched, $total, $recording->php, count($accepted))
-                        : sprintf('Replay passed: %d of %d answers match the baseline from PHP %s, and %d send the guest to sign-in on the half that answers now:', $matched, $total, $recording->php, count($ownSignIn))),
+                        : sprintf('Replay passed: %d of %d answers match the baseline from PHP %s, and %d %s the guest to sign-in on the half that answers now:', $matched, $total, $recording->php, count($ownSignIn), count($ownSignIn) === 1 ? 'sends' : 'send')),
                 ...self::indent($accepted),
                 ...($accepted !== [] && $ownSignIn !== [] ? ['Sent to sign-in on the half that answers now (accepted):'] : []),
                 ...self::indent($ownSignIn),
