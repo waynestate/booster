@@ -2387,7 +2387,7 @@ PHP,
         $fake = $this->fake();
         (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))->execute($plan, new RunOptions());
 
-        $baseline = implode(' ', $this->dockerRuns($fake)[0]);
+        $baseline = implode(' ', $this->dockerRuns($fake)[0]['command']);
         self::assertStringContainsString("-not -path '*/vendor/*'", $baseline, 'the syntax check over both roots');
         self::assertStringContainsString('(cd legacy && composer test)', $baseline, 'then the legacy suite');
     }
