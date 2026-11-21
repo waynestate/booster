@@ -204,7 +204,8 @@ final class HopExecutor
         // dry run creates nothing, so only an --allow-dirty real run needs the
         // status read.
         $this->startingUntracked = !$options->dryRun && $options->allowDirty ? $this->untrackedPaths($path) : [];
-        $this->startedDirty = !$options->dryRun && $options->allowDirty && $this->workingCopyDirty($path);
+        $strangles = array_filter($plan->steps, static fn(PlanStep $s): bool => HopRegistry::stranglerFramework($s->hop->id) !== null) !== [];
+        $this->startedDirty = $strangles && !$options->dryRun && $options->allowDirty && $this->workingCopyDirty($path);
         // The report names the --test-env variables by key only; the values may
         // hold credentials and must never reach a report or a log.
         $testEnvKeys = array_map(

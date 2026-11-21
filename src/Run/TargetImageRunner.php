@@ -163,6 +163,10 @@ final class TargetImageRunner
             $updatePackages === [self::LOCK_REFRESH] => 'composer update --lock --no-interaction --no-progress --prefer-dist',
             default => sprintf('composer update -W --no-interaction --no-progress %s', implode(' ', $updatePackages)),
         };
+        // A strangled app runs its legacy suite with (cd legacy && ...): its failOn rules are
+        // legacy/'s, not the Laravel half's phpunit.xml at the root (attendance, 2026-11-20).
+        $testsDir = preg_match('#\(cd legacy && #', $testCommand) === 1 ? 'legacy/' : '';
+        $failOnFiles = implode(' ', array_map(static fn(string $f): string => $testsDir . $f, ['phpunit.xml', 'phpunit.xml.dist', 'composer.json']));
         $lines = [
             'install_log=/tmp/booster-gate-install.log',
             // An app with no composer.json (a 2012 app that hand-copied its
@@ -188,7 +192,7 @@ final class TargetImageRunner
             // with every test green. That run counts as passed, with a note,
             // only when every PHPUnit warning is such an ini, PHP here does not
             // know the setting at all, and the app asked for no failOn rule.
-            'if [ "$test_exit" -ne 0 ] && grep -q "OK, but there were issues" "$tests_log" && ! grep -qs -e "failOn[A-Za-z]*=\"true\"" -e "--fail-on" phpunit.xml phpunit.xml.dist composer.json; then',
+            'if [ "$test_exit" -ne 0 ] && grep -q "OK, but there were issues" "$tests_log" && ! grep -qs -e "failOn[A-Za-z]*=\"true\"" -e "--fail-on" ' . $failOnFiles . '; then',
             '  ini_names=$(sed -n \'s/.*Failed to set "\([^"=]*\)=.*/\1/p\' "$tests_log" | sort -u)',
             '  ini_count=$(grep -c \'Failed to set "\' "$tests_log")',
             '  warn_count=$(sed -n \'s/.*PHPUnit Warnings: \([0-9]*\).*/\1/p\' "$tests_log" | tail -n 1)',

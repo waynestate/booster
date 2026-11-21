@@ -111,9 +111,9 @@ final class TargetImageRunnerTest extends TestCase
         $dir = sys_get_temp_dir() . '/booster-ini-' . bin2hex(random_bytes(4));
         mkdir($dir);
         $printer = $dir . '/fake-phpunit.sh';
-        $run = static function (string $summary, string $warning) use ($dir, $printer): array {
+        $run = static function (string $summary, string $warning, ?string $command = null) use ($dir, $printer): array {
             file_put_contents($printer, "printf '%s\\n' 'There was 1 PHPUnit test runner warning:' '' '1) Failed to set \"" . $warning . "=1\": ' '' 'OK, but there were issues!' '" . $summary . "'\nexit 1\n");
-            $script = TargetImageRunner::containerScript('sh ' . $printer, null);
+            $script = TargetImageRunner::containerScript($command ?? 'sh ' . $printer, null);
             $process = proc_open(['/bin/sh', '-c', $script], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $dir, ['PATH' => (string) getenv('PATH')]);
             self::assertIsResource($process);
             $out = (string) stream_get_contents($pipes[1]);
@@ -134,9 +134,13 @@ final class TargetImageRunnerTest extends TestCase
             self::assertSame([1, []], $run('Tests: 10, Assertions: 23, PHPUnit Warnings: 2.', 'booster_no_such_ext.enable_cli'));
             file_put_contents($dir . '/phpunit.xml', '<phpunit failOnPhpunitWarning="true"/>');
             self::assertSame([1, []], $run('Tests: 10, Assertions: 23, PHPUnit Warnings: 1.', 'booster_no_such_ext.enable_cli'));
+            // A strangled app's legacy suite reads legacy/'s rules, not the Laravel half's phpunit.xml at the root.
+            mkdir($dir . '/legacy');
+            self::assertSame(0, $run('Tests: 10, Assertions: 23, PHPUnit Warnings: 1.', 'booster_no_such_ext.enable_cli', '(cd legacy && sh ' . $printer . ')')[0]);
         } finally {
             @unlink($dir . '/phpunit.xml');
             @unlink($printer);
+            @rmdir($dir . '/legacy');
             @rmdir($dir);
         }
     }
