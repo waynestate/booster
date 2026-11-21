@@ -30,6 +30,8 @@
         "resources/strangler/slim/CapturingEmitter.php",
         "resources/strangler/slim/LegacyClosure.php",
         "resources/strangler/slim/LegacyContainer.php",
+        "resources/strangler/slim/LegacyDispatch.php",
+        "resources/strangler/slim/LegacyDispatched.php",
         "resources/strangler/slim/LegacyResponse.php",
         "resources/strangler/slim/LegacyServiceProvider.php",
         "resources/strangler/slim/LegacyTwigExtension.php",

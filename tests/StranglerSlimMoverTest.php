@@ -274,7 +274,7 @@ final class StranglerSlimMoverTest extends TestCase
             token_get_all((string) file_get_contents($file), TOKEN_PARSE);
             self::assertStringContainsString('declare(strict_types=1);', (string) file_get_contents($file), basename($file));
         }
-        self::assertCount(7, glob(dirname(__DIR__) . '/resources/strangler/slim/*.php') ?: []);
+        self::assertCount(9, glob(dirname(__DIR__) . '/resources/strangler/slim/*.php') ?: []);
     }
 
     public static function copyTree(string $from, string $to): void

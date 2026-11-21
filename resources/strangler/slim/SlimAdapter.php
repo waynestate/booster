@@ -45,9 +45,13 @@ final class SlimAdapter
         }
         $manifest = self::manifest();
         // A Slim-hosted route (design 9.5) runs the copied front controller;
-        // every other moved route runs its handler right here.
+        // every other moved route runs its handler right here, inside the
+        // legacy app's own middleware when the app builds its own container.
         if ($spec === 'bootstrap') {
             return self::bootstrap((array) ($manifest['hosted'] ?? []));
+        }
+        if (($manifest['container'] ?? 'none') === 'app') {
+            return self::inApp((array) ($manifest['hosted'] ?? []), $spec);
         }
         $container = app('legacy.container');
         self::pointSesameAtLaravel();
@@ -94,8 +98,11 @@ final class SlimAdapter
      *
      * @param array<string, mixed> $manifest
      */
-    public static function buildContainer(array $manifest): ?ContainerInterface
+    public static function buildContainer(array $manifest): mixed
     {
+        if (($manifest['container'] ?? 'none') === 'app') {
+            return self::appSetup((array) ($manifest['hosted'] ?? []))['container'];
+        }
         if (($manifest['container'] ?? 'none') !== 'php-di') {
             return null;
         }
@@ -110,40 +117,148 @@ final class SlimAdapter
         return $builder->build();
     }
 
-    /** sesame_user() in moved code reads the Laravel half's SESAME session, the one its guard reads. */
     /**
      * Bootstrap mode (design 10.2): run the copy of the legacy front
      * controller (boot/public/index.php), whose routes script registers only
-     * the moved routes, as the legacy web server would: PHP's own error
-     * handling and ini settings, the legacy public/ folder as the working
-     * directory, and everything it echoes and every header() it sends
-     * captured into the Laravel response. Laravel's own handlers come back
-     * afterwards. A legacy exit() ends the request as it does in legacy.
+     * the moved routes, as the legacy web server would (see legacyRun()).
      *
      * @param array<string, mixed> $manifest
      */
     private static function bootstrap(array $manifest): \Symfony\Component\HttpFoundation\Response
     {
         self::pointSesameAtLaravel();
-        $front = base_path((string) ($manifest['front'] ?? 'app/Http/Controllers/Legacy/boot/public/index.php'));
-        $previousError = set_error_handler(null);
-        $previousException = set_exception_handler(null);
+        $front = self::front($manifest);
+        $run = self::legacyRun(static function () use ($front): void {
+            (static function (string $file): void {
+                require $file;
+            })($front);
+        }, null);
+
+        return self::captured($run['body'], $run['status'], $run['lines']);
+    }
+
+    /**
+     * An app that builds its own container (an app class like App\App, a
+     * Pimple container, the Slim 3 to 4 hop's LegacyApp): the legacy app
+     * builds itself as legacy does, then the moved handler answers inside
+     * its middleware, never Slim's dispatch (see LegacyDispatch). What the
+     * setup echoed or sent with header() comes first, as it did in legacy.
+     *
+     * @param array<string, mixed> $manifest the copied front controller part
+     */
+    private static function inApp(array $manifest, string $spec): \Symfony\Component\HttpFoundation\Response
+    {
+        self::pointSesameAtLaravel();
+        $setup = self::appSetup($manifest);
+        $request = $setup['request'];
+        if (!$request instanceof ServerRequestInterface) {
+            // The front controller answered before its dispatch (a redirect,
+            // a disabled-app page): that is the answer, as in legacy.
+            return self::captured($setup['body'], $setup['status'], $setup['lines']);
+        }
+        $container = $setup['container'] instanceof ContainerInterface ? $setup['container'] : null;
+        $recorder = $setup['recorder'];
+        $run = self::legacyRun(static function () use ($setup, $recorder, $request, $container, $spec): void {
+            echo $setup['body'];
+            foreach ($setup['lines'] as $line) {
+                header($line, false);
+            }
+            if ($setup['status'] !== 200) {
+                http_response_code($setup['status']);
+            }
+            $response = $recorder->run($request, static fn(): callable => self::callable($spec, $container));
+            (new \Slim\ResponseEmitter())->emit($response);
+        }, $setup['legacy']);
+
+        return self::captured($run['body'], $run['status'], $run['lines']);
+    }
+
+    /**
+     * The legacy app's setup, once per request: the copied front controller
+     * runs until its dispatch, with LegacyDispatch recording the middleware
+     * it adds. legacy.container is the container it built.
+     *
+     * @param array<string, mixed> $manifest the copied front controller part
+     *
+     * @return array{recorder: LegacyDispatch, request: ?ServerRequestInterface, container: mixed, body: string, status: int, lines: list<string>, legacy: array<string, mixed>}
+     */
+    private static function appSetup(array $manifest): array
+    {
+        if (self::$setup !== null) {
+            return self::$setup;
+        }
+        $front = self::front($manifest);
+        $recorder = LegacyDispatch::install();
+        $request = null;
+        try {
+            $run = self::legacyRun(static function () use ($front, &$request): void {
+                try {
+                    (static function (string $file): void {
+                        require $file;
+                    })($front);
+                } catch (LegacyDispatched $dispatched) {
+                    $request = $dispatched->request;
+                }
+            }, null);
+        } finally {
+            LegacyDispatch::uninstall();
+        }
+        if (!$recorder->seeded() && $run['body'] === '' && $run['lines'] === []) {
+            throw new RuntimeException('The copied legacy front controller never built its Slim app through AppFactory::create, so Booster could not record its middleware; move the unit with --hand');
+        }
+        $container = $recorder->app()?->getContainer();
+        if ($container !== null) {
+            self::bindContainer($container);
+        }
+        self::$setup = ['recorder' => $recorder, 'request' => $request, 'container' => $container, 'body' => $run['body'], 'status' => $run['status'], 'lines' => $run['lines'], 'legacy' => $run['legacy']];
+
+        return self::$setup;
+    }
+
+    /** @var array{recorder: LegacyDispatch, request: ?ServerRequestInterface, container: mixed, body: string, status: int, lines: list<string>, legacy: array<string, mixed>}|null */
+    private static ?array $setup = null;
+
+    /** @param array<string, mixed> $manifest */
+    private static function front(array $manifest): string
+    {
+        return base_path((string) ($manifest['front'] ?? 'app/Http/Controllers/Legacy/boot/public/index.php'));
+    }
+
+    /**
+     * Run legacy code as the legacy web server would: PHP's own error
+     * handling and ini settings (or the ones the legacy code set in an
+     * earlier run, $legacy), the legacy public/ folder as the working
+     * directory, and everything it echoes and every header() it sends
+     * captured. Laravel's own handlers come back afterwards. An uncaught
+     * error goes to the legacy exception handler, as in legacy. A legacy
+     * exit() ends the request as it does in legacy.
+     *
+     * @param array<string, mixed>|null $legacy what an earlier legacyRun() returned as 'legacy'
+     *
+     * @return array{body: string, status: int, lines: list<string>, legacy: array<string, mixed>}
+     */
+    private static function legacyRun(Closure $code, ?array $legacy): array
+    {
+        $keys = ['display_errors', 'error_reporting', 'log_errors', 'error_log', 'html_errors'];
+        $previousError = set_error_handler($legacy['error'] ?? null);
+        $previousException = set_exception_handler($legacy['exception'] ?? null);
         $ini = [];
-        foreach (['display_errors', 'error_reporting', 'log_errors', 'error_log', 'html_errors'] as $key) {
+        foreach ($keys as $key) {
             $ini[$key] = ini_get($key);
             ini_restore($key);
+            if (is_string($legacy['ini'][$key] ?? null)) {
+                ini_set($key, $legacy['ini'][$key]);
+            }
         }
         $reporting = error_reporting();
-        error_reporting((int) ini_get('error_reporting'));
+        error_reporting(is_int($legacy['reporting'] ?? null) ? $legacy['reporting'] : (int) ini_get('error_reporting'));
         $cwd = getcwd();
         @chdir(base_path('legacy/public'));
         $level = ob_get_level();
         ob_start();
         $thrown = null;
         try {
-            (static function (string $file): void {
-                require $file;
-            })($front);
+            $code();
         } catch (Throwable $e) {
             $thrown = $e;
         }
@@ -164,6 +279,10 @@ final class SlimAdapter
         $status = http_response_code();
         $lines = headers_list();
         header_remove();
+        $after = ['ini' => [], 'reporting' => error_reporting(), 'exception' => $legacyException];
+        foreach ($keys as $key) {
+            $after['ini'][$key] = ini_get($key);
+        }
         if ($cwd !== false) {
             @chdir($cwd);
         }
@@ -173,13 +292,13 @@ final class SlimAdapter
             }
         }
         error_reporting($reporting);
-        set_error_handler($previousError);
+        $after['error'] = set_error_handler($previousError);
         set_exception_handler($previousException);
         if ($thrown !== null) {
             throw $thrown;
         }
 
-        return self::captured($body, is_int($status) ? $status : 200, $lines);
+        return ['body' => $body, 'status' => is_int($status) ? $status : 200, 'lines' => array_values($lines), 'legacy' => $after];
     }
 
     /**

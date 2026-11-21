@@ -15,7 +15,10 @@ use Illuminate\Support\ServiceProvider;
  * Slim move; add a binding here for a service Booster could not rebuild.
  *
  * - `legacy.container`: the legacy container, rebuilt from the same
- *   definition files the legacy front controller loads (null when it had none);
+ *   definition files the legacy front controller loads (null when it had none),
+ *   or, when the app builds its own (an app class, Pimple, the Slim 3 to 4
+ *   hop's LegacyApp), the one its own setup builds: the copied front
+ *   controller runs up to the app's dispatch, once per request;
  * - `legacy.<key>`: each key those definitions declare, resolved through it;
  * - `legacy`: an ArrayAccess shim, so `$c['x']` resolves `legacy.x`.
  */
