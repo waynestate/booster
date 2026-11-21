@@ -13,7 +13,8 @@
  *   3. Laravel-owned prefixes (/_laravel/) go to Laravel, and so does /build/
  *      when legacy has no file there.
  *   4. Moved routes: bootstrap/booster-moved.php (Booster writes it) lists
- *      method and regex per moved unit; HEAD counts as GET; first match wins.
+ *      method and regex per moved unit; HEAD counts as GET; first match wins. The regex sees
+ *      the fully decoded path (%2F too), as Laravel's own matcher does.
  *      (Skipped, with 3, when a legacy rule moved into public/.htaccess named
  *      a legacy file: that request stays legacy's, as before.)
  *   5. A real file under the legacy docroot is served as it was: static files
@@ -136,7 +137,10 @@ $booster_route = (static function (): array {
         if (!in_array($method, $methods, true) && !($method === 'HEAD' && in_array('GET', $methods, true))) {
             continue;
         }
-        if (preg_match((string) $row['regex'], $path) === 1) {
+        // Matched on the fully decoded path, as Laravel's UriValidator and Slim's
+        // router match: /users/1%2F2 is /users/1/2 to both, so it is never sent
+        // to a moved users/{id} that Laravel would answer with its own 404.
+        if (preg_match((string) $row['regex'], rawurldecode($path)) === 1) {
             $half('laravel');
             // bootstrap/app.php reads this: moved code gets its input as legacy did.
             $_SERVER['BOOSTER_MOVED_UNIT'] = (string) ($row['unit'] ?? '');

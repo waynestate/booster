@@ -305,7 +305,7 @@ final class StranglerDispatcherTest extends TestCase
     public function test_an_encoded_slash_never_splits_a_segment(): void
     {
         $this->mountedApp();
-        self::assertOnlyLegacy($this->request('GET', '/users/7%2F8'), 'users/7%2F8 is one segment, which the \d+ constraint refuses');
+        self::assertOnlyLegacy($this->request('GET', '/users/7%2F8'), 'users/7%2F8 is users/7/8 to Laravel and the legacy router alike, so it stays legacy\'s');
         self::assertOnlyLaravel($this->request('GET', '/users/%37'), 'other escapes are decoded (%37 is 7)');
     }
 
