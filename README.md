@@ -1160,6 +1160,8 @@ open, and [BEST_PRACTICES.md](BEST_PRACTICES.md) for the rules Booster follows.
 
 MIT, Wayne State University, Enterprise Applications.
 
+Found a security problem? See [SECURITY.md](SECURITY.md); please do not open a public issue.
+
 <details>
 <summary><b>The brand board</b>: the syringe that is also a rocket, lockups, palette and type</summary>
 <br>
