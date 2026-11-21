@@ -16,7 +16,8 @@ use Waynestate\Booster\ToolError;
  * The finish step's file work (design section 4, "Finish"), once no unit is
  * left in legacy: legacy/ goes, and with it the route table, the install
  * hook and the dispatcher, which gives back Laravel's stock front
- * controller. The sign-in move (/login to Laravel) is SIGNIN's part and the
+ * controller. The legacy docroot's static files (robots.txt, images, css)
+ * move into public/ first, since the dispatcher served them until now. The sign-in move (/login to Laravel) is SIGNIN's part and the
  * ledger goes only after the gate passes; both are the caller's.
  */
 final class StranglerFinish
@@ -65,6 +66,14 @@ final class StranglerFinish
         $lines = [];
         $manual = [];
         if (is_dir($root . '/legacy')) {
+            [$copied, $clashes, $docroot] = self::keepStaticFiles($root);
+            if ($copied !== []) {
+                $files = [...$files, ...array_map(static fn(string $f): string => 'public/' . $f, $copied)];
+                $lines[] = sprintf('Copied %d static file%s from %s into public/ (%s), where the dispatcher served them from.', count($copied), count($copied) === 1 ? '' : 's', $docroot, implode(', ', array_slice($copied, 0, 8)) . (count($copied) > 8 ? ', ...' : ''));
+            }
+            foreach ($clashes as $clash) {
+                $manual[] = sprintf('MANUAL: public/%s and %s/%s differ; the dispatcher served the legacy one, public/ keeps its own. Compare them before you deploy.', $clash, $docroot, $clash);
+            }
             $count = self::deleteTree($root . '/legacy');
             $files[] = 'legacy/';
             $lines[] = sprintf('Deleted legacy/ (%d file%s): no unit answers from it any more.', $count, $count === 1 ? '' : 's');
@@ -100,6 +109,58 @@ final class StranglerFinish
         $manual[] = 'MANUAL: run PROCTOR and `sourdough feed` on the plain Laravel app, and drop any legacy-only lines from .env.example.';
 
         return ['files' => $files, 'lines' => $lines, 'manual' => $manual];
+    }
+
+    /**
+     * Copies every file the legacy docroot holds that is not a script (and
+     * not its .htaccess, whose rules the mount already moved) into public/,
+     * where public/ has no such file. Reads the docroot from the dispatcher's
+     * marked line. Returns the copied paths, the paths public/ already has
+     * with other content, and the docroot.
+     *
+     * @return array{list<string>, list<string>, string}
+     */
+    private static function keepStaticFiles(string $root): array
+    {
+        $index = $root . '/public/index.php';
+        $code = is_file($index) ? (string) file_get_contents($index) : '';
+        if (preg_match('/\$legacyDocroot = \'([^\']+)\'; \/\/ booster:legacy-docroot/', $code, $m) !== 1) {
+            return [[], [], ''];
+        }
+        $docroot = trim($m[1], '/');
+        $dir = $root . '/' . $docroot;
+        if ((!str_starts_with($docroot, 'legacy/') && $docroot !== 'legacy') || !is_dir($dir)) {
+            return [[], [], $docroot];
+        }
+        $copied = [];
+        $clashes = [];
+        $items = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS));
+        foreach ($items as $item) {
+            if (!$item instanceof SplFileInfo || !$item->isFile()) {
+                continue;
+            }
+            $relative = str_replace('\\', '/', substr($item->getPathname(), strlen($dir) + 1));
+            if (preg_match('/\.(php[0-9s]?|phtml|phar)$/i', $relative) === 1 || basename($relative) === '.htaccess') {
+                continue;
+            }
+            $target = $root . '/public/' . $relative;
+            if (is_file($target)) {
+                if (file_get_contents($target) !== file_get_contents($item->getPathname())) {
+                    $clashes[] = $relative;
+                }
+
+                continue;
+            }
+            if (!is_dir(dirname($target))) {
+                mkdir(dirname($target), 0775, true);
+            }
+            copy($item->getPathname(), $target);
+            $copied[] = $relative;
+        }
+        sort($copied);
+        sort($clashes);
+
+        return [$copied, $clashes, $docroot];
     }
 
     /** Deletes a folder and everything in it; returns the number of files deleted. */

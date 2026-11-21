@@ -549,12 +549,19 @@ final class StranglerEngineTest extends TestCase
         self::assertStringContainsString('MANUAL (finish):', implode("\n", $result->messages));
     }
 
-    public function test_finish_drops_the_mounts_cd_legacy_group_from_the_replay_setup_whole(): void
+    public function test_finish_keeps_the_legacy_static_files_and_drops_the_mounts_cd_legacy_setup_whole(): void
     {
         [$step, $dir] = $this->mounted('slim', ['GET /a'], Ledger::STEP0_DONE, ['GET /a' => Ledger::LARAVEL]);
-        mkdir($dir . '/legacy');
+        mkdir($dir . '/legacy/public/img', 0777, true);
+        file_put_contents($dir . '/legacy/public/robots.txt', "User-agent: *
+");
+        file_put_contents($dir . '/legacy/public/img/a.gif', 'GIF');
+        file_put_contents($dir . '/legacy/public/index.php', '<?php');
+        file_put_contents($dir . '/legacy/public/.htaccess', 'RewriteEngine On');
+        file_put_contents($dir . '/legacy/public/favicon.ico', 'legacy icon');
         mkdir($dir . '/public');
-        file_put_contents($dir . '/public/index.php', '<?php // the dispatcher');
+        file_put_contents($dir . '/public/favicon.ico', 'laravel icon');
+        file_put_contents($dir . '/public/index.php', "<?php\n    \$legacyDocroot = 'legacy/public'; // booster:legacy-docroot\n");
         file_put_contents($dir . '/composer.json', json_encode(['require' => ['laravel/framework' => '^13.0']], JSON_PRETTY_PRINT));
         file_put_contents($dir . '/booster-replay.json', json_encode(['version' => 1, 'serve' => ['docroot' => 'public', 'setup' => 'mkdir -p storage/logs bootstrap/cache && (cd legacy && mkdir -p logs var/cache)'], 'requests' => []], JSON_PRETTY_PRINT));
 
@@ -563,6 +570,15 @@ final class StranglerEngineTest extends TestCase
         self::assertSame(StepResult::APPLIED, $result->status, implode("\n", $result->messages));
         $replay = json_decode((string) file_get_contents($dir . '/booster-replay.json'), true);
         self::assertSame('mkdir -p storage/logs bootstrap/cache', $replay['serve']['setup']);
+        self::assertSame("User-agent: *
+", file_get_contents($dir . '/public/robots.txt'), 'the static files the dispatcher served stay');
+        self::assertFileExists($dir . '/public/img/a.gif');
+        self::assertFileDoesNotExist($dir . '/public/.htaccess');
+        self::assertSame('laravel icon', file_get_contents($dir . '/public/favicon.ico'));
+        $text = implode("
+", $result->messages);
+        self::assertStringContainsString('Copied 2 static files from legacy/public into public/ (img/a.gif, robots.txt)', $text);
+        self::assertStringContainsString('public/favicon.ico and legacy/public/favicon.ico differ', $text);
     }
 
     public function test_finish_is_refused_while_slim_hosted_units_remain_and_names_them(): void
