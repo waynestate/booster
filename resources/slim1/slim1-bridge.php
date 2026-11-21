@@ -80,7 +80,7 @@ class Slim
     {
         return array(
             'mode' => 'development',
-            'debug' => true,
+            'debug' => false,
             'templates.path' => './templates',
             'view' => 'Slim_View',
             'http.version' => '1.1',

@@ -25,6 +25,9 @@ final class RectorRunner
     /** The memory limit Rector runs with unless the user raises it. Big apps need more than the old hard-coded gigabyte. */
     public const DEFAULT_MEMORY_LIMIT = '2G';
 
+    /** The SHA-256 of the bridges earlier Booster releases wrote, after normalizing CRLF to LF; their apps keep them untouched too. */
+    private const EARLIER_BRIDGE_SHA256 = ['2a82d6761211870bb47b66b632dfe5fb8f46a3c13b4f9217f29b76fe888d7b5e'];
+
     private bool $configValidated = false;
 
     public function __construct(
@@ -58,6 +61,8 @@ final class RectorRunner
      * it does not pick up 8.0, 8.1 and 8.4 syntax and churn in every later
      * hop's diff. A rocket does not repaint its own booster mid-flight. Once
      * a person edits it, it is the app's code and gets the hops like the rest.
+     * A bridge an earlier Booster release wrote is left alone too, recognized
+     * by the SHA-256 of its normalized contents.
      *
      * @return list<string>
      */
@@ -70,7 +75,11 @@ final class RectorRunner
             return [];
         }
 
-        return str_replace("\r\n", "\n", $theirs) === str_replace("\r\n", "\n", $ours) ? [$file] : [];
+        $normalized = str_replace("\r\n", "\n", $theirs);
+        $untouched = $normalized === str_replace("\r\n", "\n", $ours)
+            || in_array(hash('sha256', $normalized), self::EARLIER_BRIDGE_SHA256, true);
+
+        return $untouched ? [$file] : [];
     }
 
     /**

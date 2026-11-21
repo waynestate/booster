@@ -94,9 +94,11 @@ framework move eats a semester. Instead the hop writes `slim1-bridge.php`, about
   `urlFor()`, `getMode()`, `configureMode()`, route middleware, and the app's own properties on `$app`.
 
 It does not turn a PHP notice into an error page the way Slim 1 did in development mode: on a new PHP every
-deprecation would become a 500, which is a strange way to celebrate an upgrade. The bridge is the app's code from
-then on. Move one route at a time to plain Slim 4 (or to Laravel) with the replay green after each, and delete the
-file when nothing calls `new Slim()` any more.
+deprecation would become a 500, which is a strange way to celebrate an upgrade. It defaults to debug off, so a
+migrated app no longer shows Slim's debug error pages unless its own settings turn them on, and a bridge written
+by an earlier Booster release is left as it is. The bridge is the app's code from then on. Move one route at a
+time to plain Slim 4 (or to Laravel) with the replay green after each, and delete the file when nothing calls
+`new Slim()` any more.
 
 ## Stop signs
 
