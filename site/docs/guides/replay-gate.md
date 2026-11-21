@@ -86,7 +86,8 @@ The transcripts are plain text, one block per request, written outside the app (
 ```
 
 - **`serve`**: `docroot` (relative, inside the app; default `.`), `front_controller` (a PHP file in the docroot that every path without a file of its own goes to, like Apache's rewrite to `index.php`; leave it out and the server serves the docroot as files), `setup` (a shell command run once, in the app folder, before the server starts: seed a SQLite file, write a `.env`), `env` and `ini` (passed to the setup and the server), and `services`.
-- **`requests`** or **`sequences`**: a request has `path`, and may have `name`, `method` (default GET), `query`, `headers`, `cookies`, one body (`form`, `json` or a raw `body`), `capture` and `expect`. A sequence shares a cookie jar, so a session started by one request carries to the next. Redirects are recorded, never followed.
+- **`requests`** or **`sequences`**: a request has `path`, and may have `name`, `method` (default GET), `query`, `headers`, `cookies`, one body (`form`, `json` or a raw `body`), `capture`, `expect` and `csrf`. A sequence shares a cookie jar, so a session started by one request carries to the next. Redirects are recorded, never followed (the one exception is a silent sign-in, see [Strangler runs](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#strangler-runs)).
+- **`csrf`**: `true` on a POST, PUT, PATCH or DELETE takes the CSRF field from the previous answer in the sequence and sends it: as form fields when the request posts a form (every hidden field named like a token: Laravel's `_token`, CakePHP's `_csrfToken` and its `_Token[...]` form protection fields, slim/csrf's `csrf_name` and `csrf_value`), else as an `X-CSRF-Token` header from the page's `csrf-token` or `csrfToken` meta tag. A value the form already names is replaced. It is the capture above without the regular expression, and it keeps working when the form page moves to another framework and its field changes name. A page with no CSRF field sends the request as it is, and the transcript says so. It cannot go on the first request of a sequence: there is no answer before it.
 - **`capture`**: a regular expression whose first group is saved under a name, matched against the body and the headers (as `Name: value` lines). Later requests in the same sequence use it as `{{name}}` in the path, query, headers, cookies or body. A placeholder nobody captured is an error when the file loads, not a surprise later.
 - **`expect`**: the status the baseline must answer. It is checked while recording only, so a baseline that is already broken (a 500 where a 200 belongs) is refused instead of faithfully recorded.
 - **`defaults`**: headers every request gets.
@@ -96,13 +97,21 @@ The transcripts are plain text, one block per request, written outside the app (
 
 For each answer: the status, `Content-Type`, `Location` (with the server's own address written as `<app>`), `Allow`, the names of the cookies set (never their values), and the body. Everything else (`Date`, `X-Powered-By`, the values of cookies) changes on every request or every PHP, and is left out. By default runs of spaces and blank lines do not matter, and a JSON body is compared by value, so a reordered key or `1.0` against `1` is not a difference. `"compare": {"whitespace": "exact", "json": "exact"}` compares byte for byte.
 
+`compare` takes three more keys, all written by the strangler's mount step and usable by hand:
+
+- **`ignore_cookies`**: exact cookie names left out of the compared names (`["CAKEPHP", "csrfToken", "laravel_session", "XSRF-TOKEN"]`). The framework's session and CSRF cookies change names when a page moves to Laravel; the app's own cookies stay compared. Patterns are refused.
+- **`preset`**: `"default"`, or `"strangler"` to compare more, below.
+- **`silent_sign_in`**: paths whose redirect is a browser's silent sign-in, below.
+
+None of the three is part of the recording's fingerprint.
+
 ### Normalizers [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#normalizers)
 
 A normalizer rewrites the volatile parts of an answer before it is compared and written. The presets:
 
 | Name | Hides |
 | --- | --- |
-| `csrf` | CSRF tokens in hidden form fields and meta tags (`_token`, `authenticity_token`, and any field whose name holds `csrf` or `xsrf`, such as `csrf_token`, `CSRF_KEY` or slim/csrf's `csrf_name` and `csrf_value`) |
+| `csrf` | CSRF tokens in hidden form fields and meta tags (Laravel's `_token` and `csrf-token`, CakePHP's `_csrfToken` and `csrfToken`, `authenticity_token`, and any field whose name holds `csrf` or `xsrf`, such as `csrf_token`, `CSRF_KEY` or slim/csrf's `csrf_name` and `csrf_value`) |
 | `session-id` | session ids in links, forms and scripts (`PHPSESSID=...`, `laravel_session=...`) |
 | `timestamps` | dates with a time of day, and Unix times from 2020 to 2033 |
 | `asset-hash` | content hashes in built asset names (`app.3f9a1c2b.js`, Vite's `app-L1fqnEWe.js`, `app.js?id=3f9a1c`) |
@@ -135,6 +144,8 @@ Anything else is an object: `{"name": "request id", "pattern": "req-[0-9a-f]{12}
 A `phpinfo()` page is never drafted: it answers differently on every PHP, so every hop would fail on it.
 
 Every GET without parameters becomes a request, plus one unknown path (an honest 404 is an answer too). Every path parameter, form and setup command gets a `todo`, because Booster cannot know which note id exists or what a valid form looks like. Fill those in, delete the `todo` lines, and record.
+
+Each write is drafted with `"csrf": true` in the `forms` sequence, right after a GET of the page that shows its form, so the token comes from that page. When the app has no GET route at the same path, that page gets a `todo` to point it at the right one.
 
 ## Pages behind sign-in [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#pages-behind-sign-in)
 
@@ -187,6 +198,46 @@ serve: docroot public, front index.php -> docroot public, front index.php, setup
 ```
 
 Without the flag nothing changes: a changed `serve` section is refused like any other file change. A recording made before Booster could compare across a serve change has no requests fingerprint of its own; `--serve-changed` says so and asks for one new record on the current setup. The flag goes with `check` only: `record` and `init` refuse it.
+
+## Strangler runs [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#strangler-runs)
+
+`slim-to-laravel` and `cakephp-to-laravel` move an app onto Laravel one unit at a time, with both frameworks serving it in between (the CakePHP and Slim to Laravel guide). The replay is what makes each move safe, so the strangler refuses every move without a usable one: no `booster-replay.json`, a file with `todo` items, or a baseline whose every answer is the same redirect or an error. The mount step may still run, with the usual warning. Its rewrite of the request file turns on what follows.
+
+Step 0, which moves the legacy half's sign-in onto SESAME before the mount, changes one kind of answer on purpose: the sign-in hand-off now sends the browser to CAS. Its check accepts exactly that on the request paths Step 0 names, when the baseline answered a redirect, the answer now is a redirect to sign-in, and nothing but the `Location` changed; the report lists each one (`02 requests: GET /auth/login: Location <old> -> <CAS login>`). Every other request is compared as always, and a new cookie on a listed path is still a difference.
+
+On an app with its own sign-in form, Step 0 turns that form page's 200 into a redirect to CAS. On a listed path that is accepted too when every header line but status, content type and `Location` stayed the same (the form's body goes with it). The requests later in that sequence that posted the form (the next request when it sends CSRF, or a POST to the form's path or a listed path) are reported as `sign-in moved to SESAME` instead of failing: the replay signs in through the fake driver now (`compare.silent_sign_in`). The signed-in pages after them are compared as always.
+
+### Which half answered [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#which-half-answered)
+
+While a replay runs, the container sets `BOOSTER_REPLAY=1`, and the mounted app's dispatcher answers every request with an `X-Booster-Half: laravel` or `X-Booster-Half: legacy` header. The replay reports it and never compares it: each block in the transcript starts with `answered by: laravel`, and the result counts them:
+
+```
+Replay passed: all 9 answers match the baseline from PHP 8.5.
+Answered by: legacy 7, laravel 2 (laravel: 03, 04).
+```
+
+The JSON report carries the same map as `halves`. A moved unit that still shows `legacy` did not move.
+
+### The strangler preset [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#the-strangler-preset)
+
+A PHP upgrade rarely changes a cookie's flags or a security header; moving a page to another framework can. `"compare": {"preset": "strangler"}` adds to what is compared:
+
+- **Each cookie's attributes**: `Path`, `Secure`, `HttpOnly` and `SameSite`, one `cookie <name>:` line per cookie the answer sets (not the ignored ones). `Expires`, `Max-Age` and `Domain` stay out.
+- **The security headers**, when either side sends them: `Content-Security-Policy` (and its report-only twin, with each nonce hidden), `Strict-Transport-Security`, `X-Frame-Options`, and the CORS `Access-Control-Allow-*`, `-Expose-Headers` and `-Max-Age` headers.
+
+It also hides which framework's CSRF field a form carries: CakePHP's `_csrfToken`, slim/csrf's pair and Laravel's `_token` all compare as one hidden CSRF field, and the `csrf-token` and `csrfToken` meta tags as one meta tag. A form that loses its CSRF field still differs, and so does any field of the form's own.
+
+And it treats the mount's legacy root and the old app root as one path in bodies: an error page that prints `/app/legacy/src/...` after the mount compares equal to the baseline's `/app/src/...` (also JSON-escaped).
+
+### Signed-in sequences [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#signed-in-sequences)
+
+The legacy half keeps its sign-in until the last step, and each half keeps its own session (both on SESAME). A sequence that reaches a signed-in page therefore signs in through a legacy request first: the test login POST, or a seeded session plus any legacy page. When a request that answered 200 in the baseline now answers a redirect to sign-in, and it is the first request of its sequence, the check says exactly that:
+
+```
+Signed-in sequence: 02 staff: GET /articles is the first request of sequence "staff" and now answers the redirect to sign-in (Location: /_laravel/login) (answered by laravel) where the baseline answered 200. A sequence must sign in through a legacy request before its first moved route: start it with the test login POST, or a seeded session plus any legacy page.
+```
+
+When Laravel answers that redirect later in a sequence, the Laravel half had no session of its own yet. In a browser that is a silent round trip through CAS; in the replay SESAME's `fake` driver signs in at once. List the Laravel half's sign-in path in `"compare": {"silent_sign_in": ["/_laravel/login"]}` and the client follows that one redirect chain the way a browser does, on GET and HEAD requests only: the redirect to a listed path, its answers, and the redirect back to the page asked for, whose answer is the one compared. The transcript lists each hop it followed (`client: sign-in: followed 302 to GET /_laravel/login`). Any other redirect is still recorded, never followed.
 
 ## Limits, honestly [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#limits-honestly)
 

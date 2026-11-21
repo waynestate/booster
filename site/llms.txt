@@ -13,6 +13,7 @@ Every page below is Markdown. The HTML pages send the same Markdown to a client 
 - [Checks | Booster docs](https://booster.apps.wayne.edu/docs/checks.md): How Booster is built, tested and released, and where its proof lives.
 - [The baseline | Booster docs](https://booster.apps.wayne.edu/docs/guides/baseline.md): The test run that separates a bad hop from a suite that was already red.
 - [Behavior changes | Booster docs](https://booster.apps.wayne.edu/docs/guides/behaviour-changes.md): The silent changes between versions that Rector does not rewrite, one block per hop.
+- [CakePHP and Slim apps onto Laravel | Booster docs](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.md): Booster 1.21 moves a CakePHP 5 or Slim 4 app onto Laravel 13 one unit at a time (the strangler), with sign-in on SESAME first and the replay as the gate for every run.
 - [CakePHP and Slim apps to PHP 8.5 | Booster docs](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.md): Booster 1.20 moves a CakePHP 4 app to CakePHP 5.4 and a Slim 3 app to Slim 4.15, with the PHP hops to 8.5 around them, the replay as the real gate and a MANUAL list for what only a person can do.
 - [Deploying on Citadel | Booster docs](https://booster.apps.wayne.edu/docs/guides/citadel.md): What a real run tells a Citadel app about its next deploy, and the install script it writes when one is needed.
 - [The dependency check | Booster docs](https://booster.apps.wayne.edu/docs/guides/dependency-check.md): How Booster asks Packagist whether your direct dependencies can follow the plan.
@@ -31,6 +32,7 @@ Every page below is Markdown. The HTML pages send the same Markdown to a client 
 - [Commands | Booster docs](https://booster.apps.wayne.edu/docs/reference/commands.md): Every Booster command and option, generated from the tool itself.
 - [Configuration | Booster docs](https://booster.apps.wayne.edu/docs/reference/configuration.md): The environment variables Booster reads, and where it gets the policy.
 - [Hops | Booster docs](https://booster.apps.wayne.edu/docs/reference/hops.md): Every hop Booster knows, generated from the hop data.
+- [Strangler sign-in | Booster docs](https://booster.apps.wayne.edu/docs/reference/strangler-sign-in.md): What Booster's strangler changes to move an app's sign-in onto SESAME (Step 0), how the Laravel half signs in under /_laravel/, how one logout ends both halves, and what the finish puts back.
 - [Upgrading | Booster docs](https://booster.apps.wayne.edu/docs/upgrading.md): What changes when you move Booster to a new release, and what an app an older Booster already moved needs.
 - [Booster proof: real output](https://booster.apps.wayne.edu/proof.md): Booster plans and runs PHP and Laravel upgrades one hop at a time on Rector, gates every hop with your tests on the target PHP, and never commits or pushes for you.
 

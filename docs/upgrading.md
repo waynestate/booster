@@ -36,6 +36,20 @@ Laravel 13 one unit at a time (the strangler). Two hops were added and none remo
   (`"strangler"`) and `silent_sign_in`. `replay init` now drafts a GET of each write's form page right before it.
   Existing request files and recordings keep working unchanged: no fingerprint moves, and the replay container only
   gains `BOOSTER_REPLAY=1`.
+- **The mount sets the PHP line once for both halves.** The root `composer.json` asks for the same PHP as
+  `legacy/` (never lower) and its `config.platform.php` pin moves up with it, so one PHP runs both halves.
+- **Moved routes keep the legacy headers.** The first move scopes HELMET to `web`, and each moved route skips
+  HELMET's security headers, the ribbon and the forgery guard, so a moved page answers with the headers the legacy
+  page sent. Port those to Laravel when the unit is yours.
+- **A strangler gate may move a package the app requires.** When SESAME or a moved unit needs a shared package at a
+  new major and a locked package holds it, the gate names the holders in another `composer update`; when a package
+  the app requires itself still holds it, the gate raises that package one major, keeps the raise only when your
+  check passes, and says so in a MANUAL line. Read that line before you commit.
+- **Slim-hosted units and the finish.** A Slim unit that needs Slim's own dispatch (route middleware, a closure's
+  `use` variables) is Slim-hosted, listed in its own report section (`strangler.slim_hosted` in JSON). `--finish`
+  refuses while any moved unit still depends on `legacy/`: a Slim-hosted unit, or one whose adapter runs the legacy
+  app's own setup per request. Port the services to a Laravel provider and the app-wide middleware to Laravel
+  middleware first. A finish copies the legacy docroot's static files (robots.txt and the like) into `public/`.
 
 ### An app that an older Booster already moved
 

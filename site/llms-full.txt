@@ -368,14 +368,14 @@ Options shared by `plan` and `run`:
 | `--today` | Override today's date (`YYYY-MM-DD`) so runs are repeatable |
 | `--goal` | Shorthand such as `php-74-to-84` (sets `--from-php` and `--to-php`) |
 | `--from-php`, `--from-laravel` | Say what the app runs on when the manifest does not |
-| `--to-php`, `--to-laravel`, `--to-phpunit` | The target. Default: the newest version the policy supports today (PHPUnit: the newest that runs on the target PHP) |
+| `--to-php`, `--to-laravel`, `--to-phpunit` | The target. Default: the newest version the policy supports today (PHPUnit: the newest that runs on the target PHP). A bare `--to-laravel` on a CakePHP 5 or Slim 4 app opts in to the move onto Laravel ([the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/cakephp-and-slim-to-laravel.md)) |
 | `--to-cakephp`, `--to-slim` | The framework line for a CakePHP or Slim app (default: the newest Booster supports, CakePHP 5.4 or Slim 4.15; `--to-cakephp 4` stops on 4.6). [The guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/cakephp-and-slim.md) |
 | `--sesame` | Include the `wayne-cas` to SESAME swap |
 | `--wayneui` | Include the WayneUI 1.x to 2.x move |
 | `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of `vendor/` and onto Composer ([the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/framework-hops.md)) |
 | `--strict-session` | Include the hop that turns on `session.use_strict_mode` and `session.use_only_cookies` before each `session_start()` in a raw PHP app ([the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/strict-sessions.md)) |
 | `--skip` | A hop id to leave out (repeat it) |
-| `--no-package-check` | Skip the Packagist dependency check (for offline use) |
+| `--no-package-check` | Skip the Packagist checks: the plan's dependency check and a run's dependency raise (for offline use) |
 | `--until` | Cut the plan after this hop id: that step and everything before it stay, and the plan's targets move to where it lands |
 | `--only` | Plan and run just this one hop id. The app must sit on the hop's starting versions, and `--until` and `--only` are never combined |
 | `--with-node` | include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version. Without it, any of `--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php` or `--from-laravel` leaves those hops out, and the plan prints: "Node front-end hops were left out because you passed a target version: . Add --with-node to include them." |
@@ -415,6 +415,7 @@ Options for `run`:
 | `--proctor-command` | An extra command run in the image after the tests, for example a PROCTOR check |
 | `--replay[=FILE]` | Record how the app answers the requests in `booster-replay.json` (or FILE) before the first hop, replay them after every hop's tests, and fail the hop on a changed answer. Off by default |
 | `--replay-out` | Where the replay transcripts go (default: a new `booster-replay--` folder in the temp folder) |
+| `--moves`, `--route`, `--hand`, `--finish` | Strangler runs after the mount: move the next N units (default 1), one unit by id, flip a unit a person ported (with `--route`), or finish once no unit is left in legacy ([the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/cakephp-and-slim-to-laravel.md)) |
 | `--proctor-advisory` | Report the PROCTOR result but do not fail the run on it. Applied automatically when the run stops before the final target (`--until`, `--only`, or a target past security support) |
 
 Exit codes: `0` pass, `1` the baseline failed, a hop was capped, errored or failed its gate, or the PROCTOR check
@@ -521,7 +522,7 @@ abandoned (use acme/new instead).`). Packages the check cannot reach are reporte
 `package_checks`, with the fields `package`, `newest`, `blocks`, `abandoned` and `checked`.
 
 The check fetches from `repo.packagist.org` and from any composer-type repository the app declares in
-`composer.json`; VCS repositories are never fetched. `--no-package-check` skips the whole check, for offline use.
+`composer.json`; VCS repositories are never fetched. `--no-package-check` skips the whole check, for offline use. In `run` it also turns off the dependency raise a PHP hop tries when its gate fails inside a package that needs its next major ([Hops](https://github.com/waynestate/booster/blob/HEAD/docs/reference/hops.md)).
 
 #### Behavior changes
 
@@ -706,7 +707,10 @@ hop that turns `0 == "abc"` from true to false fails there even when no test vis
 drafts the request file from the app's routes, with `todo` items for what only a person knows; normalizers hide CSRF
 tokens, session ids, timestamps and asset hashes. A baseline where every answer is an error (a PHP fatal, an
 unexpected 5xx, or one error page for every path) stops the run before the first hop, since replaying it would only
-prove the app fails the same way; `--allow-failing-baseline` records it anyway. The file format, the design and the
+prove the app fails the same way; `--allow-failing-baseline` records it anyway. A write drafted with `"csrf": true`
+takes its CSRF field from the form page before it, whichever framework printed it. For the Laravel strangler the file
+can ignore the frameworks' session cookies, compare cookie flags and security headers (`"preset": "strangler"`), and
+the replay reports which half of the mounted app answered each request. The file format, the design and the
 honest limits (no real Oracle, SSO or JavaScript-driven pages) are in [the replay gate guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/replay-gate.md).
 
 #### Hand-copied libraries to Composer
@@ -736,6 +740,19 @@ adapter and route group prefixes through the group callable, moves code typed wi
 `Response` onto slim/http's decorators, and leaves the old error handlers, `pathFor()`, Twig `path_for` and
 `Slim\Http\Environment` as MANUAL. Run them with `--replay` and `--to-php 8.5`; the commands and the full MANUAL lists are in
 [the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/cakephp-and-slim.md).
+
+#### CakePHP and Slim apps onto Laravel
+
+Once a CakePHP app is on 5 or a Slim app on 4, a bare `--to-laravel` plans `cakephp-to-laravel` or `slim-to-laravel`
+last: the strangler, which moves the app onto Laravel 13 one unit (a route, or a form's GET and POST) at a time instead
+of a rewrite. Run 1 moves the old sign-in onto SESAME (Step 0), then mounts Laravel at the root with the old app
+unchanged in `legacy/` and a dispatcher in `public/index.php`, and stops. Each later run moves `--moves N` units (or
+one `--route`), gated by the replay with the moved units answering from Laravel; a unit Booster cannot move is refused
+with file and line, ported by hand and flipped with `--hand --route`. `--finish` deletes `legacy/` and puts back the
+stock front controller. The ledger, `booster-strangler.json`, is the only state between runs, and the replay is
+required. Details in [the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/cakephp-and-slim-to-laravel.md).
+
+> A strangler fig takes years to swallow its host tree. Booster asks for one unit per run.
 
 #### Strict session IDs for raw PHP apps
 
@@ -957,7 +974,10 @@ Pimple container; the old error handlers and `pathFor()` stay MANUAL ([the guide
 `--strict-session` for a raw PHP app that calls `session_start()` without strict session IDs, first, on the PHP the
 app runs today; never for Laravel): adds one guarded `ini_set()` line for `session.use_strict_mode` and
 `session.use_only_cookies` before each call, skips what is already covered, and refuses on a stop sign
-([the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/strict-sessions.md)). `booster hops` prints them all.
+([the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/strict-sessions.md)). `cakephp-to-laravel` and `slim-to-laravel` (planned last, with a bare
+`--to-laravel`, for a CakePHP 5 or Slim 4 app on PHP 8.3 or newer): the strangler; run 1 moves sign-in onto SESAME and
+mounts Laravel 13 with the old app in `legacy/`, later runs move units one at a time behind the replay, and
+`--finish` removes `legacy/` ([the guide](https://github.com/waynestate/booster/blob/HEAD/docs/guides/cakephp-and-slim-to-laravel.md)). `booster hops` prints them all.
 
 > Every other hop lifts the engine; `wayneui-1-to-2` is the one that repaints the bodywork.
 
@@ -1235,7 +1255,7 @@ $ bin/booster run --path=examples/raw-php --to-php=8.2 --dry-run BOOSTER dry run
 
 **hopsEvery hop Booster knows**
 
-$ bin/booster hops php-55-to-56 Move PHP 5.5 code to PHP 5.6. php-56-to-70 Move PHP 5.6 code to PHP 7.0. php-70-to-71 Move PHP 7.0 code to PHP 7.1. php-71-to-72 Move PHP 7.1 code to PHP 7.2. php-72-to-73 Move PHP 7.2 code to PHP 7.3. php-73-to-74 Move PHP 7.3 code to PHP 7.4. php-74-to-80 Move PHP 7.4 code to PHP 8.0. php-80-to-81 Move PHP 8.0 code to PHP 8.1. php-81-to-82 Move PHP 8.1 code to PHP 8.2. php-82-to-83 Move PHP 8.2 code to PHP 8.3. php-83-to-84 Move PHP 8.3 code to PHP 8.4. php-84-to-85 Move PHP 8.4 code to PHP 8.5. laravel-5.8-to-6 Move a Laravel 5.8 app to Laravel 6. laravel-6-to-7 Move a Laravel 6 app to Laravel 7. laravel-7-to-8 Move a Laravel 7 app to Laravel 8. laravel-8-to-9 Move a Laravel 8 app to Laravel 9. laravel-9-to-10 Move a Laravel 9 app to Laravel 10. laravel-10-to-11 Move a Laravel 10 app to Laravel 11. laravel-11-to-12 Move a Laravel 11 app to Laravel 12. laravel-12-to-13 Move a Laravel 12 app to Laravel 13. phpunit-9-to-10 Move PHPUnit 9 tests to PHPUnit 10. phpunit-10-to-11 Move PHPUnit 10 tests to PHPUnit 11. phpunit-11-to-12 Move PHPUnit 11 tests to PHPUnit 12. phpunit-12-to-13 Move PHPUnit 12 tests to PHPUnit 13. phpunit-to-9-manual Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves. \[playbook\] cas-to-sesame Swap the wayne-cas package for SESAME native names: ModelUserResolver, auth.sesame, and the app's own ReadOnlyAttributes. wayneui-1-to-2 Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. vendored-to-composer Move hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto their maintained Composer releases (doctrine/orm 2.20, smarty/smarty 4.5, slim/slim 4 through a Slim 1 bridge). cakephp-4-to-4.6 Move a CakePHP 4 app to the last 4.x release (4.6) with CakePHP's own upgrade rules, so every deprecation is flagged before the jump to 5. cakephp-4.6-to-5 Move a CakePHP 4.6 app to CakePHP 5.4 with CakePHP's own upgrade rules: AuthComponent moves to the Authentication plugin and .ctp templates become .php. slim-3-to-4 Move a Slim 3 app to Slim 4.15: the app factory, PSR-7 through slim/psr7, Slim's ErrorMiddleware, and a double-pass adapter so the app's middleware keeps working. session-strict-mode Turn on strict session IDs in a raw PHP app: set session.use_strict_mode and session.use_only_cookies before each session_start() call. node-pin-24 Pin the app to Node 26: set engines.node in package.json and write .nvmrc. mix-to-vite Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). vite-major Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions. tailwind-3-to-4 Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool. typescript-major Move the app to TypeScript 6: pin typescript in package.json, and vue-tsc too when the app has it. vue-26-to-27 Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API. vue-27-to-compat Move a Vue 2.7 front end to Vue 3 through the @vue/compat build. vue-compat-codemod Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists. vue-2-to-3 Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue). \[playbook\] inertia-2-to-3 Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0. These are every step Booster knows; \`plan\` picks the ones your app needs. Use an id with --until=\<id>, --only=\<id> or --skip=\<id>. \[playbook\] steps are done by hand, not by Booster.
+$ bin/booster hops php-55-to-56 Move PHP 5.5 code to PHP 5.6. php-56-to-70 Move PHP 5.6 code to PHP 7.0. php-70-to-71 Move PHP 7.0 code to PHP 7.1. php-71-to-72 Move PHP 7.1 code to PHP 7.2. php-72-to-73 Move PHP 7.2 code to PHP 7.3. php-73-to-74 Move PHP 7.3 code to PHP 7.4. php-74-to-80 Move PHP 7.4 code to PHP 8.0. php-80-to-81 Move PHP 8.0 code to PHP 8.1. php-81-to-82 Move PHP 8.1 code to PHP 8.2. php-82-to-83 Move PHP 8.2 code to PHP 8.3. php-83-to-84 Move PHP 8.3 code to PHP 8.4. php-84-to-85 Move PHP 8.4 code to PHP 8.5. laravel-5.8-to-6 Move a Laravel 5.8 app to Laravel 6. laravel-6-to-7 Move a Laravel 6 app to Laravel 7. laravel-7-to-8 Move a Laravel 7 app to Laravel 8. laravel-8-to-9 Move a Laravel 8 app to Laravel 9. laravel-9-to-10 Move a Laravel 9 app to Laravel 10. laravel-10-to-11 Move a Laravel 10 app to Laravel 11. laravel-11-to-12 Move a Laravel 11 app to Laravel 12. laravel-12-to-13 Move a Laravel 12 app to Laravel 13. phpunit-9-to-10 Move PHPUnit 9 tests to PHPUnit 10. phpunit-10-to-11 Move PHPUnit 10 tests to PHPUnit 11. phpunit-11-to-12 Move PHPUnit 11 tests to PHPUnit 12. phpunit-12-to-13 Move PHPUnit 12 tests to PHPUnit 13. phpunit-to-9-manual Move PHPUnit to ^9 by hand: PHPUnit below 9 does not run on PHP 8, so later gates cannot run until it moves. \[playbook\] cas-to-sesame Swap the wayne-cas package for SESAME native names: ModelUserResolver, auth.sesame, and the app's own ReadOnlyAttributes. wayneui-1-to-2 Move WayneUI 1.x (Bootstrap 3) to 2.x (wsu- classes): rewrites the one-to-one items and lists the rest. vendored-to-composer Move hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto their maintained Composer releases (doctrine/orm 2.20, smarty/smarty 4.5, slim/slim 4 through a Slim 1 bridge). cakephp-4-to-4.6 Move a CakePHP 4 app to the last 4.x release (4.6) with CakePHP's own upgrade rules, so every deprecation is flagged before the jump to 5. cakephp-4.6-to-5 Move a CakePHP 4.6 app to CakePHP 5.4 with CakePHP's own upgrade rules: AuthComponent moves to the Authentication plugin and .ctp templates become .php. slim-3-to-4 Move a Slim 3 app to Slim 4.15: the app factory, PSR-7 through slim/psr7, Slim's ErrorMiddleware, and a double-pass adapter so the app's middleware keeps working. session-strict-mode Turn on strict session IDs in a raw PHP app: set session.use_strict_mode and session.use_only_cookies before each session_start() call. cakephp-to-laravel Move a CakePHP 5 app onto Laravel 13 one unit at a time: sign-in on SESAME first, then Laravel at the root with the old app in legacy/, then routes and forms move run by run, each one gated by the replay. slim-to-laravel Move a Slim 4 app onto Laravel 13 one unit at a time: sign-in on SESAME first, then Laravel at the root with the old app in legacy/, then routes and forms move run by run, each one gated by the replay. node-pin-24 Pin the app to Node 26: set engines.node in package.json and write .nvmrc. mix-to-vite Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). vite-major Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions. tailwind-3-to-4 Move a Tailwind CSS 3 front end to Tailwind CSS 4 with the official upgrade tool. typescript-major Move the app to TypeScript 6: pin typescript in package.json, and vue-tsc too when the app has it. vue-26-to-27 Move a Vue 2.6 front end to Vue 2.7, the last Vue 2 release, which carries the Vue 3 reactivity API. vue-27-to-compat Move a Vue 2.7 front end to Vue 3 through the @vue/compat build. vue-compat-codemod Run the vue-upgrade-tool codemod over the front end and keep every manual item it lists. vue-2-to-3 Move a Vue 2 front end to Vue 3 (playbook only; Rector does not read Vue). \[playbook\] inertia-2-to-3 Move an Inertia 2 app to Inertia 3: pin inertiajs/inertia-laravel to ^3.0 and @inertiajs/vue3 to ^3.0. These are every step Booster knows; \`plan\` picks the ones your app needs. Use an id with --until=\<id>, --only=\<id> or --skip=\<id>. \[playbook\] steps are done by hand, not by Booster.
 
 **initWrites the coding-tab playbooks to .agents/skills**
 
@@ -1565,6 +1585,40 @@ Source: https://booster.apps.wayne.edu/docs/changelog.html
 All notable changes to Booster are recorded here. The format follows Keep a Changelog.
 
 ### \[Unreleased\] [#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
+
+- Added: `cakephp-to-laravel` and `slim-to-laravel`, the strangler (one hop, two faces): a bare `--to-laravel` plans it last for a CakePHP 5 or Slim 4 app on PHP 8.3 or newer. Run 1 moves the old sign-in onto SESAME (Step 0), mounts Laravel 13 at the root with the old app unchanged in `legacy/`, and stops; later runs move units (a route, or a form's GET and POST) with `--moves N` or `--route "<id>"`, flip a hand-ported unit with `--hand --route`, and `--finish` deletes `legacy/` and puts back the stock `public/index.php`. Every run is gated by the replay, which the hop requires. The guide is docs/guides/cakephp-and-slim-to-laravel.md.
+- Added: a strangler move that adds packages to the Laravel half's `composer.json` gets `composer update -W` for them in the gate image before the gate; a failed update marks the unit failed with Composer's first error line (`failed` in the JSON report's `strangler` section).
+- Added: `booster-strangler.json`, the strangler's ledger at the app root (framework, mount time, Step 0, and each unit's state: legacy, laravel, hand or failed). An app with a ledger plans only the strangler until `--finish`.
+- Added: the run report's strangler section, in text and in JSON (`strangler`): units moved with their replay line, units left, refusals with file and line, the MANUAL checklist grouped by sign-in, mount, route moves and finish, and the next command.
+- Changed: `--to-laravel` takes its value optionally: a bare `--to-laravel` is the strangler opt-in, and `--to-laravel=13` (or `--to-laravel 13`) is still a Laravel app's target.
+- Added: the replay's strangler pieces (strangler design sections 5 and 9.5). `compare.ignore_cookies` leaves exact cookie names (a framework's session and CSRF cookies) out of the compared names; `"compare": {"preset": "strangler"}` also compares each cookie's Path, Secure, HttpOnly and SameSite and the security headers (CSP with its nonces hidden, HSTS, X-Frame-Options, CORS), and treats CakePHP's `_csrfToken`, slim/csrf's pair and Laravel's `_token` as one CSRF field; `compare.silent_sign_in` follows the Laravel half's silent sign-in redirect on GET requests the way a browser does. None of them changes the recording's fingerprint.
+- Added: the `"csrf": true` request flag takes the CSRF field (name and value) from the previous answer in the sequence and sends it as form fields, or as an `X-CSRF-Token` header for JSON, so a sequence keeps working when its form page moves from one framework's token to another's. `replay init` drafts every write with it, right after a GET of its form page.
+- Added: the replay container sets `BOOSTER_REPLAY=1`, and the replay reports which half of a mounted app answered each request (its `X-Booster-Half` header) in the transcript, the result line ("Answered by: legacy 7, laravel 2") and the JSON report's `halves`; it is never compared.
+- Added: a request that answered 200 in the baseline and now answers a redirect to sign-in gets its own failure line: as the first request of its sequence, that the sequence must sign in through a legacy request before its first moved route; later, answered by Laravel, that the Laravel half signs in on its own session.
+- Added: the strangler's Step 0 check accepts the sign-in hand-off it moves to CAS on the request paths it names (a redirect before, a redirect to sign-in now, nothing else changed), lists each in the report, and compares every other request as always.
+- Added: Step 0's check also accepts a listed sign-in form page whose 200 now redirects to CAS (nothing else on it changed), and reports the requests of that sequence that posted the form as "sign-in moved to SESAME" instead of failing; the replay signs in through the fake driver.
+- Added: the strangler compare preset treats the mount's legacy root (`/app/legacy`) and the old app root (`/app`) as one path in bodies, so an error page that prints a file path still matches.
+- Added: `ReplayFile::usableForStrangler()`, the strangler's check that the app has a usable replay (a file with no todo items, and a baseline that is not one redirect everywhere or all errors).
+- Changed: the `csrf` preset also hides CakePHP's `csrfToken` meta tag and meta tags that put `content` before `name`.
+- Added: strangler Step 0 moves an app's sign-in onto SESAME 0.10 before the mount: CakePHP's validUser cookie check (an AuthController, or the shared SsoController and SsoAuthenticator) and form login, Slim's WSUCookie family, and the shared sign-out store for an app already on SESAME. Edits are planned first and written only when all of them place exactly; LTI apps and a legacy session named `laravel_session` are stop signs; sign-in Booster cannot map is a MANUAL line. See [Strangler sign-in](https://github.com/waynestate/booster/blob/main/docs/reference/strangler-sign-in.md).
+- Added: after the mount, the Laravel half signs in through SESAME's guard under `/_laravel/login` on its own session, keeps the same user array as the old half (`StranglerUser`), and shares one sign-out directory with it, so a logout on either half ends both; the finish puts SESAME's routes back at `/login`.
+- Added: the CakePHP half of the strangler (`cakephp-to-laravel`). Its units come from `config/routes.php` with `fallbacks()` spelled out one action at a time; a form, the action it posts to and the page its flash message lands on move together as one unit; units are ordered stateless, page, write, then sign-in.
+- Added: a CakePHP unit moves only when every statement of its actions (and of the `initialize()` and `beforeFilter()` they inherit) maps: `getData`, `getQuery`, `getParam`, `is()`, `set()` plus its template, `return $this->redirect([...])`, `Flash`, and the Authentication identity, which becomes SESAME's `$request->user()`. Anything else (the ORM, other components, `paginate`, `FormHelper`) is a refusal with its file and line, for a person to port and finish with `--hand`.
+- Added: a moved CakePHP template, its elements and, on the first page move, its layout are written as Blade files with the helpers mapped (`Html->charset/css/script/meta/link`, `Url->build`, `fetch`, `assign`, `Flash->render`, `element`, `h()`) and the PHP left as PHP, so the HTML comes out byte for byte; each is a MANUAL line for the idiomatic Blade rewrite, and a layout helper that does not map is a MANUAL line too. Redirects keep CakePHP's empty body and full `Location`, and Laravel's input trimming skips moved actions.
+- Added: Eloquent model skeletons from the CakePHP Table and Entity classes (table, key, timestamps, associations, `_accessible` as `$fillable`, `_hidden` as `$hidden`), written with the first move; a model the Laravel half already has is left alone with a MANUAL line.
+- Fixed: a CakePHP or Slim app with no composer.lock is planned on the line Composer installs, the newest line its constraint allows on the app's PHP, not the constraint's floor: the public slim-skeleton 4.5.0 (`slim/slim ^4.10`) stopped a `--to-php 8.5` run at PHP 8.1, Slim 4.10's ceiling, while its baseline installed Slim 4.15. A lock still says what is installed.
+- Fixed: a PHPUnit step's composer update also names the locked packages that lean on PHPUnit or its parts (phpspec/prophecy, prophecy-phpunit, a PHPStan extension that conflicts with the new PHPUnit), so they move with it inside their constraints; on slim-skeleton 4.5.0 the PHPUnit 12 and 13 steps failed with "locked to version ... and an update of this package was not requested".
+- Fixed: `plan` holds PHPUnit at the last major every direct dependency's constraint can install next to, with a warning naming the package, instead of planning a PHPUnit step whose composer update can only fail; with `--to-phpunit` the step stays and the warning says why it will fail. Laravel plans are unchanged.
+- Fixed: the Slim 3 to 4 hop rewrites Slim 3's `$request->getUri()->getBasePath()`, which Slim 4's Uri lacks, to `$request->getAttribute(\Slim\Routing\RouteContext::BASE_PATH, '')`, the base path its routing glue puts on every request; a Uri base path it cannot place, and every `getBaseUrl()`, is a MANUAL line with its line number. On testeval a signed-in `/login/` answered 500 at Slim 4.15.
+- Added: a PHP hop whose gate fails inside a direct dependency that is already on the newest release its constraint allows widens that constraint to `<old> || ^<next>` when the next major installs on the new PHP, runs `composer update -W` for it and gates again; the raise stays only when that gate passes, with a MANUAL line naming the package, both majors and its source link, and is backed out otherwise. One per hop, never for the framework packages or PHPUnit, off with `--no-package-check`. On slim-skeleton 4.5.0 it moves php-di/php-di to 7 at PHP 8.4, where 6.4.0's deprecations turned `GET /` into a 500.
+- Added: the strangler mount (`Waynestate\Booster\Strangler\Mount`, the first step of slim-to-laravel and cakephp-to-laravel). Sourdough 0.4.2 bakes the Laravel half at the root in the gate image, the old Composer root moves unchanged to `legacy/` (from the root or a `src/` folder), and a framework-free `public/index.php` sends each request to exactly one half: `/_laravel/`, `/build/` and the moved routes in `bootstrap/booster-moved.php` (the new `RouteTable`; a route URI that ends in `/` matches only with its slash, so the slashless path stays legacy's) to Laravel, everything else to the legacy front controller or its static files, with the server variables it saw before. One `composer install` installs both roots, and the root `composer.json` never asks for a lower PHP than `legacy/` does (its `config.platform.php` pin moves up with it), so one PHP runs both halves. The mount points `booster-replay.json` at the dispatcher (the recording stays valid for `replay check --serve-changed`), maps `.env.example`, and lists the Citadel public directory and config file paths as MANUAL. The legacy docroot's `.htaccess` moves into `public/.htaccess` ahead of the front-controller rule (the new `LegacyHtaccess`): redirects and denials as written, file tests pointed at the legacy docroot, pass-through and file-target rules sent through the dispatcher to the same legacy file, deny-only `<Files>` blocks turned into `[F]` rules, legacy folders answered as Apache answered them (a 301 that adds the slash, the folder's index, or Apache's own 403; under php -S, what the legacy replay run gave), and per-directory `php_value`, `Header` and `Redirect` lines at the top; what it cannot place is a MANUAL line naming its file and line. Moved routes skip Laravel's `TrimStrings` and `ConvertEmptyStringsToNull` (the dispatcher marks them), so moved code gets its input as legacy did.
+- Added: the strangler's Slim half (`slim-to-laravel`). Booster lists a mounted Slim 4 app's routes as units (group prefixes, a group that calls a class's `addRoutes()`, names kept, a form's GET and POST as one unit, in the order stateless, page, write, signed-in, with a catch-all last) and moves one unit at a time into `routes/web.php`. The moved handler and the app classes it uses are copied under `app/Http/Controllers/Legacy/` and run unchanged behind a PSR-7 adapter: Slim's own request and response, the route arguments, echoed output added the way the app had it, the legacy container rebuilt from the same PHP-DI definition files and bound as `legacy.<key>` (with an ArrayAccess shim) by a new `LegacyServiceProvider`, and the app's own response emitter and error handler, so headers and error bodies stay the same. `{x:regex}` becomes `->where()` and spaces in placeholders are dropped. An optional segment (`/[login[/]]`, `/page[/{n}]`, nested) is one unit per Laravel path, named on the longest. An app that builds its own Slim app and container (an app class like `App\App`, Pimple, an init script, the Slim 3 to 4 hop's `LegacyApp`) keeps its handlers behind the adapter too: the adapter runs a copy of the legacy front controller and the scripts it requires up to the app's `run()`, recording every `$app->add()` middleware through `AppFactory::create`, then answers with the moved handler inside that middleware, in Slim's order, without Slim's dispatch. Its CSRF check runs on the moved routes with the legacy session token, and a route behind a role `if` is registered inside the same `if`, so a guest, a wrong role and a bad token get exactly the legacy answer; every container key is bound as `legacy.<key>`. A route with its own middleware or a closure's `use` variables, or an app that builds `Slim\App` outside `AppFactory::create`, is Slim-hosted (the copy runs Slim itself); its move says why, with the file and line, in a `SLIM-HOSTED:` MANUAL line, and `SlimMover::hostedUnits()` lists what is left. A moved write keeps the legacy CSRF check (Laravel's own stays off on it, with a MANUAL line). Legacy Twig templates rendered through TwigBridge get url_for, full_url_for, is_current_url and base_path. Packages the moved code needs are added to the root composer.json with the legacy constraint, Slim's and PHP-DI's widened by one major when a locked dependency would conflict, and any other conflicting package left out with a MANUAL line. `is_array()` on SESAME's user is rewritten to read its array. Booster still refuses, with the file and line, a role check it cannot copy (an `else`, a loop, `$this`), an include it cannot resolve and a pattern that would shadow a route left behind. A signed-in unit waits for Step 0. Proven on testeval: the login form and the signed-in logout moved behind the adapter, all 17 guest and signed-in answers the same, and the 12 on the moved paths still the same with the legacy half, its login handler and Slim's dispatch disabled.
+- Added: a moved strangler route keeps the legacy answer's headers: the first move scopes HELMET to `web` and every moved route skips SecurityHeaders, InjectRibbon and RequestForgeryGuard, on every move path (the PSR-7 adapter, the app-setup mode and Slim-hosted).
+- Added: a strangler gate whose `composer update` fails because a locked package holds a shared one at its old major ("found X but these were not loaded") names those holders in another update, up to four rounds; when a package the app requires itself still holds it, the gate raises that package to its next major once and keeps the raise only when the update and the app's own check pass, with a MANUAL line. On testeval Step 0 moved slim/http, slim/psr7 and then monolog/monolog 1 to 2 for SESAME's psr/http-message 2 and psr/log 3.
+- Added: `--finish` refuses while any moved unit still depends on `legacy/`: a Slim-hosted unit, or a unit whose adapter runs the legacy app's own setup per request (container `app`), naming each, with a MANUAL line to port the services to a Laravel provider and the app-wide middleware to Laravel middleware first. A finish copies the legacy docroot's static files into `public/` before `legacy/` goes, drops the mount's `(cd legacy && ...)` group from `serve.setup`, and a failed finish gate names the legacy fallback answers as the likely cause.
+- Fixed: the strangler's dispatcher matches moved routes on the fully decoded path, as Laravel and the legacy routers do (slim-skeleton's `GET /users/1` stayed legacy's); `--hand` reads `route:list` from a file in the app, so a long route list is read whole.
+- Fixed: strangler Step 0 on a validUser app: the replay env sets `APP_ENV=local`, so SESAME takes the replay's plain-http service URL (every testeval page answered 500); the replay gate reads a Slim sign-in that lists `*` as every path; the mount keeps the legacy half on the replay CAS and accepts the sign-in change Step 0 made in the same run.
+- Fixed: the mount's clean-tree stop sign reads the tree as the run found it, before the baseline, so an app that tracks its logs or `vendor/` is not refused for what its own tests wrote; a strangled app's legacy suite reads `legacy/`'s failOn rules for the unknown-ini tolerance, not the Laravel half's `phpunit.xml` (the fleet attendance app's mount gate failed on `apc.enable_cli`).
 
 ### \[1.20.0\] - 2026-11-20 [#](https://booster.apps.wayne.edu/docs/changelog.html#1-20-0-2026-11-20)
 
@@ -2250,11 +2304,110 @@ Only confirmed changes ship, each with its source link, and at most three `alway
 
 ---
 
+Source: https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html
+
+## CakePHP and Slim apps onto Laravel [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html#cakephp-and-slim-apps-onto-laravel)
+
+This page covers `cakephp-to-laravel` and `slim-to-laravel`, the two faces of one hop that moves a CakePHP or Slim app onto Laravel 13 without a rewrite. Before this: [CakePHP and Slim apps to PHP 8.5](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html). Next: [Strict session IDs for raw PHP apps](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html).
+
+CakePHP and Slim are being phased out at WSU (D-124). The upgrade hops keep an app supported; this hop retires the framework. It is the strangler fig pattern: Laravel grows around the old app, one route or form at a time, until nothing is left to strangle. The old app keeps answering every request it has not handed over yet, so the app ships after every run, not after a big-bang rewrite.
+
+### Before you start [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html#before-you-start)
+
+The hop is opt-in, and it is always the last step of a plan. It needs:
+
+- **The framework's latest major.** CakePHP 5 or Slim 4. Run the upgrade hops first (`booster plan` shows them).
+- **PHP 8.3 or newer.** SESAME and Laravel 13 both need it.
+- **A committed, clean tree.** The mount moves the whole app, so `--allow-dirty` does not apply to this hop.
+- **A usable replay.** `booster-replay.json` with no todo items left, and a baseline that is not one redirect everywhere or all errors. Draft it with `booster replay init`; [the replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html) has the details. The replay is the only thing that can say a moved page still answers the same, so there is no strangler without it.
+- **No LTI.** SESAME has no LTI driver yet, so an LTI tool's Laravel half could not sign anyone in.
+
+```
+booster plan --path=../my-app --to-laravel
+```
+
+A bare `--to-laravel` (no major) is the opt-in; `--to-laravel=13` still only sets a Laravel app's target. `--only slim-to-laravel` (or `cakephp-to-laravel`) plans the hop alone.
+
+### Run 1: Step 0 and the mount [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html#run-1-step-0-and-the-mount)
+
+```
+booster run --path=../my-app --only slim-to-laravel --replay
+```
+
+Run 1 does two things and stops:
+
+1. **Step 0, sign-in on SESAME.** The old app's sign-in moves onto SESAME first, so both halves can share one sign-in and one logout. It is gated by the replay as the app is served today; the sign-in hand-off now goes to CAS, and the gate accepts exactly that change on the paths Step 0 names. An app that already signs in through SESAME skips the change.
+2. **The mount.** Laravel 13 goes at the app root (the same app `sourdough new --laravel` makes). The old Composer root moves, unchanged, to `legacy/` with its own `vendor/`. `public/index.php` becomes a small dispatcher that sends every request to legacy unless the route table, `bootstrap/booster-moved.php`, says Laravel has it. The Laravel half signs in under `/_laravel/login`. The replay checks the mounted app against the untouched app's answers (`--serve-changed`, since the app is now served another way).
+
+Only when the mount passes its gate does Booster write the ledger, `booster-strangler.json`. A mount that fails leaves its changes in place for you to read, and no ledger: undo it with `git checkout -- . && git clean -fd` and run again once the cause is fixed.
+
+Commit run 1, then deploy it together with the one Citadel change it needs: the app's public directory becomes `public` (the report lists it under MANUAL).
+
+### Later runs: one unit at a time [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html#later-runs-one-unit-at-a-time)
+
+```
+booster run --path=../my-app --only slim-to-laravel --replay --moves 1
+booster run --path=../my-app --only slim-to-laravel --replay --route "GET /users/{id}"
+```
+
+A **unit** is one route, or one form (its GET and its POST move together). The ledger lists every unit with its state: `legacy`, `laravel` (Booster moved it), `hand` (a person ported it) or `failed` (it failed a gate). Units move in a set order: stateless pages first, then pages, then writes, then the ones that need sign-in.
+
+`--moves N` moves the next N units still in legacy (1 by default); `--route "<id>"` moves just that one, and is also how to retry a failed unit. Booster writes the Laravel route and controller, adds the unit to the route table, and (when the move added a package to the Laravel half's `composer.json`) runs `composer update -W` for it in the gate image; a failed update marks the unit `failed` with Composer's first error line and the run stops before the gate. Then it runs the gate with the moved units answering from Laravel: the syntax check over both halves, the old app's own tests from inside `legacy/`, then the replay. A green run marks the units `laravel`. A red one marks them `failed`, leaves the changes in place, and says how to undo them. A failed unit waits for a person: the next `--moves` run skips it.
+
+Each run is one diff to review and commit. Booster never commits.
+
+A moved route keeps the old answer's headers. The first move sets HELMET's `scope` to `web` in `config/helmet.php`, and every moved route skips HELMET's SecurityHeaders, InjectRibbon and RequestForgeryGuard, so a moved page carries no CSP or X-Frame-Options the old app did not send (a nonce CSP would also block its inline scripts). The Laravel half's own pages keep all three. A MANUAL line says so; once the units are on Laravel, drop the skips one route at a time and check each page under HELMET's CSP. A hand-ported route needs the same skip until then.
+
+When a package a move or Step 0 adds needs a shared package (such as `psr/http-message` 2) that a locked package holds at its old major, the gate's `composer update -W` fails on it; Booster then names those locked packages once more, inside `composer.json`'s constraints, and says which in the report.
+
+#### A unit Booster cannot move [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html#a-unit-booster-cannot-move)
+
+When a unit uses something Booster cannot translate exactly, it refuses that unit, names the file and line, and moves on to the next one. Port it by hand in the Laravel half (`routes/web.php` and a controller), then flip it:
+
+```
+booster run --path=../my-app --only slim-to-laravel --replay --hand --route "FORM /articles/add"
+```
+
+Booster checks that `php artisan route:list` has every method of the unit at its URI, adds it to the route table, marks it `hand` and gates it like any other move.
+
+### Finish [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html#finish)
+
+```
+booster run --path=../my-app --only slim-to-laravel --replay --finish
+```
+
+Once no unit is left in legacy, `--finish` deletes `legacy/`, the route table and the install hook, puts back Laravel's stock `public/index.php`, moves `/login` to Laravel, and gates the result against the replay (`--serve-changed`). When it passes, the ledger goes too: the app is a plain Laravel app, and the next `booster plan` plans it like one. While units are left, `--finish` refuses and lists them.
+
+`--finish` also refuses, naming the units, while moved Slim code still needs the old app at run time: a Slim-hosted unit (it runs a copy of the legacy front controller inside its Laravel route), or an app whose moved units run in container `app` mode (the copied legacy setup boots per request for its services and app-wide middleware). Port those services to a Laravel provider and that middleware to Laravel middleware first.
+
+Before `legacy/` goes, the old docroot's static files (robots.txt, images, css) are copied into `public/`, where the dispatcher served them from; a file `public/` already has with other content is a MANUAL line. When the finish gate still fails with every unit on Laravel, the difference is usually the old app's own fallback: what it answered for paths no unit owns (its not-found or method-not-allowed page) and for a trailing-slash path Laravel matches as the route without it. Port that to Laravel (`Route::fallback()`, the exception handler) and run `--finish` again.
+
+### While the move is in progress [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html#while-the-move-is-in-progress)
+
+An app with a ledger plans only the strangler: every other hop waits for `--finish`, and the plan says so. To patch the old app meanwhile (a security fix, a PHP hop), run Booster on it alone with `--path=../my-app/legacy`.
+
+### The report [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html#the-report)
+
+Every strangler run reports, in text and in the JSON report's `strangler` section:
+
+- the units moved this run, each with its replay line;
+- the units still in legacy, with failed ones marked;
+- every refusal, with file and line;
+- the MANUAL checklist, grouped: sign-in, mount, route moves, finish;
+- for Slim, the Slim-hosted units still in `routes/web.php` and their `SLIM-HOSTED:` lines, in their own section (`strangler.slim_hosted` in JSON);
+- the next command to run.
+
+### Stop signs [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html#stop-signs)
+
+Each one means nothing changed: not on the framework's latest major, PHP under 8.3, a dirty tree, `legacy/` there without a ledger (a mount that did not pass), a Laravel app already at the root (`artisan`, `bootstrap/app.php` or `routes/web.php`), no usable replay, and an LTI app. A Slim skeleton's own `app/` folder is not one: it moves into `legacy/` with the rest of the old app.
+
+---
+
 Source: https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html
 
 ## CakePHP and Slim apps to PHP 8.5 [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html#cakephp-and-slim-apps-to-php-8-5)
 
-This page covers the three framework hops for CakePHP and Slim apps: the commands, what each hop changes, and the MANUAL list each one prints. Before this: [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html). Next: [Strict session IDs for raw PHP apps](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html).
+This page covers the three framework hops for CakePHP and Slim apps: the commands, what each hop changes, and the MANUAL list each one prints. Before this: [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html). Next: [CakePHP and Slim apps onto Laravel](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html).
 
 Booster 1.20 takes a CakePHP 4 app to CakePHP 5.4 and a Slim 3 app to Slim 4.15, and moves PHP to 8.5 around those steps. The frameworks hold PHP back: CakePHP 4.5 stops at PHP 8.3 and Slim 3.12 at 7.3, so the PHP hops wait for the framework hop that lets them go on. PHP 8.6 is out; Booster's 8.6 hops follow once CakePHP and Slim support it.
 
@@ -2267,7 +2420,7 @@ booster plan   --path=../my-app --to-php 8.5
 booster run    --path=../my-app --replay --to-php 8.5
 ```
 
-`detect` names the framework and its major.minor (`framework cakephp 4.5` or `framework slim 3.12`), read from `composer.lock`. `plan` puts the framework hops between the PHP hops, and `run` applies them one at a time, each gated by the app's tests and the replay. Pass `--to-php 8.5` to both: it keeps the plan and the run on the same target. `--to-cakephp` and `--to-slim` pick the framework line (the newest by default; `--to-cakephp 4` stops on 4.6).
+`detect` names the framework and its major.minor (`framework cakephp 4.5` or `framework slim 3.12`), read from `composer.lock`. With no lock, `detect` shows the floor of the `composer.json` constraint, but `plan` uses the line Composer would install: the newest line that constraint allows on the app's PHP (`slim/slim ^4.10` plans as Slim 4.15). `plan` puts the framework hops between the PHP hops, and `run` applies them one at a time, each gated by the app's tests and the replay. Pass `--to-php 8.5` to both: it keeps the plan and the run on the same target. `--to-cakephp` and `--to-slim` pick the framework line (the newest by default; `--to-cakephp 4` stops on 4.6).
 
 **Point Booster at the folder with `composer.json`.** Plenty of Slim apps keep it under `src/`, next to the code, not at the repository root. Booster reads the framework from that file and refuses a hop without it, so give it that folder:
 
@@ -2322,6 +2475,7 @@ One hop, `slim-3-to-4`, at the lowest PHP Slim 4.15 runs on (7.4: first when the
 - Slim 3 test harnesses keep working: `Slim\Http\Environment` becomes the generated `LegacyEnvironment` (with `mock()`), `Request::createFromEnvironment()` becomes `LegacyHttp::createRequest()`, `new Response()` becomes `LegacyHttp::createResponse()`, and `$app->process($request, $response)` becomes `LegacyApp::process($app, $request, $response)`, which finishes the app once and handles the request.
 - Route groups: `function () use ($app)` becomes a callable that takes the group, so prefixes survive, and a route adder typed `\Slim\App` that a group calls is widened to take the group too.
 - `$request->getAttribute('route')` becomes `RouteContext::fromRequest($request)->getRoute()`.
+- Slim 3's `$request->getUri()->getBasePath()`, which Slim 4's Uri lacks, becomes `$request->getAttribute(\Slim\Routing\RouteContext::BASE_PATH, '')`: the base path the hop's routing glue puts on every request before the app's middleware and routes run (on testeval, a signed-in `/login/` answered 500).
 - Code typed with Slim 3's own `Slim\Http\Request` and `Slim\Http\Response` (the official Slim 3 skeleton's routes are) moves onto `slim/http`, whose decorators keep `withJson()`, `write()`, `getParam()` and `isXhr()` on Slim 4: `Slim\Http\Request` becomes `Slim\Http\ServerRequest` in use statements, fully qualified names and type hints (`use Slim\Http\Request;` becomes `use Slim\Http\ServerRequest as Request;`, so the bare name keeps working), and `Slim\Http\Response` keeps its name. Comments and strings are never touched. This covers `src`, `app`, `routes`, `config`, `tests`, `public` and the bootstrap file.
 - Controllers typed with Slim 3's `Slim\Container` get the generated `LegacyContainer` instead (an import keeps its bare name through an alias), and container-interop's `Interop\Container\ContainerInterface`, which Slim 4 no longer installs, becomes PSR-11's `Psr\Container\ContainerInterface`. `LegacyApp::create()` also takes a container the app built first.
 - When the app lists Twig-View or Twig, Twig 1 and 2's underscore class names (`Twig_Environment`, `Twig_SimpleFilter`, `\Twig_Extension`), which Twig 3 removed, become the namespaced classes, and `new Slim\Views\Twig($path, $settings)` becomes Twig-View 3's `Slim\Views\Twig::create($path, $settings)`. The name map is Rector's own Twig set, read from the Rector Booster ships.
@@ -2334,6 +2488,7 @@ One hop, `slim-3-to-4`, at the lowest PHP Slim 4.15 runs on (7.4: first when the
 - `$settings->get('k')`, now a plain array read.
 - `pathFor()`, `urlFor()` and `relativePathFor()` calls (build the URL with the route parser), and Twig templates that call `path_for(` or `base_url(` (Twig-View 3 has `url_for`).
 - `getAttribute('routeInfo')`, `subRequest()`, `setArgument()` calls to check, the container's `router` entry, and code in outer middleware that reads the route before routing ran.
+- A Slim 3 Uri base path the hop cannot place: `getBasePath()` on a Uri kept in a variable or property, or on a request that is not a plain variable (`$this->request`, the container's `request`), and every `getBaseUrl()`.
 - A Twig underscore class name Rector's map does not know, and `Slim\Container` imported in a group `use` statement (import the generated `LegacyContainer` by hand).
 - `Slim\Http\Environment` imported in a group `use` statement (import the generated `LegacyEnvironment` by hand), and Slim 3's `Headers`, `Body`, `RequestBody`, `Stream`, `UploadedFile` and `Cookies` classes or `new Request(...)`, which have no Slim 4 form: one line per file with its line numbers, the `tests` folder included.
 - A group callable that uses `$this`, or calls `$app` without `use ($app)`, a route adder typed `\Slim\App` that was not widened, and middleware added by its container name.
@@ -2412,7 +2567,7 @@ The warning names only the dimensions the blocked hop fails on: a Laravel ceilin
 
 A package whose newest release requires several `illuminate/*` components is judged by the loosest of those constraints, the one that allows the most Laravel versions. Abandoned packages get their own warning (`acme/old is abandoned (use acme/new instead).`). Packages the check cannot reach are reported as `Not checked: <package> (not on Packagist or unreachable).` or `(VCS repository).`, and the plan goes on. In JSON output every package lands under `package_checks`, with the fields `package`, `newest`, `blocks`, `abandoned` and `checked`.
 
-The check fetches from `repo.packagist.org` and from any composer-type repository the app declares in `composer.json`; VCS repositories are never fetched. `--no-package-check` skips the whole check, for offline use.
+The check fetches from `repo.packagist.org` and from any composer-type repository the app declares in `composer.json`; VCS repositories are never fetched. `--no-package-check` skips the whole check, for offline use. In `run` it also turns off the dependency raise a PHP hop tries when its gate fails inside a package that needs its next major ([Hops](https://booster.apps.wayne.edu/docs/reference/hops.html)).
 
 ---
 
@@ -2843,7 +2998,8 @@ The transcripts are plain text, one block per request, written outside the app (
 ```
 
 - **`serve`**: `docroot` (relative, inside the app; default `.`), `front_controller` (a PHP file in the docroot that every path without a file of its own goes to, like Apache's rewrite to `index.php`; leave it out and the server serves the docroot as files), `setup` (a shell command run once, in the app folder, before the server starts: seed a SQLite file, write a `.env`), `env` and `ini` (passed to the setup and the server), and `services`.
-- **`requests`** or **`sequences`**: a request has `path`, and may have `name`, `method` (default GET), `query`, `headers`, `cookies`, one body (`form`, `json` or a raw `body`), `capture` and `expect`. A sequence shares a cookie jar, so a session started by one request carries to the next. Redirects are recorded, never followed.
+- **`requests`** or **`sequences`**: a request has `path`, and may have `name`, `method` (default GET), `query`, `headers`, `cookies`, one body (`form`, `json` or a raw `body`), `capture`, `expect` and `csrf`. A sequence shares a cookie jar, so a session started by one request carries to the next. Redirects are recorded, never followed (the one exception is a silent sign-in, see [Strangler runs](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#strangler-runs)).
+- **`csrf`**: `true` on a POST, PUT, PATCH or DELETE takes the CSRF field from the previous answer in the sequence and sends it: as form fields when the request posts a form (every hidden field named like a token: Laravel's `_token`, CakePHP's `_csrfToken` and its `_Token[...]` form protection fields, slim/csrf's `csrf_name` and `csrf_value`), else as an `X-CSRF-Token` header from the page's `csrf-token` or `csrfToken` meta tag. A value the form already names is replaced. It is the capture above without the regular expression, and it keeps working when the form page moves to another framework and its field changes name. A page with no CSRF field sends the request as it is, and the transcript says so. It cannot go on the first request of a sequence: there is no answer before it.
 - **`capture`**: a regular expression whose first group is saved under a name, matched against the body and the headers (as `Name: value` lines). Later requests in the same sequence use it as `{{name}}` in the path, query, headers, cookies or body. A placeholder nobody captured is an error when the file loads, not a surprise later.
 - **`expect`**: the status the baseline must answer. It is checked while recording only, so a baseline that is already broken (a 500 where a 200 belongs) is refused instead of faithfully recorded.
 - **`defaults`**: headers every request gets.
@@ -2853,13 +3009,21 @@ The transcripts are plain text, one block per request, written outside the app (
 
 For each answer: the status, `Content-Type`, `Location` (with the server's own address written as `<app>`), `Allow`, the names of the cookies set (never their values), and the body. Everything else (`Date`, `X-Powered-By`, the values of cookies) changes on every request or every PHP, and is left out. By default runs of spaces and blank lines do not matter, and a JSON body is compared by value, so a reordered key or `1.0` against `1` is not a difference. `"compare": {"whitespace": "exact", "json": "exact"}` compares byte for byte.
 
+`compare` takes three more keys, all written by the strangler's mount step and usable by hand:
+
+- **`ignore_cookies`**: exact cookie names left out of the compared names (`["CAKEPHP", "csrfToken", "laravel_session", "XSRF-TOKEN"]`). The framework's session and CSRF cookies change names when a page moves to Laravel; the app's own cookies stay compared. Patterns are refused.
+- **`preset`**: `"default"`, or `"strangler"` to compare more, below.
+- **`silent_sign_in`**: paths whose redirect is a browser's silent sign-in, below.
+
+None of the three is part of the recording's fingerprint.
+
 #### Normalizers [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#normalizers)
 
 A normalizer rewrites the volatile parts of an answer before it is compared and written. The presets:
 
 | Name | Hides |
 | --- | --- |
-| `csrf` | CSRF tokens in hidden form fields and meta tags (`_token`, `authenticity_token`, and any field whose name holds `csrf` or `xsrf`, such as `csrf_token`, `CSRF_KEY` or slim/csrf's `csrf_name` and `csrf_value`) |
+| `csrf` | CSRF tokens in hidden form fields and meta tags (Laravel's `_token` and `csrf-token`, CakePHP's `_csrfToken` and `csrfToken`, `authenticity_token`, and any field whose name holds `csrf` or `xsrf`, such as `csrf_token`, `CSRF_KEY` or slim/csrf's `csrf_name` and `csrf_value`) |
 | `session-id` | session ids in links, forms and scripts (`PHPSESSID=...`, `laravel_session=...`) |
 | `timestamps` | dates with a time of day, and Unix times from 2020 to 2033 |
 | `asset-hash` | content hashes in built asset names (`app.3f9a1c2b.js`, Vite's `app-L1fqnEWe.js`, `app.js?id=3f9a1c`) |
@@ -2892,6 +3056,8 @@ Anything else is an object: `{"name": "request id", "pattern": "req-[0-9a-f]{12}
 A `phpinfo()` page is never drafted: it answers differently on every PHP, so every hop would fail on it.
 
 Every GET without parameters becomes a request, plus one unknown path (an honest 404 is an answer too). Every path parameter, form and setup command gets a `todo`, because Booster cannot know which note id exists or what a valid form looks like. Fill those in, delete the `todo` lines, and record.
+
+Each write is drafted with `"csrf": true` in the `forms` sequence, right after a GET of the page that shows its form, so the token comes from that page. When the app has no GET route at the same path, that page gets a `todo` to point it at the right one.
 
 ### Pages behind sign-in [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#pages-behind-sign-in)
 
@@ -2944,6 +3110,46 @@ serve: docroot public, front index.php -> docroot public, front index.php, setup
 ```
 
 Without the flag nothing changes: a changed `serve` section is refused like any other file change. A recording made before Booster could compare across a serve change has no requests fingerprint of its own; `--serve-changed` says so and asks for one new record on the current setup. The flag goes with `check` only: `record` and `init` refuse it.
+
+### Strangler runs [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#strangler-runs)
+
+`slim-to-laravel` and `cakephp-to-laravel` move an app onto Laravel one unit at a time, with both frameworks serving it in between (the CakePHP and Slim to Laravel guide). The replay is what makes each move safe, so the strangler refuses every move without a usable one: no `booster-replay.json`, a file with `todo` items, or a baseline whose every answer is the same redirect or an error. The mount step may still run, with the usual warning. Its rewrite of the request file turns on what follows.
+
+Step 0, which moves the legacy half's sign-in onto SESAME before the mount, changes one kind of answer on purpose: the sign-in hand-off now sends the browser to CAS. Its check accepts exactly that on the request paths Step 0 names, when the baseline answered a redirect, the answer now is a redirect to sign-in, and nothing but the `Location` changed; the report lists each one (`02 requests: GET /auth/login: Location <old> -> <CAS login>`). Every other request is compared as always, and a new cookie on a listed path is still a difference.
+
+On an app with its own sign-in form, Step 0 turns that form page's 200 into a redirect to CAS. On a listed path that is accepted too when every header line but status, content type and `Location` stayed the same (the form's body goes with it). The requests later in that sequence that posted the form (the next request when it sends CSRF, or a POST to the form's path or a listed path) are reported as `sign-in moved to SESAME` instead of failing: the replay signs in through the fake driver now (`compare.silent_sign_in`). The signed-in pages after them are compared as always.
+
+#### Which half answered [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#which-half-answered)
+
+While a replay runs, the container sets `BOOSTER_REPLAY=1`, and the mounted app's dispatcher answers every request with an `X-Booster-Half: laravel` or `X-Booster-Half: legacy` header. The replay reports it and never compares it: each block in the transcript starts with `answered by: laravel`, and the result counts them:
+
+```
+Replay passed: all 9 answers match the baseline from PHP 8.5.
+Answered by: legacy 7, laravel 2 (laravel: 03, 04).
+```
+
+The JSON report carries the same map as `halves`. A moved unit that still shows `legacy` did not move.
+
+#### The strangler preset [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#the-strangler-preset)
+
+A PHP upgrade rarely changes a cookie's flags or a security header; moving a page to another framework can. `"compare": {"preset": "strangler"}` adds to what is compared:
+
+- **Each cookie's attributes**: `Path`, `Secure`, `HttpOnly` and `SameSite`, one `cookie <name>:` line per cookie the answer sets (not the ignored ones). `Expires`, `Max-Age` and `Domain` stay out.
+- **The security headers**, when either side sends them: `Content-Security-Policy` (and its report-only twin, with each nonce hidden), `Strict-Transport-Security`, `X-Frame-Options`, and the CORS `Access-Control-Allow-*`, `-Expose-Headers` and `-Max-Age` headers.
+
+It also hides which framework's CSRF field a form carries: CakePHP's `_csrfToken`, slim/csrf's pair and Laravel's `_token` all compare as one hidden CSRF field, and the `csrf-token` and `csrfToken` meta tags as one meta tag. A form that loses its CSRF field still differs, and so does any field of the form's own.
+
+And it treats the mount's legacy root and the old app root as one path in bodies: an error page that prints `/app/legacy/src/...` after the mount compares equal to the baseline's `/app/src/...` (also JSON-escaped).
+
+#### Signed-in sequences [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#signed-in-sequences)
+
+The legacy half keeps its sign-in until the last step, and each half keeps its own session (both on SESAME). A sequence that reaches a signed-in page therefore signs in through a legacy request first: the test login POST, or a seeded session plus any legacy page. When a request that answered 200 in the baseline now answers a redirect to sign-in, and it is the first request of its sequence, the check says exactly that:
+
+```
+Signed-in sequence: 02 staff: GET /articles is the first request of sequence "staff" and now answers the redirect to sign-in (Location: /_laravel/login) (answered by laravel) where the baseline answered 200. A sequence must sign in through a legacy request before its first moved route: start it with the test login POST, or a seeded session plus any legacy page.
+```
+
+When Laravel answers that redirect later in a sequence, the Laravel half had no session of its own yet. In a browser that is a silent round trip through CAS; in the replay SESAME's `fake` driver signs in at once. List the Laravel half's sign-in path in `"compare": {"silent_sign_in": ["/_laravel/login"]}` and the client follows that one redirect chain the way a browser does, on GET and HEAD requests only: the redirect to a listed path, its answers, and the redirect back to the page asked for, whose answer is the one compared. The transcript lists each hop it followed (`client: sign-in: followed 302 to GET /_laravel/login`). Any other redirect is still recorded, never followed.
 
 ### Limits, honestly [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#limits-honestly)
 
@@ -3097,7 +3303,7 @@ Source: https://booster.apps.wayne.edu/docs/guides/strict-sessions.html
 
 ## Strict session IDs for raw PHP apps [#](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html#strict-session-ids-for-raw-php-apps)
 
-This page covers `session-strict-mode`: which apps it is for, the line it adds, what counts as already covered, and what makes it refuse. Before this: [CakePHP and Slim apps to PHP 8.5](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html). Next: [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html).
+This page covers `session-strict-mode`: which apps it is for, the line it adds, what counts as already covered, and what makes it refuse. Before this: [CakePHP and Slim apps onto Laravel](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html). Next: [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html).
 
 PHP ships with `session.use_strict_mode` off. With it off, PHP takes any session ID a browser sends, even one the server never handed out, and starts a session under it. That is the door session fixation walks through: someone plants an ID on a victim, waits for the victim to sign in, and then rides the same session. With strict mode on, PHP throws an unknown ID away and issues a fresh one. `session.use_only_cookies` (on by default) keeps the ID out of URLs.
 
@@ -3275,6 +3481,7 @@ Every route, per OS, is on [Install](https://booster.apps.wayne.edu/docs/install
 - [The replay gate](https://booster.apps.wayne.edu/docs/guides/replay-gate.html)
 - [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html)
 - [CakePHP and Slim apps](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html)
+- [CakePHP and Slim apps onto Laravel](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html)
 - [Strict session IDs](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html)
 - [Laravel hops and vendor/](https://booster.apps.wayne.edu/docs/guides/laravel-and-vendor.html)
 - [Deploying on Citadel](https://booster.apps.wayne.edu/docs/guides/citadel.html)
@@ -3709,7 +3916,7 @@ Usage: `booster init [--path PATH] [--dir DIR] [--check]`
 
 Show the ordered hops from the app to a supported version. Changes nothing.
 
-Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--to-cakephp TO-CAKEPHP] [--to-slim TO-SLIM] [--with-node] [--node NODE] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--no-scan]`
+Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel [TO-LARAVEL]] [--to-phpunit TO-PHPUNIT] [--to-cakephp TO-CAKEPHP] [--to-slim TO-SLIM] [--with-node] [--node NODE] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--no-scan]`
 
 | Option | Meaning | Default |
 | --- | --- | --- |
@@ -3721,7 +3928,7 @@ Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today 
 | `--from-php=VALUE` | The PHP version the app runs on (major.minor). |  |
 | `--to-php=VALUE` | Target PHP version (default: the newest the policy supports). |  |
 | `--from-laravel=VALUE` | The Laravel major the app runs on. |  |
-| `--to-laravel=VALUE` | Target Laravel major (default: the newest the policy supports). |  |
+| `--to-laravel=VALUE` | Target Laravel major (default: the newest the policy supports). Bare --to-laravel on a CakePHP or Slim app opts in to the move onto Laravel (cakephp-to-laravel, slim-to-laravel), planned last. |  |
 | `--to-phpunit=VALUE` | Target PHPUnit major (default: the newest that runs on the target PHP). |  |
 | `--to-cakephp=VALUE` | Target CakePHP line (default: the newest Booster supports, 5.4). |  |
 | `--to-slim=VALUE` | Target Slim line (default: the newest Booster supports, 4.15). |  |
@@ -3732,7 +3939,7 @@ Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today 
 | `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto Composer. |  |
 | `--strict-session` | Include the hop that turns on strict session IDs before each session_start() in a raw PHP app. |  |
 | `--skip=VALUE` | Hop id to leave out (repeatable). |  |
-| `--no-package-check` | Skip the Packagist dependency check (for offline use). |  |
+| `--no-package-check` | Skip the Packagist checks: the plan's dependency check and a run's dependency raise (for offline use). |  |
 | `--until=VALUE` | Cut the plan after this hop id: that step and everything before it stay. |  |
 | `--only=VALUE` | Plan and run just this one hop id; the app must sit on the hop's starting versions. |  |
 | `--no-scan` | Skip the advisory scans (PHPCompatibility and PHPStan). |  |
@@ -3767,7 +3974,7 @@ Usage: `booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recordin
 
 Run the plan: Rector, composer.json edits and a test gate per hop. Edits the working copy only.
 
-Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--to-cakephp TO-CAKEPHP] [--to-slim TO-SLIM] [--with-node] [--node NODE] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory] [--replay [REPLAY]] [--replay-out REPLAY-OUT]`
+Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel [TO-LARAVEL]] [--to-phpunit TO-PHPUNIT] [--to-cakephp TO-CAKEPHP] [--to-slim TO-SLIM] [--with-node] [--node NODE] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory] [--replay [REPLAY]] [--replay-out REPLAY-OUT] [--moves MOVES] [--route ROUTE] [--hand] [--finish]`
 
 | Option | Meaning | Default |
 | --- | --- | --- |
@@ -3779,7 +3986,7 @@ Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today T
 | `--from-php=VALUE` | The PHP version the app runs on (major.minor). |  |
 | `--to-php=VALUE` | Target PHP version (default: the newest the policy supports). |  |
 | `--from-laravel=VALUE` | The Laravel major the app runs on. |  |
-| `--to-laravel=VALUE` | Target Laravel major (default: the newest the policy supports). |  |
+| `--to-laravel=VALUE` | Target Laravel major (default: the newest the policy supports). Bare --to-laravel on a CakePHP or Slim app opts in to the move onto Laravel (cakephp-to-laravel, slim-to-laravel), planned last. |  |
 | `--to-phpunit=VALUE` | Target PHPUnit major (default: the newest that runs on the target PHP). |  |
 | `--to-cakephp=VALUE` | Target CakePHP line (default: the newest Booster supports, 5.4). |  |
 | `--to-slim=VALUE` | Target Slim line (default: the newest Booster supports, 4.15). |  |
@@ -3790,7 +3997,7 @@ Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today T
 | `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto Composer. |  |
 | `--strict-session` | Include the hop that turns on strict session IDs before each session_start() in a raw PHP app. |  |
 | `--skip=VALUE` | Hop id to leave out (repeatable). |  |
-| `--no-package-check` | Skip the Packagist dependency check (for offline use). |  |
+| `--no-package-check` | Skip the Packagist checks: the plan's dependency check and a run's dependency raise (for offline use). |  |
 | `--until=VALUE` | Cut the plan after this hop id: that step and everything before it stay. |  |
 | `--only=VALUE` | Plan and run just this one hop id; the app must sit on the hop's starting versions. |  |
 | `--dry-run` | Show the diffs Rector would make and change nothing. |  |
@@ -3806,6 +4013,10 @@ Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today T
 | `--proctor-advisory` | Report the PROCTOR result but do not fail the run on it. |  |
 | `--replay=VALUE` | Also gate on request replay: record how the app answers before the first hop, replay after each hop, fail on a changed answer. Takes the request file (default: booster-replay.json). |  |
 | `--replay-out=VALUE` | Folder for the replay transcripts (default: a new booster-replay-- folder in the system temp folder). |  |
+| `--moves=VALUE` | Strangler runs after the mount: move this many units onto Laravel this run, in move order (default 1). |  |
+| `--route=VALUE` | Strangler runs after the mount: move just this unit (its id from booster-strangler.json, for example "GET /users/{id}"). |  |
+| `--hand` | Strangler runs, with --route: a person ported this unit; check route:list, flip it in the route table and gate it. |  |
+| `--finish` | Strangler runs, once no unit is left in legacy: delete legacy/, put back the stock front controller, move /login to Laravel. |  |
 | `--silent` | Do not output any message |  |
 
 #### `booster scan` [#](https://booster.apps.wayne.edu/docs/reference/commands.html#booster-scan)
@@ -3942,6 +4153,8 @@ This page lists every hop Booster knows; the list is generated from the hop data
 | `cakephp-4.6-to-5` | framework | 4.6 | 5.4 | Move a CakePHP 4.6 app to CakePHP 5.4 with CakePHP's own upgrade rules: AuthComponent moves to the Authentication plugin and .ctp templates become .php. |
 | `slim-3-to-4` | framework | 3 | 4.15 | Move a Slim 3 app to Slim 4.15: the app factory, PSR-7 through slim/psr7, Slim's ErrorMiddleware, and a double-pass adapter so the app's middleware keeps working. |
 | `session-strict-mode` | session | off | strict | Turn on strict session IDs in a raw PHP app: set session.use_strict_mode and session.use_only_cookies before each session_start() call. |
+| `cakephp-to-laravel` | strangler | cakephp-5 | laravel-13 | Move a CakePHP 5 app onto Laravel 13 one unit at a time: sign-in on SESAME first, then Laravel at the root with the old app in legacy/, then routes and forms move run by run, each one gated by the replay. |
+| `slim-to-laravel` | strangler | slim-4 | laravel-13 | Move a Slim 4 app onto Laravel 13 one unit at a time: sign-in on SESAME first, then Laravel at the root with the old app in legacy/, then routes and forms move run by run, each one gated by the replay. |
 | `node-pin-24` | node | any | 26 | Pin the app to Node 26: set engines.node in package.json and write .nvmrc. |
 | `mix-to-vite` | node | laravel-mix | vite | Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). |
 | `vite-major` | node | any | 8 | Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions. |
@@ -3965,9 +4178,78 @@ A Laravel major hop also raises the companion packages its target major pairs wi
 
 A PHPUnit major hop does the same for Pest, whose majors pair one to one with PHPUnit's: PHPUnit 10, 11, 12 and 13 take `pestphp/pest` and `pestphp/pest-plugin-laravel` to ^2.0, ^3.0, ^4.0 and ^5.0, again only where the app lists them. Other Pest plugins are not raised; when one holds the old Pest back, Composer's answer in the gate names it.
 
+A PHPUnit hop's `composer update -W` also names every locked package that leans on PHPUnit or its parts (one that requires phpunit/phpunit or a package PHPUnit pulls in, such as phpspec/prophecy, or one whose `conflict` rules out the new major, such as a PHPStan extension), because `-W` moves only what PHPUnit needs, never what needs PHPUnit. Each moves inside its own `composer.json` constraint. When no release a direct dependency's constraint allows can sit next to the next PHPUnit major, `plan` holds PHPUnit at the last major that fits and names the package to raise (`acme/phpstan-ext ^1.0 holds PHPUnit at 11: ...`); with `--to-phpunit` the step stays, with a warning. Laravel plans keep their PHPUnit target, since the Laravel hops move the test stack.
+
+A PHP hop raises a dependency when the gate proves it must. When the gate (the tests, or the replay's answers and PHP error log) fails in a file under `vendor/<vendor>/<package>/`, and that package is a direct dependency already on the newest release its constraint allows, while a newer major installs on the new PHP, Booster widens the constraint to `<old> || ^<next>`, runs `composer update -W <package>` and runs the whole gate again. If that gate passes, the step passes with a `MANUAL:` line that names the package, both majors and the release's source or docs link from Packagist, so the new major gets its review. If it still fails, `composer.json` and `composer.lock` go back to what the first gate left and the step stops as before, saying what was tried. A hop raises at most one package, and never laravel/framework, cakephp/cakephp, slim/slim or phpunit/phpunit, which their own hops move. `--no-package-check` turns the raise off. On the public slim-skeleton 4.5.0 it moves `php-di/php-di ^6.4` to `^6.4 || ^7` at PHP 8.4, where 6.4.0's implicitly nullable parameters turn `GET /` into a 500.
+
 `typescript-major` raises the npm packages in `typescript_companion_pins` when the app lists an older release: today `prettier-plugin-organize-imports` to ^4.2, the first release whose peer range accepts vue-tsc 3. Without it, npm only warns during the hop and the next `npm install` refuses the tree.
 
 `inertia-2-to-3` runs `npm install` (the lock still names Inertia 2, so `npm ci` would refuse it), then the build gate (`npm ci`, `npm run build`), then the composer gate. `--skip-gate` skips both gates; the install still runs.
+
+---
+
+Source: https://booster.apps.wayne.edu/docs/reference/strangler-sign-in.html
+
+## Strangler sign-in [#](https://booster.apps.wayne.edu/docs/reference/strangler-sign-in.html#strangler-sign-in)
+
+The strangler (Booster's move of a CakePHP or Slim app onto Laravel) runs the old app and Laravel side by side, so both halves must agree on who is signed in. Booster does this with SESAME on both halves, each with its own session, and one shared sign-out store. This page lists exactly what it writes. Every file it writes is app-owned afterwards: edit it freely.
+
+Two halves, one user, one logout. Think of it as a joint account with a single "close account" button.
+
+For the whole run (Step 0, the mount, moves, `--hand` and `finish`), read [CakePHP and Slim to Laravel](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html). This page is the sign-in detail behind it.
+
+### Step 0: the old app signs in through SESAME [#](https://booster.apps.wayne.edu/docs/reference/strangler-sign-in.html#step-0-the-old-app-signs-in-through-sesame)
+
+Step 0 runs before the mount. It reads how the app signs people in today and picks one shape:
+
+| Shape | What Booster finds | What Step 0 does |
+| --- | --- | --- |
+| none | no sign-in at all | nothing; Step 0 is done |
+| sesame | `new Sesame(...)`, `WayneAuth::boot(...)` or `SesameAuthenticator` | adds the shared sign-out store as a named `revocations:` argument |
+| validuser, CakePHP | the old validUser cookie check: an `AuthController`, or the shared `SsoController` plus `SsoAuthenticator` | the method that posted the cookie to the old validator asks SESAME instead and keeps its return shape; the hand-off to the old SSO page goes to CAS through SESAME, back to the same destination; `TicketMiddleware` runs before `AuthenticationMiddleware`; the logout signs SESAME out too |
+| form, CakePHP | `Authentication.Form` | it becomes SESAME's `SesameAuthenticator`; the login action hands a guest to SESAME instead of showing the form |
+| validuser, Slim | the WSUCookie family (a `CheckWSUCookie()` that sets `$this->user->id($uid)`) | that method asks SESAME, then runs the app's own authz check; the login page hands a guest to CAS instead of showing the LDAP form; the logout signs SESAME out too |
+| custom | sign-in Booster cannot map (an LDAP form on its own, a hand-rolled session check) | a MANUAL line; Step 0 stays pending until the owner moves it by hand |
+
+The files it writes for CakePHP: `src/Sesame/LegacySignIn.php`, `src/Sesame/TicketMiddleware.php`, `src/Sesame/UserResolver.php` and `config/sesame.php`. For Slim: `Sesame/LegacySignIn.php` in the folder `composer.json` maps `App\` to. It requires `waynestate/sesame` `^0.10` and `guzzlehttp/guzzle` `^7.9`.
+
+Every edit is planned first and written only when all of them are known; if any step cannot be placed exactly, or an edited file would not parse, Step 0 writes nothing and names the file and line.
+
+The user both halves keep is the array `['username' => <AccessID>]`. The app's own code still builds its profile and roles from that username, as it did from the old cookie.
+
+#### Stop signs [#](https://booster.apps.wayne.edu/docs/reference/strangler-sign-in.html#stop-signs)
+
+- An LTI app: "No strangler yet for LTI apps, see the guide."
+- A legacy session named `laravel_session`, the Laravel half's default cookie: rename it first.
+
+#### The replay after Step 0 [#](https://booster.apps.wayne.edu/docs/reference/strangler-sign-in.html#the-replay-after-step-0)
+
+Step 0 writes the replay's fake settings into `booster-replay.json`'s `serve.env`, and lists the request paths whose sign-in hand-off changed on purpose (`*` for an authenticator, which answers every guarded path). An app on the validUser cookie hands guests to `https://cas.replay.invalid/cas`, a CAS that is never reached, so the Location is stable; the others sign in on the spot with SESAME's fake driver as `replay.user`.
+
+### The Laravel half [#](https://booster.apps.wayne.edu/docs/reference/strangler-sign-in.html#the-laravel-half)
+
+After the mount, the same step signs the Laravel half in through SESAME's Laravel guard:
+
+- `config/sesame.php` gets a marked block: `route_prefix` `_laravel` (so `/_laravel/login` and `POST /_laravel/logout`; the old app keeps `/login`), the shared store on `storage/sesame-revocations`, and `user_resolver` set to `App\Sesame\StranglerUserResolver`.
+- `app/Sesame/StranglerUser.php` holds the same array the old half keeps, so moved routes read the same keys (`$user['username']`), and it is an `Authenticatable` for `auth()->user()`.
+- `config/auth.php`: the web guard's driver is `sesame`.
+- `bootstrap/app.php`: guests go to `route('sesame.login')`.
+- `.env.example` gets a commented `SESAME_CAS_SERVICE_URL="${APP_URL}/_laravel/login"` for an app behind a proxy.
+
+Each half keeps its own session and cookie. The old half finds the shared directory on its own once it sits under `legacy/` next to `artisan`; set `SESAME_REVOCATION_PATH` on both halves to use another directory. The web server must be able to write it: that directory is how a logout on either half ends both.
+
+### Finish [#](https://booster.apps.wayne.edu/docs/reference/strangler-sign-in.html#finish)
+
+The strangler's finish removes the marked block from `config/sesame.php` and the notes from `.env.example`, so SESAME's own routes are back at `/login` and `POST /logout` and the app's own resolver is back. The MANUAL lines name the environment keys to drop on Citadel (`SESAME_ROUTE_PREFIX`, `SESAME_REVOCATION_PATH`, `SESAME_REVOCATION_TTL`) and the service URL to set.
+
+### MANUAL lines it adds [#](https://booster.apps.wayne.edu/docs/reference/strangler-sign-in.html#manual-lines-it-adds)
+
+- Set `SESAME_CAS_BASE_URL` unless Playbook supplies it.
+- Everyone signed in before the Step 0 deploy signs in once more.
+- The CakePHP logout still redirects to the old SSO logout page afterwards; SESAME has already ended both sessions by then.
+- For a form login: the form template and the password identifier are unused; code that reads `getIdentifier()` needs the resolver to return the user's row.
+- For Slim: the middleware that ignores `CheckWSUCookie()`'s answer lands the browser on the base path after sign-in; the app's session cookie flags, then SESAME's session check turned back on.
+- The first moved page signs in once more on the Laravel half: a silent CAS round trip.
 
 ---
 
@@ -3979,11 +4261,31 @@ This page says what changes when you move Booster itself to a new release, newes
 
 To take a new Booster, download the PHAR again (the same `curl` line as on [Install](https://booster.apps.wayne.edu/docs/install.html); its `releases/latest` link always names the newest release), or run `git pull` and `composer install` in your clone. `booster --version` prints the version you have.
 
+### 1.21.0 [#](https://booster.apps.wayne.edu/docs/upgrading.html#1-21-0)
+
+Not released yet: this section follows the Changelog's Unreleased list. A CakePHP 5 or Slim 4 app can move onto Laravel 13 one unit at a time (the strangler). Two hops were added and none removed; `plan` and `run` take a bare `--to-laravel`, and `run` gains `--moves`, `--route`, `--hand` and `--finish`. No exit code changed.
+
+#### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see)
+
+- **The strangler, opt-in.** `cakephp-to-laravel` and `slim-to-laravel` are planned only with a bare `--to-laravel` (or `--only` naming one), always last, and only for an app on CakePHP 5 or Slim 4 and PHP 8.3 or newer. Without the flag, no plan changes. [The guide](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html) walks through run 1, the later runs and the finish.
+- **`--to-laravel` takes its value optionally.** `--to-laravel=13` and `--to-laravel 13` still set a Laravel app's target; only the bare flag is new.
+- **A ledger at the app root.** A mounted app carries `booster-strangler.json`. Commit it with each run. While it is there, `booster plan` plans only the strangler and says so; patch the old app meanwhile with `--path=<app>/legacy`.
+- **A strangler section in the report**, in text and in the JSON report (`strangler`): units moved and left, refusals with file and line, and the MANUAL lines grouped by sign-in, mount, route moves and finish.
+- **Request files can say more.** Writes gain `"csrf": true`, and `compare` gains `ignore_cookies`, `preset` (`"strangler"`) and `silent_sign_in`. `replay init` now drafts a GET of each write's form page right before it. Existing request files and recordings keep working unchanged: no fingerprint moves, and the replay container only gains `BOOSTER_REPLAY=1`.
+- **The mount sets the PHP line once for both halves.** The root `composer.json` asks for the same PHP as `legacy/` (never lower) and its `config.platform.php` pin moves up with it, so one PHP runs both halves.
+- **Moved routes keep the legacy headers.** The first move scopes HELMET to `web`, and each moved route skips HELMET's security headers, the ribbon and the forgery guard, so a moved page answers with the headers the legacy page sent. Port those to Laravel when the unit is yours.
+- **A strangler gate may move a package the app requires.** When SESAME or a moved unit needs a shared package at a new major and a locked package holds it, the gate names the holders in another `composer update`; when a package the app requires itself still holds it, the gate raises that package one major, keeps the raise only when your check passes, and says so in a MANUAL line. Read that line before you commit.
+- **Slim-hosted units and the finish.** A Slim unit that needs Slim's own dispatch (route middleware, a closure's `use` variables) is Slim-hosted, listed in its own report section (`strangler.slim_hosted` in JSON). `--finish` refuses while any moved unit still depends on `legacy/`: a Slim-hosted unit, or one whose adapter runs the legacy app's own setup per request. Port the services to a Laravel provider and the app-wide middleware to Laravel middleware first. A finish copies the legacy docroot's static files (robots.txt and the like) into `public/`.
+
+#### An app that an older Booster already moved [#](https://booster.apps.wayne.edu/docs/upgrading.html#an-app-that-an-older-booster-already-moved)
+
+Nothing to do. An app on CakePHP 5 or Slim 4 that 1.20 moved there is exactly where the strangler starts; draft its replay first if it has none.
+
 ### 1.20.0 [#](https://booster.apps.wayne.edu/docs/upgrading.html#1-20-0)
 
 Released 2026-11-20. CakePHP 4 apps move to CakePHP 5.4 and Slim 3 apps to Slim 4.15, with the PHP hops to 8.5 around them. Three hops were added and none removed; `plan` and `run` gain `--to-cakephp` and `--to-slim`, `replay check` gains `--serve-changed` and `replay record` gains `--allow-failing-baseline`. No exit code changed, but a run whose replay baseline is all errors now stops before the first hop (see below).
 
-#### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see)
+#### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-1)
 
 - **Three framework hops**, planned between the PHP hops for a CakePHP or Slim app:
   - `cakephp-4-to-4.6` runs CakePHP's own upgrade rules for 4.1 through 4.5 and requires `cakephp/cakephp ^4.6`. It goes first, on the PHP the app runs today, when that is 7.4 or newer; an app below 7.4 gets the PHP hops to 7.4 first, then this one.
@@ -4025,14 +4327,14 @@ Each of these is a `MANUAL:` line in the run's output, with the file (and the li
 
 Released 2026-11-14. The `cas-to-sesame` hop lands on SESAME's native names and sets SESAME `^0.8`. No hop was added or removed, no option changed and no exit code changed.
 
-#### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-1)
+#### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-2)
 
 - **Native names for `cas-to-sesame`.** The hop now lands on SESAME's native names instead of the deprecated `Waynestate\Sesame\WayneCas` shim and writes `waynestate/sesame:^0.8` (it wrote `^0.7`): `config/sesame.php` defaults to `ModelUserResolver`, the web routes run under `auth.sesame`, any `wayne.cas` alias registration is removed, user models drop `WayneCasable`, and a model's `ReadOnlyAttributes` trait moves to `app/Models/Concerns` (Booster writes the trait file from SESAME 0.7.5 when it is absent).
 - **Two WayneUI 2 behaviour rows.** A plan for an app on WayneUI 2 (`package:cit-web-infra/wayne-ui@2`) now lists two behaviour-change rows, `wayneui-bootstrap-data-hooks` and `wayneui-nav-active-prefix`, taken from WayneUI's MIGRATING guide.
 - **PROCTOR ^0.16** in Booster and its deploy layer (was `^0.15`, which does not allow 0.16): the `ci-pipelines` check no longer asks for a GitHub workflow. Booster also requires Pinstripe `^0.4`.
 - **The deploy kit is Squire 0.11.1** (was 0.10.8): the release script fetches PROCTOR when `--no-dev` left it out and installs the frontend from a `yarn.lock`, the HAProxy pin is current, the fallback base follows the app's PHP line, and the parity scripts carry the deprecation note.
 
-#### An app that an older Booster already moved [#](https://booster.apps.wayne.edu/docs/upgrading.html#an-app-that-an-older-booster-already-moved)
+#### An app that an older Booster already moved [#](https://booster.apps.wayne.edu/docs/upgrading.html#an-app-that-an-older-booster-already-moved-1)
 
 An app an older Booster moved with `cas-to-sesame` keeps `waynestate/sesame:^0.7` and the `Waynestate\Sesame\WayneCas` shim, which SESAME 0.8.0 removed. The caret stops below 0.8, so the app stays on the 0.7 line until its owner moves off the shim. The hop will not plan it again, because the app no longer requires `cit-web-infra/wayne-cas`; the move is the hop's own edits, by hand: `config/sesame.php` defaults to `ModelUserResolver`, the web routes run under `auth.sesame`, any `wayne.cas` alias registration goes, `WayneCasable` drops from the user models, and the model's `ReadOnlyAttributes` trait moves to `app/Models/Concerns`. Then `composer require waynestate/sesame:^0.8` and run the app's tests, as after any SESAME release.
 
@@ -4040,13 +4342,13 @@ An app an older Booster moved with `cas-to-sesame` keeps `waynestate/sesame:^0.7
 
 Released 2026-11-10. Housekeeping to keep pace with the stack. No hop was added or removed, no option changed and no exit code changed.
 
-#### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-2)
+#### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-3)
 
 - **A newer SESAME starting point.** When an app has no vendor copy of SESAME's config, `cas-to-sesame` now writes SESAME 0.7.3's (it was 0.5.0's). The hop still requires `^0.7`, so an app that already ran it needs nothing.
 - **Pinstripe 0.3.** Booster requires `waynestate/pinstripe` `^0.3` (was `^0.1.4`); the lint presets it reads are 0.3.1's.
 - **PROCTOR ^0.15** in Booster and its deploy layer: the newer checks only warn.
 
-#### An app that an older Booster already moved [#](https://booster.apps.wayne.edu/docs/upgrading.html#an-app-that-an-older-booster-already-moved-1)
+#### An app that an older Booster already moved [#](https://booster.apps.wayne.edu/docs/upgrading.html#an-app-that-an-older-booster-already-moved-2)
 
 Nothing to do.
 
@@ -4054,13 +4356,13 @@ Nothing to do.
 
 Released 2026-11-09. Follow-ups to 1.16.0. No hop was added or removed, no option changed and no exit code changed. Two environment variables are new, and both are off unless you set them.
 
-#### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-3)
+#### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-4)
 
 - **A Node pin that builds.** On an app whose `package.json` has a `build` script and a `package-lock.json`, `node-pin-24` now runs `npm ci` and `npm run build` in the `node:<major>` container before the tests, so a real run takes longer and needs Docker for that step too. A red build stops the run at that hop. With no build script the hop prints `No build script in package.json, so the front-end build was not checked.` and carries on as before.
 - **A rerun that re-gates.** After a run that stopped at a red gate, the next run reads `booster-hop.json` and runs that hop's gate again: a `Re-gate: PASS` or `FAIL` line after the baseline when the hop left the plan, or a gate on the hop's own step when it is back with nothing to edit. Keep `booster-hop.json` between the two runs. The JSON report and `booster-hop.json` gain `regate` on such a run; a script that reads them by key keeps working.
 - **Faster gates, if you ask.** `BOOSTER_COMPOSER_CACHE` and `BOOSTER_NPM_CACHE` name a Docker volume or a folder that every gate container shares (see [Configuration](https://booster.apps.wayne.edu/docs/reference/configuration.html)). The WSU stack's volumes are `stack-composer-cache` and `stack-npm-cache`.
 
-#### An app that an older Booster already moved [#](https://booster.apps.wayne.edu/docs/upgrading.html#an-app-that-an-older-booster-already-moved-2)
+#### An app that an older Booster already moved [#](https://booster.apps.wayne.edu/docs/upgrading.html#an-app-that-an-older-booster-already-moved-3)
 
 Nothing to do. An app that an older Booster already pinned keeps its pin, and its front end was never built on that Node by Booster: run `npm ci` and `npm run build` on that Node once to be sure.
 
@@ -4068,7 +4370,7 @@ Nothing to do. An app that an older Booster already pinned keeps its pin, and it
 
 Released 2026-11-09. Lessons from a real Laravel app taken from PHP 8.3 to 8.5. No hop was added or removed and no exit code changed. `plan` and `run` gain `--node`. The gate's target images are the same; five `booster init` playbooks carry new notes, so `booster init --check` reports them stale until you run `booster init` again.
 
-#### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-4)
+#### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-5)
 
 - **A different Citadel deploy step.** A run whose lock change touched only dev packages, or an app with `scripts/release.sh`, or an app with no `deployments/` folder, gets no `deployments/0000_composer_install_*` script any more; the report's `Deploy:` line says why and, for the last case, what each server must run. When Booster does write the script, it installs the production packages and stops there: it no longer runs `php artisan migrate --force`.
 - **A Node pin that matches the server.** An app with the Squire kit is pinned to the Node in its Citadel image (`NODE_IMAGE` in `.squire/base-fallback.Dockerfile`, 22 today), not to 26. Any other app still gets the newest Node the policy supports. `--node=<major>` picks one yourself.
@@ -4076,7 +4378,7 @@ Released 2026-11-09. Lessons from a real Laravel app taken from PHP 8.3 to 8.5. 
 - **Two more progress lines.** Standard error gets `baseline: ...` lines before the first hop, and the closing total counts the baseline. A script that counts progress lines sees two more.
 - **Local dates.** With no `date.timezone` in php.ini, or `UTC`, "today" and the deploy stamp follow the machine's time zone instead of UTC, so an evening run no longer plans for tomorrow.
 
-#### An app that an older Booster already moved [#](https://booster.apps.wayne.edu/docs/upgrading.html#an-app-that-an-older-booster-already-moved-3)
+#### An app that an older Booster already moved [#](https://booster.apps.wayne.edu/docs/upgrading.html#an-app-that-an-older-booster-already-moved-4)
 
 Booster 1.15.0 and earlier wrote `deployments/0000_composer_install_<stamp>` with `php artisan migrate --force` at its end. Citadel runs deploy scripts once each, in name order, so that script migrates before every other script in `deployments/`. If the app has not deployed it yet, look before you release:
 
@@ -4089,7 +4391,7 @@ An app that `node-pin-24` already pinned to Node 26 keeps that pin: a newer Boos
 
 Released 2026-11-09. Lessons from a real 2012 raw PHP app taken from PHP 5.6 to 8.5. No hop was added or removed, no option or exit code changed, and the gate's target images and the `booster init` playbooks are the same, so `booster init --check` stays green.
 
-#### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-5)
+#### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-6)
 
 - **New lines in `detect` and `plan`.** `detect` prints a `wayne_auth` line and lists hand-copied libraries; `plan` lists dynamic properties on the step that crosses PHP 8.2. The JSON reports gain `wayne_auth` and `hand_copied_libraries` (detect) and `dynamic_properties` (plan). A script that reads them by key keeps working.
 - **A Wayne Auth stop sign.** An app that still signs people in through Wayne Auth now sees `detect` and `plan` open with a stop sign. Move the app onto SESAME's Wayne Auth bridge before the first hop off PHP 5.6; the [recipes](https://booster.apps.wayne.edu/docs/recipes.html) link SESAME's guide.
@@ -4110,7 +4412,7 @@ Released 2026-11-09. Nothing to do: no hop, command, option, exit code or gate i
 
 Released 2026-11-09. The stack sweep: the `cas-to-sesame` hop writes `waynestate/sesame:^0.7`, and the gate's target image runs Composer 2.11.1. No command, option or exit code changed.
 
-#### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-6)
+#### What you see [#](https://booster.apps.wayne.edu/docs/upgrading.html#what-you-see-7)
 
 - **A fresh image on the first gate.** For an app on PHP 7.2 or newer, the gate's target image now installs Composer 2.11.1 (it was 2.10.3, which is no longer maintained). The images for PHP 5.6 and 7.0 build again with Debian's current archive keys. The recipe stamp changes with both, so the first `booster run` after the upgrade builds the image again, and that first gate takes a little longer. Images for older PHP keep Composer 2.2. Nothing to do.
 - **A stale playbook.** The `cas-to-sesame` hop's notes name `waynestate/sesame:^0.7`, and the hop playbooks that `booster init` writes carry those notes. In an app where you ran `booster init` with an earlier Booster, `booster init --check` reports that playbook as stale until you run `booster init` again.

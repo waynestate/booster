@@ -42,6 +42,8 @@ This page lists every hop Booster knows; the list is generated from the hop data
 | `cakephp-4.6-to-5` | framework | 4.6 | 5.4 | Move a CakePHP 4.6 app to CakePHP 5.4 with CakePHP's own upgrade rules: AuthComponent moves to the Authentication plugin and .ctp templates become .php. |
 | `slim-3-to-4` | framework | 3 | 4.15 | Move a Slim 3 app to Slim 4.15: the app factory, PSR-7 through slim/psr7, Slim's ErrorMiddleware, and a double-pass adapter so the app's middleware keeps working. |
 | `session-strict-mode` | session | off | strict | Turn on strict session IDs in a raw PHP app: set session.use_strict_mode and session.use_only_cookies before each session_start() call. |
+| `cakephp-to-laravel` | strangler | cakephp-5 | laravel-13 | Move a CakePHP 5 app onto Laravel 13 one unit at a time: sign-in on SESAME first, then Laravel at the root with the old app in legacy/, then routes and forms move run by run, each one gated by the replay. |
+| `slim-to-laravel` | strangler | slim-4 | laravel-13 | Move a Slim 4 app onto Laravel 13 one unit at a time: sign-in on SESAME first, then Laravel at the root with the old app in legacy/, then routes and forms move run by run, each one gated by the replay. |
 | `node-pin-24` | node | any | 26 | Pin the app to Node 26: set engines.node in package.json and write .nvmrc. |
 | `mix-to-vite` | node | laravel-mix | vite | Move a simple Laravel Mix front end to Vite (simple webpack.mix.js files only). |
 | `vite-major` | node | any | 8 | Move a Vite front end onto Vite 8: pin vite and the Laravel and Vue plugin packages to the data versions. |

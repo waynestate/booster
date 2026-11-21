@@ -6,6 +6,7 @@
   <url><loc>https://booster.apps.wayne.edu/docs/checks.html</loc></url>
   <url><loc>https://booster.apps.wayne.edu/docs/guides/baseline.html</loc></url>
   <url><loc>https://booster.apps.wayne.edu/docs/guides/behaviour-changes.html</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html</loc></url>
   <url><loc>https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html</loc></url>
   <url><loc>https://booster.apps.wayne.edu/docs/guides/citadel.html</loc></url>
   <url><loc>https://booster.apps.wayne.edu/docs/guides/dependency-check.html</loc></url>
@@ -24,6 +25,7 @@
   <url><loc>https://booster.apps.wayne.edu/docs/reference/commands.html</loc></url>
   <url><loc>https://booster.apps.wayne.edu/docs/reference/configuration.html</loc></url>
   <url><loc>https://booster.apps.wayne.edu/docs/reference/hops.html</loc></url>
+  <url><loc>https://booster.apps.wayne.edu/docs/reference/strangler-sign-in.html</loc></url>
   <url><loc>https://booster.apps.wayne.edu/docs/upgrading.html</loc></url>
   <url><loc>https://booster.apps.wayne.edu/proof.html</loc></url>
 </urlset>

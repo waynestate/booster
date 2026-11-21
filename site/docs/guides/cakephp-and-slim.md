@@ -8,7 +8,7 @@ generator: Squire agent-ready
 
 # CakePHP and Slim apps to PHP 8.5 [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim.html#cakephp-and-slim-apps-to-php-8-5)
 
-This page covers the three framework hops for CakePHP and Slim apps: the commands, what each hop changes, and the MANUAL list each one prints. Before this: [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html). Next: [Strict session IDs for raw PHP apps](https://booster.apps.wayne.edu/docs/guides/strict-sessions.html).
+This page covers the three framework hops for CakePHP and Slim apps: the commands, what each hop changes, and the MANUAL list each one prints. Before this: [Hand-copied libraries to Composer](https://booster.apps.wayne.edu/docs/guides/framework-hops.html). Next: [CakePHP and Slim apps onto Laravel](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html).
 
 Booster 1.20 takes a CakePHP 4 app to CakePHP 5.4 and a Slim 3 app to Slim 4.15, and moves PHP to 8.5 around those steps. The frameworks hold PHP back: CakePHP 4.5 stops at PHP 8.3 and Slim 3.12 at 7.3, so the PHP hops wait for the framework hop that lets them go on. PHP 8.6 is out; Booster's 8.6 hops follow once CakePHP and Slim support it.
 
@@ -21,7 +21,7 @@ booster plan   --path=../my-app --to-php 8.5
 booster run    --path=../my-app --replay --to-php 8.5
 ```
 
-`detect` names the framework and its major.minor (`framework cakephp 4.5` or `framework slim 3.12`), read from `composer.lock`. `plan` puts the framework hops between the PHP hops, and `run` applies them one at a time, each gated by the app's tests and the replay. Pass `--to-php 8.5` to both: it keeps the plan and the run on the same target. `--to-cakephp` and `--to-slim` pick the framework line (the newest by default; `--to-cakephp 4` stops on 4.6).
+`detect` names the framework and its major.minor (`framework cakephp 4.5` or `framework slim 3.12`), read from `composer.lock`. With no lock, `detect` shows the floor of the `composer.json` constraint, but `plan` uses the line Composer would install: the newest line that constraint allows on the app's PHP (`slim/slim ^4.10` plans as Slim 4.15). `plan` puts the framework hops between the PHP hops, and `run` applies them one at a time, each gated by the app's tests and the replay. Pass `--to-php 8.5` to both: it keeps the plan and the run on the same target. `--to-cakephp` and `--to-slim` pick the framework line (the newest by default; `--to-cakephp 4` stops on 4.6).
 
 **Point Booster at the folder with `composer.json`.** Plenty of Slim apps keep it under `src/`, next to the code, not at the repository root. Booster reads the framework from that file and refuses a hop without it, so give it that folder:
 
@@ -76,6 +76,7 @@ One hop, `slim-3-to-4`, at the lowest PHP Slim 4.15 runs on (7.4: first when the
 - Slim 3 test harnesses keep working: `Slim\Http\Environment` becomes the generated `LegacyEnvironment` (with `mock()`), `Request::createFromEnvironment()` becomes `LegacyHttp::createRequest()`, `new Response()` becomes `LegacyHttp::createResponse()`, and `$app->process($request, $response)` becomes `LegacyApp::process($app, $request, $response)`, which finishes the app once and handles the request.
 - Route groups: `function () use ($app)` becomes a callable that takes the group, so prefixes survive, and a route adder typed `\Slim\App` that a group calls is widened to take the group too.
 - `$request->getAttribute('route')` becomes `RouteContext::fromRequest($request)->getRoute()`.
+- Slim 3's `$request->getUri()->getBasePath()`, which Slim 4's Uri lacks, becomes `$request->getAttribute(\Slim\Routing\RouteContext::BASE_PATH, '')`: the base path the hop's routing glue puts on every request before the app's middleware and routes run (on testeval, a signed-in `/login/` answered 500).
 - Code typed with Slim 3's own `Slim\Http\Request` and `Slim\Http\Response` (the official Slim 3 skeleton's routes are) moves onto `slim/http`, whose decorators keep `withJson()`, `write()`, `getParam()` and `isXhr()` on Slim 4: `Slim\Http\Request` becomes `Slim\Http\ServerRequest` in use statements, fully qualified names and type hints (`use Slim\Http\Request;` becomes `use Slim\Http\ServerRequest as Request;`, so the bare name keeps working), and `Slim\Http\Response` keeps its name. Comments and strings are never touched. This covers `src`, `app`, `routes`, `config`, `tests`, `public` and the bootstrap file.
 - Controllers typed with Slim 3's `Slim\Container` get the generated `LegacyContainer` instead (an import keeps its bare name through an alias), and container-interop's `Interop\Container\ContainerInterface`, which Slim 4 no longer installs, becomes PSR-11's `Psr\Container\ContainerInterface`. `LegacyApp::create()` also takes a container the app built first.
 - When the app lists Twig-View or Twig, Twig 1 and 2's underscore class names (`Twig_Environment`, `Twig_SimpleFilter`, `\Twig_Extension`), which Twig 3 removed, become the namespaced classes, and `new Slim\Views\Twig($path, $settings)` becomes Twig-View 3's `Slim\Views\Twig::create($path, $settings)`. The name map is Rector's own Twig set, read from the Rector Booster ships.
@@ -88,6 +89,7 @@ One hop, `slim-3-to-4`, at the lowest PHP Slim 4.15 runs on (7.4: first when the
 - `$settings->get('k')`, now a plain array read.
 - `pathFor()`, `urlFor()` and `relativePathFor()` calls (build the URL with the route parser), and Twig templates that call `path_for(` or `base_url(` (Twig-View 3 has `url_for`).
 - `getAttribute('routeInfo')`, `subRequest()`, `setArgument()` calls to check, the container's `router` entry, and code in outer middleware that reads the route before routing ran.
+- A Slim 3 Uri base path the hop cannot place: `getBasePath()` on a Uri kept in a variable or property, or on a request that is not a plain variable (`$this->request`, the container's `request`), and every `getBaseUrl()`.
 - A Twig underscore class name Rector's map does not know, and `Slim\Container` imported in a group `use` statement (import the generated `LegacyContainer` by hand).
 - `Slim\Http\Environment` imported in a group `use` statement (import the generated `LegacyEnvironment` by hand), and Slim 3's `Headers`, `Body`, `RequestBody`, `Stream`, `UploadedFile` and `Cookies` classes or `new Request(...)`, which have no Slim 4 form: one line per file with its line numbers, the `tests` folder included.
 - A group callable that uses `$this`, or calls `$app` without `use ($app)`, a route adder typed `\Slim\App` that was not widened, and middleware added by its container name.

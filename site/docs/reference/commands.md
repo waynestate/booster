@@ -60,7 +60,7 @@ Usage: `booster init [--path PATH] [--dir DIR] [--check]`
 
 Show the ordered hops from the app to a supported version. Changes nothing.
 
-Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--to-cakephp TO-CAKEPHP] [--to-slim TO-SLIM] [--with-node] [--node NODE] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--no-scan]`
+Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel [TO-LARAVEL]] [--to-phpunit TO-PHPUNIT] [--to-cakephp TO-CAKEPHP] [--to-slim TO-SLIM] [--with-node] [--node NODE] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--no-scan]`
 
 | Option | Meaning | Default |
 | --- | --- | --- |
@@ -72,7 +72,7 @@ Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today 
 | `--from-php=VALUE` | The PHP version the app runs on (major.minor). |  |
 | `--to-php=VALUE` | Target PHP version (default: the newest the policy supports). |  |
 | `--from-laravel=VALUE` | The Laravel major the app runs on. |  |
-| `--to-laravel=VALUE` | Target Laravel major (default: the newest the policy supports). |  |
+| `--to-laravel=VALUE` | Target Laravel major (default: the newest the policy supports). Bare --to-laravel on a CakePHP or Slim app opts in to the move onto Laravel (cakephp-to-laravel, slim-to-laravel), planned last. |  |
 | `--to-phpunit=VALUE` | Target PHPUnit major (default: the newest that runs on the target PHP). |  |
 | `--to-cakephp=VALUE` | Target CakePHP line (default: the newest Booster supports, 5.4). |  |
 | `--to-slim=VALUE` | Target Slim line (default: the newest Booster supports, 4.15). |  |
@@ -83,7 +83,7 @@ Usage: `booster plan [--path PATH] [--format FORMAT] [--policy POLICY] [--today 
 | `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto Composer. |  |
 | `--strict-session` | Include the hop that turns on strict session IDs before each session_start() in a raw PHP app. |  |
 | `--skip=VALUE` | Hop id to leave out (repeatable). |  |
-| `--no-package-check` | Skip the Packagist dependency check (for offline use). |  |
+| `--no-package-check` | Skip the Packagist checks: the plan's dependency check and a run's dependency raise (for offline use). |  |
 | `--until=VALUE` | Cut the plan after this hop id: that step and everything before it stay. |  |
 | `--only=VALUE` | Plan and run just this one hop id; the app must sit on the hop's starting versions. |  |
 | `--no-scan` | Skip the advisory scans (PHPCompatibility and PHPStan). |  |
@@ -118,7 +118,7 @@ Usage: `booster replay [--path PATH] [--format FORMAT] [--file FILE] [--recordin
 
 Run the plan: Rector, composer.json edits and a test gate per hop. Edits the working copy only.
 
-Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel TO-LARAVEL] [--to-phpunit TO-PHPUNIT] [--to-cakephp TO-CAKEPHP] [--to-slim TO-SLIM] [--with-node] [--node NODE] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory] [--replay [REPLAY]] [--replay-out REPLAY-OUT]`
+Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today TODAY] [--goal GOAL] [--from-php FROM-PHP] [--to-php TO-PHP] [--from-laravel FROM-LARAVEL] [--to-laravel [TO-LARAVEL]] [--to-phpunit TO-PHPUNIT] [--to-cakephp TO-CAKEPHP] [--to-slim TO-SLIM] [--with-node] [--node NODE] [--sesame] [--wayneui] [--vendored] [--strict-session] [--skip SKIP] [--no-package-check] [--until UNTIL] [--only ONLY] [--dry-run] [--max-changes MAX-CHANGES] [--test-env TEST-ENV] [--memory-limit MEMORY-LIMIT] [--skip-gate] [--image IMAGE] [--allow-failing-baseline] [--allow-dirty] [--test-command TEST-COMMAND] [--proctor-command PROCTOR-COMMAND] [--proctor-advisory] [--replay [REPLAY]] [--replay-out REPLAY-OUT] [--moves MOVES] [--route ROUTE] [--hand] [--finish]`
 
 | Option | Meaning | Default |
 | --- | --- | --- |
@@ -130,7 +130,7 @@ Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today T
 | `--from-php=VALUE` | The PHP version the app runs on (major.minor). |  |
 | `--to-php=VALUE` | Target PHP version (default: the newest the policy supports). |  |
 | `--from-laravel=VALUE` | The Laravel major the app runs on. |  |
-| `--to-laravel=VALUE` | Target Laravel major (default: the newest the policy supports). |  |
+| `--to-laravel=VALUE` | Target Laravel major (default: the newest the policy supports). Bare --to-laravel on a CakePHP or Slim app opts in to the move onto Laravel (cakephp-to-laravel, slim-to-laravel), planned last. |  |
 | `--to-phpunit=VALUE` | Target PHPUnit major (default: the newest that runs on the target PHP). |  |
 | `--to-cakephp=VALUE` | Target CakePHP line (default: the newest Booster supports, 5.4). |  |
 | `--to-slim=VALUE` | Target Slim line (default: the newest Booster supports, 4.15). |  |
@@ -141,7 +141,7 @@ Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today T
 | `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto Composer. |  |
 | `--strict-session` | Include the hop that turns on strict session IDs before each session_start() in a raw PHP app. |  |
 | `--skip=VALUE` | Hop id to leave out (repeatable). |  |
-| `--no-package-check` | Skip the Packagist dependency check (for offline use). |  |
+| `--no-package-check` | Skip the Packagist checks: the plan's dependency check and a run's dependency raise (for offline use). |  |
 | `--until=VALUE` | Cut the plan after this hop id: that step and everything before it stay. |  |
 | `--only=VALUE` | Plan and run just this one hop id; the app must sit on the hop's starting versions. |  |
 | `--dry-run` | Show the diffs Rector would make and change nothing. |  |
@@ -157,6 +157,10 @@ Usage: `booster run [--path PATH] [--format FORMAT] [--policy POLICY] [--today T
 | `--proctor-advisory` | Report the PROCTOR result but do not fail the run on it. |  |
 | `--replay=VALUE` | Also gate on request replay: record how the app answers before the first hop, replay after each hop, fail on a changed answer. Takes the request file (default: booster-replay.json). |  |
 | `--replay-out=VALUE` | Folder for the replay transcripts (default: a new booster-replay-- folder in the system temp folder). |  |
+| `--moves=VALUE` | Strangler runs after the mount: move this many units onto Laravel this run, in move order (default 1). |  |
+| `--route=VALUE` | Strangler runs after the mount: move just this unit (its id from booster-strangler.json, for example "GET /users/{id}"). |  |
+| `--hand` | Strangler runs, with --route: a person ported this unit; check route:list, flip it in the route table and gate it. |  |
+| `--finish` | Strangler runs, once no unit is left in legacy: delete legacy/, put back the stock front controller, move /login to Laravel. |  |
 | `--silent` | Do not output any message |  |
 
 ### `booster scan` [#](https://booster.apps.wayne.edu/docs/reference/commands.html#booster-scan)
