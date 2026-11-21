@@ -177,7 +177,9 @@ trait CakeEntity
     public function setDirty(string $field, bool $dirty = true): static
     {
         if ($dirty) {
+            // As CakePHP's EntityTrait: a field marked dirty drops its errors.
             $this->cakeDirty[$field] = true;
+            unset($this->cakeErrors[$field], $this->cakeInvalid[$field]);
         } else {
             unset($this->cakeDirty[$field]);
         }
@@ -332,7 +334,9 @@ trait CakeEntity
         if ($setter && method_exists($this, $method)) {
             $value = $this->{$method}($value);
         }
-        $this->cakeDirty[$field] = true;
+        // CakePHP's set() marks the field dirty, which drops its errors: a setter that fills another field
+        // (the CMS tutorial's _setTitle() writes slug) clears the requirePresence error validation put there.
+        $this->setDirty($field);
         if (is_array($value) || (is_object($value) && in_array(CakeEntity::class, class_uses($value), true))) {
             $this->cakeAssociated[$field] = $value;
             unset($this->attributes[$field]);

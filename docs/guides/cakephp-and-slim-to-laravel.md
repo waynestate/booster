@@ -102,7 +102,9 @@ so).
 After Step 0 on an app with a form sign-in, `src/Sesame/UserResolver.php` looks up the row the form used to find
 (for example `Users` by `email`) by the CAS username, so `getIdentifier()` still returns that row's id and policies
 and `user_id` writes keep working. A person with no row signs in with a username only and no id. Make sure that
-field holds what CAS sends (the AccessID).
+field holds what CAS sends (the AccessID). The mount gives the Laravel half's resolver, `app/Sesame/StranglerUserResolver.php`,
+the same lookup on the legacy database, once a moved unit has brought `CakeDatabase`, so a moved page sees the same
+id as the legacy one.
 
 ### A unit Booster cannot move
 
@@ -151,7 +153,8 @@ Every strangler run reports, in text and in the JSON report's `strangler` sectio
 
 - the units moved this run, each with its replay line;
 - the units still in legacy, with failed ones marked;
-- every refusal, with file and line;
+- every refusal, with file and line; a refusal several units share prints once with the units it names, and when every
+  refused unit runs the same file (a CakePHP base controller's `initialize()`), a MANUAL line says to port that file first;
 - the MANUAL checklist, grouped: sign-in, mount, route moves, finish;
 - for Slim, the Slim-hosted units still in `routes/web.php` and their `SLIM-HOSTED:` lines, in their own section (`strangler.slim_hosted` in JSON);
 - the next command to run.

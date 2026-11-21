@@ -31,7 +31,13 @@ Laravel 13 one unit at a time (the strangler). Two hops were added and none remo
   there, `booster plan` plans only the strangler and says so; patch the old app meanwhile with
   `--path=<app>/legacy`.
 - **A strangler section in the report**, in text and in the JSON report (`strangler`): units moved and left,
-  refusals with file and line, and the MANUAL lines grouped by sign-in, mount, route moves and finish.
+  refusals with file and line, and the MANUAL lines grouped by sign-in, mount, route moves and finish. A refusal many
+  units share prints once, naming them.
+- **Step 0 keeps the user's row.** On a CakePHP form sign-in, both halves' SESAME resolvers look up the row the form
+  found (for example `Users` by `email`) by the CAS username, so `getIdentifier()` keeps returning its id. Make sure
+  that field holds the AccessID CAS sends.
+- **`replay init` gives each sign-in and sign-out page its own sequence** (`sign-in 1`, `sign-in 2`), and on a
+  CakePHP app normalizes `postLink`'s form names.
 - **Request files can say more.** Writes gain `"csrf": true`, and `compare` gains `ignore_cookies`, `preset`
   (`"strangler"`) and `silent_sign_in`. `replay init` now drafts a GET of each write's form page right before it.
   Existing request files and recordings keep working unchanged: no fingerprint moves, and the replay container only
