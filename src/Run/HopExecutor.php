@@ -2171,7 +2171,7 @@ final class HopExecutor
         }
         $raised = [];
         if (!$gate->passed && $update !== [] && $this->packages !== null && $step->phpAfter !== null) {
-            [$gate, $raised] = $this->raiseRootHolder($step, $path, $options, $baseline, $gate, [...$update, ...$named], $signInChanges !== null);
+            [$gate, $raised] = $this->raiseRootHolder($step, $path, $options, $baseline, $gate, $update, $named, $signInChanges !== null);
         }
         if ($raised !== []) {
             $gate = new GateReport($gate->passed, [...$raised, ...$gate->lines]);
@@ -2219,17 +2219,19 @@ final class HopExecutor
      * again, keep it only when that passes (with a MANUAL line), else put
      * composer.json and composer.lock back as the failed gate left them.
      *
-     * @param list<string> $update
+     * @param list<string> $update the packages the step added
+     * @param list<string> $named  the held packages named after them (moved only inside their constraints)
      *
      * @return array{0: GateReport, 1: list<string>}
      */
-    private function raiseRootHolder(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, GateReport $failed, array $update, bool $stepZero): array
+    private function raiseRootHolder(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, GateReport $failed, array $update, array $named, bool $stepZero): array
     {
         $php = (string) $step->phpAfter;
         $candidate = $this->packages === null ? null : (new DependencyRaise($this->packages))->rootHolder($path, $php, implode("\n", $failed->lines), $update);
         if ($candidate === null) {
             return [$failed, []];
         }
+        $update = array_values(array_unique([...$update, ...$named]));
         $package = $candidate['package'];
         $files = [];
         foreach (['composer.json', 'composer.lock'] as $name) {
@@ -2243,8 +2245,8 @@ final class HopExecutor
             return [$failed, ['Could not raise ' . $package . ': ' . $e->getMessage()]];
         }
         $gate = $stepZero
-            ? $this->runTestGate($step, $path, $options, $baseline, [...$update, $package])
-            : $this->runTestGateWith($step, $path, $options, $baseline, [...$update, $package], $this->strangledTestCommand($path, $options, $baseline->gateKind));
+            ? $this->runTestGate($step, $path, $options, $baseline, array_values(array_unique([...$update, $package])))
+            : $this->runTestGateWith($step, $path, $options, $baseline, array_values(array_unique([...$update, $package])),$this->strangledTestCommand($path, $options, $baseline->gateKind));
         if ($gate->passed) {
             return [$gate, [$tried, sprintf(
                 'MANUAL: %s moved from %s.x to %s.x (locked %s) and the gate passed. A new major can change behavior the tests and replay do not cover: read its upgrade notes before release%s.',
