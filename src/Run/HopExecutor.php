@@ -579,7 +579,9 @@ final class HopExecutor
             return new BaselineResult(BaselineResult::SKIPPED, $php, null, [], $warning, $kind);
         }
 
-        $test = $options->testCommand ?? $this->defaultTestCommand($path);
+        // A mounted app (mid-strangler) is gated as its strangler steps are: the root's own
+        // suite is the Laravel half's, which the mount leaves pointing at routes now under /_laravel.
+        $test = self::mounted($path) ? $this->strangledTestCommand($path, $options, $kind) : ($options->testCommand ?? $this->defaultTestCommand($path));
         // The baseline can take minutes before the first hop line (the first
         // run on a machine builds the gate image), so it gets its own lines.
         $started = microtime(true);
@@ -1968,6 +1970,23 @@ final class HopExecutor
      */
     public const STRANGLER_SYNTAX_COMMAND = "find . -name '*.php' -not -path '*/vendor/*' -not -path '*/node_modules/*' -not -path './storage/*' -print0 | xargs -0 -r -n1 php -l > /dev/null";
 
+    /** Whether the app is mid-strangler: the ledger at the root and the legacy half in legacy/. */
+    private static function mounted(string $path): bool
+    {
+        return is_file($path . '/' . \Waynestate\Booster\Strangler\Ledger::FILE) && is_dir($path . '/legacy');
+    }
+
+    /** The strangler's gate command: the syntax check over both roots, then, while legacy/ exists, the legacy suite from inside it. */
+    private function strangledTestCommand(string $path, RunOptions $options, string $gateKind): string
+    {
+        $test = self::STRANGLER_SYNTAX_COMMAND;
+        if (is_dir($path . '/legacy') && ($options->testCommand !== null || $gateKind === BaselineResult::GATE_TESTS)) {
+            $test .= ' && (cd legacy && ' . ($options->testCommand ?? $this->defaultTestCommand($path . '/legacy')) . ')';
+        }
+
+        return $test;
+    }
+
     /**
      * A strangler hop (cakephp-to-laravel, slim-to-laravel): StranglerStep
      * walks run 1 (Step 0, the mount) or a later run (moves, a hand flip,
@@ -2032,15 +2051,9 @@ final class HopExecutor
      */
     private function stranglerGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, bool $serveChanged, array $update, ?array $signInChanges = null): GateReport
     {
-        if ($signInChanges !== null) {
-            $gate = $this->runTestGate($step, $path, $options, $baseline, $update);
-        } else {
-            $test = self::STRANGLER_SYNTAX_COMMAND;
-            if (is_dir($path . '/legacy') && ($options->testCommand !== null || $baseline->gateKind === BaselineResult::GATE_TESTS)) {
-                $test .= ' && (cd legacy && ' . ($options->testCommand ?? $this->defaultTestCommand($path . '/legacy')) . ')';
-            }
-            $gate = $this->runTestGateWith($step, $path, $options, $baseline, $update, $test);
-        }
+        $gate = $signInChanges !== null
+            ? $this->runTestGate($step, $path, $options, $baseline, $update)
+            : $this->runTestGateWith($step, $path, $options, $baseline, $update, $this->strangledTestCommand($path, $options, $baseline->gateKind));
         if (!$gate->passed) {
             return $gate;
         }
@@ -3688,8 +3701,10 @@ final class HopExecutor
         if ($options->testCommand !== null) {
             return BaselineResult::GATE_CUSTOM;
         }
+        // Mid-strangler, the app's own suite is the legacy half's.
+        $suite = self::mounted($path) ? $path . '/legacy' : $path;
 
-        return $this->defaultTestCommand($path) === self::SYNTAX_CHECK_COMMAND
+        return $this->defaultTestCommand($suite) === self::SYNTAX_CHECK_COMMAND
             ? BaselineResult::GATE_SYNTAX
             : BaselineResult::GATE_TESTS;
     }

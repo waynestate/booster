@@ -2374,6 +2374,24 @@ PHP,
         return $executor->execute($plan, $options);
     }
 
+    public function test_a_mounted_app_baselines_with_the_strangler_gate_not_the_laravel_half_suite(): void
+    {
+        // Mid-strangler, the root suite is Sourdough's (its pages moved under /_laravel); the legacy suite is the app's.
+        $dir = $this->copyExample('raw-php');
+        $project = (new ProjectDetector())->detect($dir);
+        $plan = (new Planner($this->policy(), new HopRegistry()))->plan($project, new PlanOptions(fromPhp: '8.1', toPhp: '8.3'), $this->today());
+        // Mounted after the plan, so only the baseline sees it.
+        @mkdir($dir . '/legacy', 0775, true);
+        file_put_contents($dir . '/legacy/composer.json', (string) json_encode(['scripts' => ['test' => 'phpunit']]));
+        file_put_contents($dir . '/booster-strangler.json', '{}');
+        $fake = $this->fake();
+        (new HopExecutor(new RectorRunner($fake, '/fake/rector'), new ComposerEditor(), new TargetImageRunner($fake), $fake))->execute($plan, new RunOptions());
+
+        $baseline = implode(' ', $this->dockerRuns($fake)[0]);
+        self::assertStringContainsString("-not -path '*/vendor/*'", $baseline, 'the syntax check over both roots');
+        self::assertStringContainsString('(cd legacy && composer test)', $baseline, 'then the legacy suite');
+    }
+
     public function test_a_suite_of_only_stock_examples_is_named_next_to_the_baseline(): void
     {
         $report = $this->executePrepared($this->stockExample(), new RunOptions());

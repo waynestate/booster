@@ -533,6 +533,9 @@ final class Mount
                 $this->changed[] = 'routes/web.php';
             }
         }
+        if (is_dir($root . '/tests/Feature')) {
+            $this->manual[] = 'tests/Feature: Sourdough\'s own tests still ask for its pages at /, /dashboard, /login and /up, which now live under /_laravel (sign-in at /_laravel/login), so the root suite fails until you point them there or delete the demo tests. While legacy/ exists, Booster gates with the syntax check and the legacy suite, not the root suite.';
+        }
     }
 
     /** Pint and PHPStan in the root leave legacy/ alone. */
