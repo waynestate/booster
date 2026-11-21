@@ -25,7 +25,9 @@ final class LegacyServiceProvider extends ServiceProvider
     {
         $this->app->singleton('legacy.container', static fn() => SlimAdapter::buildContainer(SlimAdapter::manifest()));
         $this->app->singleton('legacy', static fn($app) => new LegacyContainer($app));
-        foreach ((array) (SlimAdapter::manifest()['keys'] ?? []) as $key) {
+        $manifest = SlimAdapter::manifest();
+        $keys = array_merge((array) ($manifest['keys'] ?? []), (array) ($manifest['hosted']['keys'] ?? []));
+        foreach (array_unique($keys) as $key) {
             $this->app->bind('legacy.' . $key, static fn() => SlimAdapter::service($key));
         }
     }

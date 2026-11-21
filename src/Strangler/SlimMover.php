@@ -39,6 +39,9 @@ final class SlimMover implements AddsComposerPackages, Mover
 
     public const PROVIDER = 'app/Providers/LegacyServiceProvider.php';
 
+    /** The MANUAL line prefix of a Slim-hosted move (design 9.5); hostedUnits() lists them. */
+    public const HOSTED_PREFIX = 'SLIM-HOSTED:';
+
     /** The runtime files every Slim move needs, from resources/strangler/slim/. */
     private const SUPPORT = ['SlimAdapter.php', 'LegacyClosure.php', 'LegacyContainer.php', 'CapturingEmitter.php', 'LegacyResponse.php', 'LegacyTwigExtension.php'];
 
@@ -97,10 +100,14 @@ final class SlimMover implements AddsComposerPackages, Mover
             $refusals[] = ['file' => 'legacy/composer.json', 'line' => 1, 'reason' => 'the app does not use slim/psr7; the adapter builds Slim\'s own PSR-7 request and response, so another PSR-7 implementation would change what the handler sees'];
         }
         $front = $this->frontController($appRoot, $scan['sources']);
-        $movedIds = self::movedIds($webCode, $unit->id);
         $csrf = self::csrf($legacyComposer, $scan['sources']);
-        $bootstrap = isset($scan['sources']['public/index.php'])
-            && ($front['container'] !== 'php-di' || $front['refusal'] !== null || $csrf !== null || self::needsBootstrap($movedIds, $scan));
+        // Slim-hosted only when this unit needs it (design 9.5: one
+        // framework per request is the rule, the copied front controller the
+        // exception): a role if, route or group middleware, closure imports,
+        // or an app the adapter cannot run (its container or CSRF check).
+        $hostReasons = isset($scan['sources']['public/index.php']) ? $this->hostReasons($routes, $front, $csrf, $scan['sources']) : [];
+        $bootstrap = $hostReasons !== [];
+        $movedIds = $bootstrap ? self::hostedIds($webCode, $unit->id) : [];
         foreach ($routes as $route) {
             $refusals = array_merge($refusals, $this->routeRefusals($route, $appRoot, $bootstrap));
         }
@@ -114,7 +121,7 @@ final class SlimMover implements AddsComposerPackages, Mover
 
         $copier = new SlimCodeCopier($appRoot, $scan['sources']);
         if ($bootstrap) {
-            return $this->moveBootstrap($unit, $appRoot, $scan, $routes, $movedIds, $copier, $csrf, $webCode, $web);
+            return $this->moveBootstrap($unit, $appRoot, $scan, $routes, $movedIds, $copier, $csrf === null ? null : $csrf[0], $webCode, $web, $hostReasons);
         }
         $manual = [];
         $blocks = [];
@@ -131,6 +138,10 @@ final class SlimMover implements AddsComposerPackages, Mover
             }
         }
         $manifest = $this->manifest($front, $copier, $scan['sources'], $appRoot, self::twigManifest($scan));
+        $previous = self::existingManifest($appRoot);
+        if (isset($previous['hosted'])) {
+            $manifest['hosted'] = $previous['hosted'];
+        }
         if ($copier->refusals !== []) {
             return new MoveResult(false, [], self::unique($copier->refusals), []);
         }
@@ -174,8 +185,9 @@ final class SlimMover implements AddsComposerPackages, Mover
      * @param array{units: list<Unit>, routes: array<string, list<SlimRoute>>, sources: array<string, SlimSource>} $scan
      * @param list<SlimRoute> $routes
      * @param list<string>    $movedIds
+     * @param list<string>    $hostReasons why the unit is Slim-hosted, each with its file and line
      */
-    private function moveBootstrap(Unit $unit, string $appRoot, array $scan, array $routes, array $movedIds, SlimCodeCopier $copier, ?string $csrf, string $webCode, string $web): MoveResult
+    private function moveBootstrap(Unit $unit, string $appRoot, array $scan, array $routes, array $movedIds, SlimCodeCopier $copier, ?string $csrf, string $webCode, string $web, array $hostReasons): MoveResult
     {
         $manual = [];
         $scripts = $this->bootstrapScripts($copier, $scan, $movedIds);
@@ -197,13 +209,15 @@ final class SlimMover implements AddsComposerPackages, Mover
             $copier->write(SlimCodeCopier::DIR . 'Support/' . $file, (string) file_get_contents(self::resource($file)));
         }
         $copier->write(self::PROVIDER, (string) file_get_contents(self::resource('LegacyServiceProvider.php')));
-        $manifest = [
-            'mode' => 'bootstrap',
+        // The adapter's part (an earlier plain unit's) is kept beside the
+        // hosted part: each Laravel route says which one it runs.
+        $manifest = self::existingManifest($appRoot);
+        $manifest['hosted'] = [
             'front' => SlimCodeCopier::BOOT . 'public/index.php',
             'keys' => self::containerKeys($copier, $scan['sources']),
             'csrf' => $csrf,
-            'twig' => self::twigManifest($scan),
         ];
+        $manifest['twig'] = self::twigManifest($scan);
         $generated = $scripts + [self::MANIFEST => "<?php\n\n// Written by Booster's strangler (slim-to-laravel): how the moved Slim handlers run. App-owned.\n\nreturn " . self::export($manifest) . ";\n"];
         foreach ($generated as $relative => $code) {
             $file = $appRoot . '/' . $relative;
@@ -227,7 +241,8 @@ final class SlimMover implements AddsComposerPackages, Mover
         if ($this->requirePackages($appRoot, $copier, $front, $manual)) {
             $changed[] = 'composer.json';
         }
-        $manual[] = 'the moved routes run in a copy of legacy/public/index.php and what it loads (' . SlimCodeCopier::BOOT . '); its routes script registers only the moved routes, inside the same role checks and with the same middleware, so a guest gets what legacy answers';
+        $manual[] = self::HOSTED_PREFIX . ' ' . $unit->id . ' runs through Slim inside Laravel because of ' . implode('; ', $hostReasons) . '; port the check to Laravel middleware before finish';
+        $manual[] = 'the slim-hosted routes run in a copy of legacy/public/index.php and what it loads (' . SlimCodeCopier::BOOT . '); its routes script registers only the moved routes, inside the same role checks and with the same middleware, so a guest gets what legacy answers';
         $manual = array_merge($manual, $copier->manual);
         sort($changed);
 
@@ -308,11 +323,119 @@ final class SlimMover implements AddsComposerPackages, Mover
      *
      * @return list<string>
      */
-    private static function movedIds(string $webCode, string $unitId): array
+    private static function hostedIds(string $webCode, string $unitId): array
     {
-        preg_match_all('#^// booster:strangler (.+?) from #m', $webCode, $m);
+        return array_values(array_unique(array_merge(self::hostedInWeb($webCode), [$unitId])));
+    }
 
-        return array_values(array_unique(array_merge($m[1], [$unitId])));
+    /**
+     * The units routes/web.php sends through the copied front controller
+     * (each block's routes carry `->defaults('booster_slim', 'bootstrap')`).
+     *
+     * @return list<string>
+     */
+    private static function hostedInWeb(string $webCode): array
+    {
+        $parts = preg_split('#^// booster:strangler (.+?) from .*$#m', $webCode, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [];
+        $out = [];
+        for ($i = 1; $i + 1 < count($parts); $i += 2) {
+            if (str_contains($parts[$i + 1], "->defaults('booster_slim', 'bootstrap')")) {
+                $out[] = $parts[$i];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The Slim-hosted units still in the app (design 9.5): each runs a copy
+     * of the legacy front controller inside its Laravel route, so it is
+     * still Slim. The report lists them apart and finish refuses while any
+     * remain. A move's MoveResult says the same in a MANUAL line that
+     * starts with HOSTED_PREFIX.
+     *
+     * @return list<string> unit ids, in routes/web.php order
+     */
+    public static function hostedUnits(string $appRoot): array
+    {
+        $web = rtrim($appRoot, '/\\') . '/routes/web.php';
+
+        return is_file($web) ? self::hostedInWeb((string) file_get_contents($web)) : [];
+    }
+
+    /**
+     * Why a unit needs the copied front controller: each reason with its
+     * file and line, or none when the PSR-7 adapter runs it.
+     *
+     * @param list<SlimRoute>            $routes
+     * @param array<string, mixed>       $front
+     * @param array{string, string}|null $csrf
+     * @param array<string, SlimSource>  $sources
+     *
+     * @return list<string>
+     */
+    private function hostReasons(array $routes, array $front, ?array $csrf, array $sources): array
+    {
+        $out = [];
+        $refusal = $front['refusal'] ?? null;
+        if (is_array($refusal)) {
+            $out[] = 'the container the front controller builds, which the PSR-7 adapter cannot rebuild (it rebuilds PHP-DI definitions or none), at ' . $refusal['file'] . ':' . $refusal['line'];
+        } elseif (!in_array($front['container'] ?? 'none', ['php-di', 'none'], true)) {
+            $out[] = 'the legacy container (' . $front['container'] . ') at legacy/public/index.php:1';
+        }
+        if ($csrf !== null) {
+            $out[] = 'the legacy CSRF check ' . $csrf[0] . ' at ' . $csrf[1];
+        }
+        foreach ($routes as $route) {
+            foreach ($route->links as [$file, $call, $from]) {
+                $src = $sources[$file] ?? null;
+                if ($src === null) {
+                    continue;
+                }
+                foreach ($src->guardSitesAt($call, $from) as $site) {
+                    $out[] = 'role if `' . self::condition($src, $site) . '` at legacy/' . $file . ':' . $src->t[$site][2];
+                }
+            }
+            foreach ($route->middleware as $n => $middleware) {
+                $file = $route->middlewareFiles[$n] ?? $route->file;
+                $line = $route->line;
+                $code = isset($sources[$file]) ? $sources[$file]->code : '';
+                $at = strpos($code, $middleware);
+                if ($file !== $route->file && $at !== false) {
+                    $line = substr_count($code, "\n", 0, $at) + 1;
+                }
+                $out[] = 'middleware ' . $middleware . ' at legacy/' . $file . ':' . $line;
+            }
+            if ($route->handlerKind === 'closure' && $route->closureUses !== []) {
+                $out[] = 'the closure\'s use ($' . implode(', $', $route->closureUses) . ') at legacy/' . $route->file . ':' . $route->handlerLine;
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /** The condition of the if at $site, on one line. */
+    private static function condition(SlimSource $src, int $site): string
+    {
+        $open = $src->next($site);
+        if ($open === null || !isset($src->parens[$open])) {
+            return '';
+        }
+        $text = '';
+        for ($k = $open + 1; $k < $src->parens[$open]; $k++) {
+            $text .= $src->t[$k][1];
+        }
+
+        return trim((string) preg_replace('/\s+/', ' ', $text));
+    }
+
+    /** @return array<string, mixed> the manifest an earlier move wrote, or [] */
+    private static function existingManifest(string $appRoot): array
+    {
+        $file = $appRoot . '/' . self::MANIFEST;
+        $data = is_file($file) ? require $file : [];
+
+        return is_array($data) ? $data : [];
     }
 
     /**
@@ -321,39 +444,23 @@ final class SlimMover implements AddsComposerPackages, Mover
      *
      * @param array<mixed>              $legacyComposer
      * @param array<string, SlimSource> $sources
+     *
+     * @return array{string, string}|null the check and where it is (file:line)
      */
-    private static function csrf(array $legacyComposer, array $sources): ?string
+    private static function csrf(array $legacyComposer, array $sources): ?array
     {
         if (isset($legacyComposer['require']['slim/csrf'])) {
-            return 'slim/csrf';
+            return ['slim/csrf', 'legacy/composer.json:1'];
         }
         foreach ($sources as $path => $src) {
-            if (preg_match('/\bnew\s+\\\\?((?:\w+\\\\)*\w*Csrf\w*)\s*\(|\b((?:\w+\\\\)*\w*Csrf\w*)::class/i', $src->code, $m) === 1 && !str_starts_with($path, 'vendor/')) {
-                return ltrim($m[1] !== '' ? $m[1] : $m[2], '\\');
+            if (preg_match('/\bnew\s+\\\\?((?:\w+\\\\)*\w*Csrf\w*)\s*\(|\b((?:\w+\\\\)*\w*Csrf\w*)::class/i', $src->code, $m, PREG_OFFSET_CAPTURE) === 1 && !str_starts_with($path, 'vendor/')) {
+                $name = $m[1][0] !== '' ? $m[1][0] : $m[2][0];
+
+                return [ltrim($name, '\\'), 'legacy/' . $path . ':' . (substr_count($src->code, "\n", 0, $m[0][1]) + 1)];
             }
         }
 
         return null;
-    }
-
-    /**
-     * Whether a moved route needs the legacy pipeline: it is registered
-     * inside an if, adds middleware, or its closure imports variables.
-     *
-     * @param list<string> $movedIds
-     * @param array{units: list<Unit>, routes: array<string, list<SlimRoute>>, sources: array<string, SlimSource>} $scan
-     */
-    private static function needsBootstrap(array $movedIds, array $scan): bool
-    {
-        foreach ($movedIds as $id) {
-            foreach ($scan['routes'][$id] ?? [] as $route) {
-                if ($route->guards !== [] || $route->middleware !== [] || $route->closureUses !== []) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 
     /**

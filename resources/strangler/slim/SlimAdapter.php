@@ -44,8 +44,10 @@ final class SlimAdapter
             }
         }
         $manifest = self::manifest();
-        if (($manifest['mode'] ?? 'php-di') === 'bootstrap') {
-            return self::bootstrap($manifest);
+        // A Slim-hosted route (design 9.5) runs the copied front controller;
+        // every other moved route runs its handler right here.
+        if ($spec === 'bootstrap') {
+            return self::bootstrap((array) ($manifest['hosted'] ?? []));
         }
         $container = app('legacy.container');
         self::pointSesameAtLaravel();

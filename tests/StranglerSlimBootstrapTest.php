@@ -68,8 +68,7 @@ final class StranglerSlimBootstrapTest extends TestCase
         $this->move('FORM /login');
 
         $manifest = require $this->app . '/' . self::LEGACY . 'booster-slim.php';
-        self::assertSame('bootstrap', $manifest['mode']);
-        self::assertSame(self::LEGACY . 'boot/public/index.php', $manifest['front']);
+        self::assertSame(self::LEGACY . 'boot/public/index.php', $manifest['hosted']['front']);
 
         $front = $this->read(self::LEGACY . 'boot/public/index.php');
         self::assertStringContainsString("require \\base_path('" . self::LEGACY . "boot/config/init.php');", $front, 'a relative require resolves against legacy/public');
@@ -93,7 +92,7 @@ final class StranglerSlimBootstrapTest extends TestCase
         $this->move('FORM /login');
 
         $manifest = require $this->app . '/' . self::LEGACY . 'booster-slim.php';
-        self::assertSame(['config', 'files', 'session', 'user', 'view'], $manifest['keys']);
+        self::assertSame(['config', 'files', 'session', 'user', 'view'], $manifest['hosted']['keys']);
         $provider = $this->read('app/Providers/LegacyServiceProvider.php');
         self::assertStringContainsString("\$this->app->bind('legacy.' . \$key, static fn() => SlimAdapter::service(\$key));", $provider);
         self::assertStringContainsString("new LegacyContainer(\$app)", $provider);
@@ -104,7 +103,7 @@ final class StranglerSlimBootstrapTest extends TestCase
         $result = $this->move('FORM /login');
 
         $manifest = require $this->app . '/' . self::LEGACY . 'booster-slim.php';
-        self::assertSame('App\Middleware\CheckCsrf', $manifest['csrf']);
+        self::assertSame('App\Middleware\CheckCsrf', $manifest['hosted']['csrf']);
         self::assertStringContainsString('still has the legacy CSRF check (App\Middleware\CheckCsrf)', implode("\n", $result->manual));
         // The legacy middleware array is copied, so the check runs in the pipeline.
         self::assertStringContainsString('new \App\Http\Controllers\Legacy\App\Middleware\CheckCsrf(', $this->read(self::LEGACY . 'boot/config/middleware.php'));
@@ -131,6 +130,24 @@ final class StranglerSlimBootstrapTest extends TestCase
         $web = $this->read('routes/web.php');
         self::assertStringContainsString("Route::match(['GET'], 'logout', ", $web);
         self::assertStringContainsString("Route::match(['GET'], 'staff', ", $web);
+    }
+
+    public function testEveryUnitOfAnAppTheAdapterCannotRunIsSlimHostedWithItsReasons(): void
+    {
+        $login = $this->move('FORM /login');
+        $logout = $this->move('GET /logout');
+
+        $hosted = static fn(array $manual): array => array_values(array_filter($manual, static fn(string $m): bool => str_starts_with($m, SlimMover::HOSTED_PREFIX)));
+        [$loginLine] = $hosted($login->manual);
+        self::assertStringStartsWith('SLIM-HOSTED: FORM /login runs through Slim inside Laravel because of the container the front controller builds, which the PSR-7 adapter cannot rebuild (it rebuilds PHP-DI definitions or none), at legacy/public/index.php:1; ', $loginLine);
+        self::assertStringContainsString('the legacy CSRF check App\Middleware\CheckCsrf at legacy/config/middleware.php:5', $loginLine);
+        self::assertStringEndsWith('; port the check to Laravel middleware before finish', $loginLine);
+        self::assertStringNotContainsString('role if', $loginLine);
+
+        [$logoutLine] = $hosted($logout->manual);
+        self::assertStringContainsString("role if `\$app->getContainer()['user']->isAuth()` at legacy/app/Controller/Login.php:14", $logoutLine);
+        self::assertStringContainsString('middleware new \App\Middleware\NoCache() at legacy/app/Controller/Login.php:15', $logoutLine);
+        self::assertSame(['FORM /login', 'GET /logout'], SlimMover::hostedUnits($this->app));
     }
 
     public function testComposerAddsKeepTheLegacyConstraintWidenSlimAndSkipAConflict(): void

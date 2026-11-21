@@ -176,7 +176,7 @@ final class StranglerSlimMoverTest extends TestCase
         self::assertStringContainsString("Route::match(['GET'], 'page/{n}', ", $web);
     }
 
-    public function testSignedInUnitsWaitForStepZeroAndRoleChecksMoveInBootstrapMode(): void
+    public function testSignedInUnitsWaitForStepZeroAndRoleChecksAreSlimHosted(): void
     {
         $pending = $this->move('GET /admin/users');
         self::assertFalse($pending->moved);
@@ -189,8 +189,9 @@ final class StranglerSlimMoverTest extends TestCase
         // The role check runs per request in a copy of the legacy front
         // controller, whose routes script registers only the moved route.
         $manifest = require $this->app . '/app/Http/Controllers/Legacy/booster-slim.php';
-        self::assertSame('bootstrap', $manifest['mode']);
-        self::assertSame('app/Http/Controllers/Legacy/boot/public/index.php', $manifest['front']);
+        self::assertSame('app/Http/Controllers/Legacy/boot/public/index.php', $manifest['hosted']['front']);
+        self::assertContains("SLIM-HOSTED: GET /admin/users runs through Slim inside Laravel because of role if `(\$_SESSION['role'] ?? '') === 'admin'` at legacy/app/routes.php:34; port the check to Laravel middleware before finish", $done->manual);
+        self::assertSame(['GET /admin/users'], SlimMover::hostedUnits($this->app));
         $front = $this->read('app/Http/Controllers/Legacy/boot/public/index.php');
         self::assertStringContainsString('true;', $front, 'the legacy autoloader is not loaded');
         self::assertStringContainsString("require \base_path('app/Http/Controllers/Legacy/routes/app/routes.php')", $front);
@@ -206,6 +207,38 @@ final class StranglerSlimMoverTest extends TestCase
         self::assertStringContainsString("\$booster_app->map(['BOOSTER-NOT-MOVED'], '/', ", $routes);
         self::assertStringContainsString('SlimAdapter::bindContainer($booster_app->getContainer());', $routes);
         self::assertStringContainsString("->defaults('booster_slim', 'bootstrap')", $this->read('routes/web.php'));
+    }
+
+    public function testPlainUnitsRunBehindTheAdapterBesideASlimHostedOne(): void
+    {
+        file_put_contents($this->app . '/booster-strangler.json', json_encode(['framework' => 'slim', 'mounted_at' => 'x', 'step0' => 'done', 'units' => []]));
+        $plainFirst = $this->move('GET /items');
+        self::assertSame([], array_values(array_filter($plainFirst->manual, static fn(string $m): bool => str_starts_with($m, SlimMover::HOSTED_PREFIX))));
+        $hosted = $this->move('GET /admin/users');
+        self::assertTrue($hosted->moved, self::reasons($hosted->refusals));
+        $plainAfter = $this->move('GET /items/{id}');
+        self::assertTrue($plainAfter->moved, self::reasons($plainAfter->refusals));
+        self::assertSame([], array_values(array_filter($plainAfter->manual, static fn(string $m): bool => str_starts_with($m, SlimMover::HOSTED_PREFIX))), 'a plain unit is never Slim-hosted, even after one that is');
+
+        // Each Laravel route says which runtime it uses: plain units name
+        // their handler, the hosted one the copied front controller.
+        $web = $this->read('routes/web.php');
+        self::assertStringContainsString("->defaults('booster_slim', 'class:App\\\\Http\\\\Controllers\\\\Legacy\\\\App\\\\Action\\\\ListItems')", $web);
+        self::assertSame(1, substr_count($web, "->defaults('booster_slim', 'bootstrap')"));
+        self::assertSame(['GET /admin/users'], SlimMover::hostedUnits($this->app));
+
+        // The manifest keeps the adapter's part and the hosted part.
+        $manifest = require $this->app . '/app/Http/Controllers/Legacy/booster-slim.php';
+        self::assertSame('php-di', $manifest['container']);
+        self::assertSame(['container/app-dependencies.php'], $manifest['files']);
+        self::assertSame('app/Http/Controllers/Legacy/boot/public/index.php', $manifest['hosted']['front']);
+        self::assertArrayNotHasKey('mode', $manifest);
+
+        // The hosted routes script registers only the hosted unit; the plain
+        // ones are placeholders at most (named) and never answer there.
+        $routes = $this->read('app/Http/Controllers/Legacy/routes/app/routes.php');
+        self::assertStringContainsString("\$booster_app->get('/admin/users', ", $routes);
+        self::assertStringNotContainsString("->get('/items", $routes);
     }
 
     public function testRefusesBeforeTheMount(): void
