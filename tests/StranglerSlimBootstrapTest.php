@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Tests;
 
 use PHPUnit\Framework\TestCase;
+use Waynestate\Booster\Strangler\AddsComposerPackages;
 use Waynestate\Booster\Strangler\MoveResult;
 use Waynestate\Booster\Strangler\SlimMover;
 use Waynestate\Booster\Strangler\SlimUnitSource;
@@ -143,6 +144,8 @@ final class StranglerSlimBootstrapTest extends TestCase
         self::assertTrue(isset($result) && $result->moved);
 
         $adds = $mover->lastComposerAdds();
+        self::assertInstanceOf(AddsComposerPackages::class, $mover);
+        self::assertSame($adds, $mover->composerAdds());
         self::assertSame('^3.5', $adds['pimple/pimple'] ?? null, 'no conflict: the legacy constraint as is');
         self::assertSame('^4.15 || ^5.0', $adds['slim/slim'] ?? null, 'psr/http-message ^1.1 against the root 2.0: the next major is allowed');
         self::assertArrayNotHasKey('league/flysystem-sftp', $adds);

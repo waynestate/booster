@@ -33,7 +33,7 @@ namespace Waynestate\Booster\Strangler;
  * user through sesame_user(), which the adapter points at the Laravel half's
  * SESAME instance, the one SESAME's Laravel guard reads.
  */
-final class SlimMover implements Mover
+final class SlimMover implements AddsComposerPackages, Mover
 {
     public const MANIFEST = SlimCodeCopier::DIR . 'booster-slim.php';
 
@@ -60,6 +60,12 @@ final class SlimMover implements Mover
      * @return array<string, string>
      */
     public function lastComposerAdds(): array
+    {
+        return $this->composerAdds;
+    }
+
+    /** ENGINE's AddsComposerPackages: the same list as lastComposerAdds(). */
+    public function composerAdds(): array
     {
         return $this->composerAdds;
     }
