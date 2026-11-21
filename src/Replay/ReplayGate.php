@@ -367,7 +367,7 @@ final class ReplayGate
             return $lines;
         };
         $clean = static fn(?string $l): string => (string) preg_replace('/[\x00-\x1F\x7F]/', '', str_replace(ReplayComparison::APP_ORIGIN, '<app>', (string) $l));
-        // "*" is every path: a Slim app whose middleware answers every guest page with its login page (testeval).
+        // "*" is every path: a Slim app whose middleware answers every guest page with its login page (a Slim 3 fleet app).
         $listedPath = static fn(ReplayRequest $r): bool => in_array('*', $paths, true) || in_array($r->path, $paths, true) || in_array($r->target(), $paths, true);
         // A capture note (the form's CSRF field matched nothing) goes with the form.
         $formLines = ['status: ', 'content-type: ', 'location: ', 'note: '];

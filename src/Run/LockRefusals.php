@@ -22,7 +22,7 @@ use Composer\Semver\VersionParser;
  * constraints, so the lock follows the hops instead, one package at a time.
  *
  * A few releases allow a PHP they do not work on; those are listed in BROKEN
- * and updated the same way. Found on testeval (2026-11-20): Twig 2.5.0 says
+ * and updated the same way. Found on a Slim 3 fleet app (2026-11-20): Twig 2.5.0 says
  * php ^7.0, but on PHP 7.4 its lexer trims the whitespace before every
  * `{{`, so the 7.4 hop's replay caught "Slimapp - Login" turning into
  * "Slimapp -Login" on every page.

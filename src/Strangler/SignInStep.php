@@ -186,7 +186,7 @@ final class SignInStep
      * from Oracle) hands guests to a CAS that is never reached, so the
      * hand-off's Location is stable; the others sign in on the spot with the
      * fake driver, so signed-in sequences work. Both are local: SESAME takes
-     * the replay's plain-http service URL on 127.0.0.1 only there (testeval,
+     * the replay's plain-http service URL on 127.0.0.1 only there (a Slim 3 fleet app,
      * 2026-11-20: production refused it with a 500 on every page).
      *
      * @return array<string, string>

@@ -7,7 +7,7 @@ namespace Waynestate\Booster\Tests;
 use Waynestate\Booster\Run\Slim\TwigNameRewriter;
 
 /**
- * Bug S8 (testeval): the Slim 3 to 4 hop moves Twig to 3, which has no
+ * Bug S8 (a Slim 3 fleet app): the Slim 3 to 4 hop moves Twig to 3, which has no
  * Twig_Environment, Twig_SimpleFilter or Twig_Extension, and Twig-View 3,
  * whose Twig constructor takes a loader, so every page died.
  */
@@ -65,7 +65,7 @@ final class SlimTwigNameRewriterTest extends TestCase
 
     public function test_a_file_with_no_namespace_and_twig_views_constructor(): void
     {
-        // testeval's config/core.php: container entries in a plain PHP file.
+        // a Slim 3 fleet app's config/core.php: container entries in a plain PHP file.
         $core = <<<'PHP'
             <?php
             return [

@@ -13,7 +13,7 @@ use Waynestate\Booster\Run\Slim\UriBasePathRewriter;
  */
 final class SlimUriBasePathRewriterTest extends TestCase
 {
-    /** The testeval shape: a controller that redirects to the base path. */
+    /** The Slim 3 fleet app shape: a controller that redirects to the base path. */
     private const CONTROLLER = <<<'PHP'
         <?php
 
