@@ -2199,10 +2199,11 @@ final class HopExecutor
     private function laravelRouteList(string $path, string $php, RunOptions $options): array|string
     {
         // The gate script keeps a passing command's output in its own log, so
-        // the JSON goes to a file in the app (mounted at /app) and is read here.
+        // the JSON goes to a file in the app (mounted at /app) and is read here;
+        // the braces keep the script's own redirect from taking it back.
         $file = self::ROUTE_LIST_FILE;
         self::removeFile($path . '/' . $file);
-        $result = $this->gate->run($path, $php, 'php artisan route:list --json > ' . $file, null, $options->gateImage, [], $options->testEnv);
+        $result = $this->gate->run($path, $php, '{ php artisan route:list --json > ' . $file . '; }', null, $options->gateImage, [], $options->testEnv);
         $out = is_file($path . '/' . $file) ? (string) file_get_contents($path . '/' . $file) : '';
         self::removeFile($path . '/' . $file);
         if (!$result->successful() || trim($out) === '') {
