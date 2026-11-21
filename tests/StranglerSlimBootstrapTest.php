@@ -140,7 +140,12 @@ final class StranglerSlimBootstrapTest extends TestCase
 
     public function testAnAppBuiltByItsOwnClassRunsAPlainUnitBehindTheAdapterInItsOwnSetup(): void
     {
+        mkdir($this->app . '/config');
+        file_put_contents($this->app . '/config/helmet.php', "<?php\n\nreturn [\n    'policy_path' => null,\n];\n");
         $login = $this->move('FORM /login');
+
+        self::assertStringContainsString("'scope' => 'web'", $this->read('config/helmet.php'), 'the setup path holds HELMET off the moved routes too (testeval, 2026-11-20)');
+        self::assertContains('config/helmet.php', $login->changedFiles);
 
         self::assertSame([], self::hostedLines($login), 'the app class, its Pimple container and its CSRF middleware no longer force hosting');
         self::assertSame([], SlimMover::hostedUnits($this->app));

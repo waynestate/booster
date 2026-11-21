@@ -268,6 +268,11 @@ final class SlimMover implements AddsComposerPackages, Mover
         $block = "\n" . self::marker($unit->id) . $unit->sourceFile . ':' . $unit->sourceLine . "\n" . implode("\n", $blocks) . "\n";
         file_put_contents($web, rtrim($webCode, "\n") . "\n" . $block);
         $changed[] = 'routes/web.php';
+        // The hosted and app-setup routes carry HelmetHold::SKIP too, so the scope must be web here as well.
+        if (HelmetHold::scopeToWeb($appRoot)) {
+            $changed[] = HelmetHold::FILE;
+            $manual[] = HelmetHold::MANUAL;
+        }
         $front = ['container' => 'bootstrap', 'error_middleware' => true, 'error_handler' => null, 'emitter' => null];
         if ($this->requirePackages($appRoot, $copier, $front, $manual)) {
             $changed[] = 'composer.json';
