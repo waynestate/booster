@@ -1520,7 +1520,7 @@ final class HopExecutor
      * On the final target, drops Booster's temporary advisory unblocks and
      * runs the step's whole gate again with `composer update -W` for those
      * packages, which can now move past the blocked releases on the new PHP.
-     * Found on testeval (2026-11-20): Twig had to be unblocked on PHP 7.4,
+     * Found on a Slim 3 fleet app (2026-11-20): Twig had to be unblocked on PHP 7.4,
      * where every release it could install is flagged, and the final target
      * failed on the leftover entry although PHP 8.5 installs a fixed Twig.
      * When the gate passes and nothing was unblocked again, the entry is
@@ -2171,7 +2171,7 @@ final class HopExecutor
             : $this->runTestGateWith($step, $path, $options, $baseline, $update, $this->strangledTestCommand($path, $options, $baseline->gateKind));
         // A package Step 0 or a move added may need a shared package (psr/http-message 2) that a
         // locked package holds at its old major; `-W` never moves the packages that require it.
-        // Name those once more, inside composer.json's constraints (testeval: SESAME 0.10 next to
+        // Name those once more, inside composer.json's constraints (a Slim 3 fleet app: SESAME 0.10 next to
         // slim/http 1.3 and slim/psr7 1.6, 2026-11-20).
         // Each failed update can name one more shared package, so this goes a few rounds.
         $named = [];

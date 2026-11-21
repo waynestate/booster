@@ -66,7 +66,7 @@ final class RouteCallScannerTest extends TestCase
                 'staff' => function ($app) {
                     if (in_array('staff', $app->getContainer()['user']->roles)) {
                         $app->group('/staff/', function () use ($app) {
-                            \App\Testeval\StaffController::addRoutes($app);
+                            \App\ExampleApp\StaffController::addRoutes($app);
                         });
                     }
                 },
@@ -80,7 +80,7 @@ final class RouteCallScannerTest extends TestCase
             ];
             PHP;
         $login = "<?php\nnamespace App\\Controller\\Page;\nclass Login extends Page\n{\n    static function AddRoutes (\\Slim\\App \$app)\n    {\n        \$app->get('/[login[/]]', __CLASS__ . ':Login');\n        if (\$app->getContainer()['user']->isAuth()) {\n            \$app->get('/logout/', __CLASS__ . ':Logout');\n        }\n    }\n    function Login(\$request, \$response) { return \$this->get('view'); }\n}\n";
-        $staff = "<?php\nnamespace App\\Testeval;\nclass StaffController\n{\n    static function AddRoutes(\\Slim\\App \$app)\n    {\n        \$app->get('', __CLASS__ . ':Home');\n        \$app->get('report/{id}', function (\$request, \$response) { return \$this->get('/not-a-route'); });\n    }\n    function Home() { return Model\\Job::GetExports(); }\n}\n";
+        $staff = "<?php\nnamespace App\\ExampleApp;\nclass StaffController\n{\n    static function AddRoutes(\\Slim\\App \$app)\n    {\n        \$app->get('', __CLASS__ . ':Home');\n        \$app->get('report/{id}', function (\$request, \$response) { return \$this->get('/not-a-route'); });\n    }\n    function Home() { return Model\\Job::GetExports(); }\n}\n";
         $api = "<?php\nnamespace App\\Controller\\Api;\nclass WSUGeneral\n{\n    static function AddRoutes (\\Slim\\App \$app) {\n        \$app->get('terms/', self::class . ':terms');\n        self::more(\$app);\n    }\n    private static function more(\$app) { \$app->post('save/', 'save'); }\n}\n";
 
         self::assertSame([

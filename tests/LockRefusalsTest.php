@@ -93,7 +93,7 @@ final class LockRefusalsTest extends TestCase
 
     public function test_a_release_broken_on_the_php_is_updated_too(): void
     {
-        // Bug S-twig (testeval): Twig 2.5.0 allows PHP 7.4 but trims the
+        // Bug S-twig (a Slim 3 fleet app): Twig 2.5.0 allows PHP 7.4 but trims the
         // whitespace before every {{ there, so the 7.4 hop's replay failed.
         $dir = $this->app(['require' => ['php' => '>=7']], [
             ['twig/twig', 'v2.5.0', '^7.0'],

@@ -745,7 +745,7 @@ final class SlimUpgradeMigrationTest extends TestCase
 
     public function test_slim_container_type_hints_move_to_the_generated_container(): void
     {
-        // Bug S7 (testeval): controllers typed \Slim\Container died with a
+        // Bug S7 (a Slim 3 fleet app): controllers typed \Slim\Container died with a
         // TypeError on every page once the app ran on the legacy container.
         $controller = <<<'PHP'
             <?php
@@ -791,7 +791,7 @@ final class SlimUpgradeMigrationTest extends TestCase
 
     public function test_twig_names_move_when_the_hop_moves_twig(): void
     {
-        // Bug S8 (testeval): Twig 3 has no underscore names, and Twig-View 3's
+        // Bug S8 (a Slim 3 fleet app): Twig 3 has no underscore names, and Twig-View 3's
         // constructor takes a loader.
         $core = "<?php\n\nreturn ['view' => function (\$c) {\n    \$view = new Slim\\Views\\Twig('templates', []);\n    \$view->addExtension(new Twig_Extension_Debug());\n\n    return \$view;\n}];\n";
         $files = ['src/core.php' => $core, 'scripts/mail.php' => "<?php\n\n\$t = new Twig_Environment();\n"];
@@ -813,7 +813,7 @@ final class SlimUpgradeMigrationTest extends TestCase
 
     public function test_slim_3s_uri_base_path_moves_to_the_request_attribute(): void
     {
-        // testeval (2026-11-20): a signed-in /login/ redirected to Slim 3's
+        // a Slim 3 fleet app (2026-11-20): a signed-in /login/ redirected to Slim 3's
         // $request->getUri()->getBasePath(), a 500 on Slim 4.
         $login = <<<'PHP'
             <?php

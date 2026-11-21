@@ -106,7 +106,7 @@ final class ReplayComparisonTest extends TestCase
     {
         $csrf = ReplayNormalizer::preset('csrf');
 
-        // A Slim 3 app's own field (bug S-csrf, testeval) and slim/csrf's pair.
+        // A Slim 3 app's own field (bug S-csrf, a Slim 3 fleet app) and slim/csrf's pair.
         self::assertSame("<input type='hidden' name='CSRF_KEY' value='<CSRF>'>", $csrf->apply("<input type='hidden' name='CSRF_KEY' value='5f2a9c'>"));
         self::assertSame('<input name="csrf_name" value="<CSRF>"><input name="csrf_value" value="<CSRF>">', $csrf->apply('<input name="csrf_name" value="csrf61e"><input name="csrf_value" value="9a8b">'));
         self::assertSame('<input value="<CSRF>" name="XSRF-TOKEN">', $csrf->apply('<input value="q1" name="XSRF-TOKEN">'));
