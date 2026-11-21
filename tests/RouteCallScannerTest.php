@@ -182,6 +182,28 @@ final class RouteCallScannerTest extends TestCase
         // Never the CLI entry point, the webroot folder or a phpinfo() page.
         self::assertStringNotContainsString('cake.php', $draft['json']);
         self::assertStringNotContainsString('phpinfo', $draft['json']);
+        // postLink() names its hidden forms post_ plus a uniqid (the CMS tutorial).
+        self::assertContains(ReplayDrafter::CAKE_POSTLINK_NORMALIZER, $data['normalize']);
+    }
+
+    // The CMS tutorial, 2026-11-20: with the login page in the pages sequence, Step 0's fake
+    // driver signed the replay user in there and every page after it answered signed in.
+    public function test_replay_init_gives_each_sign_in_and_sign_out_page_a_sequence_of_its_own(): void
+    {
+        $app = $this->cakeApp();
+        file_put_contents($app . '/src/Controller/UsersController.php', "<?php\nclass UsersController extends AppController\n{\n    public function index() {}\n    public function login() {}\n    public function logout() {}\n}\n");
+
+        $file = ReplayFile::fromArray((array) json_decode((new ReplayDrafter())->draft($app)['json'], true));
+        $bySequence = [];
+        foreach ($file->requests as $request) {
+            $bySequence[$request->sequence][] = $request->path;
+        }
+
+        self::assertSame([
+            'pages' => ['/', '/pages/home', '/student-rosters', '/student-rosters/view-all', '/student-rosters/edit/{id}', '/users', '/booster-replay-no-such-page'],
+            'sign-in page: GET /users/login' => ['/users/login'],
+            'sign-in page: GET /users/logout' => ['/users/logout'],
+        ], $bySequence);
     }
 
     public function test_a_phpinfo_page_is_never_drafted_for_a_raw_php_app(): void
@@ -214,9 +236,10 @@ final class RouteCallScannerTest extends TestCase
             'GET /staff',
             'GET /staff/report/{id}',
             'GET /staff/admin/users',
-            'GET /login/',
             'GET /after',
             'GET /booster-replay-no-such-page',
+            // The sign-in page in a sequence of its own, after the pages.
+            'GET /login/',
             'GET /staff/admin/save',
             'POST /staff/admin/save',
             'GET /staff/admin/users',

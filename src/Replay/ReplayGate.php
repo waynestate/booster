@@ -339,6 +339,16 @@ final class ReplayGate
                     $forms[$request->sequence] ??= $request;
                     continue;
                 }
+                // SESAME's fake driver (the replay's, for a form sign-in) signs the replay user in
+                // on the spot and sends the browser back into the app, so the session cookie that
+                // sign-in opens is part of the move; a hand-off to CAS still compares its cookies
+                // (the CakePHP CMS tutorial, 2026-11-20).
+                $inApp = str_starts_with($clean($after->header('Location')), '<app>/') || str_starts_with((string) $after->header('Location'), '/');
+                if ($before->status === 200 && $inApp && $without($before, [...$formLines, 'set-cookie: '], true) === $without($after, [...$formLines, 'set-cookie: '], true)) {
+                    $accepted[] = sprintf('%s: the sign-in form (200) now signs in through SESAME (the replay\'s fake driver), %d Location %s', $request->label(), $after->status, $clean($after->header('Location')));
+                    $forms[$request->sequence] ??= $request;
+                    continue;
+                }
             }
             $kept[] = $difference;
         }

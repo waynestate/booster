@@ -33,6 +33,23 @@ final class ReplayDrafter
     /** The folders a CakePHP app writes to as it serves, which git does not keep. */
     public const CAKE_SETUP = 'mkdir -p logs tmp/cache/models tmp/cache/persistent tmp/cache/views tmp/sessions tmp/tests';
 
+    /**
+     * CakePHP's FormHelper::postLink() names each hidden form post_ plus a
+     * uniqid, so every page with a delete link changes on every request (the
+     * CakePHP CMS tutorial, 2026-11-20).
+     *
+     * @var array{name: string, pattern: string, replace: string}
+     */
+    public const CAKE_POSTLINK_NORMALIZER = ['name' => 'CakePHP postLink form names', 'pattern' => 'post_[0-9a-f]{13}[0-9a-f]*', 'replace' => 'post_<ID>'];
+
+    /**
+     * A sign-in or sign-out page: each gets a sequence of its own, so the
+     * strangler's Step 0 (where opening the sign-in page signs the replay user
+     * in through SESAME's fake driver) does not turn the pages after it into
+     * signed-in pages (the CakePHP CMS tutorial, 2026-11-20).
+     */
+    private const SIGN_IN_PAGE = '#(?:^|/)(?:[\w.\-]*(?:login|logout)|log-in|log-out|sign-?in|sign-?out|sso|cas)(?:/|$)#i';
+
     /** Raw-PHP folders that hold includes, not pages. */
     private const INCLUDE_DIRS = ['inc', 'include', 'includes', 'lib', 'libs', 'library', 'classes', 'class', 'config', 'conf', 'src', 'app', 'templates', 'views', 'partials'];
 
@@ -133,7 +150,15 @@ final class ReplayDrafter
         $serve['env'] = $cake ? ['DEBUG' => 'false', 'SECURITY_SALT' => 'booster-replay-fake-salt-for-local-replays-only'] : (object) [];
         $serve['todo'] = 'Name the command that builds the fake data in setup (or leave setup empty if the app reads no database), then delete this todo.';
 
-        $sequences = [['name' => 'pages', 'requests' => $pages]];
+        $signIn = [];
+        foreach ($pages as $k => $page) {
+            if (preg_match(self::SIGN_IN_PAGE, $page['path'] . '/') === 1) {
+                $signIn[] = ['name' => 'sign-in page: ' . $page['name'], 'requests' => [$page]];
+                unset($pages[$k]);
+            }
+        }
+        $pages = array_values($pages);
+        $sequences = [['name' => 'pages', 'requests' => $pages], ...$signIn];
         if ($writes !== []) {
             $sequences[] = ['name' => 'forms', 'requests' => $writes];
         }
@@ -141,16 +166,16 @@ final class ReplayDrafter
             '$comment' => 'Booster replay request file, drafted by booster replay init from ' . ($source === '' ? 'nothing' : $source) . '. Each sequence starts with an empty cookie jar; requests in it share cookies like one browser. See the Booster docs, "The replay gate".',
             'version' => 1,
             'serve' => $serve,
-            'normalize' => ['csrf', 'session-id', ...self::frontEndPresets($appPath)],
+            'normalize' => ['csrf', 'session-id', ...self::frontEndPresets($appPath), ...($cake ? [self::CAKE_POSTLINK_NORMALIZER] : [])],
             'sequences' => $sequences,
         ];
         $json = json_encode($draft, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n";
         $todos = 1;
-        foreach ([...$pages, ...$writes] as $request) {
+        foreach ([...$pages, ...array_merge([], ...array_column($signIn, 'requests')), ...$writes] as $request) {
             $todos += isset($request['todo']) ? 1 : 0;
         }
 
-        return ['json' => $json, 'source' => $source, 'requests' => count($pages) + count($writes), 'todos' => $todos];
+        return ['json' => $json, 'source' => $source, 'requests' => count($pages) + count($signIn) + count($writes), 'todos' => $todos];
     }
 
     /**

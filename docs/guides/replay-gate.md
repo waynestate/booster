@@ -211,6 +211,11 @@ Every GET without parameters becomes a request, plus one unknown path (an honest
 parameter, form and setup command gets a `todo`, because Booster cannot know which note id exists or what a valid
 form looks like. Fill those in, delete the `todo` lines, and record.
 
+Each sign-in or sign-out page (a path with `login`, `logout`, `signin`, `signout`, `sso` or `cas` in it) gets a
+sequence of its own, after `pages`: when the strangler's Step 0 moves the sign-in to SESAME, opening that page signs
+the replay user in, and in a shared sequence every page after it would answer signed in. A CakePHP draft also lists a
+normalizer for the `post_` plus uniqid names `postLink()` gives its hidden forms, which change on every request.
+
 Each write is drafted with `"csrf": true` in the `forms` sequence, right after a GET of the page that shows its form,
 so the token comes from that page. When the app has no GET route at the same path, that page gets a `todo` to point
 it at the right one.
@@ -302,7 +307,10 @@ that is accepted too when every header line but status, content type and `Locati
 body goes with it). The requests later in that sequence that posted the form (the next request when it sends CSRF,
 or a POST to the form's path or a listed path) are reported as `sign-in moved to SESAME` instead of failing: the
 replay signs in through the fake driver now (`compare.silent_sign_in`). The signed-in pages after them are compared
-as always.
+as always. Under the fake driver the form page signs in on the spot and redirects back into the app instead of to
+CAS; that is accepted the same way, and the session cookie it opens with it (`the sign-in form (200) now signs in
+through SESAME (the replay's fake driver)`). A hand-off to CAS still compares its cookies. Keep the sign-in page in a
+sequence of its own (drafts do): the pages after it in the same sequence would answer signed in.
 
 ### Which half answered
 

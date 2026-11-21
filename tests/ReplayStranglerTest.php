@@ -280,6 +280,26 @@ final class ReplayStranglerTest extends TestCase
         self::assertSame($passed->lines[0], $every->lines[0]);
     }
 
+    // The CakePHP CMS tutorial, 2026-11-20: under the replay's fake driver the login page signs in
+    // on the spot and sends the browser back into the app, opening the session it signs into.
+    public function test_a_form_sign_in_page_the_fake_driver_signs_in_may_open_a_session_and_a_cas_hand_off_may_not(): void
+    {
+        $file = ReplayFile::fromArray(['sequences' => [['name' => 'sign-in', 'requests' => [['path' => '/users/login']]]]]);
+        $baseline = [[200, '<form method="post"></form>', [self::HTML]]];
+        $session = ['Set-Cookie', 'PHPSESSID=a; path=/'];
+        $fake = [[302, '', [self::HTML, ['Location', 'http://127.0.0.1:8765/users/login'], $session]]];
+        $cas = [[302, '', [self::HTML, ['Location', 'https://cas.replay.invalid/cas/login?service=x'], $session]]];
+        $gate = $this->gate([$baseline, $fake, $cas], $file);
+        $gate->record('8.5');
+
+        $signedIn = $gate->check('8.5', 'step-0', signInChanges: ['/users/login']);
+        self::assertSame(ReplayOutcome::PASSED, $signedIn->status, implode("\n", $signedIn->lines));
+        self::assertSame("  01 sign-in: GET /users/login: the sign-in form (200) now signs in through SESAME (the replay's fake driver), 302 Location <app>/users/login", $signedIn->lines[1]);
+
+        $handOff = $gate->check('8.5', 'step-0b', signInChanges: ['/users/login']);
+        self::assertSame(ReplayOutcome::DIFFERS, $handOff->status, 'a hand-off to CAS still compares its cookies');
+    }
+
     public function test_only_requests_that_posted_the_moved_form_are_reported_moved(): void
     {
         $file = ReplayFile::fromArray(['sequences' => [
