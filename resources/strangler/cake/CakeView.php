@@ -19,7 +19,7 @@ use Throwable;
  */
 final class CakeView
 {
-    /** @var array{cookie: string, field: string, httponly: bool}|null the legacy app's CSRF cookie and field, null when it checks none */
+    /** @var array{cookie: string, field: string, httponly: bool, guest: bool}|null the legacy app's CSRF cookie and field (`guest`: its check ran before sign-in, so a failure rendered as a guest's error), null when it checks none */
     public const LEGACY_CSRF = /*BOOSTER:LEGACY_CSRF*/ null;
 
     /** @var array{guest: string, user: string} the error template a guest and a signed-in user saw (`code` picks error400 or error500 by status) */
@@ -61,6 +61,15 @@ final class CakeView
         return $response;
     }
 
+    /**
+     * An action that ends without a response and has no template: CakePHP
+     * threw MissingTemplateException, which debug off prints as the 500 page.
+     */
+    public static function missingTemplate(string $template): never
+    {
+        throw new CakeHttpException(500, 'Template file `' . $template . '` could not be found.', false);
+    }
+
     /** A view variable of the template being rendered (FormHelper reads `$tags` for `tags._ids`). */
     public static function viewVar(string $name): mixed
     {
@@ -82,9 +91,9 @@ final class CakeView
      * The legacy app's error page, as CakePHP's ExceptionRenderer printed
      * it with debug off: the Error template inside the error layout.
      */
-    public static function error(Request $request, int $status, string $message): Response
+    public static function error(Request $request, int $status, string $message, bool $asGuest = false): Response
     {
-        $which = $request->user() === null ? self::ERROR_TEMPLATES['guest'] : self::ERROR_TEMPLATES['user'];
+        $which = $asGuest || $request->user() === null ? self::ERROR_TEMPLATES['guest'] : self::ERROR_TEMPLATES['user'];
         if ($which === 'code') {
             $which = $status >= 500 ? 'error500' : 'error400';
         }
@@ -226,7 +235,44 @@ final class CakeView
             ? 'CSRF token from either the request body or request headers did not match or is missing.'
             : 'Missing or incorrect CSRF cookie type.';
 
-        return new CakeHttpException(403, $message);
+        return new CakeHttpException(403, $message, true, $e, self::LEGACY_CSRF['guest'] ?? false);
+    }
+
+    /**
+     * Registers an exception map on Laravel's handler (routes/web.php calls
+     * this for the CSRF and error bridges). Under artisan the bound handler
+     * can be Collision's adapter, which has no map(); the console renders
+     * no legacy pages, so it is skipped there.
+     */
+    public static function mapException(\Closure $mapper): void
+    {
+        $handler = app(\Illuminate\Contracts\Debug\ExceptionHandler::class);
+        if ($handler instanceof \Illuminate\Foundation\Exceptions\Handler) {
+            $handler->map($mapper);
+        }
+    }
+
+    /**
+     * An error a moved action ends in that is not an HTTP answer (a database
+     * error): CakePHP with debug off printed the error500 page with "An
+     * Internal Error Has Occurred.", so the moved action does too
+     * (routes/web.php maps it here). The cause stays the previous exception,
+     * so the log keeps it. Laravel's own exceptions and other routes are
+     * left alone.
+     */
+    public static function serverError(Throwable $e): Throwable
+    {
+        if ($e instanceof CakeHttpException
+            || $e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface
+            || $e instanceof \Illuminate\Session\TokenMismatchException
+            || $e instanceof \Illuminate\Http\Exceptions\HttpResponseException
+            || $e instanceof \Illuminate\Auth\AuthenticationException
+            || $e instanceof \Illuminate\Validation\ValidationException
+            || !self::moved(request())) {
+            return $e;
+        }
+
+        return new CakeHttpException(500, $e->getMessage(), false, $e);
     }
 
     /**

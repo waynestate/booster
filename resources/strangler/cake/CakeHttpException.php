@@ -12,9 +12,12 @@ namespace App\Http\Controllers\Legacy\Cake;
  */
 final class CakeHttpException extends \RuntimeException
 {
-    public function __construct(public readonly int $status, string $message, public readonly bool $http = true)
+    /**
+     * @param bool $asGuest the legacy app failed before sign-in ran (a CSRF check ahead of the Authentication middleware), so its page is the one a guest saw
+     */
+    public function __construct(public readonly int $status, string $message, public readonly bool $http = true, ?\Throwable $previous = null, public readonly bool $asGuest = false)
     {
-        parent::__construct($message, $status);
+        parent::__construct($message, $status, $previous);
     }
 
     /** The message CakePHP's ExceptionRenderer prints with debug off. */
@@ -29,6 +32,6 @@ final class CakeHttpException extends \RuntimeException
 
     public function render(\Illuminate\Http\Request $request): \Illuminate\Http\Response
     {
-        return CakeView::error($request, $this->status, $this->pageMessage());
+        return CakeView::error($request, $this->status, $this->pageMessage(), $this->asGuest);
     }
 }
