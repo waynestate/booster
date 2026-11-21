@@ -2169,6 +2169,13 @@ final class HopExecutor
                 ? $this->runTestGate($step, $path, $options, $baseline, [...$update, ...$named])
                 : $this->runTestGateWith($step, $path, $options, $baseline, [...$update, ...$named], $this->strangledTestCommand($path, $options, $baseline->gateKind));
         }
+        $raised = [];
+        if (!$gate->passed && $update !== [] && $this->packages !== null && $step->phpAfter !== null) {
+            [$gate, $raised] = $this->raiseRootHolder($step, $path, $options, $baseline, $gate, [...$update, ...$named], $signInChanges !== null);
+        }
+        if ($raised !== []) {
+            $gate = new GateReport($gate->passed, [...$raised, ...$gate->lines]);
+        }
         if ($named !== []) {
             sort($named);
             $gate = new GateReport($gate->passed, [
@@ -2203,6 +2210,72 @@ final class HopExecutor
         }
 
         return new GateReport(true, [...$gate->lines, ...$outcome->lines]);
+    }
+
+    /**
+     * A strangler gate's composer update still fails after the held packages
+     * were named: a package the app requires directly holds the shared one
+     * (DependencyRaise::rootHolder). Widen it to its next major, run the gate
+     * again, keep it only when that passes (with a MANUAL line), else put
+     * composer.json and composer.lock back as the failed gate left them.
+     *
+     * @param list<string> $update
+     *
+     * @return array{0: GateReport, 1: list<string>}
+     */
+    private function raiseRootHolder(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, GateReport $failed, array $update, bool $stepZero): array
+    {
+        $php = (string) $step->phpAfter;
+        $candidate = $this->packages === null ? null : (new DependencyRaise($this->packages))->rootHolder($path, $php, implode("\n", $failed->lines), $update);
+        if ($candidate === null) {
+            return [$failed, []];
+        }
+        $package = $candidate['package'];
+        $files = [];
+        foreach (['composer.json', 'composer.lock'] as $name) {
+            $file = rtrim($path, '/\\') . '/' . $name;
+            $files[$file] = is_file($file) ? file_get_contents($file) : false;
+        }
+        $tried = sprintf('%s %s is the newest release its constraint %s allows and holds a package the new requirement needs at another major, so Booster raised it: composer.json asks for %s.', $package, $candidate['installed'], $candidate['constraint'], $candidate['widened']);
+        try {
+            DependencyRaise::widen($path, $candidate);
+        } catch (ToolError $e) {
+            return [$failed, ['Could not raise ' . $package . ': ' . $e->getMessage()]];
+        }
+        $gate = $stepZero
+            ? $this->runTestGate($step, $path, $options, $baseline, [...$update, $package])
+            : $this->runTestGateWith($step, $path, $options, $baseline, [...$update, $package], $this->strangledTestCommand($path, $options, $baseline->gateKind));
+        if ($gate->passed) {
+            return [$gate, [$tried, sprintf(
+                'MANUAL: %s moved from %s.x to %s.x (locked %s) and the gate passed. A new major can change behavior the tests and replay do not cover: read its upgrade notes before release%s.',
+                $package,
+                $candidate['oldMajor'],
+                $candidate['newMajor'],
+                ltrim(self::lockedVersionOf($path, $package) ?? '?', 'v'),
+                $candidate['notes'] === null ? '' : ' (' . $candidate['notes'] . ')',
+            )]];
+        }
+        foreach ($files as $file => $content) {
+            if ($content !== false) {
+                file_put_contents($file, $content);
+            }
+        }
+
+        return [$failed, [$tried . ' The gate still failed with it, so composer.json and composer.lock are back as before the raise.']];
+    }
+
+    private static function lockedVersionOf(string $path, string $package): ?string
+    {
+        $lock = json_decode((string) @file_get_contents(rtrim($path, '/\\') . '/composer.lock'), true);
+        foreach (['packages', 'packages-dev'] as $section) {
+            foreach (is_array($lock[$section] ?? null) ? $lock[$section] : [] as $entry) {
+                if (is_array($entry) && strtolower((string) ($entry['name'] ?? '')) === $package && is_string($entry['version'] ?? null)) {
+                    return $entry['version'];
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

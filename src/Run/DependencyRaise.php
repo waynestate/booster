@@ -88,6 +88,45 @@ final class DependencyRaise
     }
 
     /**
+     * The strangler's case (testeval, 2026-11-20): a composer update for a
+     * package Step 0 or a move added fails because a package the app
+     * requires directly holds a shared one at its old major (monolog/monolog
+     * ^1.17 holds psr/log 1, SESAME needs psr/log 3). Composer names it as
+     * "Root composer.json requires <package> <constraint>". The first such
+     * package not in $named, not owned by another hop, and on the newest
+     * release its constraint allows, with a next major for PHP $php, is the
+     * candidate; the caller proves the raise with the gate.
+     *
+     * @param list<string> $named the packages the update already names
+     *
+     * @return array{package: string, section: string, constraint: string, widened: string, installed: string, oldMajor: string, newMajor: string, notes: ?string}|null
+     */
+    public function rootHolder(string $appPath, string $php, string $failure, array $named): ?array
+    {
+        $composer = self::readJson(rtrim($appPath, '/\\') . '/composer.json');
+        if ($composer === null || preg_match_all('#Root composer\.json requires ([a-z0-9][a-z0-9_.-]*/[a-z0-9][a-z0-9_.-]*) #i', $failure, $m) < 1) {
+            return null;
+        }
+        $locked = self::lockedVersions($appPath);
+        $named = array_map('strtolower', $named);
+        foreach (array_unique(array_map('strtolower', $m[1])) as $package) {
+            if (in_array($package, $named, true) || in_array($package, self::NEVER_RAISED, true) || !isset($locked[$package])) {
+                continue;
+            }
+            [$section, $constraint] = self::appConstraint($composer, $package);
+            if ($section === null || $constraint === null) {
+                continue;
+            }
+            $found = $this->qualify($package, $constraint, $locked[$package], $php);
+            if ($found !== null) {
+                return ['package' => $package, 'section' => $section, 'constraint' => $constraint, ...$found];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Writes the widened constraint into composer.json, in the section the
      * app required the package from, keeping every other byte of meaning.
      *

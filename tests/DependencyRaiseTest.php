@@ -73,6 +73,27 @@ final class DependencyRaiseTest extends TestCase
         self::assertNull((new DependencyRaise(new FixturePackageFetcher([])))->candidate($dir, '8.4', self::FAILURE));
     }
 
+    public function test_a_strangler_update_raises_the_root_package_that_holds_a_shared_one(): void
+    {
+        $dir = $this->app('1.2.3');
+        $raise = new DependencyRaise(new FixturePackageFetcher([self::URL => $this->document()]));
+        $failure = implode("\n", [
+            '  Problem 1',
+            '    - Root composer.json requires acme/di ^1.2 -> satisfiable by acme/di[1.2.0, 1.2.3].',
+            '    - Root composer.json requires waynestate/sesame ^0.10 -> satisfiable by waynestate/sesame[0.10.0].',
+            '    - acme/di[1.2.0, 1.2.3] require psr/log ~1.0 -> satisfiable by psr/log[1.0.0, ..., 1.1.4].',
+        ]);
+
+        $candidate = $raise->rootHolder($dir, '8.4', $failure, ['waynestate/sesame']);
+        self::assertNotNull($candidate);
+        self::assertSame('acme/di', $candidate['package']);
+        self::assertSame('^1.2 || ^2', $candidate['widened']);
+        // A package the update already names is not raised.
+        self::assertNull($raise->rootHolder($dir, '8.4', $failure, ['waynestate/sesame', 'acme/di']));
+        // A failure that names no root requirement raises nothing.
+        self::assertNull($raise->rootHolder($dir, '8.4', 'found psr/log[3.0.0] but these were not loaded', []));
+    }
+
     public function test_a_php_hop_keeps_the_raise_when_the_gate_passes_again(): void
     {
         $dir = $this->app('1.2.3');
