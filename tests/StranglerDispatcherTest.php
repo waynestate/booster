@@ -56,7 +56,7 @@ final class StranglerDispatcherTest extends TestCase
                             http_response_code(500);
                         }
                         header('Content-Type: application/json');
-                        echo json_encode(['half' => 'laravel', 'files' => get_included_files(), 'laravel' => function_exists('booster_test_laravel_loaded'), 'legacy' => function_exists('booster_test_legacy_loaded'), 'script' => $_SERVER['SCRIPT_NAME'], 'start' => defined('LARAVEL_START')]);
+                        echo json_encode(['half' => 'laravel', 'files' => get_included_files(), 'laravel' => function_exists('booster_test_laravel_loaded'), 'legacy' => function_exists('booster_test_legacy_loaded'), 'script' => $_SERVER['SCRIPT_NAME'], 'start' => defined('LARAVEL_START'), 'unit' => $_SERVER['BOOSTER_MOVED_UNIT'] ?? null]);
                     }
                 };
                 PHP,
@@ -73,7 +73,7 @@ final class StranglerDispatcherTest extends TestCase
                     http_response_code(500);
                 }
                 header('Content-Type: application/json');
-                echo json_encode(['half' => 'legacy', 'files' => get_included_files(), 'laravel' => function_exists('booster_test_laravel_loaded'), 'legacy' => function_exists('booster_test_legacy_loaded'), 'script' => $_SERVER['SCRIPT_NAME'], 'filename' => $_SERVER['SCRIPT_FILENAME'], 'self' => $_SERVER['PHP_SELF'], 'docroot' => $_SERVER['DOCUMENT_ROOT'], 'cwd' => getcwd(), 'uri' => $_SERVER['REQUEST_URI'], 'globals' => array_values(array_filter(array_keys($GLOBALS), fn ($k) => str_starts_with($k, 'booster')))]);
+                echo json_encode(['half' => 'legacy', 'files' => get_included_files(), 'laravel' => function_exists('booster_test_laravel_loaded'), 'legacy' => function_exists('booster_test_legacy_loaded'), 'script' => $_SERVER['SCRIPT_NAME'], 'filename' => $_SERVER['SCRIPT_FILENAME'], 'self' => $_SERVER['PHP_SELF'], 'docroot' => $_SERVER['DOCUMENT_ROOT'], 'cwd' => getcwd(), 'uri' => $_SERVER['REQUEST_URI'], 'globals' => array_values(array_filter(array_keys($GLOBALS), fn ($k) => str_starts_with($k, 'booster'))), 'marks' => array_values(array_filter(array_keys($_SERVER), fn ($k) => preg_match('/BOOSTER_(LEGACY|MOVED)/', $k) === 1))]);
                 PHP,
             'legacy/webroot/raw.php' => "<?php\necho json_encode(['half' => 'raw', 'script' => \$_SERVER['SCRIPT_NAME'], 'cwd' => getcwd()]);\n",
             'legacy/webroot/css/app.css' => "body { color: #0c5449; }\n",
@@ -96,6 +96,7 @@ final class StranglerDispatcherTest extends TestCase
             new Unit('GET /notes/add', 'route', ['GET'], 'notes/add', null, 'write', false, 'app/routes.php', 4),
             new Unit('POST /notes', 'route', ['POST'], 'notes', null, 'write', false, 'app/routes.php', 5),
         ]));
+        $table->add(new Unit('GET /logout/', 'route', ['GET'], 'logout/', null, 'stateless', false, 'app/routes.php', 6));
         $table->save();
 
         $routerFile = dirname(__DIR__) . '/resources/replay/router.php';
@@ -104,6 +105,12 @@ final class StranglerDispatcherTest extends TestCase
             // front controller's SCRIPT_NAME carries the base.
             $routerFile = $app . '/subpath-router.php';
             file_put_contents($routerFile, "<?php\n\$_SERVER['SCRIPT_NAME'] = '/portal/index.php';\n\$_SERVER['PHP_SELF'] = '/portal/index.php';\n\$_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/public/index.php';\nchdir(__DIR__ . '/public');\nrequire __DIR__ . '/public/index.php';\n");
+        }
+        if ($router === 'apache') {
+            // What Apache does with a rule the mount moved into public/.htaccess:
+            // the rule's E= flag, REDIRECT_ prefixed after the internal redirect.
+            $routerFile = $app . '/apache-router.php';
+            file_put_contents($routerFile, "<?php\nforeach (['TARGET', 'FILE'] as \$k) {\n    if (isset(\$_SERVER['HTTP_X_TEST_' . \$k])) {\n        \$_SERVER['REDIRECT_BOOSTER_LEGACY_' . \$k] = \$_SERVER['HTTP_X_TEST_' . \$k];\n    }\n}\n\$_SERVER['SCRIPT_NAME'] = '/index.php';\n\$_SERVER['PHP_SELF'] = '/index.php';\n\$_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/public/index.php';\nchdir(__DIR__ . '/public');\nrequire __DIR__ . '/public/index.php';\n");
         }
         $this->start($app, $routerFile);
     }
@@ -300,6 +307,43 @@ final class StranglerDispatcherTest extends TestCase
         $this->mountedApp();
         self::assertOnlyLegacy($this->request('GET', '/users/7%2F8'), 'users/7%2F8 is one segment, which the \d+ constraint refuses');
         self::assertOnlyLaravel($this->request('GET', '/users/%37'), 'other escapes are decoded (%37 is 7)');
+    }
+
+    public function test_a_moved_unit_is_named_for_laravel(): void
+    {
+        $this->mountedApp();
+        $moved = $this->request('GET', '/users/7');
+        self::assertSame('GET /users/{id}', $moved['json']['unit'] ?? null, 'bootstrap/app.php skips TrimStrings and ConvertEmptyStringsToNull on it');
+        self::assertNull($this->request('GET', '/_laravel/up')['json']['unit'] ?? null, 'Laravel\'s own pages are not moved units');
+    }
+
+    public function test_a_trailing_slash_route_moves_only_with_its_slash(): void
+    {
+        $this->mountedApp();
+        self::assertOnlyLaravel($this->request('GET', '/logout/'), 'the route as FastRoute declared it');
+        $slashless = $this->request('GET', '/logout');
+        self::assertOnlyLegacy($slashless, 'Laravel would trim the slash and answer; the table keeps /logout legacy\'s');
+        $nope = $this->request('GET', '/nope/');
+        self::assertOnlyLegacy($nope, 'an unmoved slash path');
+    }
+
+    public function test_a_legacy_rule_moved_into_public_htaccess_keeps_its_request_with_legacy(): void
+    {
+        $this->mountedApp('apache');
+        $css = $this->request('GET', '/users/7', ['X-Test-Target' => 'css/app.css']);
+        self::assertSame("body { color: #0c5449; }\n", $css['body'], 'the rule\'s target is served, not the moved route');
+        self::assertSame('legacy', $css['headers']['x-booster-half'] ?? null);
+        $raw = $this->request('GET', '/_laravel/up', ['X-Test-Target' => 'raw.php']);
+        self::assertSame('raw', $raw['json']['half'] ?? null, $raw['body']);
+        self::assertSame('/raw.php', $raw['json']['script']);
+        $front = $this->request('GET', '/users/7', ['X-Test-Target' => 'index.php']);
+        self::assertOnlyLegacy($front, 'a target of the legacy front controller');
+        self::assertSame([], $front['json']['marks'], 'legacy never sees the mount\'s variables');
+        self::assertSame(404, $this->request('GET', '/users/7', ['X-Test-Target' => 'css/none.css'])['status'], 'a missing target is a 404, as Apache answered it');
+        self::assertSame(404, $this->request('GET', '/users/7', ['X-Test-Target' => '../composer.json'])['status'], 'nothing outside the legacy docroot');
+        self::assertSame("console.log('legacy');\n", $this->request('GET', '/build/legacy.js', ['X-Test-File' => '1'])['body'], 'a pass-through serves the legacy file at the path');
+        self::assertSame(404, $this->request('GET', '/users/7', ['X-Test-File' => '1'])['status'], 'a pass-through never reaches a front controller');
+        self::assertOnlyLaravel($this->request('GET', '/users/7'), 'without the rule, the moved route');
     }
 
     public function test_without_the_replay_flag_no_half_header_is_sent(): void

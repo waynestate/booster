@@ -22,7 +22,10 @@
                 {"name": "POST where only GET is routed (405 with Allow)", "method": "POST", "path": "/", "expect": 405},
                 {"name": "the CORS catch-all", "method": "OPTIONS", "path": "/users"},
                 {"name": "a static file", "path": "/robots.txt"},
-                {"name": "a query string", "path": "/users", "query": {"page": "2"}}
+                {"name": "a query string", "path": "/users", "query": {"page": "2"}},
+                {"name": "a path .htaccess redirects (under Apache; php -S has no .htaccess, so the skeleton's 405)", "path": "/old-users", "expect": 405},
+                {"name": "a path .htaccess denies (under Apache; 405 here)", "path": "/private/notes", "expect": 405},
+                {"name": "a file .htaccess denies (under Apache; php -S serves it)", "path": "/settings.ini"}
             ]
         }
     ]

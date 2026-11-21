@@ -23,12 +23,23 @@ deny from all
   # the following 2 lines to eliminate the overhead.
   RewriteCond %{REQUEST_URI}::$1 ^(/.+)/(.*)::\2$
   RewriteRule ^(.*) - [E=BASE:%1]
-  
+
   # If the above doesn't work you might need to set the `RewriteBase` directive manually, it should be the
   # absolute physical path to the directory that contains this htaccess file.
   # RewriteBase /
+
+  # Not the skeleton's: Booster's strangler proof adds a redirect (behind a
+  # file test) and a deny, which the mount moves into public/.htaccess.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^old-users/?$ /users [R=301,L]
+  RewriteRule ^private(/|$) - [F]
 
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteRule ^ index.php [QSA,L]
 </IfModule>
+
+# Not the skeleton's either: settings files are never served.
+<FilesMatch "\.(ini|sql)$">
+  Require all denied
+</FilesMatch>

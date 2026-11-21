@@ -14,6 +14,8 @@
  *      when legacy has no file there.
  *   4. Moved routes: bootstrap/booster-moved.php (Booster writes it) lists
  *      method and regex per moved unit; HEAD counts as GET; first match wins.
+ *      (Skipped, with 3, when a legacy rule moved into public/.htaccess named
+ *      a legacy file: that request stays legacy's, as before.)
  *   5. A real file under the legacy docroot is served as it was: static files
  *      streamed with the type the server in front gave (php -S or Apache), ETag,
  *      Last-Modified and 304; a .php script runs as its own script, as Apache
@@ -97,15 +99,30 @@ $booster_route = (static function (): array {
         return $real;
     };
 
+    // A legacy rewrite rule the mount moved into public/.htaccess sent this
+    // request to a legacy file (BOOSTER_LEGACY_FILE: the path itself, a
+    // pass-through rule; BOOSTER_LEGACY_TARGET: the rule's target). Apache
+    // adds REDIRECT_ after its internal redirect. Clients cannot set these
+    // (headers arrive as HTTP_*), and legacy never sees them.
+    $target = null;
+    foreach ($_SERVER as $key => $value) {
+        if (is_string($key) && preg_match('/^(?:REDIRECT_)*BOOSTER_LEGACY_(TARGET|FILE)$/', $key, $m) === 1) {
+            if ($target === null && is_string($value) && $value !== '') {
+                $target = $m[1] === 'FILE' ? $path : '/' . ltrim($value, '/');
+            }
+            unset($_SERVER[$key]);
+        }
+    }
+
     // 3. Laravel-owned prefixes.
-    foreach ($laravelPrefixes as $prefix) {
+    foreach ($target === null ? $laravelPrefixes : [] as $prefix) {
         if ($path === $prefix || strncmp($path, $prefix . '/', strlen($prefix) + 1) === 0) {
             $half('laravel');
 
             return ['laravel'];
         }
     }
-    if (strncmp($path, '/build/', 7) === 0 && $legacyFile($path) === null) {
+    if ($target === null && strncmp($path, '/build/', 7) === 0 && $legacyFile($path) === null) {
         $half('laravel');
 
         return ['laravel'];
@@ -113,7 +130,7 @@ $booster_route = (static function (): array {
 
     // 4. Moved routes.
     $table = $root . '/bootstrap/booster-moved.php';
-    $rows = is_file($table) ? require $table : [];
+    $rows = $target === null && is_file($table) ? require $table : [];
     foreach (is_array($rows) ? $rows : [] as $row) {
         $methods = (array) ($row['methods'] ?? []);
         if (!in_array($method, $methods, true) && !($method === 'HEAD' && in_array('GET', $methods, true))) {
@@ -121,6 +138,8 @@ $booster_route = (static function (): array {
         }
         if (preg_match((string) $row['regex'], $path) === 1) {
             $half('laravel');
+            // bootstrap/app.php reads this: moved code gets its input as legacy did.
+            $_SERVER['BOOSTER_MOVED_UNIT'] = (string) ($row['unit'] ?? '');
 
             return ['laravel'];
         }
@@ -131,8 +150,14 @@ $booster_route = (static function (): array {
     $script = $legacyDir . '/' . $legacyFront;
     $name = $base . '/' . $legacyFront;
 
-    // 5. A real file under the legacy docroot.
-    $file = $legacyFile($path);
+    // 5. A real file under the legacy docroot, or the moved rule's target
+    // (a missing target is a 404, as Apache answered it before).
+    $file = $legacyFile($target ?? $path);
+    if ($target !== null && $file === null) {
+        http_response_code(404);
+
+        return ['done'];
+    }
     if ($file !== null && preg_match('/\.(php[0-9s]?|phtml|phar)$/i', $file) === 1) {
         $script = $file;
         $name = $base . '/' . ltrim(str_replace('\\', '/', substr($file, strlen($legacyDir))), '/');
@@ -140,7 +165,9 @@ $booster_route = (static function (): array {
         // Answered as the server in front answered it before the mount:
         // php -S (the replay) with its own type table and a charset on text/*,
         // Apache with the system mime.types and no charset. Any method gets
-        // the file, as both servers do; HEAD gets no body.
+        // the file, as both servers do; HEAD gets no body. The table is the
+        // web-facing part of php -S's own (PHP 8.5 knows about 930
+        // extensions): one outside it answers with no type here.
         $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
         $phpTypes = [
             'css' => 'text/css', 'js' => 'application/javascript', 'mjs' => 'application/javascript',
@@ -154,6 +181,21 @@ $booster_route = (static function (): array {
             'mp4' => 'video/mp4', 'webm' => 'video/webm', 'mp3' => 'audio/mpeg', 'wav' => 'audio/wave', 'ogg' => 'audio/ogg',
             'wasm' => 'application/wasm', 'swf' => 'application/x-shockwave-flash', 'rss' => 'application/rss+xml',
             'atom' => 'application/atom+xml', 'webmanifest' => 'application/manifest+json', 'jsonld' => 'application/ld+json',
+            'ini' => 'text/plain', 'log' => 'text/plain', 'conf' => 'text/plain', 'text' => 'text/plain', 'tsv' => 'text/tab-separated-values',
+            'ics' => 'text/calendar', 'vcf' => 'text/x-vcard', 'sql' => 'application/x-sql', 'rtf' => 'application/rtf',
+            'doc' => 'application/msword', 'xls' => 'application/vnd.ms-excel', 'ppt' => 'application/vnd.ms-powerpoint',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'odt' => 'application/vnd.oasis.opendocument.text', 'ods' => 'application/vnd.oasis.opendocument.spreadsheet',
+            'odp' => 'application/vnd.oasis.opendocument.presentation', 'epub' => 'application/epub+zip',
+            'tar' => 'application/x-tar', 'gz' => 'application/gzip', '7z' => 'application/x-7z-compressed', 'rar' => 'application/vnd.rar',
+            'jar' => 'application/java-archive', 'bin' => 'application/octet-stream', 'xhtml' => 'application/xhtml+xml',
+            'xsl' => 'application/xml', 'xslt' => 'application/xslt+xml', 'dtd' => 'application/xml-dtd', 'ps' => 'application/postscript',
+            'eps' => 'application/postscript', 'kml' => 'application/vnd.google-earth.kml+xml', 'gpx' => 'application/gpx+xml',
+            'geojson' => 'application/geo+json', 'apng' => 'image/apng', 'heic' => 'image/heic', 'svgz' => 'image/svg+xml',
+            'mov' => 'video/quicktime', 'avi' => 'video/x-msvideo', 'mpeg' => 'video/mpeg', 'mpg' => 'video/mpeg', 'm4v' => 'video/x-m4v',
+            'ogv' => 'video/ogg', 'm4a' => 'audio/mp4', 'aac' => 'audio/x-aac', 'flac' => 'audio/x-flac', 'oga' => 'audio/ogg', 'opus' => 'audio/ogg',
         ];
         $type = null;
         if (PHP_SAPI === 'cli-server') {

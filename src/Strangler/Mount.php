@@ -26,16 +26,18 @@ use Waynestate\Booster\ToolError;
  *    collision keeps the app's file and becomes a MANUAL line (.gitignore is
  *    merged instead).
  * 4. public/index.php becomes the dispatcher (and public/.htaccess Laravel's
- *    without the trailing-slash 301), bootstrap/booster-moved.php
+ *    without the trailing-slash 301, with the legacy docroot's rules moved
+ *    in by LegacyHtaccess), bootstrap/booster-moved.php
  *    the empty route table, bin/install-legacy.php the install hook that the
  *    root composer.json runs after every install and update.
  * 5. Laravel's own routes move under /_laravel (health, readiness, the demo
- *    pages), so the Laravel half answers nothing legacy answered.
+ *    pages), so the Laravel half answers nothing legacy answered; and
+ *    TrimStrings and ConvertEmptyStringsToNull skip moved legacy routes.
  * 6. booster-replay.json is served from public/ with legacy's setup run in
  *    legacy/ and Laravel's replay environment (a fixed fake APP_KEY).
  * 7. .env.example gets the keys the legacy half reads; the report lists the
  *    Citadel public directory, the moved config paths and the .htaccess
- *    lines that no longer apply.
+ *    lines that could not move.
  *
  * Booster never commits, so the mount is one reviewable diff. Moving house
  * with the furniture still in the boxes: every box keeps its label.
@@ -82,8 +84,22 @@ final class Mount
     /** @var list<string> */
     private array $manual = [];
 
+    /** The lines movedInputAsLegacy() puts at the top of bootstrap/app.php's withMiddleware(). */
+    private const MOVED_INPUT = <<<'APP'
+                // Booster's strangler mount: code moved from legacy/ gets its input as
+                // legacy gave it (no trimming, "" stays ""). public/index.php marks
+                // those requests with BOOSTER_MOVED_UNIT; the finish step removes this.
+                $movedFromLegacy = fn (Request $request): bool => $request->server->has('BOOSTER_MOVED_UNIT');
+                $middleware->trimStrings(except: [$movedFromLegacy]);
+                $middleware->convertEmptyStringsToNull(except: [$movedFromLegacy]);
+
+        APP;
+
     /** @var list<string> */
     private array $notes = [];
+
+    /** @var list<string> */
+    private array $htaccessManual = [];
 
     public function __construct(
         private readonly MountBaker $baker,
@@ -98,6 +114,7 @@ final class Mount
         $this->changed = [];
         $this->manual = [];
         $this->notes = [];
+        $this->htaccessManual = [];
         $root = rtrim(str_replace('\\', '/', $appRoot), '/');
         if (!is_dir($root)) {
             throw new ToolError(sprintf('No app at %s.', $appRoot));
@@ -134,6 +151,8 @@ final class Mount
         }
         $legacyCookie = self::legacySessionCookie($framework, $legacySource);
         $htaccess = $this->htaccessLines($legacySource, $composerRoot, $legacyDocroot);
+        $docrootHtaccess = $legacySource . '/' . $legacyDocroot . '/.htaccess';
+        $moved = LegacyHtaccess::move(is_file($docrootHtaccess) ? (string) file_get_contents($docrootHtaccess) : '', self::LEGACY . '/' . $legacyDocroot, $legacyFront);
 
         // 1. Bake first: a failed bake changes nothing.
         $scratch = sys_get_temp_dir() . '/booster-mount-' . bin2hex(random_bytes(6));
@@ -159,8 +178,11 @@ final class Mount
         RouteTable::load($root)->save();
         $this->changed[] = RouteTable::FILE;
         $this->writeFile($root, 'bin/install-legacy.php', $this->resource('install-legacy.php'));
-        // Laravel's .htaccess without its trailing-slash 301, which would answer legacy paths first.
-        $this->writeFile($root, 'public/.htaccess', $this->resource('public.htaccess'));
+        // Laravel's .htaccess without its trailing-slash 301, which would answer
+        // legacy paths first, with the legacy docroot's rules moved in.
+        $this->writeFile($root, 'public/.htaccess', $moved->apply($this->resource('public.htaccess'), self::join($composerRoot, $legacyDocroot . '/.htaccess')));
+        $this->htaccessReport($moved, self::join($composerRoot, $legacyDocroot . '/.htaccess'), $legacyDocroot . '/.htaccess');
+        $this->movedInputAsLegacy($root);
         $this->addInstallHook($root);
 
         // 5. Laravel's own routes under /_laravel.
@@ -197,7 +219,7 @@ final class Mount
                 $this->manual[] = sprintf('Citadel: a dashboard config file written to %s now belongs at %s; change its path in the dashboard.', self::join($composerRoot, $config), self::LEGACY . '/' . $config);
             }
         }
-        foreach ($htaccess as $line) {
+        foreach ([...$htaccess, ...$this->htaccessManual] as $line) {
             $this->manual[] = $line;
         }
         $this->manual[] = 'Sourdough feed will skip public/index.php until the finish step: the dispatcher is app-owned until then.';
@@ -720,9 +742,10 @@ final class Mount
     }
 
     /**
-     * The legacy .htaccess lines other than the standard front-controller
-     * block: they stop applying once the docroot is public/ (and the replay
-     * never saw them either).
+     * The legacy root .htaccess lines (outside the docroot) other than the
+     * standard front-controller block: they stop applying once the docroot is
+     * public/ (and the replay never saw them either). The docroot's own file
+     * moves into public/.htaccess (LegacyHtaccess).
      *
      * @return list<string>
      */
@@ -739,9 +762,9 @@ final class Mount
             '/^RewriteCond\s+%\{REQUEST_URI\}::\$1\s+\^\(\/\.\+\)\/\(\.\*\)::\\\\2\$$/i', '/^RewriteRule\s+\^\(\.\*\)\s+-\s+\[E=BASE:%1\]$/i',
         ];
         $lines = [];
-        foreach (['.htaccess', $legacyDocroot . '/.htaccess'] as $file) {
+        foreach (['.htaccess'] as $file) {
             $path = $legacySource . '/' . $file;
-            if (!is_file($path)) {
+            if (!is_file($path) || in_array($legacyDocroot, ['', '.'], true)) {
                 continue;
             }
             foreach (file($path, FILE_IGNORE_NEW_LINES) ?: [] as $i => $line) {
@@ -759,6 +782,58 @@ final class Mount
         }
 
         return $lines;
+    }
+
+    /** The moved .htaccess lines as a note, the ones left behind as MANUAL rows. */
+    private function htaccessReport(LegacyHtaccess $moved, string $file, string $legacyFile): void
+    {
+        if ($moved->moved() !== []) {
+            $this->notes[] = sprintf('public/.htaccess carries the rules of %s (lines %s), rewritten for the new layout.', $file, self::ranges($moved->moved()));
+        }
+        foreach ($moved->manual() as $row) {
+            $this->htaccessManual[] = sprintf('%s:%d: "%s" could not move to public/.htaccess: %s. The file is legacy/%s now; carry it to public/.htaccess or the Citadel config by hand, or drop it.', $file, $row['line'], $row['text'], $row['why'], $legacyFile);
+        }
+    }
+
+    /** @param list<int> $lines */
+    private static function ranges(array $lines): string
+    {
+        $out = [];
+        foreach ($lines as $line) {
+            $last = count($out) - 1;
+            if ($last >= 0 && $out[$last][1] === $line - 1) {
+                $out[$last][1] = $line;
+            } else {
+                $out[] = [$line, $line];
+            }
+        }
+
+        return implode(', ', array_map(static fn(array $r): string => $r[0] === $r[1] ? (string) $r[0] : $r[0] . '-' . $r[1], $out));
+    }
+
+    /**
+     * Code moved out of legacy/ gets its input as legacy gave it: Laravel's
+     * TrimStrings and ConvertEmptyStringsToNull skip the requests the
+     * dispatcher sent to a moved unit (it sets BOOSTER_MOVED_UNIT), so
+     * neither mover has to. Laravel's own pages keep both.
+     */
+    private function movedInputAsLegacy(string $root): void
+    {
+        $app = $root . '/bootstrap/app.php';
+        $open = '->withMiddleware(function (Middleware $middleware) {';
+        $use = "use Illuminate\\Foundation\\Configuration\\Middleware;\n";
+        $text = is_file($app) ? (string) file_get_contents($app) : '';
+        if (substr_count($text, $open) !== 1 || !str_contains($text, $use)) {
+            $this->manual[] = 'bootstrap/app.php: skip TrimStrings and ConvertEmptyStringsToNull for moved legacy routes ($middleware->trimStrings(except: [fn ($r) => $r->server->has(\'BOOSTER_MOVED_UNIT\')]), and the same for convertEmptyStringsToNull); the mount could not find the stock withMiddleware line.';
+
+            return;
+        }
+        if (!str_contains($text, "use Illuminate\\Http\\Request;\n")) {
+            $text = str_replace($use, $use . "use Illuminate\\Http\\Request;\n", $text);
+        }
+        $text = str_replace($open, $open . "\n" . self::MOVED_INPUT, $text);
+        file_put_contents($app, $text);
+        $this->changed[] = 'bootstrap/app.php';
     }
 
     /** The legacy session cookie name, as far as the config says (PHPSESSID when it says nothing). */

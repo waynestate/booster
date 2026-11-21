@@ -7,6 +7,7 @@ namespace Waynestate\Booster\Tests;
 use Waynestate\Booster\Replay\ReplayFile;
 use Waynestate\Booster\Run\ProcessResult;
 use Waynestate\Booster\Run\TargetImageRunner;
+use Waynestate\Booster\Strangler\LegacyHtaccess;
 use Waynestate\Booster\Strangler\Mount;
 use Waynestate\Booster\Strangler\MountBaker;
 use Waynestate\Booster\Strangler\MountResult;
@@ -70,7 +71,7 @@ final class StranglerMountTest extends TestCase
                     'public/.htaccess' => "RewriteEngine On\n",
                     'public/robots.txt' => "User-agent: *\nDisallow:\n",
                     'public/favicon.ico' => "ico",
-                    'bootstrap/app.php' => "<?php\nreturn Application::configure(basePath: dirname(__DIR__))\n    ->withRouting(\n        health: '/up',\n        then: function () {\n            Route::helmetReady('/ready', []);\n        },\n    )->create();\n",
+                    'bootstrap/app.php' => "<?php\n\nuse Illuminate\Foundation\Application;\nuse Illuminate\Foundation\Configuration\Middleware;\n\nreturn Application::configure(basePath: dirname(__DIR__))\n    ->withRouting(\n        health: '/up',\n        then: function () {\n            Route::helmetReady('/ready', []);\n        },\n    )\n    ->withMiddleware(function (Middleware \$middleware) {\n        \$middleware->redirectGuestsTo('/login');\n    })->create();\n",
                     'routes/web.php' => "<?php\n\n// /ready, HELMET's readiness probe, is registered in bootstrap/app.php,\n// outside the web group.\n\nRoute::get('/', fn () => view('home'))->name('home');\n\nRoute::get('/dashboard', fn () => view('dashboard'))\n    ->name('dashboard');\n",
                     'pint.json' => json_encode(['preset' => 'laravel', 'exclude' => ['vendor', 'storage']], JSON_PRETTY_PRINT),
                     '.gitignore' => "/vendor\n/node_modules\n.env\n/storage/*.key\n",
@@ -128,6 +129,27 @@ final class StranglerMountTest extends TestCase
         $htaccess = (string) file_get_contents($dir . '/public/.htaccess');
         self::assertStringContainsString('RewriteRule ^ index.php [L]', $htaccess);
         self::assertStringNotContainsString('[L,R=301]', $htaccess, 'no trailing-slash 301 in front of legacy paths');
+        // The fixture's own redirect and denials moved in, ahead of the front controller.
+        $front = strpos($htaccess, LegacyHtaccess::FRONT_MARKER);
+        self::assertNotFalse($front);
+        foreach ([
+            "    RewriteCond %{CONTEXT_DOCUMENT_ROOT}::%{REQUEST_FILENAME}%{PATH_INFO} ^(.*?)/?::\\1(.*)$\n    RewriteCond %1/../legacy/public%2 !-f\n    RewriteRule ^old-users/?$ /users [R=301,L]\n",
+            "    RewriteRule ^private(/|$) - [F]\n",
+            "    RewriteCond \$1 \"\.(ini|sql)$\"\n    RewriteRule (?:^|/)([^/]*)$ - [F]\n",
+            "    RewriteRule ^_laravel(?:/|$) index.php [END]\n",
+        ] as $moved) {
+            $at = strpos($htaccess, $moved);
+            self::assertNotFalse($at, 'moved: ' . $moved . "\n" . $htaccess);
+            self::assertLessThan($front, $at, 'ahead of the front controller: ' . $moved);
+        }
+        self::assertStringNotContainsString('E=BASE', $htaccess, 'the Slim BASE lines are dropped: the dispatcher derives the base');
+        self::assertNotEmpty(array_filter($result->notes, static fn(string $n): bool => str_starts_with($n, 'public/.htaccess carries the rules of public/.htaccess (lines ')));
+        // Moved code gets its input as legacy gave it.
+        $app = (string) file_get_contents($dir . '/bootstrap/app.php');
+        self::assertStringContainsString("use Illuminate\Foundation\Configuration\Middleware;\nuse Illuminate\Http\Request;\n", $app);
+        self::assertStringContainsString("->withMiddleware(function (Middleware \$middleware) {\n        // Booster's strangler mount: code moved from legacy/", $app);
+        self::assertStringContainsString("        \$middleware->trimStrings(except: [\$movedFromLegacy]);\n        \$middleware->convertEmptyStringsToNull(except: [\$movedFromLegacy]);\n\n        \$middleware->redirectGuestsTo('/login');", $app);
+        self::assertStringContainsString("health: '/_laravel/up'", $app);
 
         // The dispatcher, the empty table, the install hook.
         $dispatcher = (string) file_get_contents($dir . '/public/index.php');
@@ -222,7 +244,7 @@ final class StranglerMountTest extends TestCase
             'src/config/app.php' => "<?php\nreturn [\n    'Session' => [\n        'defaults' => 'php',\n        'cookie' => 'ATTEND',\n    ],\n];\n",
             'src/config/app_local.example.php' => "<?php\nreturn [];\n",
             'src/.htaccess' => "<IfModule mod_rewrite.c>\n    RewriteEngine on\n    RewriteRule    ^$    webroot/    [L]\n    RewriteRule    (.*) webroot/$1    [L]\n</IfModule>\nphp_value upload_max_filesize 64M\n",
-            'src/webroot/.htaccess' => "<IfModule mod_rewrite.c>\n    RewriteEngine On\n    RewriteCond %{REQUEST_FILENAME} !-f\n    RewriteRule ^ index.php [L]\n</IfModule>\nHeader set X-Frame-Options DENY\n",
+            'src/webroot/.htaccess' => "<IfModule mod_rewrite.c>\n    RewriteEngine On\n    RewriteCond %{REQUEST_FILENAME} !-f\n    RewriteRule ^ index.php [L]\n</IfModule>\nHeader set X-Frame-Options DENY\n<FilesMatch \"\.(ttf|woff2?)$\">\n    Header set Access-Control-Allow-Origin \"*\"\n</FilesMatch>\n",
             'src/booster-replay.json' => json_encode(['version' => 1, 'serve' => ['docroot' => 'webroot', 'front_controller' => 'index.php', 'setup' => 'mkdir -p tmp logs'], 'requests' => [['path' => '/']]]),
         ];
         foreach ($files as $path => $contents) {
@@ -255,8 +277,11 @@ final class StranglerMountTest extends TestCase
         $htaccess = array_values(array_filter($result->manual, static fn(string $l): bool => str_contains($l, '.htaccess:')));
         self::assertSame([
             'src/.htaccess:6: "php_value upload_max_filesize 64M" no longer applies once the docroot is public/ (the file is legacy/.htaccess now). Carry it to public/.htaccess or the Citadel config, or drop it.',
-            'src/webroot/.htaccess:6: "Header set X-Frame-Options DENY" no longer applies once the docroot is public/ (the file is legacy/webroot/.htaccess now). Carry it to public/.htaccess or the Citadel config, or drop it.',
+            'src/webroot/.htaccess:7: "<FilesMatch "\.(ttf|woff2?)$">" could not move to public/.htaccess: lines 7-9, a filename block: the dispatcher serves legacy files now, so it would never match them. The file is legacy/webroot/.htaccess now; carry it to public/.htaccess or the Citadel config by hand, or drop it.',
         ], $htaccess);
+        // The docroot's per-directory header moved as written, at the top.
+        self::assertStringStartsWith("# Moved by Booster's strangler mount from src/webroot/.htaccess, as written.\nHeader set X-Frame-Options DENY\n\n", (string) file_get_contents($dir . '/public/.htaccess'));
+        self::assertContains('public/.htaccess carries the rules of src/webroot/.htaccess (lines 6), rewritten for the new layout.', $result->notes);
     }
 
     public function test_it_refuses_and_changes_nothing(): void
