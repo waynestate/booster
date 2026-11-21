@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Legacy\Cake;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Written by Booster's strangler (cakephp-to-laravel): the part of
@@ -273,7 +272,12 @@ final class CakeQuery implements \Countable, \IteratorAggregate, \JsonSerializab
 
     public function count(): int
     {
-        return $this->builder->clone()->limit(null)->offset(null)->reorder()->count();
+        // Builder::offset(null) is OFFSET 0, which SQLite refuses without a LIMIT: clear both.
+        $builder = $this->builder->clone()->reorder();
+        $builder->limit = null;
+        $builder->offset = null;
+
+        return $builder->count();
     }
 
     /**
@@ -354,7 +358,7 @@ final class CakeQuery implements \Countable, \IteratorAggregate, \JsonSerializab
                 $keys = array_values(array_map(fn(Model $r) => $this->table->toDatabase($pk, $r->cakeRaw($pk)), $rows));
                 $join = (string) $assoc['joinTable'];
                 $targetTable = $target->getTable();
-                $query = DB::table($targetTable)
+                $query = CakeDatabase::connection()->table($targetTable)
                     ->join($join, $targetTable . '.' . $target->getPrimaryKey(), '=', $join . '.' . $assoc['targetForeignKey'])
                     ->whereIn($join . '.' . $assoc['foreignKey'], $keys)
                     ->select([$targetTable . '.*', $join . '.' . $assoc['foreignKey'] . ' as __booster_owner']);

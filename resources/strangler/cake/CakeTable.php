@@ -6,8 +6,6 @@ use Cake\I18n\Date;
 use Cake\I18n\DateTime;
 use Cake\Utility\Inflector;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Written by Booster's strangler (cakephp-to-laravel): the part of
@@ -269,7 +267,7 @@ abstract class CakeTable
     {
         if ($this->cakeSchema === null) {
             $this->cakeSchema = [];
-            foreach (Schema::getColumns($this->cakeTable) as $column) {
+            foreach (CakeDatabase::connection()->getSchemaBuilder()->getColumns($this->cakeTable) as $column) {
                 $type = strtolower((string) ($column['type_name'] ?? $column['type'] ?? ''));
                 $full = strtolower((string) ($column['type'] ?? $type));
                 $this->cakeSchema[(string) $column['name']] = match (true) {
@@ -561,7 +559,7 @@ abstract class CakeTable
         }
 
         try {
-            return DB::transaction(fn(): Model|false => $this->saveRow($entity, $options));
+            return CakeDatabase::connection()->transaction(fn(): Model|false => $this->saveRow($entity, $options));
         } catch (CakeRollback) {
             return false;
         }
@@ -655,15 +653,15 @@ abstract class CakeTable
             $ids[] = $item->cakeRaw($target->getPrimaryKey());
         }
         $own = $this->toDatabase($this->cakePrimaryKey, $entity->cakeRaw($this->cakePrimaryKey));
-        $join = DB::table((string) $assoc['joinTable']);
+        $join = CakeDatabase::connection()->table((string) $assoc['joinTable']);
         $existing = array_map(static fn($v) => (string) $v, $join->clone()->where($assoc['foreignKey'], $own)->pluck((string) $assoc['targetForeignKey'])->all());
         $keep = array_map(static fn($v) => (string) $v, $ids);
         $gone = array_values(array_diff($existing, $keep));
         if ($gone !== []) {
-            DB::table((string) $assoc['joinTable'])->where($assoc['foreignKey'], $own)->whereIn((string) $assoc['targetForeignKey'], $gone)->delete();
+            CakeDatabase::connection()->table((string) $assoc['joinTable'])->where($assoc['foreignKey'], $own)->whereIn((string) $assoc['targetForeignKey'], $gone)->delete();
         }
         foreach (array_values(array_unique(array_diff($keep, $existing))) as $id) {
-            DB::table((string) $assoc['joinTable'])->insert([$assoc['foreignKey'] => $own, (string) $assoc['targetForeignKey'] => $id]);
+            CakeDatabase::connection()->table((string) $assoc['joinTable'])->insert([$assoc['foreignKey'] => $own, (string) $assoc['targetForeignKey'] => $id]);
         }
 
         return true;
@@ -681,7 +679,7 @@ abstract class CakeTable
             throw new \LogicException('Booster: delete() options are not covered.');
         }
 
-        return (bool) DB::transaction(function () use ($entity): bool {
+        return (bool) CakeDatabase::connection()->transaction(function () use ($entity): bool {
             if (method_exists($this, 'beforeDelete')) {
                 $event = new CakeEvent('Model.beforeDelete', $this);
                 if ($this->beforeDelete($event, $entity, new \ArrayObject([])) === false || $event->isStopped()) {
@@ -691,7 +689,7 @@ abstract class CakeTable
             $own = $this->toDatabase($this->cakePrimaryKey, $entity->cakeRaw($this->cakePrimaryKey));
             foreach ($this->cakeAssociations as $assoc) {
                 if ($assoc['type'] === 'belongsToMany') {
-                    DB::table((string) $assoc['joinTable'])->where($assoc['foreignKey'], $own)->delete();
+                    CakeDatabase::connection()->table((string) $assoc['joinTable'])->where($assoc['foreignKey'], $own)->delete();
                 } elseif (in_array($assoc['type'], ['hasMany', 'hasOne'], true) && $assoc['dependent']) {
                     self::for($assoc['target'])->newModel()->newQuery()->toBase()->where($assoc['foreignKey'], $own)->delete();
                 }

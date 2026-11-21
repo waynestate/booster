@@ -5,15 +5,24 @@ namespace App\Http\Controllers\Legacy\Cake;
 /**
  * Written by Booster's strangler (cakephp-to-laravel): the signed-in user
  * as a copied Policy sees it (Authorization's IdentityInterface):
- * getIdentifier() is the Laravel user's identifier, get() a field of it.
+ * getIdentifier() is the user data's `id` field, as Authentication's
+ * Identity reads it (its fieldMap default), and get() a field of it.
  */
 final class CakeIdentity implements \ArrayAccess
 {
     public function __construct(private readonly mixed $user) {}
 
+    /** The `id` field of a signed-in user (Identity::getIdentifier()); null when the user data has none. */
+    public static function idOf(mixed $user): mixed
+    {
+        $data = is_object($user) && method_exists($user, 'toArray') ? $user->toArray() : $user;
+
+        return data_get($data, 'id');
+    }
+
     public function getIdentifier(): mixed
     {
-        return is_object($this->user) && method_exists($this->user, 'getAuthIdentifier') ? $this->user->getAuthIdentifier() : null;
+        return self::idOf($this->user);
     }
 
     public function get(string $field): mixed

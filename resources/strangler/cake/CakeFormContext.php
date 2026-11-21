@@ -97,7 +97,7 @@ final class CakeFormContext
         if ($this->table === null) {
             return null;
         }
-        foreach (\Illuminate\Support\Facades\Schema::getColumns($this->table->getTable()) as $column) {
+        foreach (CakeDatabase::connection()->getSchemaBuilder()->getColumns($this->table->getTable()) as $column) {
             if ($column['name'] === $field && preg_match('/^(?:var)?char\((\d+)\)$/i', (string) ($column['type'] ?? ''), $m) === 1) {
                 return (int) $m[1];
             }
@@ -143,7 +143,7 @@ final class CakeFormContext
             return $this->entity->cakeGet($field);
         }
         if (($options['schemaDefault'] ?? true) && $this->isCreate() && $this->table !== null) {
-            foreach (\Illuminate\Support\Facades\Schema::getColumns($this->table->getTable()) as $column) {
+            foreach (CakeDatabase::connection()->getSchemaBuilder()->getColumns($this->table->getTable()) as $column) {
                 if ($column['name'] === $field && $column['default'] !== null) {
                     return $options['default'] ?? trim((string) $column['default'], "'");
                 }

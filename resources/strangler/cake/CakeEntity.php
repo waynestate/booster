@@ -34,6 +34,12 @@ trait CakeEntity
 
     public string $cakeSource = '';
 
+    /** The legacy app's database (CakeDatabase), not the Laravel half's default connection. */
+    public function getConnectionName(): ?string
+    {
+        return CakeDatabase::name();
+    }
+
     public function isNew(): bool
     {
         return $this->cakeNew;
