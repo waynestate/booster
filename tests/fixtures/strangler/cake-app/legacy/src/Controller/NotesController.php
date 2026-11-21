@@ -45,4 +45,23 @@ class NotesController extends AppController
         $rows = $this->Notes->find()->all();
         $this->set(compact('rows'));
     }
+
+    public function stats()
+    {
+        $driver = $this->Notes->getConnection()->getDriver();
+        $this->set(compact('driver'));
+    }
+
+    public function show($id)
+    {
+        $this->set('id', $id);
+    }
+
+    public function delete($id)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $this->Flash->success(__('Deleted.'));
+
+        return $this->redirect(['action' => 'report']);
+    }
 }

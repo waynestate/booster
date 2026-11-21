@@ -19,12 +19,19 @@ use ReflectionFunction;
  * - `return $this->redirect([...])` (the path CakePHP's router builds)
  * - `$this->Flash->success/error/...('message')` (into Laravel's session)
  * - `$this->Authentication->getIdentity()/getIdentityData()` (SESAME's user,
- *   `$request->user()`), `Hash::get` on it, `Authorization->skipAuthorization()`
- * - plain PHP (internal functions and global classes), copied as is
+ *   `$request->user()`), `Hash::get` on it
+ * - `$this->Authorization->authorize()/skipAuthorization()` (the copied
+ *   Policies, CakeAuth)
+ * - `$this->Articles->find()/get()/newEmptyEntity()/patchEntity()/save()/delete()`
+ *   and the query calls after them (the copied Tables, CakeTable), and
+ *   `$this->paginate()`
+ * - plain PHP (internal functions, global classes, and cakephp/utility,
+ *   cakephp/collection and cakephp/i18n classes), copied as is
  *
  * Template helpers that map: `Html->charset/css/script/meta('icon')/link`,
  * `Url->build`, `fetch`, `assign('title')`, `Flash->render`, `element`,
- * `h()` and a plain `__('text')`.
+ * `Form->create/control/...` (CakeForm), `Number->format/...`, `h()`,
+ * `__()` and `__d()` (CakePHP's own, from cakephp/core and cakephp/i18n).
  */
 final class CakeTranslator
 {
@@ -54,6 +61,26 @@ final class CakeTranslator
 
     /** The layout a `viewBuilder()->setLayout()` call named, if any. */
     public ?string $layout = null;
+
+    /** @var list<string> the Table methods moved code reaches: `Articles::save`, `Articles::find:tagged` */
+    public array $reached = [];
+
+    /** Whether the code prints a form (CakeForm then needs the legacy FormHelper's templates). */
+    public bool $usesForm = false;
+
+    /** The action being translated (authorize()'s default action name). */
+    public ?string $action = null;
+
+    /** The prefixes of the CakePHP packages the Laravel half installs (Booster adds them to composer.json). */
+    public const RUNTIME_CLASSES = ['Cake\\Utility\\', 'Cake\\Collection\\', 'Cake\\I18n\\'];
+
+    /** Table and query methods a moved controller may call (CakeTable, CakeQuery). */
+    private const TABLE_CALLS = ['find', 'get', 'exists', 'newemptyentity', 'newentity', 'patchentity', 'save', 'delete', 'query', 'getvalidator', 'getdisplayfield', 'getprimarykey', 'gettable', 'getalias'];
+
+    private const QUERY_CALLS = ['where', 'andwhere', 'order', 'orderby', 'orderasc', 'orderdesc', 'limit', 'offset', 'page', 'contain', 'all', 'first', 'firstorfail', 'count', 'toarray', 'tolist', 'extract', 'combine', 'map', 'filter', 'reduce', 'indexby', 'groupby', 'sortby', 'isempty', 'last'];
+
+    /** FormHelper methods CakeForm prints. */
+    private const FORM_CALLS = ['create', 'end', 'control', 'label', 'error', 'isfielderror', 'text', 'password', 'email', 'tel', 'number', 'url', 'search', 'textarea', 'hidden', 'checkbox', 'select', 'button', 'submit', 'postlink'];
 
     /** @var array<string, string> import alias (lowercased) => fully qualified name */
     private array $imports = [];
@@ -208,11 +235,12 @@ final class CakeTranslator
         }
         // A function call.
         if ($nextText === '(' && $prevId !== T_NEW) {
-            if ($lower === '__' && isset($c->close[$next])) {
-                return $this->translate($c, $i, $next, $line);
+            if (($lower === '__' || $lower === '__d') && isset($c->close[$next])) {
+                return $this->translate($c, $i, $next, $line, $lower);
             }
-            if ($lower === 'h' && $this->mode === 'template' && isset($c->close[$next])) {
-                return ['e(' . $this->rewrite($c, $next + 1, $c->close[$next] - 1) . ')', $c->close[$next]];
+            if ($lower === 'h' && isset($c->close[$next])) {
+                // CakePHP's h(): objects print through __toString(), scalars as is.
+                return ['\\Cake\\Core\\h(' . $this->rewrite($c, $next + 1, $c->close[$next] - 1) . ')', $c->close[$next]];
             }
             if ($lower === 'compact' || $lower === 'isset' || $lower === 'empty' || $lower === 'unset' || $lower === 'list') {
                 return null;
@@ -235,6 +263,11 @@ final class CakeTranslator
             $open = $method === null ? null : $c->next($method, $to);
             if ($method !== null && $open !== null && strcasecmp($c->t[$method][1], 'get') === 0 && $c->t[$open][1] === '(' && isset($c->close[$open])) {
                 return ['data_get(' . $this->rewrite($c, $open + 1, $c->close[$open] - 1) . ')', $c->close[$open]];
+            }
+        }
+        foreach (self::RUNTIME_CLASSES as $prefix) {
+            if (str_starts_with($fq, $prefix)) {
+                return null;
             }
         }
         if (str_contains($fq, '\\') || !class_exists($fq) && !interface_exists($fq)) {
@@ -261,24 +294,23 @@ final class CakeTranslator
 
     /**
      * `__('plain text')`: the text itself, when the legacy app has no
-     * translations and the text has no placeholders.
+     * translations and the text has no placeholders; CakePHP's own `__()`
+     * or `__d()` (cakephp/i18n) otherwise.
      *
      * @return array{string, int}
      */
-    private function translate(CakeCode $c, int $i, int $open, int $line): array
+    private function translate(CakeCode $c, int $i, int $open, int $line, string $function = '__'): array
     {
         $args = $c->items($open);
-        $text = count($args) === 1 ? $c->stringAt($args[0]) : null;
-        if ($text === null || preg_match('/[{}\'#|]/', $text) === 1) {
-            $this->refuse($line, '`__()` with arguments or ICU placeholders needs CakePHP\'s message formatter');
-
-            return [$c->text($i, $c->close[$open]), $c->close[$open]];
-        }
         if ((glob($this->app->legacy . '/resources/locales/*/*.{po,mo}', GLOB_BRACE) ?: []) !== []) {
-            $this->refuse($line, '`__()` in an app with translations (resources/locales) needs CakePHP\'s translator');
+            $this->refuse($line, '`' . $function . '()` in an app with translations (resources/locales) needs CakePHP\'s translator set up with them');
+        }
+        $text = $function === '__' && count($args) === 1 ? $c->stringAt($args[0]) : null;
+        if ($text !== null && preg_match('/[{}\'#|]/', $text) !== 1) {
+            return [var_export($text, true), $c->close[$open]];
         }
 
-        return [var_export($text, true), $c->close[$open]];
+        return ['\\Cake\\I18n\\' . $function . '(' . $this->rewrite($c, $open + 1, $c->close[$open] - 1) . ')', $c->close[$open]];
     }
 
     /**
@@ -500,9 +532,43 @@ final class CakeTranslator
             return ['/* the route middleware decides who may reach the action */ null', $chain[1]['end']];
         }
 
-        // $this->Authorization->skipAuthorization()
+        // $this->Authorization->skipAuthorization() / authorize($entity[, 'action'])
         if ($first === 'authorization' && $second === 'skipauthorization' && $statement) {
-            return ['/* skipAuthorization: the Laravel half has no authorization check to skip */ null', $chain[1]['end']];
+            return ['CakeAuth::skip($request)', $chain[1]['end']];
+        }
+        if ($first === 'authorization' && $second === 'authorize' && $statement && count($chain) === 2 && in_array(count($items(1)), [1, 2], true)) {
+            $list = $items(1);
+            $action = isset($list[1]) ? trim($this->rewrite($c, $list[1][0], $list[1][1])) : var_export($this->action ?? 'index', true);
+            $this->readsUser = true;
+
+            return ['CakeAuth::authorize($request, ' . trim($this->rewrite($c, $list[0][0], $list[0][1])) . ', ' . $action . ')', $chain[1]['end']];
+        }
+
+        // $this->paginate($query)
+        if ($first === 'paginate' && $chain[0]['open'] !== null && count($chain) === 1) {
+            $list = $items(0);
+            if (count($list) > 2) {
+                $this->refuse($line, '`$this->paginate()` with more than a query and settings');
+            }
+            $table = $this->controller['name'] ?? '';
+            $query = isset($list[0]) ? trim($this->rewrite($c, $list[0][0], $list[0][1])) : 'CakeTable::for(' . var_export($table, true) . ')';
+            $this->reached[] = $table . '::find';
+
+            return ['CakeView::paginate($request, ' . $query . (isset($list[1]) ? ', ' . trim($this->rewrite($c, $list[1][0], $list[1][1])) : '') . ')', $chain[0]['end']];
+        }
+
+        // $this->Articles->..., $this->fetchTable('Articles')->...
+        $alias = null;
+        $from = 0;
+        if ($chain[0]['open'] === null && preg_match('/^[A-Z]\w*$/', $chain[0]['name']) === 1 && $this->isTable($chain[0]['name'])) {
+            $alias = $chain[0]['name'];
+            $from = 1;
+        } elseif ($first === 'fetchtable' && $chain[0]['open'] !== null && ($name = $c->stringAt($items(0)[0] ?? null)) !== null && $this->isTable($name)) {
+            $alias = $name;
+            $from = 1;
+        }
+        if ($alias !== null) {
+            return $this->tableChain($c, $chain, $from, $alias, $line);
         }
 
         // $this->loadComponent() of a component the move maps.
@@ -520,6 +586,81 @@ final class CakeTranslator
         $last = $chain[count($chain) - 1]['end'];
 
         return [$c->text($i, $last), $last];
+    }
+
+    /** Whether an alias names a legacy Table (src/Model/Table/<Alias>Table.php) or the controller's own table. */
+    private function isTable(string $alias): bool
+    {
+        return is_file($this->app->legacy . '/src/Model/Table/' . $alias . 'Table.php') || ($this->controller !== null && $alias === $this->controller['name'] && $this->mode === 'controller');
+    }
+
+    /**
+     * `$this->Articles->find()->where(...)->all()`: the copied Table and
+     * the query calls after it, each one checked against what CakeTable
+     * and CakeQuery cover.
+     *
+     * @param list<array{name: string, open: int|null, end: int, nullsafe: bool}> $chain
+     *
+     * @return array{string, int}
+     */
+    private function tableChain(CakeCode $c, array $chain, int $from, string $alias, int $line): array
+    {
+        $out = 'CakeTable::for(' . var_export($alias, true) . ')';
+        $last = $chain[$from - 1]['end'];
+        $stage = 'table';
+        for ($k = $from; $k < count($chain); $k++) {
+            $link = $chain[$k];
+            $name = $link['name'];
+            $lower = strtolower($name);
+            $last = $link['end'];
+            if ($link['open'] === null) {
+                // An association: $this->Articles->Tags.
+                if ($stage === 'table' && preg_match('/^[A-Z]\w*$/', $name) === 1 && $this->isTable($name)) {
+                    $out = 'CakeTable::for(' . var_export($name, true) . ')';
+                    $alias = $name;
+                    continue;
+                }
+                $this->refuse($line, sprintf('`%s` on a CakePHP table or query has no mapping to the Laravel half', $name));
+
+                return [$out, $last];
+            }
+            $args = $this->rewrite($c, $link['open'] + 1, $link['end'] - 1);
+            if ($stage === 'table') {
+                if (preg_match('/^findBy(\w+)$/', $name) === 1) {
+                    $this->reached[] = $alias . '::find';
+                } elseif (!in_array($lower, self::TABLE_CALLS, true)) {
+                    $this->refuse($line, sprintf('`Table::%s()` is outside the CakePHP table API the Laravel half covers (find, get, newEmptyEntity, newEntity, patchEntity, save, delete, exists)', $name));
+
+                    return [$out, $last];
+                } elseif ($lower === 'find') {
+                    $items = $c->items($link['open']);
+                    $type = isset($items[0]) ? $c->stringAt($items[0]) : 'all';
+                    if ($type === null) {
+                        $this->refuse($line, '`find()` with a finder name that is not a literal');
+                    }
+                    $this->reached[] = $alias . '::find' . (in_array($type, [null, 'all', 'list'], true) ? '' : ':' . $type);
+                } else {
+                    $this->reached[] = $alias . '::' . ($lower === 'patchentity' ? 'patchEntity' : ($lower === 'newentity' ? 'newEntity' : $lower));
+                }
+                $stage = in_array($lower, ['find', 'query'], true) || str_starts_with($lower, 'findby') ? 'query' : 'value';
+            } elseif ($stage === 'query') {
+                if (!in_array($lower, self::QUERY_CALLS, true)) {
+                    $this->refuse($line, sprintf('the query call `%s()` is outside the CakePHP query API the Laravel half covers (where, order, limit, contain, all, first, firstOrFail, count, toArray)', $name));
+
+                    return [$out, $last];
+                }
+                if (in_array($lower, ['all', 'first', 'firstorfail', 'count', 'toarray', 'tolist', 'extract', 'combine', 'map', 'filter', 'reduce', 'indexby', 'groupby', 'sortby', 'isempty', 'last'], true)) {
+                    $stage = $lower === 'all' ? 'query' : 'value';
+                }
+            } else {
+                $this->refuse($line, sprintf('`%s()` after a table call returns a value this reader does not follow', $name));
+
+                return [$out, $last];
+            }
+            $out .= ($link['nullsafe'] ? '?->' : '->') . $name . '(' . $args . ')';
+        }
+
+        return [$out, $last];
     }
 
     /**
@@ -619,7 +760,8 @@ final class CakeTranslator
     {
         $string = $c->stringAt($range);
         if ($string !== null) {
-            if (preg_match('#^https?://#', $string) === 1) {
+            // Router::url() leaves a URL with a scheme (https:, mailto:, javascript:) as it is.
+            if (preg_match('#^[a-z][a-z0-9.+-]*:#i', $string) === 1) {
                 return 'away:' . var_export($string, true);
             }
             if (str_starts_with($string, '/') && !str_starts_with($string, '//')) {
@@ -811,7 +953,49 @@ final class CakeTranslator
 
             return ["''", $last];
         }
+        if ($first === 'form' && count($chain) === 2 && $chain[1]['open'] !== null && in_array($second, self::FORM_CALLS, true)) {
+            $list = $items(1);
+            $args = [];
+            foreach ($list as $k => $item) {
+                if ($second === 'postlink' && $k === 1) {
+                    $url = $this->urlPath($c, $item, $line, false);
+                    if ($url === null || str_starts_with($url, 'away:')) {
+                        if ($url !== null) {
+                            $this->refuse($line, '`Form->postLink()` to a full URL');
+                        }
+
+                        return ["''", $last];
+                    }
+                    $args[] = $url;
+                    continue;
+                }
+                if ($second === 'create' && $k === 1) {
+                    $options = $c->firstIn($item);
+                    $code = $c->code($item[0], $item[1]);
+                    if (preg_match('/[\'"]url[\'"]\s*=>\s*(?:\[|array\s*\()/', $code) === 1 || $options === null || !in_array($c->t[$options][1], ['[', 'array'], true)) {
+                        $this->refuse($line, '`Form->create()` options that are not a literal array, or a `url` array (only a literal path is covered)');
+
+                        return ["''", $last];
+                    }
+                }
+                $args[] = trim($this->rewrite($c, $item[0], $item[1]));
+            }
+
+            $this->usesForm = true;
+
+            return ['$__form->' . $chain[1]['name'] . '(' . implode(', ', $args) . ')', $last];
+        }
+        if ($first === 'number' && count($chain) === 2 && $chain[1]['open'] !== null && in_array($second, ['format', 'precision', 'toreadablesize', 'topercentage', 'currency', 'ordinal'], true)) {
+            $name = $chain[1]['name'];
+
+            return ['\\Cake\\I18n\\Number::' . $name . '(' . $this->rewrite($c, $chain[1]['open'] + 1, $chain[1]['end'] - 1) . ')', $last];
+        }
         $call = '$this->' . $chain[0]['name'] . (isset($chain[1]) ? '->' . $chain[1]['name'] : '');
+        if ($first === 'paginator') {
+            $this->refuse($line, sprintf('`%s`: PaginatorHelper markup is not covered yet; port it by hand', $call));
+
+            return [sprintf("/* MANUAL: %s was not mapped */ ''", str_replace('*/', '* /', $call)), $last];
+        }
         $this->refuse($line, sprintf('the view helper call `%s` has no Blade mapping; port it by hand', $call));
 
         return [sprintf("/* MANUAL: %s was not mapped */ ''", str_replace('*/', '* /', $call)), $last];

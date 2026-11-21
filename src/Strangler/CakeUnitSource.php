@@ -35,41 +35,43 @@ final class CakeUnitSource implements UnitSource
     /**
      * Every unit with the route entries it is made of, in move order.
      *
-     * @return list<array{unit: Unit, entries: list<array{controller: string|null, method: string|null, action: string, path: string, uri: string, name: string|null, get: bool, writes: list<string>, identity: bool, guarded: bool, signIn: bool, json: bool, session: bool, file: string, line: int, seq: int, edges: list<string>}>}>
+     * @return list<array{unit: Unit, after: list<string>, entries: list<array{controller: string|null, method: string|null, action: string, path: string, uri: string, name: string|null, get: bool, writes: list<string>, identity: bool, guarded: bool, signIn: bool, json: bool, session: bool, file: string, line: int, seq: int, edges: list<string>, forms: list<string>}>}>
      */
     public function plan(CakeApp $app): array
     {
         $entries = $this->entries($app);
 
-        // Union-find over actions: a form and its target, a flash and its page.
-        $parent = [];
-        $find = function (string $x) use (&$parent, &$find): string {
-            if (($parent[$x] ?? $x) === $x) {
-                return $x;
-            }
-            $parent[$x] = $find($parent[$x]);
-
-            return $parent[$x];
-        };
-        $known = [];
+        // Which action needs which (design 9.2): a flash message and the page
+        // it shows on need each other (the message never crosses sessions);
+        // an action a form posts to needs every page that renders that form
+        // (a form from the other half carries the wrong CSRF token). A page
+        // that renders a form for an action that stays legacy does not need
+        // it: the moved page prints the legacy token (CakeForm's bridge).
+        $needs = [];
         foreach ($entries as $entry) {
-            $known[$entry['action']] = true;
-            $parent[$entry['action']] ??= $entry['action'];
+            $needs[$entry['action']] ??= [];
         }
         foreach ($entries as $entry) {
             foreach ($entry['edges'] as $target) {
-                if (isset($known[$target]) && $target !== $entry['action']) {
-                    $parent[$find($target)] = $find($entry['action']);
+                if (isset($needs[$target]) && $target !== $entry['action']) {
+                    $needs[$entry['action']][$target] = true;
+                    $needs[$target][$entry['action']] = true;
+                }
+            }
+            foreach ($entry['forms'] as $target) {
+                if (isset($needs[$target]) && $target !== $entry['action']) {
+                    $needs[$target][$entry['action']] = true;
                 }
             }
         }
+        $component = self::components($needs);
         $groups = [];
         foreach ($entries as $entry) {
-            $groups[$find($entry['action'])][] = $entry;
+            $groups[$component[$entry['action']]][] = $entry;
         }
 
         $units = [];
-        foreach ($groups as $group) {
+        foreach ($groups as $key => $group) {
             $actions = array_unique(array_column($group, 'action'));
             $hasWrite = false;
             $hasGet = false;
@@ -78,24 +80,119 @@ final class CakeUnitSource implements UnitSource
                 $hasGet = $hasGet || $entry['get'];
             }
             if (count($actions) > 1 || ($hasWrite && $hasGet)) {
-                $units[] = [...$this->form($group), $group];
+                $units[] = [...$this->form($group), $group, $key];
                 continue;
             }
             foreach ($group as $entry) {
-                $units[] = [...$this->route($entry, $entry['get'] ? ['GET'] : $entry['writes']), [$entry]];
+                $units[] = [...$this->route($entry, $entry['get'] ? ['GET'] : $entry['writes']), [$entry], $key];
             }
         }
         usort($units, static function (array $a, array $b): int {
             return [self::RANK[$a[0]->order], $a[1]] <=> [self::RANK[$b[0]->order], $b[1]];
         });
 
-        return array_map(static fn(array $u): array => ['unit' => $u[0], 'entries' => $u[2]], $units);
+        // The components each component needs moved first (a DAG: needs
+        // inside a cycle are inside one component).
+        $after = [];
+        foreach ($needs as $action => $targets) {
+            foreach (array_keys($targets) as $target) {
+                if ($component[$target] !== $component[$action]) {
+                    $after[$component[$action]][$component[$target]] = true;
+                }
+            }
+        }
+        // Move order: a unit after the units it needs, then by rank and route order.
+        $ordered = [];
+        $done = [];
+        while (count($ordered) < count($units)) {
+            foreach ($units as $i => $u) {
+                if (isset($done[$i])) {
+                    continue;
+                }
+                $ready = true;
+                foreach (array_keys($after[$u[3]] ?? []) as $needed) {
+                    foreach ($units as $j => $v) {
+                        if ($v[3] === $needed && !isset($done[$j])) {
+                            $ready = false;
+                        }
+                    }
+                }
+                if ($ready) {
+                    $done[$i] = true;
+                    $ordered[] = $u;
+                    continue 2;
+                }
+            }
+            break;
+        }
+
+        return array_map(static function (array $u) use ($units, $after): array {
+            $ids = [];
+            foreach (array_keys($after[$u[3]] ?? []) as $needed) {
+                foreach ($units as $v) {
+                    if ($v[3] === $needed) {
+                        $ids[] = $v[0]->id;
+                    }
+                }
+            }
+
+            return ['unit' => $u[0], 'entries' => $u[2], 'after' => array_values(array_unique($ids))];
+        }, $ordered);
+    }
+
+    /**
+     * Strongly connected components of the needs graph (Tarjan): action to
+     * the component's first action.
+     *
+     * @param array<string, array<string, true>> $needs
+     *
+     * @return array<string, string>
+     */
+    private static function components(array $needs): array
+    {
+        $index = [];
+        $low = [];
+        $stack = [];
+        $on = [];
+        $out = [];
+        $n = 0;
+        $visit = function (string $v) use (&$visit, &$index, &$low, &$stack, &$on, &$out, &$n, $needs): void {
+            $index[$v] = $low[$v] = $n++;
+            $stack[] = $v;
+            $on[$v] = true;
+            foreach (array_keys($needs[$v] ?? []) as $w) {
+                if (!isset($index[$w])) {
+                    $visit($w);
+                    $low[$v] = min($low[$v], $low[$w]);
+                } elseif (isset($on[$w])) {
+                    $low[$v] = min($low[$v], $index[$w]);
+                }
+            }
+            if ($low[$v] === $index[$v]) {
+                $members = [];
+                do {
+                    $w = (string) array_pop($stack);
+                    unset($on[$w]);
+                    $members[] = $w;
+                } while ($w !== $v);
+                foreach ($members as $m) {
+                    $out[$m] = $v;
+                }
+            }
+        };
+        foreach (array_keys($needs) as $v) {
+            if (!isset($index[$v])) {
+                $visit((string) $v);
+            }
+        }
+
+        return $out;
     }
 
     /**
      * Every (action, path) the routes reach, in route order.
      *
-     * @return list<array{controller: string|null, method: string|null, action: string, path: string, uri: string, name: string|null, get: bool, writes: list<string>, identity: bool, guarded: bool, signIn: bool, json: bool, session: bool, file: string, line: int, seq: int, edges: list<string>}>
+     * @return list<array{controller: string|null, method: string|null, action: string, path: string, uri: string, name: string|null, get: bool, writes: list<string>, identity: bool, guarded: bool, signIn: bool, json: bool, session: bool, file: string, line: int, seq: int, edges: list<string>, forms: list<string>}>
      */
     private function entries(CakeApp $app): array
     {
@@ -115,7 +212,7 @@ final class CakeUnitSource implements UnitSource
             }
             $seen[$actionKey . ' ' . $path] = true;
             if ($controller === null || $method === null) {
-                $entries[] = ['controller' => null, 'method' => null, 'action' => $actionKey, 'path' => $path, 'uri' => self::uri($path), 'name' => $name, 'get' => $verbs === null || in_array('GET', $verbs, true), 'writes' => $verbs === null ? [] : array_values(array_diff($verbs, ['GET', 'HEAD'])), 'identity' => false, 'guarded' => false, 'signIn' => false, 'json' => false, 'session' => false, 'file' => 'legacy/config/routes.php', 'line' => $routeLine, 'seq' => $seq, 'edges' => []];
+                $entries[] = ['controller' => null, 'method' => null, 'action' => $actionKey, 'path' => $path, 'uri' => self::uri($path), 'name' => $name, 'get' => $verbs === null || in_array('GET', $verbs, true), 'writes' => $verbs === null ? [] : array_values(array_diff($verbs, ['GET', 'HEAD'])), 'identity' => false, 'guarded' => false, 'signIn' => false, 'json' => false, 'session' => false, 'file' => 'legacy/config/routes.php', 'line' => $routeLine, 'seq' => $seq, 'edges' => [], 'forms' => []];
 
                 return;
             }
@@ -130,8 +227,12 @@ final class CakeUnitSource implements UnitSource
                 $writes = array_values(array_diff($verbs, ['GET', 'HEAD']));
             }
             $edges = [];
-            foreach (array_merge($facts['targets'], $facts['flashTargets']) as $target) {
+            foreach ($facts['flashTargets'] as $target) {
                 $edges[] = strtolower(($target['prefix'] ?? '') . '/' . $target['controller'] . '::' . $target['action']);
+            }
+            $forms = [];
+            foreach ($facts['targets'] as $target) {
+                $forms[] = strtolower(($target['prefix'] ?? '') . '/' . $target['controller'] . '::' . $target['action']);
             }
             $entries[] = [
                 'controller' => $controller['key'],
@@ -151,6 +252,7 @@ final class CakeUnitSource implements UnitSource
                 'line' => $method['line'],
                 'seq' => $seq,
                 'edges' => $edges,
+                'forms' => $forms,
             ];
         };
 
@@ -210,7 +312,7 @@ final class CakeUnitSource implements UnitSource
     }
 
     /**
-     * @param array{controller: string|null, method: string|null, action: string, path: string, uri: string, name: string|null, get: bool, writes: list<string>, identity: bool, guarded: bool, signIn: bool, json: bool, session: bool, file: string, line: int, seq: int, edges: list<string>} $entry
+     * @param array{controller: string|null, method: string|null, action: string, path: string, uri: string, name: string|null, get: bool, writes: list<string>, identity: bool, guarded: bool, signIn: bool, json: bool, session: bool, file: string, line: int, seq: int, edges: list<string>, forms: list<string>} $entry
      * @param list<string> $methods
      *
      * @return array{Unit, int}
@@ -241,7 +343,7 @@ final class CakeUnitSource implements UnitSource
     }
 
     /**
-     * @param list<array{controller: string|null, method: string|null, action: string, path: string, uri: string, name: string|null, get: bool, writes: list<string>, identity: bool, guarded: bool, signIn: bool, json: bool, session: bool, file: string, line: int, seq: int, edges: list<string>}> $group
+     * @param list<array{controller: string|null, method: string|null, action: string, path: string, uri: string, name: string|null, get: bool, writes: list<string>, identity: bool, guarded: bool, signIn: bool, json: bool, session: bool, file: string, line: int, seq: int, edges: list<string>, forms: list<string>}> $group
      *
      * @return array{Unit, int}
      */

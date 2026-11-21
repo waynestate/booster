@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Tests;
 
+use Waynestate\Booster\Strangler\CakeApp;
 use Waynestate\Booster\Strangler\CakeModels;
 use Waynestate\Booster\Strangler\CakeMover;
+use Waynestate\Booster\Strangler\CakeRuntime;
 use Waynestate\Booster\Strangler\CakeUnitSource;
 use Waynestate\Booster\Strangler\HelmetHold;
 use Waynestate\Booster\Strangler\Unit;
@@ -33,14 +35,18 @@ final class CakeMoverTest extends TestCase
         $this->assertTrue($result->moved);
         $this->assertSame([], $result->refusals);
         $this->assertSame([
-            'app/Http/Controllers/Legacy/Cake/CakeView.php',
+            ...self::runtime(),
             'app/Http/Controllers/Legacy/Cake/Notes/HelloAction.php',
             'app/Models/Note.php',
+            'composer.json',
+            'resources/views/legacy/Error/error400.blade.php',
+            'resources/views/legacy/Error/error500.blade.php',
             'resources/views/legacy/Notes/hello.blade.php',
             'resources/views/legacy/element/flash/error.blade.php',
             'resources/views/legacy/element/flash/success.blade.php',
             'resources/views/legacy/flash.blade.php',
             'resources/views/legacy/layout/default.blade.php',
+            'resources/views/legacy/layout/error.blade.php',
             'routes/web.php',
         ], $result->changedFiles);
 
@@ -50,9 +56,11 @@ final class CakeMoverTest extends TestCase
         $this->assertStringContainsString('public function __invoke(Request $request, $name = \'world\'): mixed', $action);
         $this->assertStringContainsString('$viewData = array_merge($viewData, compact(\'name\', \'year\'));', $action);
         $this->assertStringContainsString("return CakeView::render('legacy.Notes.hello', 'legacy.layout.default', \$viewData, 'Notes');", $action);
+        // No AuthorizationMiddleware in the fixture, so no end-of-action check.
+        $this->assertStringNotContainsString('CakeAuth::ensure', $action);
         $this->assertStringNotContainsString('parent::', $action);
 
-        $this->assertSame("<p>Hello, <?= e(\$name) ?>! It is <?= \$year ?>.</p>\n", file_get_contents($app . '/resources/views/legacy/Notes/hello.blade.php'));
+        $this->assertSame("<p>Hello, <?= \\Cake\\Core\\h(\$name) ?>! It is <?= \$year ?>.</p>\n", file_get_contents($app . '/resources/views/legacy/Notes/hello.blade.php'));
 
         $web = (string) file_get_contents($app . '/routes/web.php');
         $this->assertStringContainsString(CakeMover::SKIP_INPUT, $web);
@@ -145,31 +153,107 @@ final class CakeMoverTest extends TestCase
     {
         $app = $this->app();
         $before = (string) file_get_contents($app . '/routes/web.php');
-        $result = (new CakeMover())->move($this->unit($app, 'GET /notes/report'), $app);
+        $result = (new CakeMover())->move($this->unit($app, 'GET /notes/stats'), $app);
 
         $this->assertFalse($result->moved);
         $this->assertSame([], $result->changedFiles);
         $this->assertSame([], $result->manual);
-        $this->assertSame([[
+        $this->assertContains([
             'file' => 'legacy/src/Controller/NotesController.php',
-            'line' => 45,
-            'reason' => '`$this->Notes->find` has no mapping to Laravel (component, model, controller API or property)',
-        ]], $result->refusals);
+            'line' => 51,
+            'reason' => '`Table::getConnection()` is outside the CakePHP table API the Laravel half covers (find, get, newEmptyEntity, newEntity, patchEntity, save, delete, exists)',
+        ], $result->refusals);
         $this->assertSame($before, file_get_contents($app . '/routes/web.php'));
         $this->assertDirectoryDoesNotExist($app . '/app/Http/Controllers/Legacy');
     }
 
-    public function test_a_write_refuses_when_the_legacy_app_checks_csrf_tokens(): void
+    public function test_a_write_keeps_laravel_csrf_when_the_legacy_app_checks_tokens(): void
     {
         $app = $this->app(step0Done: true);
         $file = $app . '/legacy/src/Application.php';
-        file_put_contents($file, str_replace('->add(new RoutingMiddleware($this))', '->add(new RoutingMiddleware($this))->add(new \Cake\Http\Middleware\CsrfProtectionMiddleware())', (string) file_get_contents($file)));
+        file_put_contents($file, str_replace('->add(new RoutingMiddleware($this))', '->add(new RoutingMiddleware($this))->add(new \Cake\Http\Middleware\CsrfProtectionMiddleware([\'httponly\' => true]))', (string) file_get_contents($file)));
         $result = (new CakeMover())->move($this->unit($app, 'FORM /'), $app);
 
+        $this->assertTrue($result->moved, json_encode($result->refusals, JSON_PRETTY_PRINT) ?: '');
+        $web = (string) file_get_contents($app . '/routes/web.php');
+        // Design 9.2: the moved form posts to a moved action, so Laravel checks the token.
+        $this->assertStringContainsString("Route::match(['GET', 'POST'], 'notes/add', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\AddAction::class);", $web);
+        $this->assertStringNotContainsString('withoutMiddleware', $web);
+        $this->assertStringContainsString(CakeMover::CSRF_BRIDGE, $web);
+        $this->assertStringContainsString("\\Illuminate\\Cookie\\Middleware\\EncryptCookies::except('csrfToken');", $web);
+        $view = (string) file_get_contents($app . '/app/Http/Controllers/Legacy/Cake/CakeView.php');
+        $this->assertStringContainsString("'cookie' => 'csrfToken',", $view);
+        $this->assertStringContainsString("'httponly' => true,", $view);
+        // A bad token ends in the legacy error page, written as Blade without the debug block.
+        $error = (string) file_get_contents($app . '/resources/views/legacy/Error/error500.blade.php');
+        $this->assertStringContainsString("<h2><?= \\Cake\\I18n\\__d('cake', 'An Internal Error Has Occurred') ?></h2>", $error);
+        $this->assertStringNotContainsString('Configure', $error);
+        $this->assertStringNotContainsString('$this->', $error);
+        $this->assertStringContainsString("e('javascript:history.back()')", (string) file_get_contents($app . '/resources/views/legacy/layout/error.blade.php'));
+        $this->assertContains(
+            'legacy/src/Controller/NotesController.php:16 POST /notes/add keeps Laravel\'s CSRF check (PreventRequestForgery; ValidateCsrfToken before Laravel 13): the moved form prints Laravel\'s _token, and a bad token gets the legacy 403 page',
+            $result->manual,
+        );
+    }
+
+    public function test_a_route_scope_csrf_middleware_counts(): void
+    {
+        $app = $this->app();
+        $routes = $app . '/legacy/config/routes.php';
+        file_put_contents($routes, preg_replace('/^<\?php/', "<?php\n\$routes->registerMiddleware('csrf', new \\Cake\\Http\\Middleware\\CsrfProtectionMiddleware(['cookieName' => 'tok']));", (string) file_get_contents($routes), 1));
+        $settings = (new CakeRuntime(new CakeApp($app)))->csrfSettings();
+
+        $this->assertSame(['cookie' => 'tok', 'field' => '_csrfToken', 'httponly' => false, 'file' => 'legacy/config/routes.php', 'session' => false], $settings);
+    }
+
+    public function test_a_table_call_maps_to_the_ported_table_and_moves_after_the_page_with_its_form(): void
+    {
+        $app = $this->app(step0Done: true);
+        $result = (new CakeMover())->move($this->unit($app, 'FORM /notes/report'), $app);
         $this->assertFalse($result->moved);
-        $this->assertCount(1, $result->refusals);
-        $this->assertSame(16, $result->refusals[0]['line']);
-        $this->assertStringContainsString('the legacy app checks CSRF tokens (CsrfProtectionMiddleware)', $result->refusals[0]['reason']);
+        $this->assertContains('FORM /notes/report shares a form or a flash message with GET /notes/show/{id}, which has not moved yet; move GET /notes/show/{id} first', array_column($result->refusals, 'reason'));
+
+        $this->assertTrue((new CakeMover())->move($this->unit($app, 'GET /notes/show/{id}'), $app)->moved);
+        $result = (new CakeMover())->move($this->unit($app, 'FORM /notes/report'), $app);
+        $this->assertTrue($result->moved, json_encode($result->refusals, JSON_PRETTY_PRINT) ?: '');
+        $report = (string) file_get_contents($app . '/app/Http/Controllers/Legacy/Cake/Notes/ReportAction.php');
+        $this->assertStringContainsString("\$rows = CakeTable::for('Notes')->find()->all();", $report);
+        $table = (string) file_get_contents($app . '/app/Http/Controllers/Legacy/Cake/Model/Table/NotesTable.php');
+        $this->assertStringContainsString('namespace App\\Http\\Controllers\\Legacy\\Cake\\Model\\Table;', $table);
+        $this->assertStringContainsString('use App\\Http\\Controllers\\Legacy\\Cake\\CakeTable as Table;', $table);
+        $this->assertStringContainsString("\$this->setTable('notes');", $table);
+        $entity = (string) file_get_contents($app . '/app/Http/Controllers/Legacy/Cake/Model/Entity/Note.php');
+        $this->assertStringContainsString("class Note extends \\Illuminate\\Database\\Eloquent\\Model\n{\n    use \\App\\Http\\Controllers\\Legacy\\Cake\\CakeEntity;", $entity);
+    }
+
+    public function test_a_form_helper_call_maps_to_the_form_runtime_with_the_legacy_templates(): void
+    {
+        $app = $this->app(step0Done: true);
+        $mover = new CakeMover();
+        $result = $mover->move($this->unit($app, 'GET /notes/show/{id}'), $app);
+
+        $this->assertTrue($result->moved, json_encode($result->refusals, JSON_PRETTY_PRINT) ?: '');
+        $show = (string) file_get_contents($app . '/resources/views/legacy/Notes/show.blade.php');
+        $this->assertStringContainsString("\$__form->postLink('Delete', ", $show);
+        $this->assertStringContainsString("['confirm' => 'Sure?'])", $show);
+        $form = (string) file_get_contents($app . '/app/Http/Controllers/Legacy/Cake/CakeForm.php');
+        $this->assertStringContainsString("'formStart' => '<form{{attrs}}>',", $form);
+        $this->assertStringContainsString("'string' => 'text',", $form);
+        $this->assertStringNotContainsString('/*BOOSTER:', $form);
+        // No CSRF middleware in the fixture: the form prints no token.
+        $this->assertStringContainsString('public const LEGACY_CSRF = null;', (string) file_get_contents($app . '/app/Http/Controllers/Legacy/Cake/CakeView.php'));
+        $composer = json_decode((string) file_get_contents($app . '/composer.json'), true);
+        // The legacy app's CakePHP minor (its composer.lock, else composer.json).
+        $this->assertSame('^5.0', $composer['require']['cakephp/utility'] ?? null);
+        $this->assertContains('composer.json', $result->changedFiles);
+        $this->assertSame(['cakephp/collection' => '^5.0', 'cakephp/core' => '^5.0', 'cakephp/i18n' => '^5.0', 'cakephp/utility' => '^5.0'], $mover->composerAdds());
+    }
+
+    public function test_the_error_template_loses_only_its_debug_block(): void
+    {
+        $source = "<?php\nuse Cake\\Core\\Configure;\nuse Cake\\Error\\Debugger;\n\n\$this->layout = 'error';\n\nif (Configure::read('debug')) :\n    \$this->layout = 'dev_error';\nendif;\n?>\n<h2><?= h(\$message) ?></h2>\n";
+        $this->assertSame("<?php\n\n\n?>\n<h2><?= h(\$message) ?></h2>\n", CakeRuntime::errorTemplate($source));
+        $this->assertNull(CakeRuntime::errorTemplate("<?php\n?>\n<?= Configure::read('x') ?>"));
     }
 
     public function test_a_unit_moves_once_and_needs_the_mounted_laravel_half(): void
@@ -199,7 +283,7 @@ final class CakeMoverTest extends TestCase
 
         $this->assertTrue($result->moved);
         $this->assertContains(
-            'legacy/templates/layout/default.php:14 the view helper call `$this->Paginator->counter` has no Blade mapping; port it by hand (in the Blade layout resources/views/legacy/layout/default.blade.php)',
+            'legacy/templates/layout/default.php:14 `$this->Paginator->counter`: PaginatorHelper markup is not covered yet; port it by hand (in the Blade layout resources/views/legacy/layout/default.blade.php)',
             $result->manual,
         );
         $this->assertStringContainsString("/* MANUAL: \$this->Paginator->counter was not mapped */ ''", (string) file_get_contents($app . '/resources/views/legacy/layout/default.blade.php'));
@@ -230,6 +314,18 @@ final class CakeMoverTest extends TestCase
         $this->assertStringContainsString("return \$this->hasMany(Note::class, 'user_id');", $user);
         $this->assertSame('Category', CakeModels::singular('Categories'));
         $this->assertSame('articles_tags', CakeModels::underscore('ArticlesTags'));
+    }
+
+    /** @return list<string> the runtime files every move writes */
+    private static function runtime(): array
+    {
+        $out = [];
+        foreach (glob(dirname(__DIR__) . '/resources/strangler/cake/*.php') ?: [] as $file) {
+            $out[] = CakeMover::DIR . basename($file);
+        }
+        sort($out);
+
+        return $out;
     }
 
     private function app(bool $step0Done = false): string

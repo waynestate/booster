@@ -21,83 +21,27 @@ namespace Waynestate\Booster\Strangler;
  *   files under resources/views/legacy/, PHP kept as PHP and the helpers
  *   mapped, so the HTML is the same bytes (a MANUAL line asks for the Blade
  *   rewrite later; a layout helper that does not map is a MANUAL line);
+ * - the CakePHP runtime the moved code runs on (CakeView, CakeForm with the
+ *   legacy FormHelper's own templates, CakeTable, CakeQuery, CakeEntity,
+ *   CakeValidator, CakeAuth; see CakeRuntime), the legacy Tables, Entities
+ *   and Policies ported onto it, the legacy error pages as Blade, and the
+ *   split CakePHP packages (core, utility, collection, i18n) in composer.json;
  * - the Eloquent model skeletons from the Table and Entity classes;
  * - the routes in routes/web.php after a `// booster:strangler <unit> from` line,
- *   names kept, signed-in units behind SESAME's `auth.sesame`.
+ *   names kept, signed-in units behind SESAME's `auth.sesame`. When the legacy
+ *   app checks CSRF tokens, a moved write keeps Laravel's PreventRequestForgery
+ *   (the moved form prints Laravel's `_token`) and a bad token gets the legacy
+ *   403 page (design 9.2); when it checks none, the route skips it as before.
+ *
+ * A unit that posts to or flashes into another unit moves after it (the
+ * plan's `after` list), so a form and the action it posts to always agree on
+ * whose token they carry.
  */
-final class CakeMover implements Mover
+final class CakeMover implements Mover, AddsComposerPackages
 {
     public const DIR = 'app/Http/Controllers/Legacy/Cake/';
 
     public const NS = 'App\\Http\\Controllers\\Legacy\\Cake';
-
-    /** The render helper the moved actions share. */
-    private const SUPPORT = <<<'PHP'
-<?php
-
-namespace App\Http\Controllers\Legacy\Cake;
-
-use ArrayObject;
-use Illuminate\Http\Request;
-use Illuminate\Http\Response;
-use Throwable;
-
-/**
- * Written by Booster's strangler (cakephp-to-laravel): renders a moved
- * CakePHP template the way CakePHP's View does (the template first, then
- * the layout with the `content` and `title` blocks), so the HTML is the
- * same. Removed by the finish step once every view is idiomatic Blade.
- */
-final class CakeView
-{
-    /**
-     * @param array<string, mixed> $viewData
-     */
-    public static function render(string $template, ?string $layout, array $viewData, string $title): Response
-    {
-        $blocks = new ArrayObject(['content' => '', 'title' => '', 'meta' => '', 'css' => '', 'script' => '']);
-        $content = view($template, ['__blocks' => $blocks] + $viewData)->render();
-        if ($layout !== null) {
-            $blocks['content'] = $content;
-            if ((string) $blocks['title'] === '') {
-                $blocks['title'] = $title;
-            }
-            $content = view($layout, ['__blocks' => $blocks] + $viewData)->render();
-        }
-
-        // CakePHP's header, byte for byte.
-        return response($content)->header('Content-Type', 'text/html; charset=UTF-8');
-    }
-
-    /**
-     * CakePHP's redirect: an empty body and the full URL in Location
-     * (scheme, host, base path, then the path its router built).
-     */
-    public static function redirect(Request $request, string $path, int $status = 302): Response
-    {
-        $url = preg_match('#^[a-z][a-z0-9+.-]*://#i', $path) === 1 ? $path : $request->getSchemeAndHttpHost() . $request->getBasePath() . $path;
-
-        return response('', $status)->header('Location', $url)->header('Content-Type', 'text/html; charset=UTF-8');
-    }
-
-    /**
-     * Whether a request goes to a moved CakePHP action. Laravel's
-     * TrimStrings and ConvertEmptyStringsToNull skip those, because the
-     * CakePHP code read its input untouched (routes/web.php registers this).
-     */
-    public static function moved(Request $request): bool
-    {
-        try {
-            $route = app('router')->getRoutes()->match($request);
-        } catch (Throwable) {
-            return false;
-        }
-
-        return str_starts_with($route->getActionName(), __NAMESPACE__ . '\\');
-    }
-}
-
-PHP;
 
     /** The routes/web.php lines that keep Laravel's input cleaners off moved CakePHP actions. */
     public const SKIP_INPUT = "\\Illuminate\\Foundation\\Http\\Middleware\\TrimStrings::skipWhen(static fn (\\Illuminate\\Http\\Request \$request): bool => \\App\\Http\\Controllers\\Legacy\\Cake\\CakeView::moved(\$request));\n\\Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull::skipWhen(static fn (\\Illuminate\\Http\\Request \$request): bool => \\App\\Http\\Controllers\\Legacy\\Cake\\CakeView::moved(\$request));";
@@ -113,6 +57,25 @@ PHP;
 
     /** @var list<string> */
     private array $manual = [];
+
+    /** @var list<string> the Table methods the moved code reaches (CakeTranslator::$reached) */
+    private array $reached = [];
+
+    /** Whether a moved view prints a form, or a moved action can end in the legacy error page. */
+    private bool $usesForm = false;
+
+    private bool $canFail = false;
+
+    /** @var array<string, string> package => constraint, the last move's composer.json adds */
+    private array $adds = [];
+
+    /** The routes/web.php lines, written once, that give a bad CSRF token on a moved action the legacy 403 page and leave the legacy CSRF cookie unencrypted. */
+    public const CSRF_BRIDGE = "app(\Illuminate\Contracts\Debug\ExceptionHandler::class)->map(static fn (\Illuminate\Session\TokenMismatchException \$e): \Throwable => \App\Http\Controllers\Legacy\Cake\CakeView::csrfFailure(\$e));";
+
+    public function composerAdds(): array
+    {
+        return $this->adds;
+    }
 
     public function framework(): string
     {
@@ -130,15 +93,21 @@ PHP;
         $this->files = [];
         $this->refusals = [];
         $this->manual = [];
+        $this->adds = [];
+        $this->reached = [];
+        $this->usesForm = false;
+        $this->canFail = false;
         $appRoot = rtrim($appRoot, '/\\');
         if (!CakeApp::isCakePhp($appRoot)) {
             return self::refused($unit, 'legacy/ is not a CakePHP app (no config/routes.php, or composer.json does not require cakephp/cakephp)');
         }
         $app = new CakeApp($appRoot);
         $entries = null;
+        $after = [];
         foreach ((new CakeUnitSource())->plan($app) as $planned) {
             if ($planned['unit']->id === $unit->id) {
                 $entries = $planned['entries'];
+                $after = $planned['after'];
             }
         }
         if ($entries === null) {
@@ -157,8 +126,19 @@ PHP;
             $this->refusals[] = ['file' => $unit->sourceFile, 'line' => $unit->sourceLine, 'reason' => $unit->id . ' needs a signed-in user; it moves once Step 0 (sign-in on SESAME) is done'];
         }
 
+        foreach ($after as $needed) {
+            if (!str_contains($webCode, self::marker($needed))) {
+                $this->refusals[] = ['file' => $unit->sourceFile, 'line' => $unit->sourceLine, 'reason' => sprintf('%s shares a form or a flash message with %s, which has not moved yet; move %s first', $unit->id, $needed, $needed)];
+            }
+        }
+
         $assets = $this->assets($app);
-        $csrf = $this->csrfMiddleware($app);
+        $runtime = new CakeRuntime($app);
+        $csrfSettings = $runtime->csrfSettings();
+        $csrf = $csrfSettings !== null;
+        if ($csrfSettings !== null && $csrfSettings['session']) {
+            $this->refusals[] = ['file' => $csrfSettings['file'], 'line' => 1, 'reason' => 'SessionCsrfProtectionMiddleware keeps the token in the CakePHP session, which the Laravel half cannot read'];
+        }
         $moving = [];
         foreach ($entries as $entry) {
             if ($entry['controller'] !== null && $entry['method'] !== null) {
@@ -172,12 +152,18 @@ PHP;
                 $routeLines[] = $line;
             }
         }
+        if ($this->refusals === []) {
+            $this->runtime($app, $runtime, $assets);
+        }
         if ($this->refusals !== []) {
             return new MoveResult(false, [], self::unique($this->refusals), []);
         }
 
         $changed = [];
-        $this->files[self::DIR . 'CakeView.php'] = self::SUPPORT;
+        $composer = $this->composer($appRoot, $runtime);
+        if ($composer !== null) {
+            $this->files['composer.json'] = $composer;
+        }
         foreach ($this->files as $file => $code) {
             $path = $appRoot . '/' . $file;
             if (is_file($path) && (string) file_get_contents($path) === $code) {
@@ -196,6 +182,10 @@ PHP;
             $webCode = rtrim($webCode, "\n") . "\n\n// booster:strangler CakePHP code reads its input untouched: Laravel's input cleaners skip moved actions.\n" . self::SKIP_INPUT . "\n";
             $this->manual[] = 'routes/web.php tells TrimStrings and ConvertEmptyStringsToNull to skip moved CakePHP actions (CakePHP never trimmed input); with `php artisan route:cache` routes/web.php is not loaded, so move those two lines to AppServiceProvider::boot() before caching routes';
         }
+        if ($csrfSettings !== null && !str_contains($webCode, self::CSRF_BRIDGE)) {
+            $webCode = rtrim($webCode, "\n") . "\n\n// booster:strangler CakePHP's CSRF: a bad token on a moved action gets the legacy 403 page; the legacy cookie stays as CakePHP wrote it.\n"
+                . self::CSRF_BRIDGE . "\n\\Illuminate\\Cookie\\Middleware\\EncryptCookies::except(" . var_export($csrfSettings['cookie'], true) . ");\n";
+        }
         $block = "\n" . self::marker($unit->id) . $unit->sourceFile . ':' . $unit->sourceLine . "\n" . implode("\n", $routeLines) . "\n";
         file_put_contents($web, rtrim($webCode, "\n") . "\n" . $block);
         $changed[] = 'routes/web.php';
@@ -212,7 +202,7 @@ PHP;
      * One action: its controller class and views into $this->files, and its
      * route line; null when it refused.
      *
-     * @param array{controller: string|null, method: string|null, action: string, path: string, uri: string, name: string|null, get: bool, writes: list<string>, identity: bool, guarded: bool, signIn: bool, json: bool, session: bool, file: string, line: int, seq: int, edges: list<string>} $entry
+     * @param array{controller: string|null, method: string|null, action: string, path: string, uri: string, name: string|null, get: bool, writes: list<string>, identity: bool, guarded: bool, signIn: bool, json: bool, session: bool, file: string, line: int, seq: int, edges: list<string>, forms: list<string>} $entry
      * @param array<string, true> $moving
      * @param array{css: string, js: string, encoding: string, timestamp: bool} $assets
      */
@@ -241,9 +231,6 @@ PHP;
             }
         }
         $writes = array_values(array_diff($entry['writes'], ['GET', 'HEAD']));
-        if ($writes !== [] && $csrf) {
-            $this->refusals[] = ['file' => $file, 'line' => $method['line'], 'reason' => sprintf('%s answers %s, and the legacy app checks CSRF tokens (CsrfProtectionMiddleware); the form that posts here is CakePHP\'s, so Laravel cannot check its token: port the form and the action together and run the --hand move', $entry['controller'] . '::' . $entry['method'], implode('|', $writes))];
-        }
         $facts = $app->analyse($controller, $method);
         $chain = $app->chain($controller);
         $prefix = $controller['prefix'];
@@ -308,7 +295,9 @@ PHP;
         }
         foreach ($translators as $tr) {
             $this->refusals = array_merge($this->refusals, $tr->refusals);
+            $this->reached = array_merge($this->reached, $tr->reached);
         }
+        $this->canFail = $this->canFail || $this->reached !== [] || self::authorizes($app) || ($csrf && array_diff($entry['writes'], ['GET', 'HEAD']) !== []);
 
         $layoutView = 'null';
         if ($rendersView && $view !== null) {
@@ -337,15 +326,24 @@ PHP;
         $class = self::className($prefix, $controller['name'], $method['name']);
         $ns = substr($class, 0, (int) strrpos($class, '\\'));
         $short = substr($class, (int) strrpos($class, '\\') + 1);
-        $imports = array_merge(['use ' . self::NS . '\\CakeView;', 'use Illuminate\\Http\\Request;'], $t->globalImports());
+        $imports = array_merge(['use ' . self::NS . '\\CakeAuth;', 'use ' . self::NS . '\\CakeTable;', 'use ' . self::NS . '\\CakeView;', 'use Illuminate\\Http\\Request;'], $t->globalImports());
         $imports = array_values(array_unique($imports));
         sort($imports);
+        $inner = "        \$viewData = [];\n" . $prelude . rtrim($body) . "\n";
+        if (self::authorizes($app)) {
+            // AuthorizationMiddleware's check: an action that neither authorized nor skipped authorization ends in the error page.
+            $args = ['$request'];
+            foreach ($method['params'] as $param) {
+                $args[] = '$' . $param['name'];
+            }
+            $inner = "        \$response = \$this->action(" . implode(', ', $args) . ");\n        CakeAuth::ensure(\$request);\n\n        return \$response;\n    }\n\n"
+                . '    private function action(' . implode(', ', $params) . "): mixed\n    {\n" . $inner;
+        }
         $code = "<?php\n\nnamespace " . $ns . ";\n\n" . implode("\n", $imports) . "\n\n"
             . "/**\n * Written by Booster's strangler (cakephp-to-laravel) from " . $file . ':' . $method['line']
             . ' (' . $controller['name'] . 'Controller::' . $method['name'] . "). App-owned.\n */\nfinal class " . $short . "\n{\n"
-            . '    public function __invoke(' . implode(', ', $params) . "): mixed\n    {\n        \$viewData = [];\n"
-            . ($prelude === '' ? '' : $prelude)
-            . rtrim($body) . "\n    }\n}\n";
+            . '    public function __invoke(' . implode(', ', $params) . "): mixed\n    {\n"
+            . $inner . "    }\n}\n";
         $this->files[self::classFile($class)] = $code;
 
         $methods = array_values(array_unique(array_merge($entry['get'] ? ['GET'] : [], $writes)));
@@ -353,7 +351,9 @@ PHP;
         if ($entry['guarded']) {
             $route .= "\n    ->middleware('auth.sesame')";
         }
-        if ($writes !== []) {
+        if ($writes !== [] && $csrf) {
+            $this->manual[] = sprintf('%s:%d %s /%s keeps Laravel\'s CSRF check (PreventRequestForgery; ValidateCsrfToken before Laravel 13): the moved form prints Laravel\'s _token, and a bad token gets the legacy 403 page', $file, $method['line'], implode('|', $writes), ltrim($entry['uri'], '/'));
+        } elseif ($writes !== []) {
             // PreventRequestForgery is Laravel 13's name for ValidateCsrfToken.
             $route .= "\n    ->withoutMiddleware([\\Illuminate\\Foundation\\Http\\Middleware\\PreventRequestForgery::class, \\Illuminate\\Foundation\\Http\\Middleware\\ValidateCsrfToken::class])";
             $this->manual[] = sprintf('%s:%d %s /%s had no CSRF check in CakePHP and has none in Laravel either (the route skips PreventRequestForgery so the legacy form still posts); add one when its form is ported', $file, $method['line'], implode('|', $writes), ltrim($entry['uri'], '/'));
@@ -396,9 +396,9 @@ PHP;
      * and its helpers that do not map are MANUAL lines, not refusals.
      *
      * @param array{css: string, js: string, encoding: string, timestamp: bool} $assets
-     * @param array{key: string, name: string, prefix: string|null, file: string, code: CakeCode} $controller
+     * @param array{name: string, prefix: string|null} $controller
      */
-    private function view(CakeApp $app, string $template, bool $isLayout, array $assets, array $controller, int $depth = 0): void
+    private function view(CakeApp $app, string $template, bool $isLayout, array $assets, array $controller, int $depth = 0, ?string $source = null): void
     {
         $target = 'resources/views/legacy/' . substr($template, strlen('templates/'), -strlen('.php')) . '.blade.php';
         if (isset($this->files[$target]) || $depth > 8) {
@@ -407,11 +407,12 @@ PHP;
         if ($isLayout && is_file($app->appRoot . '/' . $target)) {
             return;
         }
-        $source = (string) file_get_contents($app->legacy . '/' . $template);
+        $source ??= (string) file_get_contents($app->legacy . '/' . $template);
         $c = new CakeCode($source);
         $t = new CakeTranslator($app, 'template', 'legacy/' . $template, ['name' => $controller['name'], 'prefix' => $controller['prefix']], '', $assets);
         $t->readImports($c);
         $code = $t->rewrite($c, 0, count($c->t) - 1);
+        $this->usesForm = $this->usesForm || $t->usesForm;
         $safe = self::bladeSafe($code);
         if ($safe === null) {
             $t->refusals[] = ['file' => 'legacy/' . $template, 'line' => 1, 'reason' => 'the template\'s PHP code holds text Blade would compile ({{--, <x-, @php or @verbatim)'];
@@ -535,15 +536,75 @@ PHP;
         return $out;
     }
 
-    private function csrfMiddleware(CakeApp $app): bool
+    /**
+     * The runtime, the ported Tables, Entities and Policies, and the legacy
+     * error pages (debug block dropped) with the error layout, into $this->files.
+     *
+     * @param array{css: string, js: string, encoding: string, timestamp: bool} $assets
+     */
+    private function runtime(CakeApp $app, CakeRuntime $runtime, array $assets): void
+    {
+        $ports = $this->reached !== [] || self::authorizes($app) || $this->usesForm ? $runtime->ports(array_values(array_unique($this->reached))) : [];
+        foreach ($runtime->files($this->usesForm) + $ports as $file => $code) {
+            $this->files[$file] = $code;
+        }
+        $this->refusals = array_merge($this->refusals, $runtime->refusals);
+        $error = ['name' => 'Error', 'prefix' => null];
+        foreach (['templates/Error/error400.php', 'templates/Error/error500.php'] as $template) {
+            $path = $app->legacy . '/' . $template;
+            $source = is_file($path) ? CakeRuntime::errorTemplate((string) file_get_contents($path)) : null;
+            if ($source === null && !$this->canFail) {
+                continue;
+            }
+            if ($source === null) {
+                $this->refusals[] = ['file' => 'legacy/' . $template, 'line' => 1, 'reason' => 'the error page is missing or not in the shape the app skeleton ships (one `if (Configure::read(\'debug\'))` block), so a moved action could not end in the same error page'];
+                continue;
+            }
+            $this->view($app, $template, false, $assets, $error, 0, $source);
+        }
+        if (is_file($app->legacy . '/templates/layout/error.php')) {
+            $this->view($app, 'templates/layout/error.php', true, $assets, $error);
+        } elseif ($this->canFail) {
+            $this->refusals[] = ['file' => 'legacy/templates/layout/error.php', 'line' => 1, 'reason' => 'the error layout is missing'];
+        }
+    }
+
+    /**
+     * composer.json with the split CakePHP packages the runtime needs, at the
+     * legacy app's CakePHP minor; null when nothing is missing.
+     */
+    private function composer(string $appRoot, CakeRuntime $runtime): ?string
+    {
+        $file = $appRoot . '/composer.json';
+        $json = is_file($file) ? json_decode((string) file_get_contents($file)) : null;
+        if (!$json instanceof \stdClass) {
+            $this->manual[] = 'composer.json could not be read, so add ' . implode(', ', CakeRuntime::PACKAGES) . ' (' . $runtime->constraint() . ') to the Laravel half by hand';
+
+            return null;
+        }
+        if (!isset($json->require) || !$json->require instanceof \stdClass) {
+            $json->require = new \stdClass();
+        }
+        foreach (CakeRuntime::PACKAGES as $package) {
+            if (!isset($json->require->{$package})) {
+                $json->require->{$package} = $runtime->constraint();
+                $this->adds[$package] = $runtime->constraint();
+            }
+        }
+        if ($this->adds === []) {
+            return null;
+        }
+        $this->manual[] = sprintf('composer.json requires %s (%s): the CakePHP pieces the moved code runs on (strings, collections, dates, translations); the finish step drops them with the last CakePHP idiom', implode(', ', array_keys($this->adds)), $runtime->constraint());
+
+        return json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
+    }
+
+    /** Whether the legacy app runs AuthorizationMiddleware (every action must authorize or skip). */
+    private static function authorizes(CakeApp $app): bool
     {
         $file = $app->legacy . '/src/Application.php';
-        if (!is_file($file)) {
-            return false;
-        }
-        $c = new CakeCode((string) file_get_contents($file));
 
-        return str_contains($c->code(0, count($c->t) - 1), 'CsrfProtectionMiddleware');
+        return is_file($file) && preg_match('/new\s+(?:\\\\?Authorization\\\\Middleware\\\\)?AuthorizationMiddleware\b/', (string) file_get_contents($file)) === 1;
     }
 
     /** @param list<string> $list */

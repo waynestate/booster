@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waynestate\Booster\Tests;
 
+use Waynestate\Booster\Strangler\CakeApp;
 use Waynestate\Booster\Strangler\CakeRoutes;
 use Waynestate\Booster\Strangler\CakeUnitSource;
 use Waynestate\Booster\Strangler\Unit;
@@ -11,7 +12,8 @@ use Waynestate\Booster\Strangler\Unit;
 /**
  * The CakePHP move units (design sections 4 and 9.2): routes from
  * config/routes.php with the fallbacks spelled out, a form and the page its
- * flash message lands on moving as one unit, and the move order.
+ * flash message lands on moving as one unit, an action a form posts to
+ * waiting for the pages that render the form, and the move order.
  */
 final class CakeUnitSourceTest extends TestCase
 {
@@ -27,10 +29,10 @@ final class CakeUnitSourceTest extends TestCase
         $units = (new CakeUnitSource())->units(self::APP);
 
         $this->assertSame(
-            ['GET /notes/hello/{name?}', 'GET /notes/me', 'GET /notes/report', 'FORM /'],
+            ['GET /notes/hello/{name?}', 'GET /notes/me', 'GET /notes/stats', 'GET /notes/show/{id}', 'FORM /', 'FORM /notes/report'],
             array_map(static fn(Unit $u): string => $u->id, $units),
         );
-        $this->assertSame(['page', 'page', 'page', 'write'], array_map(static fn(Unit $u): string => $u->order, $units));
+        $this->assertSame(['page', 'page', 'page', 'page', 'write', 'write'], array_map(static fn(Unit $u): string => $u->order, $units));
     }
 
     public function test_a_page_unit(): void
@@ -49,7 +51,7 @@ final class CakeUnitSourceTest extends TestCase
     public function test_an_action_outside_the_unauthenticated_list_needs_sign_in(): void
     {
         $this->assertTrue($this->unit('GET /notes/me')->needsSignIn);
-        $this->assertFalse($this->unit('GET /notes/report')->needsSignIn);
+        $this->assertFalse($this->unit('GET /notes/hello/{name?}')->needsSignIn);
     }
 
     public function test_a_form_and_the_page_its_flash_lands_on_are_one_unit(): void
@@ -65,6 +67,26 @@ final class CakeUnitSourceTest extends TestCase
         $this->assertSame(
             ['GET /', 'GET /notes', 'GET /notes/add', 'POST /notes/add'],
             array_map(static fn(Unit $u): string => $u->id, $form->parts),
+        );
+    }
+
+    public function test_an_action_a_form_posts_to_moves_after_the_pages_that_render_the_form(): void
+    {
+        $plan = [];
+        foreach ((new CakeUnitSource())->plan(new CakeApp(self::APP)) as $entry) {
+            $plan[$entry['unit']->id] = $entry['after'];
+        }
+
+        // show renders a postLink to delete: show can move alone (the moved
+        // page prints the legacy token while delete is legacy), but delete
+        // waits for show, because a legacy page's token fails Laravel's check.
+        // delete's flash lands on report, so the two are one unit.
+        $this->assertSame([], $plan['GET /notes/show/{id}']);
+        $this->assertSame(['GET /notes/show/{id}'], $plan['FORM /notes/report']);
+        $this->assertSame([], $plan['FORM /']);
+        $this->assertSame(
+            ['GET /notes/report', 'POST /notes/delete/{id}'],
+            array_map(static fn(Unit $u): string => $u->id, $this->unit('FORM /notes/report')->parts),
         );
     }
 
