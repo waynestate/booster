@@ -2122,7 +2122,7 @@ final class HopExecutor
             $this->stranglerParts ?? new UnwiredStranglerParts(),
             // Step 0 rewrites serve.env in the request file (SESAME's replay settings), so its gate reads the file again, as the mount's does.
             fn(array $signInChanges): GateReport => $options->skipGate ? new GateReport(true, ['Gate skipped.']) : $this->stranglerGate($step, $path, $options, $baseline, true, $changedPackages(), $signInChanges),
-            fn(bool $serveChanged): GateReport => $options->skipGate ? new GateReport(true, ['Gate skipped.']) : $this->stranglerGate($step, $path, $options, $baseline, $serveChanged, $serveChanged ? [] : $changedPackages()),
+            fn(bool $serveChanged, array $step0Changes = []): GateReport => $options->skipGate ? new GateReport(true, ['Gate skipped.']) : $this->stranglerGate($step, $path, $options, $baseline, $serveChanged, $serveChanged ? [] : $changedPackages(), null, $step0Changes),
             $dirty,
             fn(): array|string => $this->laravelRouteList($path, $step->phpAfter ?? '', $options),
             static fn(): string => (new \DateTimeImmutable('now'))->format(DATE_ATOM),
@@ -2145,10 +2145,14 @@ final class HopExecutor
      * syntax check), and the replay reads the request file Step 0 rewrote
      * (serve.env), accepting the sign-in hand-off it moved on purpose.
      *
+     * The mount passes $step0Changes when Step 0 ran in the same run: the
+     * recording predates it, so the replay accepts the same sign-in changes.
+     *
      * @param list<string> $update
      * @param list<string> $signInChanges
+     * @param list<string> $step0Changes
      */
-    private function stranglerGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, bool $serveChanged, array $update, ?array $signInChanges = null): GateReport
+    private function stranglerGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, bool $serveChanged, array $update, ?array $signInChanges = null, array $step0Changes = []): GateReport
     {
         $gate = $signInChanges !== null
             ? $this->runTestGate($step, $path, $options, $baseline, $update)
@@ -2196,7 +2200,7 @@ final class HopExecutor
             $file = ReplayFile::load($options->replay->path);
             $replay = new ReplayGate($this->replayRunnerUsed, $file, $path, $this->replayOutDir, $options->gateImage);
             $replay->useRecording($recording, $file->path, $serveChanged);
-            $outcome = $replay->check($php, sprintf('step-%d-%s-php%s', $step->number, $step->hop->id, $php), serveChanged: $serveChanged, signInChanges: $signInChanges ?? []);
+            $outcome = $replay->check($php, sprintf('step-%d-%s-php%s', $step->number, $step->hop->id, $php), serveChanged: $serveChanged, signInChanges: $signInChanges ?? $step0Changes);
         } catch (ToolError $e) {
             return new GateReport(false, [...$gate->lines, 'Replay could not run: ' . $e->getMessage(), $this->undoHint($path)]);
         }
@@ -2246,7 +2250,7 @@ final class HopExecutor
         }
         $gate = $stepZero
             ? $this->runTestGate($step, $path, $options, $baseline, array_values(array_unique([...$update, $package])))
-            : $this->runTestGateWith($step, $path, $options, $baseline, array_values(array_unique([...$update, $package])),$this->strangledTestCommand($path, $options, $baseline->gateKind));
+            : $this->runTestGateWith($step, $path, $options, $baseline, array_values(array_unique([...$update, $package])), $this->strangledTestCommand($path, $options, $baseline->gateKind));
         if ($gate->passed) {
             return [$gate, [$tried, sprintf(
                 'MANUAL: %s moved from %s.x to %s.x (locked %s), and the update and the app\'s own check passed with it. A new major can change behavior the tests and replay do not cover: read its upgrade notes before release%s.',

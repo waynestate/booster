@@ -236,7 +236,7 @@ final class StranglerEngineTest extends TestCase
         // SignInStep::migrate runs twice: Step 0, then the Laravel half's wiring once legacy/ is there.
         self::assertSame(['signInInspect', 'signInMigrate', 'mount', 'signInMigrate', 'unitSource'], $parts->calls);
         self::assertSame([['/auth/login']], $signInChanges, 'the Step 0 gate gets the sign-in paths Step 0 changed');
-        self::assertSame(['legacy', 'mounted:serve-changed'], $gates);
+        self::assertSame(['legacy', 'mounted:serve-changed step0:/auth/login'], $gates, 'the mount gate accepts the same sign-in changes: the recording predates Step 0');
         $ledger = Ledger::load($dir);
         self::assertNotNull($ledger);
         self::assertSame(Ledger::STEP0_DONE, $ledger->step0());
@@ -793,8 +793,8 @@ final class StranglerEngineTest extends TestCase
 
                 return new GateReport($legacyPasses, [$legacyPasses ? 'Replay passed: 12 answers match.' : 'Replay failed: GET / changed.']);
             },
-            static function (bool $serveChanged) use ($mountedPasses, &$log): GateReport {
-                $log[] = $serveChanged ? 'mounted:serve-changed' : 'mounted';
+            static function (bool $serveChanged, array $step0Changes = []) use ($mountedPasses, &$log): GateReport {
+                $log[] = ($serveChanged ? 'mounted:serve-changed' : 'mounted') . ($step0Changes === [] ? '' : ' step0:' . implode(',', $step0Changes));
 
                 return new GateReport($mountedPasses, [$mountedPasses ? 'Replay passed: 12 answers match.' : 'Replay failed: GET /a changed.']);
             },

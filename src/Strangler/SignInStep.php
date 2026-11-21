@@ -133,8 +133,10 @@ final class SignInStep
         if ($report->mounted && ! $wired) {
             $plan = new SignInPlan($root);
             SignInLaravelHalf::wire($plan);
-            $replayEnv = [...$replayEnv, ...self::laravelReplayEnv($report->shape)];
-            self::replayEnv($plan, self::laravelReplayEnv($report->shape));
+            // After Step 0 the legacy half reads as 'sesame'; the replay file still says when it was a validUser app.
+            $shape = $report->shape === 'sesame' && self::legacyOnReplayCas($plan) ? 'validuser' : $report->shape;
+            $replayEnv = [...$replayEnv, ...self::laravelReplayEnv($shape)];
+            self::replayEnv($plan, self::laravelReplayEnv($shape));
             $written = $plan->write();
             if ($plan->failures !== []) {
                 return new SignInResult($report->step0Done, false, $changed, $changes, [...$manual, ...$plan->manual], $plan->failures, $replayChanges);
@@ -248,6 +250,18 @@ final class SignInStep
         $data->serve->env = $env;
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         $plan->put(self::REPLAY_FILE, $json . "\n", sprintf('%s: serve.env gets the replay\'s SESAME settings (%s); the gate after this step runs with the serve change named', self::REPLAY_FILE, self::envLine($set)));
+    }
+
+    /** True when Step 0 left the legacy half on the replay's CAS (the validUser shape's settings). */
+    private static function legacyOnReplayCas(SignInPlan $plan): bool
+    {
+        $content = $plan->read(self::REPLAY_FILE);
+        $data = $content === null ? null : json_decode($content);
+        $env = $data instanceof \stdClass && isset($data->serve->env) && $data->serve->env instanceof \stdClass ? $data->serve->env : null;
+
+        return $env !== null
+            && ($env->SESAME_CAS_BASE_URL ?? null) === self::REPLAY_CAS
+            && (($env->SESAME_LEGACY_DRIVER ?? null) === 'cas' || ($env->SESAME_DRIVER ?? null) === 'cas');
     }
 
     private static function dropReplayEnv(SignInPlan $plan): void

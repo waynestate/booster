@@ -456,6 +456,31 @@ JSON;
         self::assertNotEmpty(array_filter($finish->manual, static fn(string $line): bool => str_contains($line, 'SESAME_ROUTE_PREFIX')));
     }
 
+    public function testAValidUserStepZeroKeepsTheLegacyHalfOnTheReplayCasAfterTheMount(): void
+    {
+        $replay = json_encode(['version' => 1, 'serve' => ['docroot' => 'public', 'env' => ['SESAME_DRIVER' => 'cas', 'SESAME_CAS_BASE_URL' => SignInStep::REPLAY_CAS, 'APP_ENV' => 'local']], 'sequences' => [['name' => 'g', 'requests' => [['path' => '/']]]]]);
+        $app = $this->app([
+            'composer.json' => json_encode(['require' => ['laravel/framework' => '^13.0', 'waynestate/sesame' => '^0.8']]),
+            'artisan' => "#!/usr/bin/env php\n",
+            'storage/.gitignore' => "*\n",
+            'config/sesame.php' => "<?php\n\nreturn [\n\n    'driver' => env('SESAME_DRIVER', 'cas'),\n\n    'routes' => env('SESAME_ROUTES', true),\n\n];\n",
+            'config/auth.php' => "<?php\n\nreturn [\n    'guards' => [\n        'web' => [\n            'driver' => 'session',\n            'provider' => 'users',\n        ],\n    ],\n];\n",
+            'bootstrap/app.php' => "<?php\n\n\$x->withMiddleware(function (\$middleware): void {\n    \$middleware->redirectGuestsTo('/login');\n});\n",
+            '.env.example' => "APP_NAME=Laravel\n",
+            'booster-replay.json' => (string) $replay,
+            'legacy/composer.json' => '{}',
+            'legacy/app/Sesame/LegacySignIn.php' => "<?php\n// This app's sign-in through SESAME, written by Booster's strangler Step 0.\n",
+        ]);
+
+        $result = SignInStep::migrate($app, 'slim');
+        self::assertSame([], $result->failures);
+
+        $env = json_decode($this->read($app, 'booster-replay.json'))->serve->env;
+        self::assertSame('fake', $env->SESAME_DRIVER, 'the Laravel half signs in on the spot');
+        self::assertSame('cas', $env->SESAME_LEGACY_DRIVER ?? null, 'the legacy half keeps handing guests to the replay CAS, as in Step 0');
+        self::assertSame(SignInStep::REPLAY_CAS, $env->SESAME_CAS_BASE_URL);
+    }
+
     public function testAMountedAppWhoseLegacyHalfIsNotOnSesameIsRefused(): void
     {
         $app = $this->app([

@@ -37,7 +37,7 @@ final class StranglerStep
 {
     /**
      * @param Closure(list<string>): GateReport                            $legacyGate the step's normal gate (tests, then the replay as served now), for Step 0; takes the request paths whose sign-in hand-off Step 0 changed on purpose
-     * @param Closure(bool): GateReport                                    $mountedGate the gate on the mounted tree; true when this run changed how the app is served (the mount, the finish)
+     * @param Closure(bool, list<string>=): GateReport                     $mountedGate the gate on the mounted tree; true when this run changed how the app is served (the mount, the finish); then the paths whose sign-in Step 0 moved in this same run
      * @param Closure(): bool                                              $dirty       whether the working copy has uncommitted changes
      * @param Closure(): (list<array{methods: list<string>, uri: string}>|string) $routeList   Laravel's route:list, or why it could not be read
      * @param Closure(): string                                            $now         the time stamp the ledger records
@@ -129,6 +129,8 @@ final class StranglerStep
 
         $files = [];
         $messages = [];
+        // The recording predates a Step 0 that runs now, so the mount's gate accepts the same sign-in changes.
+        $step0Changes = [];
         if ($step0Done) {
             $messages[] = 'Step 0: nothing to change (the legacy half signs nobody in, or already signs in through SESAME with the shared sign-out store).';
             $messages = [...$messages, ...$inspect->lines];
@@ -149,6 +151,7 @@ final class StranglerStep
                 ], $report);
             }
             $messages = [...$messages, ...self::prefix('Step 0 gate: ', $gate->lines)];
+            $step0Changes = $migrate->replayChanges;
         }
         $report->step0 = Ledger::STEP0_DONE;
 
@@ -184,7 +187,7 @@ final class StranglerStep
         } catch (ToolError $e) {
             return $this->result($step, StepResult::ERROR, $files, [...$messages, 'The mount is in place, but the legacy units could not be read: ' . $e->getMessage()], $report);
         }
-        $gate = ($this->mountedGate)(true);
+        $gate = ($this->mountedGate)(true, $step0Changes);
         if (!$gate->passed) {
             return $this->result($step, StepResult::GATE_FAILED, $files, [
                 ...$messages,
