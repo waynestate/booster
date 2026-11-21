@@ -451,7 +451,13 @@ final class StranglerStep
         }
         $hosted = $framework === 'slim' ? SlimMover::hostedUnits($path) : [];
         if ($hosted !== []) {
-            return $this->refused($step, [sprintf('%d unit%s on Laravel still run%s through Slim inside the Laravel route (%s), and --finish deletes the legacy code %s. Port each one\'s check to Laravel middleware first (the SLIM-HOSTED: lines say what to port) and replace its route, then run --finish again.', count($hosted), count($hosted) === 1 ? '' : 's', count($hosted) === 1 ? 's' : '', implode(', ', array_slice($hosted, 0, 12)) . (count($hosted) > 12 ? ', ...' : ''), count($hosted) === 1 ? 'it runs' : 'they run')], $report);
+            return $this->refused($step, [sprintf('%d unit%s on Laravel still run%s through Slim inside the Laravel route (%s), and --finish deletes the legacy code %s. Port each one\'s check to Laravel middleware first (the SLIM-HOSTED: lines say what to port) and replace its route, then run --finish again.', count($hosted), count($hosted) === 1 ? '' : 's', count($hosted) === 1 ? 's' : '', self::idList($hosted), count($hosted) === 1 ? 'it runs' : 'they run')], $report);
+        }
+        $booted = $framework === 'slim' ? self::slimAppBootstrapUnits($path) : [];
+        if ($booted !== []) {
+            $report->addManual('finish', ['Port the legacy services the moved Slim code reads (legacy.container) to a Laravel service provider and the app-wide middleware to Laravel middleware, then point the moved routes at them, so no unit needs the legacy front controller.']);
+
+            return $this->refused($step, [sprintf('%d moved unit%s still boot%s the legacy app\'s own setup per request (container "app" in %s: the copied legacy front controller up to run(), for its services and app-wide middleware), and --finish deletes legacy/ (%s). Port those services and that middleware to Laravel first, then run --finish again.', count($booted), count($booted) === 1 ? '' : 's', count($booted) === 1 ? 's' : '', SlimMover::MANIFEST, self::idList($booted))], $report);
         }
         if ($options->dryRun) {
             return $this->result($step, StepResult::PREVIEWED, [], ['Would delete legacy/, the route table and the install hook, put back Laravel\'s stock public/index.php, move /login to Laravel, and gate it with the replay (--serve-changed).'], $report);
@@ -483,6 +489,39 @@ final class StranglerStep
             ...$gate->lines,
             sprintf('Finished: the app is a plain Laravel app. %s is gone, so the next `booster plan` plans it like any Laravel app.', Ledger::FILE),
         ], $report);
+    }
+
+    /** @param list<string> $ids */
+    private static function idList(array $ids): string
+    {
+        return implode(', ', array_slice($ids, 0, 12)) . (count($ids) > 12 ? ', ...' : '');
+    }
+
+    /**
+     * The moved Slim units that run behind the adapter in container "app"
+     * mode (SLIM round 3): the manifest says so for the whole app, and every
+     * adapter route in routes/web.php after a `// booster:strangler` line
+     * then boots the copied legacy front controller per request. Read as
+     * text; Booster never runs the app's files.
+     *
+     * @return list<string>
+     */
+    private static function slimAppBootstrapUnits(string $path): array
+    {
+        $manifest = rtrim($path, '/\\') . '/' . SlimMover::MANIFEST;
+        $web = rtrim($path, '/\\') . '/routes/web.php';
+        if (!is_file($manifest) || !is_file($web) || preg_match('/\'container\'\s*=>\s*\'app\'/', (string) file_get_contents($manifest)) !== 1) {
+            return [];
+        }
+        $parts = preg_split('#^// booster:strangler (.+?) from .*$#m', (string) file_get_contents($web), -1, PREG_SPLIT_DELIM_CAPTURE) ?: [];
+        $out = [];
+        for ($i = 1; $i + 1 < count($parts); $i += 2) {
+            if (str_contains($parts[$i + 1], 'SlimAdapter::class')) {
+                $out[] = $parts[$i];
+            }
+        }
+
+        return $out;
     }
 
     /** Why route:list does not show the unit, or null when it shows every method at the unit's URI. */

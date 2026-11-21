@@ -82,6 +82,16 @@ the changes in place, and says how to undo them. A failed unit waits for a perso
 
 Each run is one diff to review and commit. Booster never commits.
 
+A moved route keeps the old answer's headers. The first move sets HELMET's `scope` to `web` in `config/helmet.php`,
+and every moved route skips HELMET's SecurityHeaders, InjectRibbon and RequestForgeryGuard, so a moved page carries
+no CSP or X-Frame-Options the old app did not send (a nonce CSP would also block its inline scripts). The Laravel
+half's own pages keep all three. A MANUAL line says so; once the units are on Laravel, drop the skips one route at a
+time and check each page under HELMET's CSP. A hand-ported route needs the same skip until then.
+
+When a package a move or Step 0 adds needs a shared package (such as `psr/http-message` 2) that a locked package
+holds at its old major, the gate's `composer update -W` fails on it; Booster then names those locked packages once
+more, inside `composer.json`'s constraints, and says which in the report.
+
 ### A unit Booster cannot move
 
 When a unit uses something Booster cannot translate exactly, it refuses that unit, names the file and line, and moves
@@ -107,6 +117,17 @@ Laravel's stock `public/index.php`, moves `/login` to Laravel, and gates the res
 (`--serve-changed`). When it passes, the ledger goes too: the app is a plain Laravel app, and the next `booster plan`
 plans it like one. While units are left, `--finish` refuses and lists them.
 
+`--finish` also refuses, naming the units, while moved Slim code still needs the old app at run time: a
+Slim-hosted unit (it runs a copy of the legacy front controller inside its Laravel route), or an app whose moved
+units run in container `app` mode (the copied legacy setup boots per request for its services and app-wide
+middleware). Port those services to a Laravel provider and that middleware to Laravel middleware first.
+
+Before `legacy/` goes, the old docroot's static files (robots.txt, images, css) are copied into `public/`, where the
+dispatcher served them from; a file `public/` already has with other content is a MANUAL line. When the finish gate
+still fails with every unit on Laravel, the difference is usually the old app's own fallback: what it answered for
+paths no unit owns (its not-found or method-not-allowed page) and for a trailing-slash path Laravel matches as the
+route without it. Port that to Laravel (`Route::fallback()`, the exception handler) and run `--finish` again.
+
 ## While the move is in progress
 
 An app with a ledger plans only the strangler: every other hop waits for `--finish`, and the plan says so. To patch the
@@ -120,6 +141,7 @@ Every strangler run reports, in text and in the JSON report's `strangler` sectio
 - the units still in legacy, with failed ones marked;
 - every refusal, with file and line;
 - the MANUAL checklist, grouped: sign-in, mount, route moves, finish;
+- for Slim, the Slim-hosted units still in `routes/web.php` and their `SLIM-HOSTED:` lines, in their own section (`strangler.slim_hosted` in JSON);
 - the next command to run.
 
 ## Stop signs

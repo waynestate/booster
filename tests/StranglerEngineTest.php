@@ -598,6 +598,26 @@ final class StranglerEngineTest extends TestCase
         self::assertDirectoryExists($dir . '/legacy');
     }
 
+    public function test_finish_is_refused_while_moved_units_boot_the_legacy_app_setup(): void
+    {
+        [$step, $dir] = $this->mounted('slim', ['FORM /login', 'GET /logout'], Ledger::STEP0_DONE, ['FORM /login' => Ledger::LARAVEL, 'GET /logout' => Ledger::LARAVEL]);
+        mkdir($dir . '/legacy');
+        mkdir($dir . '/routes');
+        mkdir($dir . '/' . dirname(SlimMover::MANIFEST), 0777, true);
+        file_put_contents($dir . '/' . SlimMover::MANIFEST, "<?php\n\nreturn [\n    'container' => 'app',\n    'units' => [],\n];\n");
+        $route = static fn(string $id, string $uri): string => "// booster:strangler {$id} from legacy/app/routes.php:9\n\Illuminate\Support\Facades\Route::match(['GET'], '{$uri}', [\App\Http\Controllers\Legacy\Support\SlimAdapter::class, 'handle'])\n    ->defaults('booster_slim', 'class:A');\n\n";
+        file_put_contents($dir . '/routes/web.php', "<?php\n\n" . $route('FORM /login', 'login') . $route('GET /logout', 'logout'));
+
+        $result = $this->step(new FakeStranglerParts([]))->run($step, $dir, $this->replayOptions(finish: true), '4.15', '4', 'NEXT');
+
+        $text = implode("\n", $result->messages);
+        self::assertSame(StepResult::ERROR, $result->status);
+        self::assertStringContainsString('2 moved units still boot the legacy app\'s own setup per request', $text);
+        self::assertStringContainsString('(FORM /login, GET /logout)', $text);
+        self::assertStringContainsString('MANUAL (finish): Port the legacy services', $text);
+        self::assertDirectoryExists($dir . '/legacy');
+    }
+
     public function test_slim_hosted_manual_lines_group_under_their_own_section(): void
     {
         $report = new StranglerReport('moves', 'slim');
