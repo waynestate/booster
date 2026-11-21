@@ -33,6 +33,7 @@
                 "BOOSTER_APP_PATH",
                 "BOOSTER_BOOTSTRAP",
                 "BOOSTER_CLASS_RENAMES",
+                "BOOSTER_MOVED_UNIT",
                 "BOOSTER_PHP_TARGET",
                 "BOOSTER_RECTOR_CACHE",
                 "BOOSTER_RECTOR_CONTAINER_CACHE",
