@@ -549,6 +549,22 @@ final class StranglerEngineTest extends TestCase
         self::assertStringContainsString('MANUAL (finish):', implode("\n", $result->messages));
     }
 
+    public function test_finish_drops_the_mounts_cd_legacy_group_from_the_replay_setup_whole(): void
+    {
+        [$step, $dir] = $this->mounted('slim', ['GET /a'], Ledger::STEP0_DONE, ['GET /a' => Ledger::LARAVEL]);
+        mkdir($dir . '/legacy');
+        mkdir($dir . '/public');
+        file_put_contents($dir . '/public/index.php', '<?php // the dispatcher');
+        file_put_contents($dir . '/composer.json', json_encode(['require' => ['laravel/framework' => '^13.0']], JSON_PRETTY_PRINT));
+        file_put_contents($dir . '/booster-replay.json', json_encode(['version' => 1, 'serve' => ['docroot' => 'public', 'setup' => 'mkdir -p storage/logs bootstrap/cache && (cd legacy && mkdir -p logs var/cache)'], 'requests' => []], JSON_PRETTY_PRINT));
+
+        $result = $this->step(new FakeStranglerParts([]))->run($step, $dir, $this->replayOptions(finish: true), '4.15', '4', 'NEXT');
+
+        self::assertSame(StepResult::APPLIED, $result->status, implode("\n", $result->messages));
+        $replay = json_decode((string) file_get_contents($dir . '/booster-replay.json'), true);
+        self::assertSame('mkdir -p storage/logs bootstrap/cache', $replay['serve']['setup']);
+    }
+
     public function test_finish_is_refused_while_slim_hosted_units_remain_and_names_them(): void
     {
         [$step, $dir] = $this->mounted('slim', ['GET /login', 'GET /a'], Ledger::STEP0_DONE, ['GET /login' => Ledger::LARAVEL, 'GET /a' => Ledger::LARAVEL]);

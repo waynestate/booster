@@ -170,6 +170,9 @@ final class StranglerFinish
         if (!is_string($setup) || !str_contains($setup, 'legacy')) {
             return null;
         }
+        // The mount appends "&& (cd legacy && ...)": that whole group goes first,
+        // so no command is split out of it and no bracket is left behind.
+        $setup = (string) preg_replace('/\s*(?:&&|;)?\s*\(\s*cd\s+\.?\/?legacy\/?\s*(?:&&|;)[^()]*\)/', '', $setup);
         $parts = preg_split('/\s*(?:&&|;)\s*/', $setup) ?: [];
         $kept = array_values(array_filter($parts, static fn(string $part): bool => $part !== '' && !str_contains($part, 'legacy')));
         if ($kept === []) {
