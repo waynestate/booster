@@ -48,6 +48,8 @@ final class CakeRuntime
         'getsubject', 'stoppropagation', 'isstopped', 'getresult', 'setresult', 'getdata', 'setdata', 'getname',
         // CakeIdentity
         'getidentifier', 'getoriginaldata',
+        // CakePasswordHasher
+        'hash', 'check', 'needsrehash',
     ];
 
     /** Classes ported code may use: the split packages the runtime installs. */
@@ -65,6 +67,7 @@ final class CakeRuntime
         'Cake\\ORM\\Query' => self::NS . '\\CakeQuery',
         'Cake\\Datasource\\EntityInterface' => 'Illuminate\\Database\\Eloquent\\Model',
         'Authorization\\IdentityInterface' => self::NS . '\\CakeIdentity',
+        'Authentication\\PasswordHasher\\DefaultPasswordHasher' => self::NS . '\\CakePasswordHasher',
     ];
 
     /** @var list<array{file: string, line: int, reason: string}> */
@@ -247,13 +250,28 @@ final class CakeRuntime
     }
 
     /**
-     * @return array{cookie: string, field: string, httponly: bool}|null
+     * The settings CakeView needs. `guest`: the check runs before the
+     * Authentication middleware (a route scope's middleware always does,
+     * RoutingMiddleware runs it ahead of the rest of the queue), so a
+     * failed token renders the error page as a guest saw it.
+     *
+     * @return array{cookie: string, field: string, httponly: bool, guest: bool}|null
      */
-    private function csrf(): ?array
+    public function csrf(): ?array
     {
         $s = $this->csrfSettings();
+        if ($s === null) {
+            return null;
+        }
+        $guest = true;
+        if ($s['file'] === 'legacy/src/Application.php') {
+            $code = (string) file_get_contents($this->app->legacy . '/src/Application.php');
+            $csrf = preg_match('/new\s+\\\\?(?:[\w\\\\]+\\\\)?(?:Session)?CsrfProtectionMiddleware\b/', $code, $m, PREG_OFFSET_CAPTURE) === 1 ? $m[0][1] : null;
+            $auth = preg_match('/new\s+\\\\?(?:[\w\\\\]+\\\\)?AuthenticationMiddleware\b/', $code, $n, PREG_OFFSET_CAPTURE) === 1 ? $n[0][1] : null;
+            $guest = $csrf === null || $auth === null || $csrf < $auth;
+        }
 
-        return $s === null ? null : ['cookie' => $s['cookie'], 'field' => $s['field'], 'httponly' => $s['httponly']];
+        return ['cookie' => $s['cookie'], 'field' => $s['field'], 'httponly' => $s['httponly'], 'guest' => $guest];
     }
 
     /**
@@ -290,7 +308,9 @@ final class CakeRuntime
         $out = preg_replace('/^use Cake\\\\(Core\\\\Configure|Error\\\\Debugger);\R/m', '', $source);
         $out = (string) preg_replace('/^\$this->layout = \'error\';\R/m', '', (string) $out);
         $count = 0;
-        $out = (string) preg_replace('/^if \(Configure::read\(\'debug\'\)\) :\R.*?^endif;\R/sm', '', $out, 1, $count);
+        // The block ends at the `endif;` that closes the PHP tag: the
+        // skeleton's error400 nests an `if (extension_loaded(...)) : endif;`.
+        $out = (string) preg_replace('/^if \(Configure::read\(\'debug\'\)\) :\R.*?^endif;\R(?=\?>)/sm', '', $out, 1, $count);
         if ($count !== 1 || str_contains($out, 'Configure::') || str_contains($out, 'Debugger::')) {
             return null;
         }
@@ -348,7 +368,7 @@ final class CakeRuntime
     private function port(string $code, string $from, string $to, string $file): string
     {
         $code = (string) preg_replace('/^namespace ' . preg_quote($from, '/') . ';/m', 'namespace ' . $to . ';', $code, 1);
-        $code = (string) preg_replace_callback('/^use ([\w\\\\]+)(?: as (\w+))?;\R/m', static function (array $m): string {
+        $code = (string) preg_replace_callback('/^use ([\w\\\\]+)(?: as (\w+))?;[ \t]*\R/m', static function (array $m): string {
             $class = $m[1];
             $alias = $m[2] ?? substr((string) strrchr('\\' . $class, '\\'), 1);
             if (array_key_exists($class, self::IMPORTS)) {
@@ -450,14 +470,21 @@ final class CakeRuntime
             for ($i = $method['open']; $i < $method['close']; $i++) {
                 $token = $c->t[$i];
                 if ($token[0] !== T_STRING) {
+                    // `new \Vendor\Thing()` names a class too.
+                    $before = in_array($token[0], [T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED], true) ? $c->prev($i) : null;
+                    if ($before !== null && $c->t[$before][0] === T_NEW) {
+                        $this->checkClass($imports, $token[1], $file, $c->line($i));
+                    }
                     continue;
                 }
                 $prev = $c->prev($i);
                 $next = $c->next($i);
+                if ($prev !== null && $c->t[$prev][0] === T_NEW) {
+                    // `new Collection(...)` names a class, not a function.
+                    $this->checkClass($imports, $token[1], $file, $c->line($i));
+                    continue;
+                }
                 if ($prev === null || $next === null || $c->t[$next][1] !== '(') {
-                    if ($prev !== null && $c->t[$prev][0] === T_NEW) {
-                        $this->checkClass($imports, $token[1], $file, $c->line($i));
-                    }
                     continue;
                 }
                 $lower = strtolower($token[1]);

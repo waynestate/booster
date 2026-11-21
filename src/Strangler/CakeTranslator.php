@@ -91,7 +91,7 @@ final class CakeTranslator
      * @param 'controller'|'template' $mode
      * @param array{name: string, prefix: string|null}|null $controller
      * @param string $renderCall the PHP that renders the action's template, for `return;`
-     * @param array{css: string, js: string, encoding: string, timestamp: bool} $assets
+     * @param array{css: string, js: string, encoding: string, timestamp: bool, shortcutIcon: bool} $assets
      */
     public function __construct(
         private readonly CakeApp $app,
@@ -99,7 +99,7 @@ final class CakeTranslator
         private readonly string $file,
         private readonly ?array $controller = null,
         private readonly string $renderCall = '',
-        private readonly array $assets = ['css' => 'css/', 'js' => 'js/', 'encoding' => 'utf-8', 'timestamp' => false],
+        private readonly array $assets = ['css' => 'css/', 'js' => 'js/', 'encoding' => 'utf-8', 'timestamp' => false, 'shortcutIcon' => false],
     ) {}
 
     /**
@@ -681,7 +681,9 @@ final class CakeTranslator
         $name = strtolower($next['name']);
         $op = $next['nullsafe'] ? '?->' : '->';
         if ($name === 'getidentifier' && $next['open'] !== null) {
-            return [$user . $op . 'getAuthIdentifier()', $next['end']];
+            // Authentication's Identity::getIdentifier() is the user data's `id`
+            // field (its fieldMap default), not the sign-in name.
+            return ['\\' . CakeRuntime::NS . '\\CakeIdentity::idOf(' . $user . ')', $next['end']];
         }
         if ($name === 'getoriginaldata' && $next['open'] !== null) {
             return [$user, $next['end']];
@@ -904,7 +906,12 @@ final class CakeTranslator
                     break;
                 case 'meta':
                     if (count($list) === 1 && $c->stringAt($list[0]) === 'icon') {
-                        return ["('<link href=\"' . " . $webroot . " . 'favicon.ico\" type=\"image/x-icon\" rel=\"icon\">')", $last];
+                        $icon = "'<link href=\"' . " . $webroot . " . 'favicon.ico\" type=\"image/x-icon\" rel=\"icon\">'";
+                        if ($this->assets['shortcutIcon']) {
+                            $icon .= " . '<link href=\"' . " . $webroot . " . 'favicon.ico\" type=\"image/x-icon\" rel=\"shortcut icon\">'";
+                        }
+
+                        return ['(' . $icon . ')', $last];
                     }
                     break;
                 case 'link':

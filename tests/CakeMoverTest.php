@@ -22,6 +22,9 @@ final class CakeMoverTest extends TestCase
 {
     private const APP = __DIR__ . '/fixtures/strangler/cake-app';
 
+    /** What every moved route ends with: HELMET's skips, then Laravel Boost's script injector. */
+    private const SKIPS = HelmetHold::SKIP . CakeMover::BOOST_SKIP;
+
     public function test_framework_is_cakephp(): void
     {
         $this->assertSame('cakephp', (new CakeMover())->framework());
@@ -64,9 +67,11 @@ final class CakeMoverTest extends TestCase
 
         $web = (string) file_get_contents($app . '/routes/web.php');
         $this->assertStringContainsString(CakeMover::SKIP_INPUT, $web);
+        // A page with no database, no sign-in and no CSRF cannot end in an error the legacy app would have printed.
+        $this->assertStringNotContainsString(CakeMover::ERROR_BRIDGE, $web);
         $this->assertStringContainsString(
             "// booster:strangler GET /notes/hello/{name?} from legacy/src/Controller/NotesController.php:32\n"
-            . "\\Illuminate\\Support\\Facades\\Route::match(['GET'], 'notes/hello/{name?}', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\HelloAction::class)" . HelmetHold::SKIP . ";\n",
+            . "\\Illuminate\\Support\\Facades\\Route::match(['GET'], 'notes/hello/{name?}', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\HelloAction::class)" . self::SKIPS . ";\n",
             $web,
         );
         $this->assertContains(
@@ -113,7 +118,7 @@ final class CakeMoverTest extends TestCase
         $this->assertStringContainsString("\$viewData['who'] = data_get(\$request->user(), 'name');", $index);
 
         $web = (string) file_get_contents($app . '/routes/web.php');
-        $this->assertStringContainsString("Route::match(['GET'], '/', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\IndexAction::class)" . HelmetHold::SKIP . "\n    ->name('home');", $web);
+        $this->assertStringContainsString("Route::match(['GET'], '/', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\IndexAction::class)" . self::SKIPS . "\n    ->name('home');", $web);
         $this->assertStringContainsString("Route::match(['GET', 'POST'], 'notes/add', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\AddAction::class)\n    ->withoutMiddleware([", $web);
         // Index lets guests in (addUnauthenticatedActions), so no auth middleware.
         $this->assertStringNotContainsString('auth.sesame', $web);
@@ -140,7 +145,7 @@ final class CakeMoverTest extends TestCase
         $result = (new CakeMover())->move($this->unit($app, 'GET /notes/me'), $app);
         $this->assertTrue($result->moved);
         $this->assertStringContainsString(
-            "Route::match(['GET'], 'notes/me', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\MeAction::class)\n    ->middleware('auth.sesame')" . HelmetHold::SKIP . ';',
+            "Route::match(['GET'], 'notes/me', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\MeAction::class)\n    ->middleware('auth.sesame')" . self::SKIPS . ';',
             (string) file_get_contents($app . '/routes/web.php'),
         );
         $this->assertStringContainsString(
@@ -177,9 +182,11 @@ final class CakeMoverTest extends TestCase
         $this->assertTrue($result->moved, json_encode($result->refusals, JSON_PRETTY_PRINT) ?: '');
         $web = (string) file_get_contents($app . '/routes/web.php');
         // Design 9.2: the moved form posts to a moved action, so Laravel checks the token.
-        $this->assertStringContainsString("Route::match(['GET', 'POST'], 'notes/add', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\AddAction::class);", $web);
-        $this->assertStringNotContainsString('withoutMiddleware', $web);
+        $this->assertStringContainsString("Route::match(['GET', 'POST'], 'notes/add', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\AddAction::class)" . self::SKIPS . ';', $web);
+        $this->assertStringNotContainsString('PreventRequestForgery::class', $web);
         $this->assertStringContainsString(CakeMover::CSRF_BRIDGE, $web);
+        // The bridges register on Laravel's handler, and CSRF's comes first: the handler takes the first map that matches.
+        $this->assertLessThan(strpos($web, CakeMover::ERROR_BRIDGE) ?: 0, strpos($web, CakeMover::CSRF_BRIDGE));
         $this->assertStringContainsString("\\Illuminate\\Cookie\\Middleware\\EncryptCookies::except('csrfToken');", $web);
         $view = (string) file_get_contents($app . '/app/Http/Controllers/Legacy/Cake/CakeView.php');
         $this->assertStringContainsString("'cookie' => 'csrfToken',", $view);
@@ -206,6 +213,77 @@ final class CakeMoverTest extends TestCase
         $this->assertSame(['cookie' => 'tok', 'field' => '_csrfToken', 'httponly' => false, 'file' => 'legacy/config/routes.php', 'session' => false], $settings);
     }
 
+    public function test_a_csrf_failure_renders_as_a_guest_when_the_check_runs_before_sign_in(): void
+    {
+        // A route scope's middleware runs inside RoutingMiddleware, ahead of Authentication (the CMS tutorial).
+        $app = $this->app();
+        $routes = $app . '/legacy/config/routes.php';
+        file_put_contents($routes, preg_replace('/^<\?php/', "<?php\n\$routes->registerMiddleware('csrf', new \\Cake\\Http\\Middleware\\CsrfProtectionMiddleware());", (string) file_get_contents($routes), 1));
+        $this->assertSame(['cookie' => 'csrfToken', 'field' => '_csrfToken', 'httponly' => false, 'guest' => true], (new CakeRuntime(new CakeApp($app)))->csrf());
+
+        $file = $app . '/legacy/src/Application.php';
+        $code = (string) file_get_contents($file);
+        foreach (['before' => true, 'after' => false] as $where => $guest) {
+            $app2 = $this->app();
+            $csrf = '->add(new \Cake\Http\Middleware\CsrfProtectionMiddleware())';
+            $auth = '->add(new AuthenticationMiddleware($this))';
+            file_put_contents($app2 . '/legacy/src/Application.php', str_replace($auth, $where === 'before' ? $csrf . "\n            " . $auth : $auth . "\n            " . $csrf, $code));
+            $this->assertSame($guest, (new CakeRuntime(new CakeApp($app2)))->csrf()['guest'] ?? null, $where);
+        }
+    }
+
+    public function test_the_icon_link_matches_the_legacy_html_helper(): void
+    {
+        $app = $this->app();
+        (new CakeMover())->move($this->unit($app, 'GET /notes/hello/{name?}'), $app);
+        $layout = (string) file_get_contents($app . '/resources/views/legacy/layout/default.blade.php');
+        $this->assertStringContainsString("'favicon.ico\" type=\"image/x-icon\" rel=\"icon\">'", $layout);
+        $this->assertStringNotContainsString('shortcut icon', $layout);
+
+        // CakePHP 5.2's HtmlHelper::meta('icon') prints a second, `shortcut icon` link.
+        $app = $this->app();
+        $helper = $app . '/legacy/vendor/cakephp/cakephp/src/View/Helper/HtmlHelper.php';
+        file_put_contents($helper, "<?php\n// meta(): \$options['rel'] = 'shortcut icon';\n");
+        (new CakeMover())->move($this->unit($app, 'GET /notes/hello/{name?}'), $app);
+        $layout = (string) file_get_contents($app . '/resources/views/legacy/layout/default.blade.php');
+        $this->assertStringContainsString("'favicon.ico\" type=\"image/x-icon\" rel=\"icon\">' . '<link href=\"' . ", $layout);
+        $this->assertStringContainsString("'favicon.ico\" type=\"image/x-icon\" rel=\"shortcut icon\">'", $layout);
+    }
+
+    public function test_authorize_without_an_action_names_the_routed_action(): void
+    {
+        $app = $this->app(step0Done: true);
+        $file = $app . '/legacy/src/Application.php';
+        file_put_contents($file, str_replace('->add(new AuthenticationMiddleware($this))', "->add(new AuthenticationMiddleware(\$this))\n            ->add(new \\Authorization\\Middleware\\AuthorizationMiddleware(\$this))", (string) file_get_contents($file)));
+        $controller = $app . '/legacy/src/Controller/NotesController.php';
+        file_put_contents($controller, preg_replace('/^(\s+)(\$this->set\(\'id\', \$id\);)/m', '$1$this->Authorization->authorize($id);$1$2', (string) file_get_contents($controller), 1));
+        $result = (new CakeMover())->move($this->unit($app, 'GET /notes/show/{id}'), $app);
+
+        $this->assertTrue($result->moved, json_encode($result->refusals, JSON_PRETTY_PRINT) ?: '');
+        // CakePHP's AuthorizationComponent asks the policy for the routed action (canShow), not for index.
+        $this->assertStringContainsString("CakeAuth::authorize(\$request, \$id, 'show');", (string) file_get_contents($app . '/app/Http/Controllers/Legacy/Cake/Notes/ShowAction.php'));
+    }
+
+    public function test_an_entity_hashing_passwords_ports_and_an_unknown_new_class_refuses(): void
+    {
+        $entity = "<?php\nnamespace App\\Model\\Entity;\n\nuse Authentication\\PasswordHasher\\DefaultPasswordHasher;\nuse Cake\\ORM\\Entity;\n\nclass User extends Entity\n{\n    protected function _setPassword(string \$password): ?string\n    {\n        return (new DefaultPasswordHasher())->hash(\$password);\n    }\n}\n";
+        $app = $this->app(step0Done: true);
+        file_put_contents($app . '/legacy/src/Model/Entity/User.php', $entity);
+        $this->assertTrue((new CakeMover())->move($this->unit($app, 'GET /notes/show/{id}'), $app)->moved);
+        $result = (new CakeMover())->move($this->unit($app, 'FORM /notes/report'), $app);
+        $this->assertTrue($result->moved, json_encode($result->refusals, JSON_PRETTY_PRINT) ?: '');
+        $ported = (string) file_get_contents($app . '/app/Http/Controllers/Legacy/Cake/Model/Entity/User.php');
+        $this->assertStringContainsString('use App\\Http\\Controllers\\Legacy\\Cake\\CakePasswordHasher as DefaultPasswordHasher;', $ported);
+        $this->assertStringContainsString('(new DefaultPasswordHasher())->hash($password)', $ported);
+
+        $app = $this->app(step0Done: true);
+        file_put_contents($app . '/legacy/src/Model/Entity/User.php', str_replace('(new DefaultPasswordHasher())', '(new \\Legacy\\Hasher())', $entity));
+        // Every move ports the Entities, so the first one refuses.
+        $result = (new CakeMover())->move($this->unit($app, 'GET /notes/show/{id}'), $app);
+        $this->assertFalse($result->moved);
+        $this->assertContains(['file' => 'legacy/src/Model/Entity/User.php', 'line' => 11, 'reason' => '`Legacy\\Hasher` is a class outside the CakePHP runtime the Laravel half covers'], $result->refusals);
+    }
+
     public function test_a_table_call_maps_to_the_ported_table_and_moves_after_the_page_with_its_form(): void
     {
         $app = $this->app(step0Done: true);
@@ -218,6 +296,9 @@ final class CakeMoverTest extends TestCase
         $this->assertTrue($result->moved, json_encode($result->refusals, JSON_PRETTY_PRINT) ?: '');
         $report = (string) file_get_contents($app . '/app/Http/Controllers/Legacy/Cake/Notes/ReportAction.php');
         $this->assertStringContainsString("\$rows = CakeTable::for('Notes')->find()->all();", $report);
+        // ORM code reaches the database, so it reads the legacy Datasource and can end in the legacy 500 page.
+        $this->assertContains(CakeRuntime::DIR . 'CakeDatabase.php gives moved ORM code the legacy app\'s database: the `default` Datasource of legacy/config/app.php and app_local.php, read at runtime, as the Laravel connection `cake` (Sqlite, Mysql, Postgres and Sqlserver map); for another driver, or to read it from .env, add a `cake` connection to config/database.php', $result->manual);
+        $this->assertStringContainsString(CakeMover::ERROR_BRIDGE, (string) file_get_contents($app . '/routes/web.php'));
         $table = (string) file_get_contents($app . '/app/Http/Controllers/Legacy/Cake/Model/Table/NotesTable.php');
         $this->assertStringContainsString('namespace App\\Http\\Controllers\\Legacy\\Cake\\Model\\Table;', $table);
         $this->assertStringContainsString('use App\\Http\\Controllers\\Legacy\\Cake\\CakeTable as Table;', $table);
@@ -254,6 +335,9 @@ final class CakeMoverTest extends TestCase
         $source = "<?php\nuse Cake\\Core\\Configure;\nuse Cake\\Error\\Debugger;\n\n\$this->layout = 'error';\n\nif (Configure::read('debug')) :\n    \$this->layout = 'dev_error';\nendif;\n?>\n<h2><?= h(\$message) ?></h2>\n";
         $this->assertSame("<?php\n\n\n?>\n<h2><?= h(\$message) ?></h2>\n", CakeRuntime::errorTemplate($source));
         $this->assertNull(CakeRuntime::errorTemplate("<?php\n?>\n<?= Configure::read('x') ?>"));
+        // The skeleton's error400 nests an `if (...) : endif;` inside the debug block; the block ends at the endif that closes the PHP tag.
+        $nested = "<?php\nuse Cake\\Core\\Configure;\n\nif (Configure::read('debug')) :\n    \$this->layout = 'dev_error';\nif (extension_loaded('xdebug')) :\n    xdebug_print_function_stack();\nendif;\n\n\$this->end();\nendif;\n?>\n<h2><?= h(\$message) ?></h2>\n";
+        $this->assertSame("<?php\n\n?>\n<h2><?= h(\$message) ?></h2>\n", CakeRuntime::errorTemplate($nested));
     }
 
     public function test_a_unit_moves_once_and_needs_the_mounted_laravel_half(): void

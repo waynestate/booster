@@ -69,8 +69,23 @@ final class CakeMover implements Mover, AddsComposerPackages
     /** @var array<string, string> package => constraint, the last move's composer.json adds */
     private array $adds = [];
 
-    /** The routes/web.php lines, written once, that give a bad CSRF token on a moved action the legacy 403 page and leave the legacy CSRF cookie unencrypted. */
-    public const CSRF_BRIDGE = "app(\Illuminate\Contracts\Debug\ExceptionHandler::class)->map(static fn (\Illuminate\Session\TokenMismatchException \$e): \Throwable => \App\Http\Controllers\Legacy\Cake\CakeView::csrfFailure(\$e));";
+    /**
+     * The routes/web.php line, written once, that gives a bad CSRF token on
+     * a moved action the legacy 403 page (CakeView::mapException registers
+     * it on Laravel's handler; under artisan the handler can be Collision's,
+     * which maps nothing).
+     */
+    public const CSRF_BRIDGE = "\App\Http\Controllers\Legacy\Cake\CakeView::mapException(static fn (\Illuminate\Session\TokenMismatchException \$e): \Throwable => \App\Http\Controllers\Legacy\Cake\CakeView::csrfFailure(\$e));";
+
+    /**
+     * Laravel Boost's browser logger script goes into every HTML answer in
+     * the local environment (the replay's too); a moved CakePHP page
+     * answers without it, as the legacy page did.
+     */
+    public const BOOST_SKIP = "\n    ->withoutMiddleware([\\Laravel\\Boost\\Middleware\\InjectBoost::class])";
+
+    /** Any other error in a moved action: the legacy 500 page (CakeView::serverError). Written after CSRF_BRIDGE: the handler takes the first map whose type matches. */
+    public const ERROR_BRIDGE = "\App\Http\Controllers\Legacy\Cake\CakeView::mapException(static fn (\Throwable \$e): \Throwable => \App\Http\Controllers\Legacy\Cake\CakeView::serverError(\$e));";
 
     public function composerAdds(): array
     {
@@ -180,11 +195,16 @@ final class CakeMover implements Mover, AddsComposerPackages
         $this->manual = array_merge($this->manual, $models->manual);
         if (!str_contains($webCode, self::SKIP_INPUT)) {
             $webCode = rtrim($webCode, "\n") . "\n\n// booster:strangler CakePHP code reads its input untouched: Laravel's input cleaners skip moved actions.\n" . self::SKIP_INPUT . "\n";
-            $this->manual[] = 'routes/web.php tells TrimStrings and ConvertEmptyStringsToNull to skip moved CakePHP actions (CakePHP never trimmed input); with `php artisan route:cache` routes/web.php is not loaded, so move those two lines to AppServiceProvider::boot() before caching routes';
+            $this->manual[] = 'routes/web.php tells TrimStrings and ConvertEmptyStringsToNull to skip moved CakePHP actions (CakePHP never trimmed input); with `php artisan route:cache` routes/web.php is not loaded, so move those lines (and the CakeView::mapException lines under them) to AppServiceProvider::boot() before caching routes';
         }
         if ($csrfSettings !== null && !str_contains($webCode, self::CSRF_BRIDGE)) {
             $webCode = rtrim($webCode, "\n") . "\n\n// booster:strangler CakePHP's CSRF: a bad token on a moved action gets the legacy 403 page; the legacy cookie stays as CakePHP wrote it.\n"
                 . self::CSRF_BRIDGE . "\n\\Illuminate\\Cookie\\Middleware\\EncryptCookies::except(" . var_export($csrfSettings['cookie'], true) . ");\n";
+        }
+        if ($this->canFail && !str_contains($webCode, self::ERROR_BRIDGE)) {
+            // After the CSRF bridge: Laravel's handler takes the first map whose type matches.
+            $webCode = rtrim($webCode, "\n") . "\n\n// booster:strangler CakePHP's error page: an error a moved action ends in (a database error) gets the legacy 500 page, as CakePHP printed it with debug off; the log keeps the cause.\n"
+                . self::ERROR_BRIDGE . "\n";
         }
         $block = "\n" . self::marker($unit->id) . $unit->sourceFile . ':' . $unit->sourceLine . "\n" . implode("\n", $routeLines) . "\n";
         file_put_contents($web, rtrim($webCode, "\n") . "\n" . $block);
@@ -204,7 +224,7 @@ final class CakeMover implements Mover, AddsComposerPackages
      *
      * @param array{controller: string|null, method: string|null, action: string, path: string, uri: string, name: string|null, get: bool, writes: list<string>, identity: bool, guarded: bool, signIn: bool, json: bool, session: bool, file: string, line: int, seq: int, edges: list<string>, forms: list<string>} $entry
      * @param array<string, true> $moving
-     * @param array{css: string, js: string, encoding: string, timestamp: bool} $assets
+     * @param array{css: string, js: string, encoding: string, timestamp: bool, shortcutIcon: bool} $assets
      */
     private function action(CakeApp $app, Unit $unit, array $entry, array $moving, array $assets, bool $csrf): ?string
     {
@@ -269,6 +289,8 @@ final class CakeMover implements Mover, AddsComposerPackages
         }
         $renderCall = 'CakeView::render(__VIEW__, __LAYOUT__, $viewData, ' . var_export($title, true) . ')';
         $t = $this->translator($app, $controller, 'controller', $renderCall);
+        // authorize() with no action names the routed action, as the component does.
+        $t->action = $method['name'];
         $translators[] = $t;
         $c = $controller['code'];
         $body = $t->rewrite($c, $method['open'] + 1, $method['close'] - 1);
@@ -280,6 +302,13 @@ final class CakeMover implements Mover, AddsComposerPackages
         }
         if ($t->layout !== null) {
             $layout = $t->layout;
+        }
+        if ($view === null && $template !== null && !$returns) {
+            // An action that falls through to a template it has none for
+            // (a delete whose delete() failed): CakePHP's
+            // MissingTemplateException, which debug off prints as the 500 page.
+            $body = (string) preg_replace('/return ' . preg_quote($renderCall, '/') . ";\n    $/", 'return CakeView::missingTemplate(' . var_export($template, true) . ");\n    ", $body, 1, $missing);
+            $this->canFail = $this->canFail || $missing === 1;
         }
         $rendersView = str_contains($body, '__VIEW__');
         if ($rendersView && $view === null) {
@@ -358,7 +387,7 @@ final class CakeMover implements Mover, AddsComposerPackages
             $route .= "\n    ->withoutMiddleware([\\Illuminate\\Foundation\\Http\\Middleware\\PreventRequestForgery::class, \\Illuminate\\Foundation\\Http\\Middleware\\ValidateCsrfToken::class])";
             $this->manual[] = sprintf('%s:%d %s /%s had no CSRF check in CakePHP and has none in Laravel either (the route skips PreventRequestForgery so the legacy form still posts); add one when its form is ported', $file, $method['line'], implode('|', $writes), ltrim($entry['uri'], '/'));
         }
-        $route .= HelmetHold::SKIP;
+        $route .= HelmetHold::SKIP . self::BOOST_SKIP;
         if ($entry['name'] !== null) {
             $route .= "\n    ->name(" . var_export($entry['name'], true) . ')';
         }
@@ -395,7 +424,7 @@ final class CakeMover implements Mover, AddsComposerPackages
      * into $this->files. A layout is written only when it is not there yet,
      * and its helpers that do not map are MANUAL lines, not refusals.
      *
-     * @param array{css: string, js: string, encoding: string, timestamp: bool} $assets
+     * @param array{css: string, js: string, encoding: string, timestamp: bool, shortcutIcon: bool} $assets
      * @param array{name: string, prefix: string|null} $controller
      */
     private function view(CakeApp $app, string $template, bool $isLayout, array $assets, array $controller, int $depth = 0, ?string $source = null): void
@@ -512,11 +541,14 @@ final class CakeMover implements Mover, AddsComposerPackages
     /**
      * App.encoding, App.cssBaseUrl, App.jsBaseUrl and Asset.timestamp from config/app.php.
      *
-     * @return array{css: string, js: string, encoding: string, timestamp: bool}
+     * @return array{css: string, js: string, encoding: string, timestamp: bool, shortcutIcon: bool}
      */
     private function assets(CakeApp $app): array
     {
-        $out = ['css' => 'css/', 'js' => 'js/', 'encoding' => 'utf-8', 'timestamp' => false];
+        // HtmlHelper::meta('icon') prints a second `shortcut icon` link where the legacy CakePHP's own helper does (5.2 does).
+        $html = $app->legacy . '/vendor/cakephp/cakephp/src/View/Helper/HtmlHelper.php';
+        $shortcut = is_file($html) && str_contains((string) file_get_contents($html), "'shortcut icon'");
+        $out = ['css' => 'css/', 'js' => 'js/', 'encoding' => 'utf-8', 'timestamp' => false, 'shortcutIcon' => $shortcut];
         $file = $app->legacy . '/config/app.php';
         if (!is_file($file)) {
             return $out;
@@ -540,7 +572,7 @@ final class CakeMover implements Mover, AddsComposerPackages
      * The runtime, the ported Tables, Entities and Policies, and the legacy
      * error pages (debug block dropped) with the error layout, into $this->files.
      *
-     * @param array{css: string, js: string, encoding: string, timestamp: bool} $assets
+     * @param array{css: string, js: string, encoding: string, timestamp: bool, shortcutIcon: bool} $assets
      */
     private function runtime(CakeApp $app, CakeRuntime $runtime, array $assets): void
     {
@@ -549,6 +581,9 @@ final class CakeMover implements Mover, AddsComposerPackages
             $this->files[$file] = $code;
         }
         $this->refusals = array_merge($this->refusals, $runtime->refusals);
+        if ($this->reached !== []) {
+            $this->manual[] = CakeRuntime::DIR . 'CakeDatabase.php gives moved ORM code the legacy app\'s database: the `default` Datasource of legacy/config/app.php and app_local.php, read at runtime, as the Laravel connection `cake` (Sqlite, Mysql, Postgres and Sqlserver map); for another driver, or to read it from .env, add a `cake` connection to config/database.php';
+        }
         $error = ['name' => 'Error', 'prefix' => null];
         foreach (['templates/Error/error400.php', 'templates/Error/error500.php'] as $template) {
             $path = $app->legacy . '/' . $template;
