@@ -58,7 +58,7 @@ final class CakeMoverTest extends TestCase
         $this->assertStringContainsString(CakeMover::SKIP_INPUT, $web);
         $this->assertStringContainsString(
             "// booster:strangler GET /notes/hello/{name?} from legacy/src/Controller/NotesController.php:32\n"
-            . "\\Illuminate\\Support\\Facades\\Route::match(['GET'], 'notes/hello/{name?}', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\HelloAction::class);\n",
+            . "\\Illuminate\\Support\\Facades\\Route::match(['GET'], 'notes/hello/{name?}', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\HelloAction::class)" . HelmetHold::SKIP . ";\n",
             $web,
         );
         $this->assertContains(
@@ -105,7 +105,7 @@ final class CakeMoverTest extends TestCase
         $this->assertStringContainsString("\$viewData['who'] = data_get(\$request->user(), 'name');", $index);
 
         $web = (string) file_get_contents($app . '/routes/web.php');
-        $this->assertStringContainsString("Route::match(['GET'], '/', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\IndexAction::class)\n    ->name('home');", $web);
+        $this->assertStringContainsString("Route::match(['GET'], '/', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\IndexAction::class)" . HelmetHold::SKIP . "\n    ->name('home');", $web);
         $this->assertStringContainsString("Route::match(['GET', 'POST'], 'notes/add', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\AddAction::class)\n    ->withoutMiddleware([", $web);
         // Index lets guests in (addUnauthenticatedActions), so no auth middleware.
         $this->assertStringNotContainsString('auth.sesame', $web);

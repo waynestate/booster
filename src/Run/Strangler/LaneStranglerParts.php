@@ -9,7 +9,6 @@ use Waynestate\Booster\Strangler\CakeMover;
 use Waynestate\Booster\Strangler\CakeUnitSource;
 use Waynestate\Booster\Strangler\Mount;
 use Waynestate\Booster\Strangler\MountBaker;
-use Waynestate\Booster\Strangler\MoveResult;
 use Waynestate\Booster\Strangler\Mover;
 use Waynestate\Booster\Strangler\RouteTable;
 use Waynestate\Booster\Strangler\SignInResult;

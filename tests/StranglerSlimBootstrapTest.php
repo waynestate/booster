@@ -109,7 +109,7 @@ final class StranglerSlimBootstrapTest extends TestCase
         self::assertStringContainsString('new \App\Http\Controllers\Legacy\App\Middleware\CheckCsrf(', $this->read(self::LEGACY . 'boot/config/middleware.php'));
         $web = $this->read('routes/web.php');
         self::assertStringContainsString("Route::match(['POST'], 'login', ", $web);
-        self::assertStringContainsString('->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class, \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);', $web);
+        self::assertStringContainsString('->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class, \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class])' . \Waynestate\Booster\Strangler\HelmetHold::SKIP . ';', $web);
     }
 
     public function testRoleChecksAndRouteMiddlewareAreKeptInTheGeneratedRoutesScript(): void
