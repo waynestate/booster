@@ -488,7 +488,9 @@ final class LegacyHtaccess
                 $text = ltrim(substr($text, $close + 1));
                 continue;
             }
-            preg_match('/^(?:\\\\\s|\S)+/', $text, $m);
+            if (preg_match('/^(?:\\\\\s|\S)+/', $text, $m) !== 1) {
+                return null;
+            }
             $args[] = [str_replace('\\ ', ' ', $m[0]), $m[0]];
             $text = ltrim(substr($text, strlen($m[0])));
         }
