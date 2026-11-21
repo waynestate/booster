@@ -150,7 +150,8 @@ final class RouteTable
      * - `{name?}` is an optional last segment, slash included;
      * - `{name:regex}` (FastRoute's inline form) keeps the legacy route's
      *   constraint, so the table is exactly as narrow as the route was;
-     * - a trailing `[/]` (FastRoute) makes the trailing slash optional.
+     * - a trailing `[/]` (FastRoute) makes the trailing slash optional, and a
+     *   plain trailing `/` makes it required (only `/logout/`, not `/logout`).
      *
      * Everything else is literal. The path is matched whole and is case
      * sensitive, like both legacy routers.
@@ -175,6 +176,10 @@ final class RouteTable
             $uri = substr($uri, 0, -3);
         }
         $uri = '/' . ltrim($uri, '/');
+        // A trailing slash is exact (FastRoute's "/logout/" refuses "/logout"):
+        // the slashless path stays legacy's, so legacy answers its own 404 there.
+        // Laravel trims the slash and would match both, so this regex is the gate.
+        $exactSlash = !$optionalSlash && $uri !== '/' && str_ends_with($uri, '/');
         if ($uri !== '/') {
             $uri = rtrim($uri, '/');
         }
@@ -225,6 +230,8 @@ final class RouteTable
         }
         if ($optionalSlash && $uri !== '/') {
             $regex .= '/?';
+        } elseif ($exactSlash) {
+            $regex .= '/';
         }
 
         return '#^' . $regex . '$#D';

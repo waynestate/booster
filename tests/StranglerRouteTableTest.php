@@ -42,6 +42,13 @@ final class StranglerRouteTableTest extends TestCase
             ['{page?}', '/about', true],
             ['users[/]', '/users', true],
             ['users[/]', '/users/', true],
+            // A trailing slash is exact both ways: /logout stays legacy's (its 404).
+            ['logout/', '/logout/', true],
+            ['logout/', '/logout', false],
+            ['/logout', '/logout/', false],
+            ['users/{id}/', '/users/7/', true],
+            ['users/{id}/', '/users/7', false],
+            ['users/{id:\d+}/', '/users/7/', true],
             ['a.b/{x}', '/a.b/1', true],
             ['a.b/{x}', '/aXb/1', false],
             ['hash#tag', '/hash#tag', true],
