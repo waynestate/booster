@@ -17,7 +17,8 @@ use Waynestate\Booster\Tests\TestCase;
  * The update notice: one stderr line after a command when a newer stable
  * release exists, with the command that updates however Booster was installed.
  * Every test runs through the injected fetcher and clock seams, so nothing
- * here touches the network, the real cache dir, or the wall clock.
+ * here touches the network. The real-binary test is the exception: it runs
+ * bin/booster in a child process against a seeded cache file.
  */
 final class UpdateNoticeTest extends TestCase
 {
@@ -289,6 +290,40 @@ final class UpdateNoticeTest extends TestCase
         self::assertStringNotContainsString('out of date', $current->getErrorOutput());
     }
 
+    // -- the real entry point ----------------------------------------------------
+
+    public function testRealBinaryPrintsTheNoticeFromASeededCache(): void
+    {
+        // The child must read its update cache from a fresh temp dir.
+        // UpdateCache::defaultPath() honours XDG_CACHE_HOME off Windows and
+        // LOCALAPPDATA on it, so pin both to the same place.
+        $cacheHome = $this->tempDir();
+        $cacheFile = $cacheHome . '/waynestate/booster/update-check.json';
+        mkdir(\dirname($cacheFile), 0775, true);
+        file_put_contents($cacheFile, json_encode(['checked_at' => time(), 'latest' => '9.9.9']));
+
+        $binary = dirname(__DIR__, 2) . '/bin/booster';
+        self::assertFileExists($binary);
+
+        $base = ['CI' => '', 'WAYNE_NO_UPDATE_CHECK' => '', 'XDG_CACHE_HOME' => $cacheHome, 'LOCALAPPDATA' => $cacheHome];
+        $outdated = $this->runBinary($binary, $base);
+        $optedOut = $this->runBinary($binary, ['WAYNE_NO_UPDATE_CHECK' => '1'] + $base);
+
+        self::assertSame(0, $outdated['exit']);
+        self::assertSame(0, $optedOut['exit']);
+
+        $lines = array_values(array_filter(
+            explode("\n", $outdated['stderr']),
+            static fn(string $line): bool => trim($line) !== '',
+        ));
+        self::assertCount(1, $lines, $outdated['stderr']);
+        self::assertStringContainsString('out of date', $lines[0]);
+        self::assertStringContainsString('9.9.9', $lines[0]);
+
+        self::assertSame($optedOut['stdout'], $outdated['stdout']);
+        self::assertStringNotContainsString('out of date', $optedOut['stderr']);
+    }
+
     // -- versions ----------------------------------------------------------------
 
     public function testNormalisesVPrefix(): void
@@ -434,6 +469,39 @@ final class UpdateNoticeTest extends TestCase
         } else {
             putenv($name . '=' . $value);
         }
+    }
+
+    /**
+     * Run the real bin/booster with --version in a child process: the
+     * inherited environment merged with $overrides (the overrides win),
+     * stdout and stderr captured separately.
+     *
+     * @param array<string, string> $overrides
+     * @return array{exit: int, stdout: string, stderr: string}
+     */
+    private function runBinary(string $binary, array $overrides): array
+    {
+        $env = [];
+        foreach (getenv() as $name => $value) {
+            $env[(string) $name] = (string) $value;
+        }
+        $env += $overrides;
+
+        $process = proc_open(
+            [PHP_BINARY, $binary, '--version'],
+            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            null,
+            $env,
+        );
+        self::assertIsResource($process);
+
+        $stdout = (string) stream_get_contents($pipes[1]);
+        $stderr = (string) stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        return ['exit' => proc_close($process), 'stdout' => $stdout, 'stderr' => $stderr];
     }
 }
 
