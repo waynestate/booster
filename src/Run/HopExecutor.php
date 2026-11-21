@@ -2153,6 +2153,20 @@ final class HopExecutor
         $gate = $signInChanges !== null
             ? $this->runTestGate($step, $path, $options, $baseline, $update)
             : $this->runTestGateWith($step, $path, $options, $baseline, $update, $this->strangledTestCommand($path, $options, $baseline->gateKind));
+        // A package Step 0 or a move added may need a shared package (psr/http-message 2) that a
+        // locked package holds at its old major; `-W` never moves the packages that require it.
+        // Name those once more, inside composer.json's constraints (testeval: SESAME 0.10 next to
+        // slim/http 1.3 and slim/psr7 1.6, 2026-11-20).
+        $held = $gate->passed || $update === [] ? [] : self::heldByLock($path, $gate->lines, $update);
+        if ($held !== []) {
+            $retry = $signInChanges !== null
+                ? $this->runTestGate($step, $path, $options, $baseline, [...$update, ...$held])
+                : $this->runTestGateWith($step, $path, $options, $baseline, [...$update, ...$held], $this->strangledTestCommand($path, $options, $baseline->gateKind));
+            $gate = new GateReport($retry->passed, [
+                sprintf('composer update named %s too: %s held a package the new requirement needs at its locked major; they moved only inside composer.json\'s constraints.', implode(', ', $held), count($held) === 1 ? 'it' : 'they'),
+                ...$retry->lines,
+            ]);
+        }
         if (!$gate->passed) {
             return $gate;
         }
@@ -2180,6 +2194,50 @@ final class HopExecutor
         }
 
         return new GateReport(true, [...$gate->lines, ...$outcome->lines]);
+    }
+
+    /**
+     * The locked packages to name in a second composer update: Composer's
+     * "found <package>[...] but these were not loaded" names a package the
+     * new requirement needs at another major, and these are the locked
+     * packages that require it, not already in $update. Empty when the gate
+     * did not fail that way or there is no readable lock.
+     *
+     * @param list<string> $lines  the failed gate's lines
+     * @param list<string> $update the packages already named
+     *
+     * @return list<string>
+     */
+    public static function heldByLock(string $path, array $lines, array $update): array
+    {
+        $blocked = [];
+        foreach ($lines as $line) {
+            if (preg_match_all('#found ([a-z0-9][a-z0-9_.-]*/[a-z0-9][a-z0-9_.-]*)\[[^\]]*\] but these were not loaded#i', $line, $m) > 0) {
+                foreach ($m[1] as $name) {
+                    $blocked[strtolower($name)] = true;
+                }
+            }
+        }
+        $lockFile = rtrim($path, '/\\') . '/composer.lock';
+        if ($blocked === [] || !is_file($lockFile)) {
+            return [];
+        }
+        $lock = json_decode((string) file_get_contents($lockFile), true);
+        $held = [];
+        foreach (['packages', 'packages-dev'] as $section) {
+            foreach (is_array($lock[$section] ?? null) ? $lock[$section] : [] as $package) {
+                if (!is_array($package) || !is_string($package['name'] ?? null) || in_array($package['name'], $update, true)) {
+                    continue;
+                }
+                $requires = array_map('strtolower', array_keys(is_array($package['require'] ?? null) ? $package['require'] : []));
+                if (array_intersect($requires, array_keys($blocked)) !== [] && !isset($blocked[strtolower($package['name'])])) {
+                    $held[] = $package['name'];
+                }
+            }
+        }
+        sort($held);
+
+        return array_values(array_unique($held));
     }
 
     private static function removeFile(string $file): void
