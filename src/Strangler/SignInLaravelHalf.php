@@ -69,7 +69,7 @@ ENV;
 
     public static function wire(SignInPlan $plan): void
     {
-        $plan->requirePackage('composer.json', 'waynestate/sesame', '^0.10', '0.10');
+        $plan->requirePackage('composer.json', 'waynestate/sesame', '^0.10.1', '0.10.1');
 
         // config/sesame.php: the prefix and the shared store.
         $config = $plan->read('config/sesame.php');

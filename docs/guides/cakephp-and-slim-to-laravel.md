@@ -46,7 +46,9 @@ Run 1 does two things and stops:
 1. **Step 0, sign-in on SESAME.** The old app's sign-in moves onto SESAME first, so both halves can share one
    sign-in and one logout. It is gated by the replay as the app is served today; the sign-in hand-off now goes to CAS,
    and the gate accepts exactly that change on the paths Step 0 names. An app that already signs in through SESAME
-   skips the change.
+   skips the change. Both halves require `waynestate/sesame` `^0.10.1`: 0.10.0 lost the signed-in identity on
+   Laravel's JSON sessions, so a logout on one half did not end the other. On a Laravel app with JSON sessions, users
+   signed in under 0.10.0 are signed out once after the upgrade and sign in again (usually silently, through SSO).
 2. **The mount.** Laravel 13 goes at the app root (the same app `sourdough new --laravel` makes). The old Composer
    root moves, unchanged, to `legacy/` with its own `vendor/`. `public/index.php` becomes a small dispatcher that sends
    every request to legacy unless the route table, `bootstrap/booster-moved.php`, says Laravel has it. The Laravel half

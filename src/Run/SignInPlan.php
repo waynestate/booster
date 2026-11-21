@@ -78,7 +78,8 @@ final class SignInPlan
         }
 
         $current = $data['require'][$package] ?? null;
-        if (is_string($current) && preg_match('/(\d+\.\d+)/', $current, $m) === 1 && version_compare($m[1], $atLeast, '>=')) {
+        // The patch counts too: `^0.10` is older than a floor of 0.10.1 (SESAME's JSON-session fix).
+        if (is_string($current) && preg_match('/(\d+\.\d+(?:\.\d+)?)/', $current, $m) === 1 && version_compare($m[1], $atLeast, '>=')) {
             return;
         }
 

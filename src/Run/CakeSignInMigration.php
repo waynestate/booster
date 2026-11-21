@@ -47,7 +47,7 @@ final class CakeSignInMigration
 
         $this->logout($plan);
 
-        $plan->requirePackage('composer.json', 'waynestate/sesame', '^0.10', '0.10');
+        $plan->requirePackage('composer.json', 'waynestate/sesame', '^0.10.1', '0.10.1');
         $plan->requirePackage('composer.json', 'guzzlehttp/guzzle', '^7.9', '7.9');
 
         $plan->manual[] = 'Set SESAME_CAS_BASE_URL in the environment unless Playbook supplies it (config/sesame.php reads the environment first, then Playbook). On Citadel it goes in the app\'s environment settings.';

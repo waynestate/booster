@@ -36,6 +36,10 @@ Laravel 13 one unit at a time (the strangler). Two hops were added and none remo
 - **Step 0 keeps the user's row.** On a CakePHP form sign-in, both halves' SESAME resolvers look up the row the form
   found (for example `Users` by `email`) by the CAS username, so `getIdentifier()` keeps returning its id. Make sure
   that field holds the AccessID CAS sends.
+- **SESAME `^0.10.1` on both halves.** Step 0 and the mount require `waynestate/sesame` `^0.10.1`, which keeps the
+  signed-in identity on Laravel's JSON sessions (0.10.0 lost it, so a legacy logout left the Laravel half signed in).
+  Users signed in under 0.10.0 on a Laravel app with JSON sessions are signed out once and sign in again, usually
+  silently through SSO.
 - **`replay init` gives each sign-in and sign-out page its own sequence** (`sign-in 1`, `sign-in 2`), and on a
   CakePHP app normalizes `postLink`'s form names.
 - **Request files can say more.** Writes gain `"csrf": true`, and `compare` gains `ignore_cookies`, `preset`
