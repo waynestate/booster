@@ -810,4 +810,45 @@ final class SlimUpgradeMigrationTest extends TestCase
         $this->migrateApp($plain);
         self::assertSame($core, file_get_contents($plain . '/src/core.php'));
     }
+
+    public function test_slim_3s_uri_base_path_moves_to_the_request_attribute(): void
+    {
+        // testeval (2026-11-20): a signed-in /login/ redirected to Slim 3's
+        // $request->getUri()->getBasePath(), a 500 on Slim 4.
+        $login = <<<'PHP'
+            <?php
+
+            namespace Acme\Controller;
+
+            final class Login
+            {
+                public function show($request, $response)
+                {
+                    return $response->withRedirect($request->getUri()->getBasePath() . '/');
+                }
+
+                public function home($request, $response)
+                {
+                    $uri = $request->getUri();
+
+                    return $response->withRedirect($uri->getBasePath());
+                }
+            }
+
+            PHP;
+        $dir = $this->slimApp(['src/Controller/Login.php' => $login]);
+
+        $result = $this->migrateApp($dir);
+
+        $moved = (string) file_get_contents($dir . '/src/Controller/Login.php');
+        self::assertStringContainsString("return \$response->withRedirect(\$request->getAttribute(\\Slim\\Routing\\RouteContext::BASE_PATH, '') . '/');", $moved);
+        self::assertStringContainsString('return $response->withRedirect($uri->getBasePath());', $moved);
+        self::assertContains("Rewrote Slim 3's \$request->getUri()->getBasePath(), which Slim 4's Uri lacks, to the base path the routing glue puts on the request (RouteContext::BASE_PATH) in src/Controller/Login.php.", $result->changes);
+        self::assertContains("MANUAL: src/Controller/Login.php: line 16: Slim 4's Uri has no getBasePath(); read \$request->getAttribute(\\Slim\\Routing\\RouteContext::BASE_PATH, '') on the request the route or middleware gets, or \$app->getBasePath().", $result->manual);
+
+        // The glue's own $app->getBasePath() is Slim 4's and stays; a second run changes nothing.
+        $after = self::snapshot($dir);
+        $this->migrateApp($dir);
+        self::assertSame($after, self::snapshot($dir));
+    }
 }

@@ -300,6 +300,26 @@ final class SlimUpgradeMigration implements FrameworkEngine
             }
         }
 
+        // 5c. Slim 3's Uri::getBasePath(), which Slim 4's PSR-7 Uri lacks: read
+        // the base path the routing glue puts on the request instead.
+        $basePathRewriter = new UriBasePathRewriter();
+        foreach (array_keys($sources) as $file) {
+            if (!in_array($file, $bootstraps, true) && !in_array(explode('/', $file)[0], self::HTTP_DIRS, true)) {
+                continue;
+            }
+            $current = $after[$file] ?? $sources[$file];
+            if (!self::containsAny(strtolower($current), ['getbasepath', 'getbaseurl'])) {
+                continue;
+            }
+            $result = $basePathRewriter->rewrite($current);
+            if ($result['code'] !== $current) {
+                $before[$file] ??= $sources[$file];
+                $after[$file] = $result['code'];
+                $changes[] = self::inFile("Rewrote Slim 3's \$request->getUri()->getBasePath(), which Slim 4's Uri lacks, to the base path the routing glue puts on the request (RouteContext::BASE_PATH).", $file, $result['rewritten']);
+            }
+            $manual = [...$manual, ...self::fileManual($result['manual'], $file)];
+        }
+
         // 6. Composer.
         [$composerNew, $composerChanges, $packages] = $this->composerJson($hop, $composerRaw, $composerData);
         if ($composerNew !== null) {

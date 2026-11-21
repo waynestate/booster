@@ -166,6 +166,9 @@ the PHP hop that lands on 7.4), then the PHP hops to 8.5. `--to-slim 3.13` is re
 - Route groups: `function () use ($app)` becomes a callable that takes the group, so prefixes survive, and a route
   adder typed `\Slim\App` that a group calls is widened to take the group too.
 - `$request->getAttribute('route')` becomes `RouteContext::fromRequest($request)->getRoute()`.
+- Slim 3's `$request->getUri()->getBasePath()`, which Slim 4's Uri lacks, becomes
+  `$request->getAttribute(\Slim\Routing\RouteContext::BASE_PATH, '')`: the base path the hop's routing glue puts on
+  every request before the app's middleware and routes run (on testeval, a signed-in `/login/` answered 500).
 - Code typed with Slim 3's own `Slim\Http\Request` and `Slim\Http\Response` (the official Slim 3 skeleton's routes
   are) moves onto `slim/http`, whose decorators keep `withJson()`, `write()`, `getParam()` and `isXhr()` on Slim 4:
   `Slim\Http\Request` becomes `Slim\Http\ServerRequest` in use statements, fully qualified names and type hints
@@ -196,6 +199,8 @@ the PHP hop that lands on 7.4), then the PHP hops to 8.5. `--to-slim 3.13` is re
   call `path_for(` or `base_url(` (Twig-View 3 has `url_for`).
 - `getAttribute('routeInfo')`, `subRequest()`, `setArgument()` calls to check, the container's `router` entry, and
   code in outer middleware that reads the route before routing ran.
+- A Slim 3 Uri base path the hop cannot place: `getBasePath()` on a Uri kept in a variable or property, or on a
+  request that is not a plain variable (`$this->request`, the container's `request`), and every `getBaseUrl()`.
 - A Twig underscore class name Rector's map does not know, and `Slim\Container` imported in a group `use`
   statement (import the generated `LegacyContainer` by hand).
 - `Slim\Http\Environment` imported in a group `use` statement (import the generated `LegacyEnvironment` by hand), and

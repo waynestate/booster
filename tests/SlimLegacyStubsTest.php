@@ -13,6 +13,7 @@ use Slim\Psr7\Factory\ServerRequestFactory;
 use Slim\Psr7\Factory\StreamFactory;
 use Slim\Psr7\Response;
 use Waynestate\Booster\Run\Slim\LegacyStubs;
+use Waynestate\Booster\Run\Slim\UriBasePathRewriter;
 
 /**
  * The files the Slim 3 to 4 hop copies into an app, run for real: the
@@ -243,6 +244,28 @@ final class SlimLegacyStubsTest extends TestCase
         $echoed = $app->handle(self::request('GET', '/echo'));
         self::assertSame('writtenechoed ', (string) $echoed->getBody());
         self::assertSame((string) strlen('writtenechoed '), $echoed->getHeaderLine('Content-Length'));
+    }
+
+    public function test_the_rewritten_base_path_read_answers_in_routes_and_app_middleware(): void
+    {
+        // What UriBasePathRewriter writes for $request->getUri()->getBasePath().
+        $read = (new UriBasePathRewriter())->rewrite('<?php $request->getUri()->getBasePath();')['code'];
+        $expression = trim(substr($read, strlen('<?php ')), " ;\n");
+        $handler = eval('return function ($request, $response) { $response->getBody()->write("route:" . ' . $expression . '); return $response; };');
+        $middleware = eval('return function ($request, $handler) { $response = $handler->handle($request); $response->getBody()->write(" middleware:" . ' . $expression . '); return $response; };');
+
+        self::assertIsCallable($handler);
+        self::assertIsCallable($middleware);
+
+        $app = self::call('LegacyApp', 'create', ['settings' => ['displayErrorDetails' => true]]);
+        self::assertInstanceOf(\Slim\App::class, $app);
+        // create() reads the base path from $_SERVER outside the CLI; set it as it would.
+        $app->setBasePath('/sub');
+        $app->get('/login/', $handler);
+        $app->add($middleware);
+        self::call('LegacyApp', 'finish', $app);
+
+        self::assertSame('route:/sub middleware:/sub', (string) $app->handle(self::request('GET', '/sub/login/'))->getBody());
     }
 
     public function test_finish_adds_body_parsing_and_cache_file_only_when_set(): void
