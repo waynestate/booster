@@ -397,6 +397,7 @@ final class StranglerMountTest extends TestCase
             ['type' => 'vcs', 'url' => 'https://git.wayne.edu/enterprise-apps/sesame.git'],
             ['type' => 'path', 'url' => './packages/sesame', 'options' => ['symlink' => false]],
             ['type' => 'path', 'url' => '/opt/shared/pkg'],
+            ['type' => 'artifact', 'url' => 'packages'],
         ];
         file_put_contents($dir . '/composer.json', json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         $result = $this->mount($dir, 'slim');
@@ -407,9 +408,10 @@ final class StranglerMountTest extends TestCase
             ['type' => 'vcs', 'url' => 'https://git.wayne.edu/enterprise-apps/sesame.git'],
             ['type' => 'path', 'url' => 'legacy/packages/sesame', 'options' => ['symlink' => false]],
             ['type' => 'path', 'url' => '/opt/shared/pkg'],
+            ['type' => 'artifact', 'url' => 'legacy/packages'],
         ], $root['repositories']);
         self::assertSame('./packages/sesame', json_decode((string) file_get_contents($dir . '/legacy/composer.json'), true)['repositories'][1]['url'], 'legacy/ keeps its own');
-        self::assertContains('composer.json lists legacy/\'s 3 Composer repositories too (a relative path repository now points into legacy/), so both halves resolve packages from the same sources.', $result->notes);
+        self::assertContains('composer.json lists legacy/\'s 3 Composer repositories too (a relative path or artifact repository now points into legacy/), so both halves resolve packages from the same sources.', $result->notes);
     }
 
     public function test_the_root_never_floors_below_the_legacy_php(): void

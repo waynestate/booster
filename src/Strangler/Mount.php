@@ -535,7 +535,7 @@ final class Mount
         $repositories = is_array($legacy) && is_array($legacy['repositories'] ?? null) ? $legacy['repositories'] : [];
         $kept = 0;
         foreach ($repositories as $key => $repository) {
-            if (is_array($repository) && ($repository['type'] ?? null) === 'path' && is_string($repository['url'] ?? null)
+            if (is_array($repository) && in_array($repository['type'] ?? null, ['path', 'artifact'], true) && is_string($repository['url'] ?? null)
                 && preg_match('#^(?:/|[A-Za-z]:[\\\\/]|~)#', $repository['url']) !== 1) {
                 $repository['url'] = self::LEGACY . '/' . preg_replace('#^\./#', '', $repository['url']);
             }
@@ -552,7 +552,7 @@ final class Mount
             ++$kept;
         }
         if ($kept > 0) {
-            $this->notes[] = sprintf('composer.json lists legacy/\'s %d Composer %s too (a relative path repository now points into legacy/), so both halves resolve packages from the same sources.', $kept, $kept === 1 ? 'repository' : 'repositories');
+            $this->notes[] = sprintf('composer.json lists legacy/\'s %d Composer %s too (a relative path or artifact repository now points into legacy/), so both halves resolve packages from the same sources.', $kept, $kept === 1 ? 'repository' : 'repositories');
         }
         file_put_contents($path, self::json($data));
         $this->changed[] = 'composer.json';
