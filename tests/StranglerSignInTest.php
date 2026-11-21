@@ -251,6 +251,7 @@ JSON;
         $replay = json_decode($this->read($app, 'booster-replay.json'));
         self::assertSame('cas', $replay->serve->env->SESAME_DRIVER);
         self::assertSame(SignInStep::REPLAY_CAS, $replay->serve->env->SESAME_CAS_BASE_URL);
+        self::assertSame('local', $replay->serve->env->APP_ENV, 'SESAME takes the replay\'s plain-http service URL on 127.0.0.1 only in a local environment.');
         self::assertSame('false', $replay->serve->env->DEBUG);
         self::assertStringContainsString('"ini": {}', $this->read($app, 'booster-replay.json'), 'Empty objects stay objects.');
 

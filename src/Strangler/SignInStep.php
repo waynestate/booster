@@ -183,14 +183,16 @@ final class SignInStep
      * sign-in reads more than SESAME (the validUser apps read their profile
      * from Oracle) hands guests to a CAS that is never reached, so the
      * hand-off's Location is stable; the others sign in on the spot with the
-     * fake driver, so signed-in sequences work.
+     * fake driver, so signed-in sequences work. Both are local: SESAME takes
+     * the replay's plain-http service URL on 127.0.0.1 only there (testeval,
+     * 2026-11-20: production refused it with a 500 on every page).
      *
      * @return array<string, string>
      */
     private static function legacyReplayEnv(string $shape): array
     {
         return $shape === 'validuser'
-            ? ['SESAME_DRIVER' => 'cas', 'SESAME_CAS_BASE_URL' => self::REPLAY_CAS]
+            ? ['SESAME_DRIVER' => 'cas', 'SESAME_CAS_BASE_URL' => self::REPLAY_CAS, 'APP_ENV' => 'local']
             : ['SESAME_DRIVER' => 'fake', 'SESAME_FAKE_USERNAME' => self::REPLAY_USER, 'APP_ENV' => 'local'];
     }
 

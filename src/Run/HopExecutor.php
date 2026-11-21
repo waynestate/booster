@@ -2249,7 +2249,7 @@ final class HopExecutor
             : $this->runTestGateWith($step, $path, $options, $baseline, array_values(array_unique([...$update, $package])),$this->strangledTestCommand($path, $options, $baseline->gateKind));
         if ($gate->passed) {
             return [$gate, [$tried, sprintf(
-                'MANUAL: %s moved from %s.x to %s.x (locked %s) and the gate passed. A new major can change behavior the tests and replay do not cover: read its upgrade notes before release%s.',
+                'MANUAL: %s moved from %s.x to %s.x (locked %s), and the update and the app\'s own check passed with it. A new major can change behavior the tests and replay do not cover: read its upgrade notes before release%s.',
                 $package,
                 $candidate['oldMajor'],
                 $candidate['newMajor'],
