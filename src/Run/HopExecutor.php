@@ -138,6 +138,14 @@ final class HopExecutor
     private array $startingUntracked = [];
 
     /**
+     * Whether the tree had uncommitted changes when the run started, before
+     * the baseline: an app that tracks its logs or its vendor/ gets them
+     * rewritten by its own tests, and the strangler's clean-tree stop sign is
+     * about the tree the person handed over (attendance, 2026-11-20).
+     */
+    private bool $startedDirty = false;
+
+    /**
      * True once the run has said which nested vendored directories Rector
      * left alone, so the note goes out once per run, not once per hop.
      */
@@ -196,6 +204,7 @@ final class HopExecutor
         // dry run creates nothing, so only an --allow-dirty real run needs the
         // status read.
         $this->startingUntracked = !$options->dryRun && $options->allowDirty ? $this->untrackedPaths($path) : [];
+        $this->startedDirty = !$options->dryRun && $options->allowDirty && $this->workingCopyDirty($path);
         // The report names the --test-env variables by key only; the values may
         // hold credentials and must never reach a report or a log.
         $testEnvKeys = array_map(
@@ -2098,8 +2107,10 @@ final class HopExecutor
         $hop = $step->hop;
         $framework = (string) HopRegistry::stranglerFramework($hop->id);
         $next = sprintf('%s run --path=%s --only %s --replay', \Waynestate\Booster\Console\Invocation::program(), \Waynestate\Booster\Console\Invocation::pathArg($plan->project->path), $hop->id);
-        $dirty = fn(): bool => $this->workingCopyDirty($path);
-        if ($step->number > 1 && !$options->dryRun && $dirty()) {
+        // The mount's stop sign reads the tree as the run found it: the baseline's own
+        // writes to tracked files (logs, .phpunit.result.cache) are not the person's changes.
+        $dirty = fn(): bool => $this->startedDirty;
+        if ($step->number > 1 && !$options->dryRun && $this->workingCopyDirty($path)) {
             return new StepResult($step->number, $hop->id, StepResult::NOT_RUN, [], [
                 sprintf('Held: the steps before this one changed the app in this run, and the move onto Laravel starts from a clean tree (the mount moves the whole app into legacy/). Review and commit them, then run: %s', $next),
             ]);
