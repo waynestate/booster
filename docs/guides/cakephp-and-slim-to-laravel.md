@@ -92,6 +92,18 @@ When a package a move or Step 0 adds needs a shared package (such as `psr/http-m
 holds at its old major, the gate's `composer update -W` fails on it; Booster then names those locked packages once
 more, inside `composer.json`'s constraints, and says which in the report.
 
+A moved CakePHP unit that reads the database uses the old app's own connection. At request time, inside the Laravel
+process, `CakeDatabase` reads the `default` Datasource from `legacy/config/app.php` and `legacy/config/app_local.php`
+and opens it as the Laravel connection `cake`. That is the app reading its own config, the way the old half does on
+every request. Booster never reads those values when it moves a unit, and they never reach a report or a log. When
+the Laravel half gets its own `DB_*` settings, point the moved models at them and drop the bridge (a MANUAL line says
+so).
+
+After Step 0 on an app with a form sign-in, `src/Sesame/UserResolver.php` looks up the row the form used to find
+(for example `Users` by `email`) by the CAS username, so `getIdentifier()` still returns that row's id and policies
+and `user_id` writes keep working. A person with no row signs in with a username only and no id. Make sure that
+field holds what CAS sends (the AccessID).
+
 ### A unit Booster cannot move
 
 When a unit uses something Booster cannot translate exactly, it refuses that unit, names the file and line, and moves

@@ -241,7 +241,36 @@ final class CakeSignInMigration
         }
 
         $plan->manual[] = 'The login form template and the password identifier are no longer used: delete them once SESAME sign-in is confirmed.';
-        $plan->manual[] = 'The identity is now SESAME\'s user, the array src/Sesame/UserResolver.php returns (only the username). Code that reads getIdentifier() or other user fields (policies, templates) needs that resolver to return the user\'s row: look it up by username there.';
+        $this->userLookup($plan, $code);
+    }
+
+    /**
+     * The form sign-in found a row (Users by the identifier's username field),
+     * and the app reads that row's id through getIdentifier() (the CMS
+     * tutorial's add-article saved user_id null, 2026-11-20). The resolver
+     * looks the same row up by the CAS username, keeping its scalar fields.
+     */
+    private function userLookup(SignInPlan $plan, string $application): void
+    {
+        $relative = 'src/Sesame/UserResolver.php';
+        $resolver = $plan->read($relative);
+        $stock = "        return ['username' => \$identity->username];\n";
+        $field = preg_match("/CREDENTIAL_USERNAME\s*=>\s*'([A-Za-z_]\w*)'/", $application, $m) === 1 || preg_match("/'fields'\s*=>\s*\[\s*'username'\s*=>\s*'([A-Za-z_]\w*)'/", $application, $m) === 1 ? $m[1] : null;
+        $model = preg_match("/'userModel'\s*=>\s*'([A-Za-z_][\w.]*)'/", $application, $u) === 1 ? $u[1] : 'Users';
+        if ($resolver === null || $field === null || ! str_contains($resolver, $stock)) {
+            $plan->manual[] = 'The identity is now SESAME\'s user, the array src/Sesame/UserResolver.php returns (only the username). Code that reads getIdentifier() or other user fields (policies, templates) needs that resolver to return the user\'s row: look it up by username there.';
+
+            return;
+        }
+        $alias = substr($model, (int) strrpos('.' . $model, '.'));
+        $lookup = "        // Booster strangler Step 0: the row the old form sign-in found ({$model} by {$field}), so getIdentifier() and policies keep working.\n"
+            . "        \$row = \\Cake\\ORM\\TableRegistry::getTableLocator()->get(" . var_export($model, true) . ')->find()->where([' . var_export($alias . '.' . $field, true) . " => \$identity->username])->first();\n"
+            . "        if (! \$row instanceof \\Cake\\Datasource\\EntityInterface) {\n"
+            . "            return ['username' => \$identity->username];\n"
+            . "        }\n\n"
+            . "        return ['username' => \$identity->username] + array_filter(\$row->toArray(), static fn (mixed \$value): bool => \$value === null || is_scalar(\$value));\n";
+        $plan->put($relative, str_replace($stock, $lookup, $resolver), sprintf('%s: the signed-in user is the %s row whose %s is the CAS username, as the form sign-in found it (its id is getIdentifier())', $relative, $model, $field));
+        $plan->manual[] = sprintf('The identity is now SESAME\'s user: src/Sesame/UserResolver.php looks up the %1$s row whose %2$s is the CAS username (the AccessID), the row the form sign-in found. Make sure %2$s holds what CAS sends; someone with no row signs in with only a username and no id.', $model, $field);
     }
 
     private function logout(SignInPlan $plan): void

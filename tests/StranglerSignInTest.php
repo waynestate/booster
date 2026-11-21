@@ -313,6 +313,38 @@ JSON;
         $replay = json_decode($this->read($app, 'booster-replay.json'));
         self::assertSame('fake', $replay->serve->env->SESAME_DRIVER, 'A public app signs in on the spot in the replay.');
         self::assertSame(SignInStep::REPLAY_USER, $replay->serve->env->SESAME_FAKE_USERNAME);
+        // No identifier fields to read: the resolver keeps the username, and a MANUAL line says what to do.
+        self::assertStringContainsString("return ['username' => \$identity->username];", $this->read($app, 'src/Sesame/UserResolver.php'));
+        self::assertStringContainsString('(only the username)', implode("\n", $result->manual));
+    }
+
+    // The CMS tutorial, 2026-11-20: getIdentifier() was null after Step 0, so the add-article POST saved no user_id.
+    public function testCakeFormLoginKeepsTheRowTheFormFoundSoTheIdentifierStays(): void
+    {
+        $application = str_replace(
+            "        \$service->loadAuthenticator('Authentication.Session'",
+            "        \$passwordIdentifier = ['Authentication.Password' => ['fields' => [AbstractIdentifier::CREDENTIAL_USERNAME => 'email', AbstractIdentifier::CREDENTIAL_PASSWORD => 'password']]];\n        \$service->loadAuthenticator('Authentication.Session'",
+            self::FORM_APPLICATION,
+        );
+        $app = $this->app([
+            'composer.json' => json_encode(['require' => ['cakephp/cakephp' => '5.4.*']]),
+            'src/Application.php' => $application,
+            'src/Controller/UsersController.php' => self::USERS_CONTROLLER,
+            'booster-replay.json' => self::REPLAY,
+        ]);
+
+        $result = SignInStep::migrate($app, 'cakephp');
+        self::assertSame([], $result->failures);
+
+        $resolver = $this->read($app, 'src/Sesame/UserResolver.php');
+        self::assertTrue(SignInSource::parses($resolver));
+        self::assertStringContainsString("->get('Users')->find()->where(['Users.email' => \$identity->username])->first();", $resolver);
+        self::assertStringContainsString('src/Sesame/UserResolver.php: the signed-in user is the Users row whose email is the CAS username', implode("\n", $result->changes));
+        self::assertStringContainsString('looks up the Users row whose email is the CAS username', implode("\n", $result->manual));
+        self::assertStringNotContainsString('(only the username)', implode("\n", $result->manual));
+
+        // A second run leaves the resolver it wrote alone.
+        self::assertSame([], SignInStep::migrate($app, 'cakephp')->failures);
     }
 
     public function testSlimValidUserKeepsTheAppsOwnAuthzAndUserSession(): void
