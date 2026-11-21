@@ -284,7 +284,7 @@ final class Slim1BridgeTest extends TestCase
 
     public function test_an_exception_in_debug_mode_shows_slim_1s_error_page(): void
     {
-        $app = self::app('GET', '/boom');
+        $app = self::app('GET', '/boom', [], ['debug' => true]);
         $app->get('/boom', static function (): void {
             throw new \RuntimeException('Database went for coffee');
         });
