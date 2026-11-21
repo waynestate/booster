@@ -287,7 +287,8 @@ final class ReplayStranglerTest extends TestCase
         $file = ReplayFile::fromArray(['sequences' => [['name' => 'sign-in', 'requests' => [['path' => '/users/login']]]]]);
         $baseline = [[200, '<form method="post"></form>', [self::HTML]]];
         $session = ['Set-Cookie', 'PHPSESSID=a; path=/'];
-        $fake = [[302, '', [self::HTML, ['Location', 'http://127.0.0.1:8765/users/login'], $session]]];
+        // The form's CSRF capture matches nothing on the redirect: its note goes with the form.
+        $fake = [[302, '', [self::HTML, ['Location', 'http://127.0.0.1:8765/users/login'], $session], ['capture csrf matched nothing']]];
         $cas = [[302, '', [self::HTML, ['Location', 'https://cas.replay.invalid/cas/login?service=x'], $session]]];
         $gate = $this->gate([$baseline, $fake, $cas], $file);
         $gate->record('8.5');
@@ -528,7 +529,7 @@ final class ReplayStranglerTest extends TestCase
     }
 
     /**
-     * @param list<list<array{0: int, 1: string, 2?: list<array{string, string}>}>|string> $replays
+     * @param list<list<array{0: int, 1: string, 2?: list<array{string, string}>, 3?: list<string>}>|string> $replays
      */
     private function gate(array $replays, ReplayFile $file): ReplayGate
     {

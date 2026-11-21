@@ -21,7 +21,7 @@ final class ReplayFake
     public const NO_SERVER = 'no-server';
 
     /**
-     * @param list<list<array{0: int, 1: string, 2?: list<array{string, string}>}>|string> $replays one entry per replay container: answers as [status, body, headers], or SETUP_FAILS / NO_SERVER
+     * @param list<list<array{0: int, 1: string, 2?: list<array{string, string}>, 3?: list<string>}>|string> $replays one entry per replay container: answers as [status, body, headers, client notes], or SETUP_FAILS / NO_SERVER
      * @param int  $gateExit exit code of each gate (non-replay) docker run
      * @param string|null $phpLog what PHP logs while serving each replay (default: one deprecation, twice)
      */
@@ -70,7 +70,7 @@ final class ReplayFake
                     'body' => base64_encode($answer[1]),
                     'body_encoding' => 'base64',
                     'error' => $answer[0] === 0 ? 'could not connect' : null,
-                    'notes' => [],
+                    'notes' => $answer[3] ?? [],
                 ];
             }
             file_put_contents($scratch . '/result.json', json_encode(['started' => true, 'answers' => $answers]));

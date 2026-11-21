@@ -309,7 +309,8 @@ final class ReplayGate
         $clean = static fn(?string $l): string => (string) preg_replace('/[\x00-\x1F\x7F]/', '', str_replace(ReplayComparison::APP_ORIGIN, '<app>', (string) $l));
         // "*" is every path: a Slim app whose middleware answers every guest page with its login page (testeval).
         $listedPath = static fn(ReplayRequest $r): bool => in_array('*', $paths, true) || in_array($r->path, $paths, true) || in_array($r->target(), $paths, true);
-        $formLines = ['status: ', 'content-type: ', 'location: '];
+        // A capture note (the form's CSRF field matched nothing) goes with the form.
+        $formLines = ['status: ', 'content-type: ', 'location: ', 'note: '];
         $kept = [];
         $accepted = [];
         // sequence => the form page that moved to SESAME (its request)
@@ -344,7 +345,7 @@ final class ReplayGate
                 // sign-in opens is part of the move; a hand-off to CAS still compares its cookies
                 // (the CakePHP CMS tutorial, 2026-11-20).
                 $inApp = str_starts_with($clean($after->header('Location')), '<app>/') || str_starts_with((string) $after->header('Location'), '/');
-                if ($before->status === 200 && $inApp && $without($before, [...$formLines, 'set-cookie: '], true) === $without($after, [...$formLines, 'set-cookie: '], true)) {
+                if ($before->status === 200 && $inApp && $without($before, [...$formLines, 'set-cookie: ', 'cookie '], true) === $without($after, [...$formLines, 'set-cookie: ', 'cookie '], true)) {
                     $accepted[] = sprintf('%s: the sign-in form (200) now signs in through SESAME (the replay\'s fake driver), %d Location %s', $request->label(), $after->status, $clean($after->header('Location')));
                     $forms[$request->sequence] ??= $request;
                     continue;
