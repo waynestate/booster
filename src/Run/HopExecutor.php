@@ -2064,6 +2064,9 @@ final class HopExecutor
      * legacy/vendor/), then, while legacy/ exists, the legacy half's own
      * suite (or the person's --test-command) from inside legacy/.
      */
+    /** Where the --hand check's route:list --json lands in the app for a moment (read, then removed). */
+    private const ROUTE_LIST_FILE = '.booster-route-list.json';
+
     public const STRANGLER_SYNTAX_COMMAND = "find . -name '*.php' -not -path '*/vendor/*' -not -path '*/node_modules/*' -not -path './storage/*' -print0 | xargs -0 -r -n1 php -l > /dev/null";
 
     /** Whether the app is mid-strangler: the ledger at the root and the legacy half in legacy/. */
@@ -2179,6 +2182,13 @@ final class HopExecutor
         return new GateReport(true, [...$gate->lines, ...$outcome->lines]);
     }
 
+    private static function removeFile(string $file): void
+    {
+        if (is_file($file)) {
+            unlink($file);
+        }
+    }
+
     /**
      * Laravel's routes as `php artisan route:list --json` prints them in the
      * gate image, or why they could not be read. The --hand move checks the
@@ -2188,17 +2198,19 @@ final class HopExecutor
      */
     private function laravelRouteList(string $path, string $php, RunOptions $options): array|string
     {
-        $command = 'echo BOOSTER-ROUTES-BEGIN; php artisan route:list --json; echo; echo BOOSTER-ROUTES-END';
-        $result = $this->gate->run($path, $php, $command, null, $options->gateImage, [], $options->testEnv);
-        $out = $result->stdout;
-        $begin = strpos($out, 'BOOSTER-ROUTES-BEGIN');
-        $end = strrpos($out, 'BOOSTER-ROUTES-END');
-        if (!$result->successful() || $begin === false || $end === false || $end < $begin) {
-            $tail = array_slice(array_values(array_filter(explode("\n", trim($result->stderr . "\n" . $out)), static fn(string $l): bool => trim($l) !== '')), -3);
+        // The gate script keeps a passing command's output in its own log, so
+        // the JSON goes to a file in the app (mounted at /app) and is read here.
+        $file = self::ROUTE_LIST_FILE;
+        self::removeFile($path . '/' . $file);
+        $result = $this->gate->run($path, $php, 'php artisan route:list --json > ' . $file, null, $options->gateImage, [], $options->testEnv);
+        $out = is_file($path . '/' . $file) ? (string) file_get_contents($path . '/' . $file) : '';
+        self::removeFile($path . '/' . $file);
+        if (!$result->successful() || trim($out) === '') {
+            $tail = array_slice(array_values(array_filter(explode("\n", trim($result->stderr . "\n" . $result->stdout . "\n" . $out)), static fn(string $l): bool => trim($l) !== '' && !str_starts_with($l, 'BOOSTER_GATE_'))), -3);
 
             return sprintf('php artisan route:list exited %d%s', $result->exitCode, $tail === [] ? '.' : ': ' . implode(' / ', $tail));
         }
-        $json = json_decode(trim(substr($out, $begin + strlen('BOOSTER-ROUTES-BEGIN'), $end - $begin - strlen('BOOSTER-ROUTES-BEGIN'))), true);
+        $json = json_decode(trim($out), true);
         if (!is_array($json)) {
             return 'php artisan route:list --json did not print JSON.';
         }
