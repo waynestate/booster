@@ -214,12 +214,19 @@ final class ReplayGate
         $halves = self::halves($this->file->requests, $run->answers);
         $halfLine = self::halfLine($halves);
         [$differences, $accepted] = $this->acceptSignInChanges($differences, $recording->answers, $run->answers, $signInChanges);
+        [$differences, $ownSignIn] = $this->acceptOwnSignIn($differences, $recording->answers, $run->answers);
         if ($differences === []) {
+            $matched = $total - count($accepted) - count($ownSignIn);
+
             return new ReplayOutcome(ReplayOutcome::PASSED, $php, [
-                $accepted === []
+                $accepted === [] && $ownSignIn === []
                     ? sprintf('Replay passed: all %d answer%s match the baseline from PHP %s.', $total, $total === 1 ? '' : 's', $recording->php)
-                    : sprintf('Replay passed: %d of %d answers match the baseline from PHP %s, and %d changed only where this step moves the sign-in on purpose:', $total - count($accepted), $total, $recording->php, count($accepted)),
+                    : ($accepted !== []
+                        ? sprintf('Replay passed: %d of %d answers match the baseline from PHP %s, and %d changed only where this step moves the sign-in on purpose:', $matched, $total, $recording->php, count($accepted))
+                        : sprintf('Replay passed: %d of %d answers match the baseline from PHP %s, and %d send the guest to sign-in on the half that answers now:', $matched, $total, $recording->php, count($ownSignIn))),
                 ...self::indent($accepted),
+                ...($accepted !== [] && $ownSignIn !== [] ? ['Sent to sign-in on the half that answers now (accepted):'] : []),
+                ...self::indent($ownSignIn),
                 ...($serveLine === null ? [] : [$serveLine]),
                 ...($halfLine === null ? [] : [$halfLine]),
                 ...$errorLine,
@@ -242,11 +249,64 @@ final class ReplayGate
             ...($others === [] ? [] : ['Also different: request' . (count($others) === 1 ? ' ' : 's ') . implode(', ', $others) . (count($differences) > 13 ? ', ...' : '') . '.']),
             ...self::signInLines($this->file, $differences, $recording->answers, $run->answers),
             ...($accepted === [] ? [] : ['Changed only where this step moves the sign-in on purpose (accepted):', ...self::indent($accepted)]),
+            ...($ownSignIn === [] ? [] : ['Sent to sign-in on the half that answers now (accepted):', ...self::indent($ownSignIn)]),
             ...($halfLine === null ? [] : [$halfLine]),
             sprintf('Every difference: diff %s %s', $baselineTranscript, $transcript),
             'A value that changes on every request (a token, a time) is not a real difference: hide it with a normalizer in ' . $name . '.',
             ...$errorLine,
         ], $name, $this->outDir, $transcript, $total, count($differences), $halves);
+    }
+
+    /**
+     * Under the strangler compare preset, a request the legacy half sent to
+     * its sign-in page in the baseline and the Laravel half now sends to its
+     * own (each half keeps its own session and signs in under its own path,
+     * /_laravel/login while the strangler runs) is the same answer: a guest
+     * sent to sign in. Both must be 3xx redirects to a sign-in page; the
+     * redirect body and the sign-in path are what differ. Found on the CMS
+     * tutorial (2026-11-20): after a legacy logout, the moved add form sent
+     * the signed-out user to /_laravel/login where legacy had sent them to
+     * /users/login?redirect=...
+     *
+     * @param list<array{request: ReplayRequest, diff: list<string>}> $differences
+     * @param list<ReplayAnswer>                                       $baseline
+     * @param list<ReplayAnswer>                                       $replay
+     *
+     * @return array{list<array{request: ReplayRequest, diff: list<string>}>, list<string>}
+     */
+    private function acceptOwnSignIn(array $differences, array $baseline, array $replay): array
+    {
+        if ($differences === [] || $this->file->comparePreset !== ReplayFile::COMPARE_PRESET_STRANGLER) {
+            return [$differences, []];
+        }
+        $index = [];
+        foreach ($this->file->requests as $i => $request) {
+            $index[$request->number] = $i;
+        }
+        $clean = static fn(?string $l): string => (string) preg_replace('/[\x00-\x1F\x7F]/', '', str_replace(ReplayComparison::APP_ORIGIN, '<app>', (string) $l));
+        $kept = [];
+        $accepted = [];
+        foreach ($differences as $difference) {
+            $i = $index[$difference['request']->number] ?? null;
+            $before = $i === null ? null : ($baseline[$i] ?? null);
+            $after = $i === null ? null : ($replay[$i] ?? null);
+            if ($before === null || $after === null || $before->half() !== ReplayAnswer::HALF_LEGACY || $after->half() !== ReplayAnswer::HALF_LARAVEL
+                || !self::isSignInRedirect($before) || !self::isSignInRedirect($after)) {
+                $kept[] = $difference;
+
+                continue;
+            }
+            $accepted[] = sprintf(
+                '%s: a guest sent to sign-in on both halves, %d Location %s (legacy, baseline) and %d Location %s (laravel, its own sign-in)',
+                $difference['request']->label(),
+                $before->status,
+                $clean($before->header('Location')),
+                $after->status,
+                $clean($after->header('Location')),
+            );
+        }
+
+        return [$kept, $accepted];
     }
 
     /**

@@ -180,6 +180,38 @@ final class ReplayStranglerTest extends TestCase
         self::assertSame(['1' => 'legacy', '2' => 'laravel', '3' => 'legacy'], (array) $outcome->toArray()['halves']);
     }
 
+    public function test_a_guest_each_half_sends_to_its_own_sign_in_is_the_same_answer_under_the_strangler_preset(): void
+    {
+        $requests = ['requests' => [['path' => '/articles/add'], ['path' => '/articles/edit/1'], ['path' => '/articles']]];
+        $legacy = ['X-Booster-Half', 'legacy'];
+        $laravel = ['X-Booster-Half', 'laravel'];
+        $baseline = [
+            [302, '', [self::HTML, ['Location', 'http://127.0.0.1:8765/users/login?redirect=%2Farticles%2Fadd'], $legacy]],
+            [200, 'the edit form', [self::HTML, $legacy]],
+            [302, '', [self::HTML, ['Location', 'http://127.0.0.1:8765/users/login'], $legacy]],
+        ];
+        $moved = [
+            [302, '<p>Redirecting to /_laravel/login</p>', [self::HTML, ['Location', 'http://127.0.0.1:8765/_laravel/login'], $laravel]],
+            [302, '', [self::HTML, ['Location', 'http://127.0.0.1:8765/_laravel/login'], $laravel]],
+            [302, '', [self::HTML, ['Location', 'http://127.0.0.1:8765/users/login'], $legacy]],
+        ];
+
+        $gate = $this->gate([$baseline, $moved], ReplayFile::fromArray(['compare' => ['preset' => 'strangler'], ...$requests]));
+        $gate->record('8.5');
+        $outcome = $gate->check('8.5', 'step-2');
+        $text = implode("\n", $outcome->lines);
+
+        self::assertSame(ReplayOutcome::DIFFERS, $outcome->status, 'a page that answered 200 and now sends to sign-in still differs');
+        self::assertStringContainsString('Replay failed on PHP 8.5: 1 of 3 answers differ', $text);
+        self::assertStringContainsString('First difference: 02 requests: GET /articles/edit/1', $text);
+        self::assertStringContainsString('01 requests: GET /articles/add: a guest sent to sign-in on both halves, 302 Location <app>/users/login?redirect=%2Farticles%2Fadd (legacy, baseline) and 302 Location <app>/_laravel/login (laravel, its own sign-in)', $text);
+
+        // The default preset compares them as always.
+        $plain = $this->gate([$baseline, $moved], ReplayFile::fromArray($requests));
+        $plain->record('8.5');
+        self::assertStringContainsString('2 of 3 answers differ', implode("\n", $plain->check('8.5', 'step-2')->lines));
+    }
+
     // Signed-in sequences (5.4)
 
     public function test_a_first_request_that_lost_its_sign_in_says_the_sequence_must_sign_in_first(): void

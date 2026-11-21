@@ -411,7 +411,7 @@ final class StranglerMountTest extends TestCase
             ['type' => 'artifact', 'url' => 'legacy/packages'],
         ], $root['repositories']);
         self::assertSame('./packages/sesame', json_decode((string) file_get_contents($dir . '/legacy/composer.json'), true)['repositories'][1]['url'], 'legacy/ keeps its own');
-        self::assertContains('composer.json lists legacy/\'s 3 Composer repositories too (a relative path or artifact repository now points into legacy/), so both halves resolve packages from the same sources.', $result->notes);
+        self::assertContains('composer.json lists legacy/\'s 4 Composer repositories too (a relative path or artifact repository now points into legacy/), so both halves resolve packages from the same sources.', $result->notes);
     }
 
     public function test_the_root_never_floors_below_the_legacy_php(): void

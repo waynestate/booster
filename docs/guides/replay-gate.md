@@ -357,6 +357,11 @@ way a browser does, on GET and HEAD requests only: the redirect to a listed path
 the page asked for, whose answer is the one compared. The transcript lists each hop it followed
 (`client: sign-in: followed 302 to GET /_laravel/login`). Any other redirect is still recorded, never followed.
 
+Under the `strangler` preset, a request the legacy half sent to its sign-in page in the baseline and the Laravel half
+now sends to its own (a 3xx to `/_laravel/login` where legacy sent `/users/login?redirect=...`) is the same answer, a
+guest sent to sign in, and the gate says so ("a guest sent to sign-in on both halves"). A page that answered 200 in
+the baseline and now sends to sign-in still differs.
+
 ## Limits, honestly
 
 - **No real Oracle, SSO or CAS.** The replay never reaches a real system, by design. An app that cannot render a
