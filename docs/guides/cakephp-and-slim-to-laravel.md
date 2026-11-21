@@ -53,7 +53,8 @@ Run 1 does two things and stops:
    root moves, unchanged, to `legacy/` with its own `vendor/`. `public/index.php` becomes a small dispatcher that sends
    every request to legacy unless the route table, `bootstrap/booster-moved.php`, says Laravel has it. The Laravel half
    signs in under `/_laravel/login`. The replay checks the mounted app against the untouched app's answers
-   (`--serve-changed`, since the app is now served another way).
+   (`--serve-changed`, since the app is now served another way). The root `composer.json` lists the old app's Composer
+   `repositories` too (a relative path repository now points into `legacy/`), so both halves find the same packages.
 
 Only when the mount passes its gate does Booster write the ledger, `booster-strangler.json`. A mount that fails leaves
 its changes in place for you to read, and no ledger: undo it with `git checkout -- . && git clean -fd` and run again

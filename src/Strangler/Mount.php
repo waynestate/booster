@@ -530,6 +530,30 @@ final class Mount
                 $this->notes[] = sprintf('composer.json config.platform.php is %s.0 (it was %s), so the lock resolves for that PHP.', $legacyFloor, $platform);
             }
         }
+        // The legacy app's own package sources (a VCS repo for a private package, a path repo) serve the Laravel
+        // half too: Step 0's SESAME and the packages a move copies resolve where legacy/ found them.
+        $repositories = is_array($legacy) && is_array($legacy['repositories'] ?? null) ? $legacy['repositories'] : [];
+        $kept = 0;
+        foreach ($repositories as $key => $repository) {
+            if (is_array($repository) && ($repository['type'] ?? null) === 'path' && is_string($repository['url'] ?? null)
+                && preg_match('#^(?:/|[A-Za-z]:[\\\\/]|~)#', $repository['url']) !== 1) {
+                $repository['url'] = self::LEGACY . '/' . preg_replace('#^\./#', '', $repository['url']);
+            }
+            $root = is_array($data['repositories'] ?? null) ? $data['repositories'] : [];
+            if (in_array($repository, $root, true)) {
+                continue;
+            }
+            if (is_string($key) && array_is_list($root) === false) {
+                $root[$key] = $repository;
+            } else {
+                $root[] = $repository;
+            }
+            $data['repositories'] = $root;
+            ++$kept;
+        }
+        if ($kept > 0) {
+            $this->notes[] = sprintf('composer.json lists legacy/\'s %d Composer %s too (a relative path repository now points into legacy/), so both halves resolve packages from the same sources.', $kept, $kept === 1 ? 'repository' : 'repositories');
+        }
         file_put_contents($path, self::json($data));
         $this->changed[] = 'composer.json';
         $this->notes[] = 'composer.json runs bin/install-legacy.php after every install and update, so one composer install installs both roots (--no-dev carries over).';

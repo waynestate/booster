@@ -389,6 +389,29 @@ final class StranglerMountTest extends TestCase
         self::assertSame(0, $run(['COMPOSER_BINARY' => $dir . '/fake-composer.php']), 'no legacy/ (after the finish step) is nothing to do');
     }
 
+    public function test_the_root_lists_the_legacy_package_sources_with_relative_paths_into_legacy(): void
+    {
+        $dir = $this->copyFixture('slim4');
+        $composer = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        $composer['repositories'] = [
+            ['type' => 'vcs', 'url' => 'https://git.wayne.edu/enterprise-apps/sesame.git'],
+            ['type' => 'path', 'url' => './packages/sesame', 'options' => ['symlink' => false]],
+            ['type' => 'path', 'url' => '/opt/shared/pkg'],
+        ];
+        file_put_contents($dir . '/composer.json', json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $result = $this->mount($dir, 'slim');
+
+        self::assertTrue($result->mounted);
+        $root = json_decode((string) file_get_contents($dir . '/composer.json'), true);
+        self::assertSame([
+            ['type' => 'vcs', 'url' => 'https://git.wayne.edu/enterprise-apps/sesame.git'],
+            ['type' => 'path', 'url' => 'legacy/packages/sesame', 'options' => ['symlink' => false]],
+            ['type' => 'path', 'url' => '/opt/shared/pkg'],
+        ], $root['repositories']);
+        self::assertSame('./packages/sesame', json_decode((string) file_get_contents($dir . '/legacy/composer.json'), true)['repositories'][1]['url'], 'legacy/ keeps its own');
+        self::assertContains('composer.json lists legacy/\'s 3 Composer repositories too (a relative path repository now points into legacy/), so both halves resolve packages from the same sources.', $result->notes);
+    }
+
     public function test_the_root_never_floors_below_the_legacy_php(): void
     {
         // An app at the 1.20.0 end state asks for PHP 8.5; Sourdough's Laravel half asks for 8.3.
@@ -405,6 +428,8 @@ final class StranglerMountTest extends TestCase
         self::assertSame('^13.0', $root['require']['laravel/framework'], 'the rest of the Laravel half\'s require is kept');
         self::assertContains('composer.json requires PHP ^8.5, as legacy/ does (the Laravel half asked for ^8.3): one PHP runs both halves.', $result->notes);
         self::assertSame('8.5.0', $root['config']['platform']['php'], 'Sourdough\'s platform pin moves up with the floor');
+
+        self::assertArrayNotHasKey('repositories', $root, 'no legacy repositories, none added');
 
         // The stock fixture floors at 7.4, below the Laravel half: the root keeps Laravel's own.
         $plain = $this->copyFixture('slim4');
