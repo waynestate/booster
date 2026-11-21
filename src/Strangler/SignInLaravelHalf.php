@@ -93,7 +93,13 @@ ENV;
             if ($current !== null && ! str_contains($current, 'written by' . "\n" . ' * Booster') && $current !== $template) {
                 $plan->failures[] = sprintf('%s already exists and Booster did not write it; move it aside, then run the strangler again.', $relative);
             } elseif ($current === null) {
-                $plan->put($relative, $template, sprintf('%s: written (the Laravel half keeps the legacy half\'s user array)', $relative));
+                $lookup = $relative === 'app/Sesame/StranglerUserResolver.php' ? self::rowLookup($plan) : null;
+                if ($lookup !== null) {
+                    $template = str_replace(self::STOCK_ATTRIBUTES, $lookup['code'], $template);
+                }
+                $plan->put($relative, $template, $lookup === null
+                    ? sprintf('%s: written (the Laravel half keeps the legacy half\'s user array)', $relative)
+                    : sprintf('%s: written; it looks up the same %s row by %s as the legacy half\'s resolver, from the legacy database, so moved code reads the same id', $relative, $lookup['table'], $lookup['field']));
             }
         }
         $plan->manual[] = 'The Laravel half\'s user is App\\Sesame\\StranglerUser: the legacy half\'s user array as an object (`[\'username\']` and `toArray()` work). Moved code that tests is_array() on the user calls toArray() instead; when the legacy resolver keeps more keys, change StranglerUserResolver::attributes() to match.';
@@ -127,6 +133,56 @@ ENV;
 
         $plan->manual[] = 'The web server must be able to write storage/sesame-revocations: that one directory is how a logout on either half ends both.';
         $plan->manual[] = 'Signed-in users sign in once more on the first moved page: a silent CAS round trip to /_laravel/login, since the halves keep separate sessions.';
+    }
+
+    private const STOCK_ATTRIBUTES = "        return ['username' => \$identity->username];\n";
+
+    /**
+     * When Step 0 made the legacy CakePHP resolver look up the row the form
+     * sign-in found (CakeSignInMigration::userLookup), the same lookup for the
+     * Laravel half, on the legacy database (the strangler's CakeDatabase), so
+     * both halves' users carry the same id. Null for any other resolver.
+     *
+     * @return array{code: string, table: string, field: string}|null
+     */
+    private static function rowLookup(SignInPlan $plan): ?array
+    {
+        $legacy = $plan->read('legacy/src/Sesame/UserResolver.php');
+        if ($legacy === null || preg_match("/->get\\('([A-Za-z_][\\w.]*)'\\)->find\\(\\)->where\\(\\['([A-Za-z_]\\w*)\\.([A-Za-z_]\\w*)' => \\\$identity->username\\]\\)/", $legacy, $m) !== 1) {
+            return null;
+        }
+        $alias = $m[2];
+        $field = $m[3];
+        $tableFile = $plan->read('legacy/src/Model/Table/' . $alias . 'Table.php') ?? '';
+        $table = preg_match("/->setTable\\(\\s*'([A-Za-z_]\\w*)'\\s*\\)/", $tableFile, $t) === 1
+            ? $t[1]
+            : strtolower((string) preg_replace('/(?<!^)[A-Z]/', '_$0', $alias));
+        // The entity's hidden fields stay out, as they do from the legacy toArray(); anything named like a secret too.
+        $hidden = ['password'];
+        foreach ([preg_replace('/s$/', '', $alias), $alias] as $entity) {
+            $code = $plan->read('legacy/src/Model/Entity/' . $entity . '.php');
+            if ($code !== null && preg_match('/\$_hidden\s*=\s*\[([^\]]*)\]/', $code, $h) === 1) {
+                preg_match_all("/'([A-Za-z_]\\w*)'/", $h[1], $names);
+                $hidden = array_values(array_unique([...$hidden, ...$names[1]]));
+
+                break;
+            }
+        }
+        $db = '\\' . CakeRuntime::NS . '\\CakeDatabase';
+        $code = "        // Booster strangler: the {$alias} row the legacy half's resolver looks up ({$table}.{$field} is the CAS username),\n"
+            . "        // read from the legacy database once a moved unit brought CakeDatabase, so both halves' users carry the same id.\n"
+            . "        \$user = ['username' => \$identity->username];\n"
+            . "        if (! class_exists({$db}::class)) {\n"
+            . "            return \$user;\n"
+            . "        }\n"
+            . "        \$row = {$db}::connection()->table(" . var_export($table, true) . ')->where(' . var_export($field, true) . ", \$identity->username)->first();\n"
+            . "        if (\$row === null) {\n"
+            . "            return \$user;\n"
+            . "        }\n"
+            . '        $hidden = [' . implode(', ', array_map(static fn(string $name): string => var_export($name, true), $hidden)) . "];\n\n"
+            . "        return \$user + array_filter((array) \$row, static fn (mixed \$value, string \$key): bool => ! in_array(\$key, \$hidden, true) && (\$value === null || is_scalar(\$value)), ARRAY_FILTER_USE_BOTH);\n";
+
+        return ['code' => $code, 'table' => $table, 'field' => $field];
     }
 
     /** At the finish: SESAME's own routes at the root again, and no shared store. */

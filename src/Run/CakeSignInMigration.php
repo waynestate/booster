@@ -268,7 +268,9 @@ final class CakeSignInMigration
             . "        if (! \$row instanceof \\Cake\\Datasource\\EntityInterface) {\n"
             . "            return ['username' => \$identity->username];\n"
             . "        }\n\n"
-            . "        return ['username' => \$identity->username] + array_filter(\$row->toArray(), static fn (mixed \$value): bool => \$value === null || is_scalar(\$value));\n";
+            . "        // Dates as the database string, so the Laravel half's user (StranglerUserResolver) carries the same values.\n"
+            . "        \$data = array_map(static fn (mixed \$value): mixed => \$value instanceof \DateTimeInterface ? \$value->format('Y-m-d H:i:s') : \$value, \$row->toArray());\n\n"
+            . "        return ['username' => \$identity->username] + array_filter(\$data, static fn (mixed \$value): bool => \$value === null || is_scalar(\$value));\n";
         $plan->put($relative, str_replace($stock, $lookup, $resolver), sprintf('%s: the signed-in user is the %s row whose %s is the CAS username, as the form sign-in found it (its id is getIdentifier())', $relative, $model, $field));
         $plan->manual[] = sprintf('The identity is now SESAME\'s user: src/Sesame/UserResolver.php looks up the %1$s row whose %2$s is the CAS username (the AccessID), the row the form sign-in found. Make sure %2$s holds what CAS sends; someone with no row signs in with only a username and no id.', $model, $field);
     }

@@ -513,6 +513,36 @@ JSON;
         self::assertSame(SignInStep::REPLAY_CAS, $env->SESAME_CAS_BASE_URL);
     }
 
+    public function testTheLaravelHalfLooksUpTheSameRowAsTheLegacyResolver(): void
+    {
+        $legacyResolver = "<?php\nnamespace App\\Sesame;\nfinal class UserResolver\n{\n    public function findOrImportUser(\$identity): mixed\n    {\n"
+            . "        \$row = \\Cake\\ORM\\TableRegistry::getTableLocator()->get('Users')->find()->where(['Users.email' => \$identity->username])->first();\n        return [];\n    }\n}\n";
+        $app = $this->app([
+            'composer.json' => json_encode(['require' => ['laravel/framework' => '^13.0', 'waynestate/sesame' => '^0.8']]),
+            'artisan' => "#!/usr/bin/env php\n",
+            'storage/.gitignore' => "*\n",
+            'config/sesame.php' => "<?php\n\nreturn [\n\n    'driver' => env('SESAME_DRIVER', 'cas'),\n\n];\n",
+            'config/auth.php' => "<?php\n\nreturn [\n    'guards' => [\n        'web' => [\n            'driver' => 'session',\n        ],\n    ],\n];\n",
+            'bootstrap/app.php' => "<?php\n",
+            'booster-replay.json' => self::REPLAY,
+            'legacy/composer.json' => '{}',
+            'legacy/src/Sesame/LegacySignIn.php' => "<?php\n// This app's sign-in through SESAME, written by Booster's strangler Step 0.\n",
+            'legacy/src/Sesame/UserResolver.php' => $legacyResolver,
+            'legacy/src/Model/Table/UsersTable.php' => "<?php\nclass UsersTable\n{\n    public function initialize(array \$config): void\n    {\n        \$this->setTable('app_users');\n    }\n}\n",
+            'legacy/src/Model/Entity/User.php' => "<?php\nclass User\n{\n    protected array \$_hidden = [\n        'password',\n        'api_token',\n    ];\n}\n",
+        ]);
+
+        $result = SignInStep::migrate($app, 'cakephp');
+        self::assertSame([], $result->failures);
+
+        $resolver = $this->read($app, 'app/Sesame/StranglerUserResolver.php');
+        self::assertTrue(SignInSource::parses($resolver));
+        self::assertStringContainsString("CakeDatabase::connection()->table('app_users')->where('email', \$identity->username)->first();", $resolver);
+        self::assertStringContainsString("\$hidden = ['password', 'api_token'];", $resolver);
+        self::assertStringContainsString('if (! class_exists(\\App\\Http\\Controllers\\Legacy\\Cake\\CakeDatabase::class)) {', $resolver);
+        self::assertStringContainsString('looks up the same app_users row by email as the legacy half\'s resolver', implode("\n", $result->changes));
+    }
+
     public function testAMountedAppWhoseLegacyHalfIsNotOnSesameIsRefused(): void
     {
         $app = $this->app([

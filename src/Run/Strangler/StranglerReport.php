@@ -123,10 +123,36 @@ final class StranglerReport
     /** @return list<string> */
     public function refusalLines(): array
     {
-        $lines = [];
+        // A reason several units share (a base controller's initialize(), say) is
+        // one line naming them, not one line per unit: attendance's 56 units
+        // repeated the same AppController refusals 2,057 times (2026-11-20). The
+        // JSON report keeps every unit's refusals as they are.
+        $byReason = [];
+        $units = [];
         foreach ($this->refusals as $r) {
             $where = $r['file'] === '' ? '' : ($r['line'] > 0 ? $r['file'] . ':' . $r['line'] . ': ' : $r['file'] . ': ');
-            $lines[] = sprintf('Refused %s: %s%s. Port it by hand, then run --hand --route "%s".', $r['unit'], $where, $r['reason'], $r['unit']);
+            $byReason[$where . $r['reason']][$r['unit']] = true;
+            $units[$r['unit']] = true;
+        }
+        $lines = [];
+        $sharedFiles = [];
+        foreach ($byReason as $reason => $refused) {
+            $ids = array_keys($refused);
+            if (count($ids) === 1) {
+                $lines[] = sprintf('Refused %s: %s. Port it by hand, then run --hand --route "%s".', $ids[0], $reason, $ids[0]);
+
+                continue;
+            }
+            $named = implode(', ', array_slice($ids, 0, 3)) . (count($ids) > 3 ? sprintf(' and %d more', count($ids) - 3) : '');
+            $lines[] = sprintf('Refused %d units (%s): %s.', count($ids), $named, $reason);
+            if (count($ids) === count($units) && preg_match('/^([^:]+\.php):/', $reason, $m) === 1) {
+                $sharedFiles[$m[1]] = true;
+            }
+        }
+        if (count($units) > 1) {
+            foreach (array_keys($sharedFiles) as $file) {
+                $lines[] = sprintf('MANUAL (route moves): every refused unit runs %s, so port that file first (in CakePHP, a base controller\'s initialize() and beforeFilter() run before every action), then move again. Port a unit by hand meanwhile with --hand --route "<id>".', $file);
+            }
         }
 
         return $lines;
