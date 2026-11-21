@@ -1112,7 +1112,7 @@ agent-ready check, the Real output page check (`bin/build-proof.php --check`) an
 docker run --rm -v "${PWD}:/app" -w /app composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0 sh -c "composer install --no-interaction && composer ci"
 ```
 
-The site's accessibility gate is Preflight's own checker, vendored into `tools/a11y/check.mjs` from Preflight 0.9.0
+The site's accessibility gate is Preflight's own checker, vendored into `tools/a11y/check.mjs` from Preflight 0.12.0
 and pinned by `tests/A11yCheckerPinTest.php`, so a local run checks exactly what CI checks: axe-core 4.14.0 in a
 real Chromium, every page under `site/` in light and dark at 320 and 1280 px, plus the WCAG 1.4.10 reflow check,
 all at WCAG 2.2 AA. It runs in Docker, with no host browser: `sh scripts/a11y.sh` on Linux, macOS and Git Bash, or
@@ -1593,6 +1593,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### \[Unreleased\] [#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Changed: CI pins Preflight 0.12.0 (components and the a11y checker copy). The php-test component now also runs an advisory PHP 8.6 job that may fail and never gates the pipeline.
 - Changed: PROCTOR is `^0.17` in Booster and its `deploy/` layer (was `^0.16`, which does not allow 0.17); 0.17.0 adds three warn-only Oracle checks (`raw-oci`, `oracle-sql-interpolation`, `oracle-credentials-literal`).
 - Changed: the Slim 1 bridge that the vendored-to-composer hop writes defaults to debug off, so a migrated app no longer shows Slim's debug pages unless its settings turn them on. Bridges written by earlier versions are left as they are.
 - Removed: Squire's local-running kit files (docker-compose.squire.yml, haproxy.cfg, parity scripts, env example; D-095). Parity runs the app locally: `parity up` in `deploy/`.
