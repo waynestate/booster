@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Waynestate\Booster\Console;
 
 use Symfony\Component\Console\Application;
-use Symfony\Component\Console\ConsoleEvents;
-use Symfony\Component\Console\Event\ConsoleTerminateEvent;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\BufferedOutput;
@@ -43,10 +41,6 @@ final class BoosterApplication extends Application
         $this->add(new InitCommand());
         $this->add(new ScanCommand($processes));
         $this->add(new ReplayCommand($processes));
-
-        $this->getDispatcher()->addListener(ConsoleEvents::TERMINATE, function (ConsoleTerminateEvent $event): void {
-            $this->finishWithUpdateNotice($event->getOutput());
-        });
     }
 
     public function doRun(InputInterface $input, OutputInterface $output): int
@@ -66,7 +60,12 @@ final class BoosterApplication extends Application
             return 0;
         }
 
-        return parent::doRun($input, $output);
+        // Symfony 7 dropped Application::getDispatcher(), so the notice hooks
+        // the run here instead of a TERMINATE listener.
+        $exitCode = parent::doRun($input, $output);
+        $this->finishWithUpdateNotice($output);
+
+        return $exitCode;
     }
 
     /**
@@ -99,7 +98,7 @@ final class BoosterApplication extends Application
                 install: InstallKind::detected(),
                 tool: 'booster',
                 version: self::VERSION,
-                clock: static fn (): int => time(),
+                clock: static fn(): int => time(),
             );
             $notice->run($output->getErrorOutput());
         } catch (Throwable) {

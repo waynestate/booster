@@ -25,7 +25,7 @@ final class HttpUpdateFetcher implements UpdateFetcher
             'http' => [
                 'timeout' => self::READ_TIMEOUT,
                 'connect_timeout' => self::CONNECT_TIMEOUT,
-                'header' => 'User-Agent: '.$this->userAgent."\r\n",
+                'header' => 'User-Agent: ' . $this->userAgent . "\r\n",
                 'ignore_errors' => true,
             ],
         ]);

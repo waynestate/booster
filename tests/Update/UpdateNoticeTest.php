@@ -59,8 +59,8 @@ final class UpdateNoticeTest extends TestCase
         );
 
         self::assertSame(
-            'booster 1.19.0 is out of date: 1.20.0 is the newest release. '.
-            'Update: curl -L -o booster.phar https://github.com/waynestate/booster/releases/latest/download/booster.phar',
+            'booster 1.19.0 is out of date: 1.20.0 is the newest release. '
+            . 'Update: curl -L -o booster.phar https://github.com/waynestate/booster/releases/latest/download/booster.phar',
             $notice->line(),
         );
     }
@@ -92,9 +92,9 @@ final class UpdateNoticeTest extends TestCase
     public function testLineForProjectDependency(): void
     {
         $project = $this->tempDir();
-        file_put_contents($project.'/composer.json', json_encode(['require' => [self::PACKAGE => '^1.0']]));
+        file_put_contents($project . '/composer.json', json_encode(['require' => [self::PACKAGE => '^1.0']]));
         $notice = $this->notice(
-            new InstallKind(InstallKind::PROJECT, 'booster', $project.'/vendor/waynestate/booster', $project),
+            new InstallKind(InstallKind::PROJECT, 'booster', $project . '/vendor/waynestate/booster', $project),
             '1.19.0',
             ['1.19.0', '1.20.0'],
         );
@@ -108,9 +108,9 @@ final class UpdateNoticeTest extends TestCase
     public function testLineForPinnedProjectDependency(): void
     {
         $project = $this->tempDir();
-        file_put_contents($project.'/composer.json', json_encode(['require' => [self::PACKAGE => '^1.0']]));
+        file_put_contents($project . '/composer.json', json_encode(['require' => [self::PACKAGE => '^1.0']]));
         $notice = $this->notice(
-            new InstallKind(InstallKind::PROJECT, 'booster', $project.'/vendor/waynestate/booster', $project),
+            new InstallKind(InstallKind::PROJECT, 'booster', $project . '/vendor/waynestate/booster', $project),
             '1.19.0',
             ['1.19.0', '2.0.0'],
         );
@@ -121,9 +121,9 @@ final class UpdateNoticeTest extends TestCase
         );
 
         $devProject = $this->tempDir();
-        file_put_contents($devProject.'/composer.json', json_encode(['require-dev' => [self::PACKAGE => '~1.2']]));
+        file_put_contents($devProject . '/composer.json', json_encode(['require-dev' => [self::PACKAGE => '~1.2']]));
         $devNotice = $this->notice(
-            new InstallKind(InstallKind::PROJECT, 'booster', $devProject.'/vendor/waynestate/booster', $devProject),
+            new InstallKind(InstallKind::PROJECT, 'booster', $devProject . '/vendor/waynestate/booster', $devProject),
             '1.19.0',
             ['1.19.0', '2.0.0'],
         );
@@ -148,7 +148,7 @@ final class UpdateNoticeTest extends TestCase
 
     public function testCachedResultMakesNoFetch(): void
     {
-        $cacheFile = $this->tempDir().'/update-check.json';
+        $cacheFile = $this->tempDir() . '/update-check.json';
         file_put_contents($cacheFile, json_encode(['checked_at' => self::NOW, 'latest' => '1.20.0']));
         $fetcher = new FixedUpdateFetcher($this->p2Document(['1.19.0']));
         $notice = $this->noticeWith($fetcher, $cacheFile, '1.19.0');
@@ -166,7 +166,7 @@ final class UpdateNoticeTest extends TestCase
 
     public function testStaleCacheFetchesOnce(): void
     {
-        $cacheFile = $this->tempDir().'/update-check.json';
+        $cacheFile = $this->tempDir() . '/update-check.json';
         file_put_contents($cacheFile, json_encode(['checked_at' => self::NOW - 86_401, 'latest' => '1.0.0']));
         $fetcher = new FixedUpdateFetcher($this->p2Document(['1.0.0', '1.20.0']));
         $notice = $this->noticeWith($fetcher, $cacheFile, '1.19.0');
@@ -188,7 +188,7 @@ final class UpdateNoticeTest extends TestCase
 
     public function testOfflineIsSilent(): void
     {
-        $cacheFile = $this->tempDir().'/update-check.json';
+        $cacheFile = $this->tempDir() . '/update-check.json';
         $fetcher = new FixedUpdateFetcher(null);
         $notice = $this->noticeWith($fetcher, $cacheFile, '1.19.0');
 
@@ -204,13 +204,13 @@ final class UpdateNoticeTest extends TestCase
     public function testMalformedJsonIsSilent(): void
     {
         // At the HTTP layer: a body that is not JSON decodes to null.
-        $bad = $this->tempDir().'/not-json.txt';
+        $bad = $this->tempDir() . '/not-json.txt';
         file_put_contents($bad, '{ this is not json');
-        self::assertNull((new HttpUpdateFetcher())->fetch('file:///'.str_replace('\\', '/', $bad)));
+        self::assertNull((new HttpUpdateFetcher())->fetch('file:///' . str_replace('\\', '/', $bad)));
 
         // At the notice layer: a document without the package list is silent.
         $fetcher = new FixedUpdateFetcher(['packages' => []]);
-        $notice = $this->noticeWith($fetcher, $this->tempDir().'/update-check.json', '1.19.0');
+        $notice = $this->noticeWith($fetcher, $this->tempDir() . '/update-check.json', '1.19.0');
         self::assertNull($notice->line());
     }
 
@@ -220,16 +220,16 @@ final class UpdateNoticeTest extends TestCase
     {
         putenv('CI=true');
         $fetcher = new FixedUpdateFetcher($this->p2Document(['1.19.0', '1.20.0']));
-        $notice = $this->noticeWith($fetcher, $this->tempDir().'/update-check.json', '1.19.0');
+        $notice = $this->noticeWith($fetcher, $this->tempDir() . '/update-check.json', '1.19.0');
 
         self::assertNull($notice->line());
         self::assertSame(0, $fetcher->calls);
 
         foreach (['0', 'false', ''] as $value) {
-            putenv('CI='.$value);
+            putenv('CI=' . $value);
             $loose = $this->noticeWith(
                 new FixedUpdateFetcher($this->p2Document(['1.19.0', '1.20.0'])),
-                $this->tempDir().'/update-check.json',
+                $this->tempDir() . '/update-check.json',
                 '1.19.0',
             );
             self::assertNotNull($loose->line());
@@ -240,7 +240,7 @@ final class UpdateNoticeTest extends TestCase
     {
         putenv('WAYNE_NO_UPDATE_CHECK=1');
         $fetcher = new FixedUpdateFetcher($this->p2Document(['1.19.0', '1.20.0']));
-        $notice = $this->noticeWith($fetcher, $this->tempDir().'/update-check.json', '1.19.0');
+        $notice = $this->noticeWith($fetcher, $this->tempDir() . '/update-check.json', '1.19.0');
 
         self::assertNull($notice->line());
         self::assertSame(0, $fetcher->calls);
@@ -249,7 +249,7 @@ final class UpdateNoticeTest extends TestCase
     public function testQuietIsSilent(): void
     {
         $fetcher = new FixedUpdateFetcher($this->p2Document(['1.19.0', '1.20.0']));
-        $notice = $this->noticeWith($fetcher, $this->tempDir().'/update-check.json', '1.19.0');
+        $notice = $this->noticeWith($fetcher, $this->tempDir() . '/update-check.json', '1.19.0');
 
         self::assertNull($notice->line(true));
         self::assertSame(0, $fetcher->calls);
@@ -261,7 +261,7 @@ final class UpdateNoticeTest extends TestCase
 
         $appOutdated = new BoosterApplication(null, $this->noticeWith(
             new FixedUpdateFetcher($this->p2Document(['1.19.0', '1.20.0'])),
-            $this->tempDir().'/outdated.json',
+            $this->tempDir() . '/outdated.json',
             '1.19.0',
             $install,
         ));
@@ -271,7 +271,7 @@ final class UpdateNoticeTest extends TestCase
 
         $appCurrent = new BoosterApplication(null, $this->noticeWith(
             new FixedUpdateFetcher($this->p2Document(['1.19.0'])),
-            $this->tempDir().'/current.json',
+            $this->tempDir() . '/current.json',
             '1.19.0',
             $install,
         ));
@@ -321,8 +321,8 @@ final class UpdateNoticeTest extends TestCase
     {
         $major = $this->notice($this->globalInstall(), '1.19.0', ['1.19.0', '2.0.0']);
         self::assertSame(
-            'booster 1.19.0 is out of date: 2.0.0 is the newest release. '.
-            'Update: composer global update waynestate/booster Upgrading: https://booster.apps.wayne.edu/docs/upgrading/',
+            'booster 1.19.0 is out of date: 2.0.0 is the newest release. '
+            . 'Update: composer global update waynestate/booster Upgrading: https://booster.apps.wayne.edu/docs/upgrading/',
             $major->line(),
         );
 
@@ -344,7 +344,7 @@ final class UpdateNoticeTest extends TestCase
     public function testDetectsSourceCheckout(): void
     {
         $root = $this->tempDir();
-        file_put_contents($root.'/.git', "gitdir: /home/dev/booster/.git/worktrees/root\n");
+        file_put_contents($root . '/.git', "gitdir: /home/dev/booster/.git/worktrees/root\n");
 
         self::assertSame(InstallKind::SOURCE, InstallKind::detected($root)->kind);
     }
@@ -352,19 +352,19 @@ final class UpdateNoticeTest extends TestCase
     public function testDetectsComposerGlobalHome(): void
     {
         $home = $this->tempDir();
-        mkdir($home.'/vendor/waynestate/booster', 0775, true);
-        putenv('COMPOSER_HOME='.$home);
+        mkdir($home . '/vendor/waynestate/booster', 0775, true);
+        putenv('COMPOSER_HOME=' . $home);
 
-        self::assertSame(InstallKind::COMPOSER_GLOBAL, InstallKind::detected($home.'/vendor/waynestate/booster')->kind);
+        self::assertSame(InstallKind::COMPOSER_GLOBAL, InstallKind::detected($home . '/vendor/waynestate/booster')->kind);
     }
 
     public function testDetectsProjectDependency(): void
     {
         $project = $this->tempDir();
-        mkdir($project.'/vendor/waynestate/booster', 0775, true);
-        putenv('COMPOSER_HOME='.$this->tempDir());
+        mkdir($project . '/vendor/waynestate/booster', 0775, true);
+        putenv('COMPOSER_HOME=' . $this->tempDir());
 
-        $kind = InstallKind::detected($project.'/vendor/waynestate/booster');
+        $kind = InstallKind::detected($project . '/vendor/waynestate/booster');
 
         self::assertSame(InstallKind::PROJECT, $kind->kind);
         self::assertSame($project, $kind->projectRoot);
@@ -393,7 +393,7 @@ final class UpdateNoticeTest extends TestCase
     {
         return $this->noticeWith(
             new FixedUpdateFetcher($this->p2Document($versions)),
-            $this->tempDir().'/update-check.json',
+            $this->tempDir() . '/update-check.json',
             $version,
             $install,
         );
@@ -409,7 +409,7 @@ final class UpdateNoticeTest extends TestCase
             install: $install,
             tool: 'booster',
             version: $version,
-            clock: static fn (): int => self::NOW,
+            clock: static fn(): int => self::NOW,
         );
     }
 
@@ -432,7 +432,7 @@ final class UpdateNoticeTest extends TestCase
         if ($value === null) {
             putenv($name);
         } else {
-            putenv($name.'='.$value);
+            putenv($name . '=' . $value);
         }
     }
 }

@@ -43,6 +43,15 @@ export BOOSTER_NPM_CACHE=~/.cache/booster-npm         # or a folder on your mach
 
 The Node containers run as root, so on Linux a host folder fills with files root owns; a Docker volume keeps them out of your way.
 
+## Update notice [#](https://booster.apps.wayne.edu/docs/reference/configuration.html#update-notice)
+
+Two variables steer the update notice, the one line Booster prints to standard error after a command when a newer stable release exists. They do not appear in the table above, which lists only Booster's own `BOOSTER_*` variables:
+
+- `WAYNE_NO_UPDATE_CHECK` set to `1` turns the check off entirely; any other value leaves it on.
+- `CI` set to anything other than empty, `0` or `false` (as CI systems set it) also turns it off, so pipelines see no extra line.
+
+The check reads Packagist at most once a day and caches its answer in your user cache folder (`~/.cache/waynestate/booster/update-check.json`, `$XDG_CACHE_HOME/waynestate/booster/` when set, or `%LOCALAPPDATA%\waynestate\booster\` on Windows); delete the file to force a fresh check. `--quiet` skips the line too. The [Install](https://booster.apps.wayne.edu/docs/install.html) page's "Update notice" section has the full behaviour.
+
 `.env.example` holds the placeholders. Booster reads no secrets and talks to no Citadel host. Its own network calls only read: the dependency check asks Packagist (and any composer-type repository the app declares) about the app's direct dependencies, which `--no-package-check` turns off, and a plan for an app on `wayne-cas` with no `vendor/` checks the VCS repository `composer.json` names for that package with `git ls-remote`. Everything it prints from an app (file names, diffs) has control characters stripped.
 
 When Rector runs, Booster passes it a few `BOOSTER_*` variables of its own (the app path, the sets, the PHP target). They are internal; do not set them.

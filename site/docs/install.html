@@ -133,11 +133,23 @@ host):</p>
 copies Rector, its <code>config/rector.php</code> and <code>docker/</code> out of the phar into a temp directory first, because Rector and
 <code>docker build</code> are child processes that cannot be pointed at a <code>phar://</code> path; the temp directory is removed when the
 command exits.</p>
+<h2 id="update-notice">Update <span class="docs-heading-tail"><span>notice</span><a class="docs-heading-link" aria-label="Link to this section" href="#update-notice">#</a></span></h2>
+<p>After any command, Booster prints one line to standard error when a newer stable release exists, with the command
+that updates your install: the PHAR re-download, <code>git pull</code> for a source checkout, <code>composer global update</code> for a
+Composer global, or <code>composer update</code> for a project dependency (a <code>composer require</code> with the new constraint when
+your <code>composer.json</code> pins the package below the newest release). When the newest release is a major version up, the
+line also links the upgrading page.</p>
+<p>The check asks Packagist at most once a day and caches its answer in your user cache folder, so an offline machine is
+not slowed down. It never changes a command's output or exit code. It is skipped on CI, with <code>--quiet</code>, and with
+<code>WAYNE_NO_UPDATE_CHECK=1</code>:</p>
+<!-- docs-test: skip sets your shell's environment -->
+<pre tabindex="0"><code>export WAYNE_NO_UPDATE_CHECK=1
+</code></pre>
 </article>
     </main>
     <nav class="docs-pager" aria-label="Pages"><a class="docs-pager__link" href="../docs/index.html"><span class="docs-pager__dir">Previous</span><span class="docs-pager__title">Overview</span></a><a class="docs-pager__link docs-pager__link--next" href="../docs/guides/quick-start.html"><span class="docs-pager__dir">Next</span><span class="docs-pager__title">Quick start</span></a></nav>
   </div>
-  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#single-file-phar">Single file (PHAR)</a></li><li class="docs-toc__item"><a href="#linux-macos-and-wsl-ubuntu-clone-it">Linux, macOS and WSL (Ubuntu): clone it</a></li><li class="docs-toc__item"><a href="#windows-powershell-with-php-and-composer-installed">Windows PowerShell, with PHP and Composer installed</a></li><li class="docs-toc__item"><a href="#docker-only-no-php-windows-or-any-os">Docker only, no PHP (Windows or any OS)</a></li><li class="docs-toc__item"><a href="#single-file-download">Single-file download</a></li></ul></nav>
+  <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#single-file-phar">Single file (PHAR)</a></li><li class="docs-toc__item"><a href="#linux-macos-and-wsl-ubuntu-clone-it">Linux, macOS and WSL (Ubuntu): clone it</a></li><li class="docs-toc__item"><a href="#windows-powershell-with-php-and-composer-installed">Windows PowerShell, with PHP and Composer installed</a></li><li class="docs-toc__item"><a href="#docker-only-no-php-windows-or-any-os">Docker only, no PHP (Windows or any OS)</a></li><li class="docs-toc__item"><a href="#single-file-download">Single-file download</a></li><li class="docs-toc__item"><a href="#update-notice">Update notice</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
   <span>Documents Booster <span data-docs-version>1.21.0</span></span>

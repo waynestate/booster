@@ -30,8 +30,8 @@ final class UpdateNotice
         private readonly InstallKind $install,
         private readonly string $tool,
         private readonly string $version,
-        /** @var callable(): int */
-        private readonly callable $clock,
+        /** @var \Closure(): int */
+        private readonly \Closure $clock,
         private readonly string $upgradeUrl = self::UPGRADE_URL,
     ) {}
 
@@ -73,15 +73,19 @@ final class UpdateNotice
             return null;
         }
 
+        $command = $this->install->updateCommand($newest);
         $line = sprintf(
             '%s %s is out of date: %s is the newest release. Update: %s',
             $this->tool,
             $have,
             $newest,
-            $this->install->updateCommand($newest),
+            $command,
         );
-        if ((int) explode('.', $newest)[0] > (int) explode('.', $have)[0]) {
-            $line .= ' Upgrading: '.$this->upgradeUrl;
+        // A major bump links the upgrading page, unless the update already
+        // names the new constraint (a composer require moves it).
+        $isMajorBump = (int) explode('.', $newest)[0] > (int) explode('.', $have)[0];
+        if ($isMajorBump && ! $this->install->movesConstraint($newest)) {
+            $line .= ' Upgrading: ' . $this->upgradeUrl;
         }
 
         return $line;
@@ -104,7 +108,7 @@ final class UpdateNotice
             return $previous;
         }
 
-        $document = $this->fetcher->fetch(self::PACKAGIST_BASE.$this->package().'.json');
+        $document = $this->fetcher->fetch(self::PACKAGIST_BASE . $this->package() . '.json');
         $latest = $document === null ? null : self::newestStable($document, $this->package());
 
         $this->cache->write($now, $document === null ? $previous : $latest);
@@ -112,7 +116,11 @@ final class UpdateNotice
         return $latest;
     }
 
-    /** Whether the stored result is at most CACHE_TTL old. */
+    /**
+     * Whether the stored result is at most CACHE_TTL old.
+     *
+     * @param array{checked_at?: int, latest?: string|null}|null $cached
+     */
     private function cacheFresh(?array $cached, int $now): bool
     {
         return $cached !== null
@@ -123,7 +131,7 @@ final class UpdateNotice
     /** The Composer package name of the running tool. */
     private function package(): string
     {
-        return 'waynestate/'.$this->tool;
+        return 'waynestate/' . $this->tool;
     }
 
     /**

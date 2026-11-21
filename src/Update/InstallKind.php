@@ -43,7 +43,7 @@ final class InstallKind
             return new self(self::SOURCE, $tool, $packageRoot);
         }
 
-        if (str_ends_with(self::flat($packageRoot), '/vendor/waynestate/'.$tool)) {
+        if (str_ends_with(self::flat($packageRoot), '/vendor/waynestate/' . $tool)) {
             $root = \dirname(\dirname(\dirname($packageRoot)));
             if (self::isComposerGlobalHome($root)) {
                 return new self(self::COMPOSER_GLOBAL, $tool, $packageRoot);
@@ -61,9 +61,27 @@ final class InstallKind
         return match ($this->kind) {
             self::PHAR => 'curl -L -o booster.phar https://github.com/waynestate/booster/releases/latest/download/booster.phar',
             self::SOURCE => 'git pull',
-            self::COMPOSER_GLOBAL, self::UNKNOWN => 'composer global update '.$this->package(),
             self::PROJECT => $this->projectCommand($newest),
+            // Composer global, unknown, or anything unexpected: the safe
+            // default is the Composer global update.
+            default => 'composer global update ' . $this->package(),
         };
+    }
+
+    /**
+     * Whether the update moves the project's own constraint (a composer
+     * require instead of a composer update): only a pinned ^ or ~ that the
+     * newest release falls outside counts.
+     */
+    public function movesConstraint(string $newest): bool
+    {
+        if ($this->kind !== self::PROJECT) {
+            return false;
+        }
+
+        [$constraint] = $this->pinnedConstraint();
+
+        return $constraint !== null && self::constraintExcludes($constraint, $newest);
     }
 
     /**
@@ -79,7 +97,7 @@ final class InstallKind
             return sprintf('composer require %s:^%s%s', $this->package(), self::majorMinor($newest), $dev ? ' --dev' : '');
         }
 
-        return 'composer update '.$this->package();
+        return 'composer update ' . $this->package();
     }
 
     /**
@@ -94,7 +112,7 @@ final class InstallKind
             return [null, false];
         }
 
-        $path = $this->projectRoot.'/composer.json';
+        $path = $this->projectRoot . '/composer.json';
         if (! is_file($path)) {
             return [null, false];
         }
@@ -131,9 +149,9 @@ final class InstallKind
 
         $parts = explode('.', substr($trimmed, 1));
         $newestParts = explode('.', ltrim($newest, 'vV'));
-        $major = (int) ($parts[0] ?? 0);
+        $major = (int) $parts[0];
         $minor = isset($parts[1]) ? (int) $parts[1] : 0;
-        $newestMajor = (int) ($newestParts[0] ?? 0);
+        $newestMajor = (int) $newestParts[0];
         $newestMinor = isset($newestParts[1]) ? (int) $newestParts[1] : 0;
 
         if ($major === 0) {
@@ -148,13 +166,13 @@ final class InstallKind
     {
         $parts = explode('.', ltrim($version, 'vV'));
 
-        return ((int) ($parts[0] ?? 0)).'.'.((int) ($parts[1] ?? 0));
+        return ((int) $parts[0]) . '.' . ((int) ($parts[1] ?? 0));
     }
 
     /** The Composer package name of the running tool. */
     private function package(): string
     {
-        return 'waynestate/'.$this->tool;
+        return 'waynestate/' . $this->tool;
     }
 
     /**
@@ -163,7 +181,7 @@ final class InstallKind
      */
     private static function isSourceCheckout(string $root): bool
     {
-        if (! is_dir($root.DIRECTORY_SEPARATOR.'.git') && ! is_file($root.DIRECTORY_SEPARATOR.'.git')) {
+        if (! is_dir($root . DIRECTORY_SEPARATOR . '.git') && ! is_file($root . DIRECTORY_SEPARATOR . '.git')) {
             return false;
         }
 
@@ -192,13 +210,13 @@ final class InstallKind
         if (\PHP_OS_FAMILY === 'Windows') {
             $appData = getenv('APPDATA');
             if ($appData !== false && trim($appData) !== '') {
-                $candidates[] = self::flat($appData).'/composer';
+                $candidates[] = self::flat($appData) . '/composer';
             }
         } else {
             $homeDir = getenv('HOME');
             if ($homeDir !== false && trim($homeDir) !== '') {
-                $candidates[] = self::flat($homeDir).'/.config/composer';
-                $candidates[] = self::flat($homeDir).'/.composer';
+                $candidates[] = self::flat($homeDir) . '/.config/composer';
+                $candidates[] = self::flat($homeDir) . '/.composer';
             }
         }
 

@@ -22,7 +22,7 @@ final class UpdateCache
             $local = getenv('LOCALAPPDATA');
             $base = $local !== false && trim($local) !== '' ? $local : sys_get_temp_dir();
 
-            return $base.DIRECTORY_SEPARATOR.'waynestate'.DIRECTORY_SEPARATOR.$tool.DIRECTORY_SEPARATOR.'update-check.json';
+            return $base . DIRECTORY_SEPARATOR . 'waynestate' . DIRECTORY_SEPARATOR . $tool . DIRECTORY_SEPARATOR . 'update-check.json';
         }
 
         $xdg = getenv('XDG_CACHE_HOME');
@@ -30,10 +30,10 @@ final class UpdateCache
             $base = rtrim(str_replace('\\', '/', $xdg), '/');
         } else {
             $home = getenv('HOME');
-            $base = ($home !== false && trim($home) !== '' ? $home : sys_get_temp_dir()).'/.cache';
+            $base = ($home !== false && trim($home) !== '' ? $home : sys_get_temp_dir()) . '/.cache';
         }
 
-        return $base.'/waynestate/'.$tool.'/update-check.json';
+        return $base . '/waynestate/' . $tool . '/update-check.json';
     }
 
     /**
