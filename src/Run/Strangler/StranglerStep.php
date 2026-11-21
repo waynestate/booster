@@ -469,6 +469,7 @@ final class StranglerStep
                 ...$signIn->lines,
                 ...$done['lines'],
                 ...$gate->lines,
+                'With every unit on Laravel, an answer that still differs is usually the legacy app\'s own fallback: what it answered for paths no unit owns (its not-found or method-not-allowed page) and for a trailing-slash path Laravel matches as the route without it. Port that to Laravel (Route::fallback(), the exception handler in bootstrap/app.php), then run --finish again.',
                 sprintf('The finish did not pass its gate. %s stays, so the next run offers --finish again; the changes are in place for you to read.', Ledger::FILE),
             ], $report);
         }

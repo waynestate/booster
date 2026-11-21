@@ -622,6 +622,7 @@ final class StranglerEngineTest extends TestCase
 
         self::assertSame(StepResult::GATE_FAILED, $result->status);
         self::assertTrue(Ledger::exists($dir));
+        self::assertStringContainsString("the legacy app's own fallback", implode("\n", $result->messages), 'the likely cause is named');
     }
 
     // Section 6: the report.
