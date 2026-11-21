@@ -547,6 +547,39 @@ final class StranglerEngineTest extends TestCase
         self::assertStringContainsString('MANUAL (finish):', implode("\n", $result->messages));
     }
 
+    public function test_finish_is_refused_while_slim_hosted_units_remain_and_names_them(): void
+    {
+        [$step, $dir] = $this->mounted('slim', ['GET /login', 'GET /a'], Ledger::STEP0_DONE, ['GET /login' => Ledger::LARAVEL, 'GET /a' => Ledger::LARAVEL]);
+        mkdir($dir . '/legacy');
+        mkdir($dir . '/routes');
+        file_put_contents($dir . '/routes/web.php', "<?php\n\n// booster:strangler GET /login from legacy/app/routes.php:9\n\Illuminate\Support\Facades\Route::match(['GET'], 'login', [\App\Http\Controllers\Legacy\Support\SlimAdapter::class, 'handle'])\n    ->defaults('booster_slim', 'bootstrap');\n\n// booster:strangler GET /a from legacy/app/routes.php:12\n\Illuminate\Support\Facades\Route::match(['GET'], 'a', [\App\Http\Controllers\Legacy\Support\SlimAdapter::class, 'handle'])\n    ->defaults('booster_slim', 'class:A');\n");
+
+        $result = $this->step(new FakeStranglerParts([]))->run($step, $dir, $this->replayOptions(finish: true), '4.15', '4', 'NEXT');
+
+        $text = implode("\n", $result->messages);
+        self::assertSame(StepResult::ERROR, $result->status);
+        self::assertStringContainsString('1 unit on Laravel still runs through Slim inside the Laravel route (GET /login)', $text);
+        self::assertStringContainsString("Slim-hosted: 1 unit on Laravel still runs through Slim", $text);
+        self::assertSame(['count' => 1, 'units' => ['GET /login'], 'notes' => []], $result->toArray()['strangler']['slim_hosted']);
+        self::assertDirectoryExists($dir . '/legacy');
+    }
+
+    public function test_slim_hosted_manual_lines_group_under_their_own_section(): void
+    {
+        $report = new StranglerReport('moves', 'slim');
+        $report->addManual('route moves', [SlimMover::HOSTED_PREFIX . ' FORM /login runs through Slim inside Laravel because of a role check (app/routes.php:9)', 'legacy/app/settings.php:21 __DIR__ moved']);
+        $report->slimHosted = ['FORM /login'];
+
+        self::assertSame(['legacy/app/settings.php:21 __DIR__ moved'], $report->manual['route moves']);
+        self::assertSame([
+            "Slim-hosted: 1 unit on Laravel still runs through Slim inside the Laravel route; port each one's check to Laravel middleware before --finish.",
+            '  FORM /login',
+            'SLIM-HOSTED: FORM /login runs through Slim inside Laravel because of a role check (app/routes.php:9)',
+        ], $report->hostedLines());
+        self::assertSame(['MANUAL (route moves): legacy/app/settings.php:21 __DIR__ moved'], $report->manualLines());
+        self::assertSame([], (new StranglerReport('moves', 'cakephp'))->hostedLines());
+    }
+
     public function test_a_failed_finish_gate_keeps_the_ledger(): void
     {
         [$step, $dir] = $this->mounted('cakephp', ['GET /a'], Ledger::STEP0_DONE, ['GET /a' => Ledger::LARAVEL]);
@@ -565,7 +598,7 @@ final class StranglerEngineTest extends TestCase
         $result = $this->step(new FakeStranglerParts([self::unit('GET /a')]))->run($step, $dir, $this->replayOptions(), '4.15', '4', 'NEXT');
 
         $data = $result->toArray();
-        self::assertSame(['phase', 'framework', 'status', 'step0', 'moved', 'left', 'counts', 'refusals', 'failed', 'stop_signs', 'manual', 'next'], array_keys($data['strangler']));
+        self::assertSame(['phase', 'framework', 'status', 'step0', 'moved', 'left', 'counts', 'refusals', 'failed', 'stop_signs', 'manual', 'slim_hosted', 'next'], array_keys($data['strangler']));
         self::assertArrayNotHasKey('strangler', (new StepResult(1, 'php-84-to-85', StepResult::APPLIED, [], []))->toArray());
     }
 
