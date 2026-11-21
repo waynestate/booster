@@ -389,7 +389,7 @@ Options shared by `plan` and `run`:
 | `--vendored` | Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of `vendor/` and onto Composer ([the guide](docs/guides/framework-hops.md)) |
 | `--strict-session` | Include the hop that turns on `session.use_strict_mode` and `session.use_only_cookies` before each `session_start()` in a raw PHP app ([the guide](docs/guides/strict-sessions.md)) |
 | `--skip` | A hop id to leave out (repeat it) |
-| `--no-package-check` | Skip the Packagist dependency check (for offline use) |
+| `--no-package-check` | Skip the Packagist checks: the plan's dependency check and a run's dependency raise (for offline use) |
 | `--until` | Cut the plan after this hop id: that step and everything before it stay, and the plan's targets move to where it lands |
 | `--only` | Plan and run just this one hop id. The app must sit on the hop's starting versions, and `--until` and `--only` are never combined |
 | `--with-node` | include the Node front-end hops (Node pin, Mix to Vite, Vite major, Tailwind, TypeScript, Vue) even when you passed a target version. Without it, any of `--goal`, `--to-php`, `--to-laravel`, `--to-phpunit`, `--from-php` or `--from-laravel` leaves those hops out, and the plan prints: "Node front-end hops were left out because you passed a target version: <hop ids>. Add --with-node to include them." |
@@ -538,7 +538,7 @@ abandoned (use acme/new instead).`). Packages the check cannot reach are reporte
 `package_checks`, with the fields `package`, `newest`, `blocks`, `abandoned` and `checked`.
 
 The check fetches from `repo.packagist.org` and from any composer-type repository the app declares in
-`composer.json`; VCS repositories are never fetched. `--no-package-check` skips the whole check, for offline use.
+`composer.json`; VCS repositories are never fetched. `--no-package-check` skips the whole check, for offline use. In `run` it also turns off the dependency raise a PHP hop tries when its gate fails inside a package that needs its next major ([Hops](docs/reference/hops.md)).
 
 ### Behavior changes
 

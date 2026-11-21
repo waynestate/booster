@@ -15,6 +15,7 @@ use Waynestate\Booster\Hop\HopRegistry;
 use Waynestate\Booster\Hop\TrustProxiesRewriter;
 use Waynestate\Booster\Node\MixBuild;
 use Waynestate\Booster\Node\MixFile;
+use Waynestate\Booster\Plan\PackageFetcher;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Plan\PlanStep;
 use Waynestate\Booster\Prepass\NewByReferenceFixer;
@@ -79,12 +80,21 @@ final class HopExecutor
         private readonly array $frameworkEngines = [],
         /** The other lanes' strangler parts (Step 0, the mount, the units and movers, the route table); null runs every strangler part as unwired. */
         private readonly ?StranglerParts $stranglerParts = null,
+        /**
+         * Packagist, for the raise a PHP hop may try when its gate fails
+         * inside a dependency (DependencyRaise). Null turns the raise off
+         * (--no-package-check, and the tests that do not ask for it).
+         */
+        private readonly ?PackageFetcher $packages = null,
     ) {}
 
     /** The replay runner and transcript folder this run recorded with, so a strangler gate can rebuild the gate on the rewritten request file. */
     private ?ReplayRunner $replayRunnerUsed = null;
 
     private ?string $replayOutDir = null;
+
+    /** The transcript of the last replay that failed in runGate, so a raise can trace the answer's error. */
+    private ?string $failedReplayTranscript = null;
 
     /** The replay gate for this run, once its baseline is recorded (--replay). */
     private ?ReplayGate $replayGate = null;
@@ -968,12 +978,16 @@ final class HopExecutor
                     $update = $this->lockUpdatePackages($step, $path);
                     $lockReason = $this->lockRefusalReason($step, $path);
                     $gate = $this->runGate($step, $path, $options, $baseline, $update);
+                    $raised = [];
+                    if (!$gate->passed && $hop->kind === HopKind::Php) {
+                        [$gate, $raised] = $this->raiseWhenProven($step, $path, $options, $baseline, $gate);
+                    }
                     if (!$gate->passed) {
                         $why = $lockReason === null ? [] : [sprintf('The gate ran %s because %s.', self::lockCommand($update), $lockReason)];
 
-                        return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...($proxies->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...($proxies->manual ?? []), ...$why, ...$gate->lines, ...$notes], false, $prepass?->files() ?? []);
+                        return new StepResult($step->number, $hop->id, StepResult::GATE_FAILED, $files, [...$messages, ...($migration->changes ?? []), ...($proxies->changes ?? []), ...$inertiaChanges, ...($migration->manual ?? []), ...($proxies->manual ?? []), ...$why, ...$gate->lines, ...$raised, ...$notes], false, $prepass?->files() ?? []);
                     }
-                    $messages = [...$messages, ...$gate->lines];
+                    $messages = [...$messages, ...$gate->lines, ...$raised];
                     $messages[] = $this->gatePassedLine($step->phpAfter, $this->stepGateKind($step, $baseline->gateKind));
                     if ($update !== []) {
                         $messages[] = $lockReason === null
@@ -1376,6 +1390,7 @@ final class HopExecutor
      */
     private function runGate(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, ?array $update = null, array $signInChanges = []): GateReport
     {
+        $this->failedReplayTranscript = null;
         $gate = $this->runTestGate($step, $path, $options, $baseline, $update);
         if (!$gate->passed || $this->replayGate === null || $this->replayGate->recording() === null) {
             return $gate;
@@ -1398,6 +1413,8 @@ final class HopExecutor
             return new GateReport(false, [...$gate->lines, 'Replay could not run: ' . $e->getMessage(), $this->undoHint($path)]);
         }
         if ($outcome->failed()) {
+            $this->failedReplayTranscript = $outcome->transcript;
+
             return new GateReport(false, [
                 ...$gate->lines,
                 ...($presetLine === null ? [] : [$presetLine]),
@@ -1408,6 +1425,85 @@ final class HopExecutor
         }
 
         return new GateReport(true, [...$gate->lines, ...($presetLine === null ? [] : [$presetLine]), ...$outcome->lines]);
+    }
+
+    /**
+     * "Raise when proven" (Adam, 2026-11-20): a PHP hop's gate failed, and
+     * the failure (the gate output, or the failed replay's transcript and
+     * its PHP error log) names a file under vendor/<vendor>/<package>/ of a
+     * direct dependency that already sits on the newest release its
+     * constraint allows, while a newer major installs on the new PHP. Booster
+     * widens the constraint to "<old> || ^<next>", runs the whole gate again
+     * with composer update -W for that package, and keeps the raise only
+     * when that gate passes, with a MANUAL line for the review a new major
+     * needs. Otherwise composer.json and composer.lock go back as the first
+     * gate left them and the step fails as before, naming what was tried.
+     * One raise per hop at most, never for a package a framework or PHPUnit
+     * hop owns (DependencyRaise::NEVER_RAISED).
+     *
+     * @return array{0: GateReport, 1: list<string>} the gate to report, then the lines about the raise
+     */
+    private function raiseWhenProven(PlanStep $step, string $path, RunOptions $options, BaselineResult $baseline, GateReport $failed): array
+    {
+        $php = $step->phpAfter;
+        if ($this->packages === null || $php === null) {
+            return [$failed, []];
+        }
+        $text = implode("\n", $failed->lines);
+        $transcript = $this->failedReplayTranscript;
+        if ($transcript !== null) {
+            foreach ([$transcript, (string) preg_replace('/\.txt$/', '.php-errors.txt', $transcript)] as $file) {
+                if (is_file($file)) {
+                    $text .= "\n" . (string) file_get_contents($file);
+                }
+            }
+        }
+        $candidate = (new DependencyRaise($this->packages))->candidate($path, $php, $text);
+        if ($candidate === null) {
+            return [$failed, []];
+        }
+        $package = $candidate['package'];
+        $files = [];
+        foreach (['composer.json', 'composer.lock'] as $name) {
+            $file = rtrim($path, '/\\') . '/' . $name;
+            $files[$file] = is_file($file) ? file_get_contents($file) : false;
+        }
+        $tried = sprintf(
+            'The gate failed inside %s on PHP %s, and %s is the newest release its constraint %s allows, so Booster raised it: composer.json asks for %s, then composer update -W %s.',
+            $package,
+            $php,
+            $candidate['installed'],
+            $candidate['constraint'],
+            $candidate['widened'],
+            $package,
+        );
+        try {
+            DependencyRaise::widen($path, $candidate);
+        } catch (ToolError $e) {
+            return [$failed, ['Could not raise ' . $package . ': ' . $e->getMessage()]];
+        }
+        $gate = $this->runGate($step, $path, $options, $baseline, [$package]);
+        if ($gate->passed) {
+            return [$gate, [$tried, sprintf(
+                'MANUAL: %s moved from %s.x to %s.x (locked %s) and the gate passed again. A new major can change behavior the tests and replay do not cover: read its upgrade notes before release%s.',
+                $package,
+                $candidate['oldMajor'],
+                $candidate['newMajor'],
+                ltrim(self::lockedVersions($path)[$package] ?? '?', 'v'),
+                $candidate['notes'] === null ? '' : ' (' . $candidate['notes'] . ')',
+            )]];
+        }
+        foreach ($files as $file => $content) {
+            if ($content !== false) {
+                file_put_contents($file, $content);
+            }
+        }
+
+        return [$failed, [$tried . sprintf(
+            ' The gate still failed with %s %s.x, so composer.json and composer.lock were put back (run composer install before the next try).',
+            $package,
+            $candidate['newMajor'],
+        )]];
     }
 
     /**

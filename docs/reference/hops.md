@@ -87,6 +87,17 @@ next to the next PHPUnit major, `plan` holds PHPUnit at the last major that fits
 (`acme/phpstan-ext ^1.0 holds PHPUnit at 11: ...`); with `--to-phpunit` the step stays, with a warning.
 Laravel plans keep their PHPUnit target, since the Laravel hops move the test stack.
 
+A PHP hop raises a dependency when the gate proves it must. When the gate (the tests, or the replay's answers and PHP
+error log) fails in a file under `vendor/<vendor>/<package>/`, and that package is a direct dependency already on the
+newest release its constraint allows, while a newer major installs on the new PHP, Booster widens the constraint to
+`<old> || ^<next>`, runs `composer update -W <package>` and runs the whole gate again. If that gate passes, the step
+passes with a `MANUAL:` line that names the package, both majors and the release's source or docs link from
+Packagist, so the new major gets its review. If it still fails, `composer.json` and `composer.lock` go back to what
+the first gate left and the step stops as before, saying what was tried. A hop raises at most one package, and never
+laravel/framework, cakephp/cakephp, slim/slim or phpunit/phpunit, which their own hops move. `--no-package-check`
+turns the raise off. On the public slim-skeleton 4.5.0 it moves `php-di/php-di ^6.4` to `^6.4 || ^7` at PHP 8.4,
+where 6.4.0's implicitly nullable parameters turn `GET /` into a 500.
+
 `typescript-major` raises the npm packages in `typescript_companion_pins` when the app lists an older release: today
 `prettier-plugin-organize-imports` to ^4.2, the first release whose peer range accepts vue-tsc 3. Without it, npm
 only warns during the hop and the next `npm install` refuses the tree.

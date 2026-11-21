@@ -26,7 +26,7 @@ use Waynestate\Booster\Run\LockRefusals;
  */
 final class PackageCompat
 {
-    private const PACKAGIST = 'https://repo.packagist.org/p2/';
+    public const PACKAGIST = 'https://repo.packagist.org/p2/';
 
     /** A version far beyond anything Booster plans, used to test for an open-ended constraint. */
     private const OPEN_ENDED_PROBE = '99.99.99';
@@ -81,7 +81,7 @@ final class PackageCompat
                 continue;
             }
             $document = $this->fetchDocument($name, $composer);
-            $versions = $document === null ? [] : ($this->expandPackages($document)[$name] ?? []);
+            $versions = $document === null ? [] : (self::expandPackages($document)[$name] ?? []);
             $releases = [];
             foreach ($versions as $version => $entry) {
                 if (VersionParser::parseStability((string) $version) === 'stable' && $this->satisfies((string) $version, $constraint)) {
@@ -207,7 +207,7 @@ final class PackageCompat
             return new PackageCheck($name, null, null, false, null, false, $this->failureReason($composer), null, null);
         }
 
-        $versions = $this->expandPackages($document)[$name] ?? [];
+        $versions = self::expandPackages($document)[$name] ?? [];
         if ($versions === []) {
             return new PackageCheck($name, null, null, false, null, false, 'offline', null, null);
         }
@@ -477,12 +477,12 @@ final class PackageCompat
      *
      * @return array<string, array<string, array<string, mixed>>>
      */
-    private function expandPackages(array $document): array
+    public static function expandPackages(array $document): array
     {
         $expanded = [];
         foreach ((array) ($document['packages'] ?? []) as $name => $entries) {
             $versions = [];
-            foreach ($this->expandMinified(array_values((array) $entries)) as $entry) {
+            foreach (self::expandMinified(array_values((array) $entries)) as $entry) {
                 if (!is_string($entry['version'] ?? null)) {
                     continue;
                 }
@@ -504,7 +504,7 @@ final class PackageCompat
      *
      * @return list<array<string, mixed>>
      */
-    private function expandMinified(array $entries): array
+    private static function expandMinified(array $entries): array
     {
         if (class_exists(\Composer\MetadataMinifier\MetadataMinifier::class)) {
             return array_values(array_filter(

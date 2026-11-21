@@ -112,7 +112,7 @@ abstract class BaseCommand extends Command
             ->addOption('vendored', null, InputOption::VALUE_NONE, 'Include the move of hand-copied Doctrine 2, Smarty 3 and Slim 1 out of vendor/ and onto Composer.')
             ->addOption('strict-session', null, InputOption::VALUE_NONE, 'Include the hop that turns on strict session IDs before each session_start() in a raw PHP app.')
             ->addOption('skip', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hop id to leave out (repeatable).')
-            ->addOption('no-package-check', null, InputOption::VALUE_NONE, 'Skip the Packagist dependency check (for offline use).')
+            ->addOption('no-package-check', null, InputOption::VALUE_NONE, "Skip the Packagist checks: the plan's dependency check and a run's dependency raise (for offline use).")
             ->addOption('until', null, InputOption::VALUE_REQUIRED, 'Cut the plan after this hop id: that step and everything before it stay.')
             ->addOption('only', null, InputOption::VALUE_REQUIRED, "Plan and run just this one hop id; the app must sit on the hop's starting versions.");
     }

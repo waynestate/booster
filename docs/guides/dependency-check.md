@@ -35,4 +35,4 @@ abandoned (use acme/new instead).`). Packages the check cannot reach are reporte
 `package_checks`, with the fields `package`, `newest`, `blocks`, `abandoned` and `checked`.
 
 The check fetches from `repo.packagist.org` and from any composer-type repository the app declares in
-`composer.json`; VCS repositories are never fetched. `--no-package-check` skips the whole check, for offline use.
+`composer.json`; VCS repositories are never fetched. `--no-package-check` skips the whole check, for offline use. In `run` it also turns off the dependency raise a PHP hop tries when its gate fails inside a package that needs its next major ([Hops](../reference/hops.md)).

@@ -13,6 +13,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Waynestate\Booster\Hop\EngineId;
 use Waynestate\Booster\Hop\HopRegistry;
+use Waynestate\Booster\Plan\HttpPackageFetcher;
 use Waynestate\Booster\Plan\Plan;
 use Waynestate\Booster\Replay\ReplayFile;
 use Waynestate\Booster\Replay\ReplayGate;
@@ -165,6 +166,8 @@ final class RunCommand extends BaseCommand
             frameworkEngines: self::frameworkEngines($this->processes, $composerEditor),
             // The strangler's real parts: Step 0 and the Laravel half's sign-in, the mount (Sourdough in the gate image), the route table, the Slim and CakePHP movers.
             stranglerParts: new LaneStranglerParts(new MountSourdough($targetImage)),
+            // A PHP hop whose gate fails inside a dependency may raise it to its next major (DependencyRaise).
+            packages: (bool) $input->getOption('no-package-check') ? null : new HttpPackageFetcher(),
         );
         // The prompt only makes sense where a person is watching: text output on an interactive terminal. JSON and
         // --no-interaction runs stop at the threshold instead of asking nobody.
