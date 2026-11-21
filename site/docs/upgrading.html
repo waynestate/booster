@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Upgrading | Booster docs</title>
 <meta name="description" content="What changes when you move Booster to a new release, and what an app an older Booster already moved needs.">
-<meta name="docs-version" content="1.20.0">
+<meta name="docs-version" content="1.21.0">
 <link rel="stylesheet" href="../assets/wayne-ui/wayne-ui.css">
 <link rel="stylesheet" href="../assets/docs.css">
 <link rel="stylesheet" href="../docs/theme/booster.css">
@@ -20,7 +20,7 @@
     <a class="masthead__brand" href="../index.html">
       <img src="../brand/booster-avatar-256.png" width="36" height="36" alt="">
       <span class="masthead__name">BOOSTER</span>
-      <span class="masthead__ver">1.20.0</span>
+      <span class="masthead__ver">1.21.0</span>
     </a>
     <nav class="masthead__nav" aria-label="Site">
       <a href="../index.html#record">Record</a>
@@ -49,9 +49,9 @@ when that needs a step of yours.</p>
 <p>To take a new Booster, download the PHAR again (the same <code>curl</code> line as on <a href="install.html">Install</a>; its
 <code>releases/latest</code> link always names the newest release), or run <code>git pull</code> and <code>composer install</code> in your clone. <code>booster --version</code> prints the version you have.</p>
 <h2 id="1-21-0"><span class="docs-heading-tail"><span>1.21.0</span><a class="docs-heading-link" aria-label="Link to this section" href="#1-21-0">#</a></span></h2>
-<p>Not released yet: this section follows the Changelog's Unreleased list. A CakePHP 5 or Slim 4 app can move onto
-Laravel 13 one unit at a time (the strangler). Two hops were added and none removed; <code>plan</code> and <code>run</code> take a bare
-<code>--to-laravel</code>, and <code>run</code> gains <code>--moves</code>, <code>--route</code>, <code>--hand</code> and <code>--finish</code>. No exit code changed.</p>
+<p>A CakePHP 5 or Slim 4 app can move onto Laravel 13 one unit at a time (the strangler). Two hops were added and none
+removed; <code>plan</code> and <code>run</code> take a bare <code>--to-laravel</code>, and <code>run</code> gains <code>--moves</code>, <code>--route</code>, <code>--hand</code> and <code>--finish</code>.
+No exit code changed.</p>
 <h3 id="what-you-see">What you <span class="docs-heading-tail"><span>see</span><a class="docs-heading-link" aria-label="Link to this section" href="#what-you-see">#</a></span></h3>
 <ul>
 <li><strong>The strangler, opt-in.</strong> <code>cakephp-to-laravel</code> and <code>slim-to-laravel</code> are planned only with a bare <code>--to-laravel</code>
@@ -64,7 +64,17 @@ target; only the bare flag is new.</li>
 there, <code>booster plan</code> plans only the strangler and says so; patch the old app meanwhile with
 <code>--path=&lt;app&gt;/legacy</code>.</li>
 <li><strong>A strangler section in the report</strong>, in text and in the JSON report (<code>strangler</code>): units moved and left,
-refusals with file and line, and the MANUAL lines grouped by sign-in, mount, route moves and finish.</li>
+refusals with file and line, and the MANUAL lines grouped by sign-in, mount, route moves and finish. A refusal many
+units share prints once, naming them.</li>
+<li><strong>Step 0 keeps the user's row.</strong> On a CakePHP form sign-in, both halves' SESAME resolvers look up the row the form
+found (for example <code>Users</code> by <code>email</code>) by the CAS username, so <code>getIdentifier()</code> keeps returning its id. Make sure
+that field holds the AccessID CAS sends.</li>
+<li><strong>SESAME <code>^0.10.1</code> on both halves.</strong> Step 0 and the mount require <code>waynestate/sesame</code> <code>^0.10.1</code>, which keeps the
+signed-in identity on Laravel's JSON sessions (0.10.0 lost it, so a legacy logout left the Laravel half signed in).
+Users signed in under 0.10.0 on a Laravel app with JSON sessions are signed out once and sign in again, usually
+silently through SSO.</li>
+<li><strong><code>replay init</code> gives each sign-in and sign-out page its own sequence</strong> (<code>sign-in 1</code>, <code>sign-in 2</code>), and on a
+CakePHP app normalizes <code>postLink</code>'s form names.</li>
 <li><strong>Request files can say more.</strong> Writes gain <code>&quot;csrf&quot;: true</code>, and <code>compare</code> gains <code>ignore_cookies</code>, <code>preset</code>
 (<code>&quot;strangler&quot;</code>) and <code>silent_sign_in</code>. <code>replay init</code> now drafts a GET of each write's form page right before it.
 Existing request files and recordings keep working unchanged: no fingerprint moves, and the replay container only
@@ -384,7 +394,7 @@ JSON sessions. SESAME's
   <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#1-21-0">1.21.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-an-older-booster-already-moved">An app that an older Booster already moved</a></li><li class="docs-toc__item"><a href="#1-20-0">1.20.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-1">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-booster-will-not-do">What Booster will not do</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#not-in-this-release">Not in this release</a></li><li class="docs-toc__item"><a href="#1-19-0">1.19.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-2">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-an-older-booster-already-moved-1">An app that an older Booster already moved</a></li><li class="docs-toc__item"><a href="#1-18-0">1.18.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-3">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-an-older-booster-already-moved-2">An app that an older Booster already moved</a></li><li class="docs-toc__item"><a href="#1-17-0">1.17.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-4">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-an-older-booster-already-moved-3">An app that an older Booster already moved</a></li><li class="docs-toc__item"><a href="#1-16-0">1.16.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-5">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-an-older-booster-already-moved-4">An app that an older Booster already moved</a></li><li class="docs-toc__item"><a href="#1-15-0">1.15.0</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-6">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-vendored-to-composer-already-moved">An app that vendored-to-composer already moved</a></li><li class="docs-toc__item"><a href="#1-14-0">1.14.0</a></li><li class="docs-toc__item"><a href="#1-13-1">1.13.1</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-you-see-7">What you see</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#an-app-that-cas-to-sesame-already-moved">An app that cas-to-sesame already moved</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
-  <span>Documents Booster <span data-docs-version>1.20.0</span></span>
+  <span>Documents Booster <span data-docs-version>1.21.0</span></span>
   <span><a rel="noopener" href="https://github.com/waynestate/booster">Source</a> <a href="upgrading.md">Markdown</a></span>
 </footer>
 </body>

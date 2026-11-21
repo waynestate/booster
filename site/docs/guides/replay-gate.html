@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The replay gate | Booster docs</title>
 <meta name="description" content="Record how the app answers before an upgrade, replay the same requests after every hop, and fail the hop when an answer changes.">
-<meta name="docs-version" content="1.20.0">
+<meta name="docs-version" content="1.21.0">
 <link rel="stylesheet" href="../../assets/wayne-ui/wayne-ui.css">
 <link rel="stylesheet" href="../../assets/docs.css">
 <link rel="stylesheet" href="../../docs/theme/booster.css">
@@ -20,7 +20,7 @@
     <a class="masthead__brand" href="../../index.html">
       <img src="../../brand/booster-avatar-256.png" width="36" height="36" alt="">
       <span class="masthead__name">BOOSTER</span>
-      <span class="masthead__ver">1.20.0</span>
+      <span class="masthead__ver">1.21.0</span>
     </a>
     <nav class="masthead__nav" aria-label="Site">
       <a href="../../index.html#record">Record</a>
@@ -257,6 +257,10 @@ around it, also through a group that calls a class's static <code>addRoutes($app
 <p>Every GET without parameters becomes a request, plus one unknown path (an honest 404 is an answer too). Every path
 parameter, form and setup command gets a <code>todo</code>, because Booster cannot know which note id exists or what a valid
 form looks like. Fill those in, delete the <code>todo</code> lines, and record.</p>
+<p>Each sign-in or sign-out page (a path with <code>login</code>, <code>logout</code>, <code>signin</code>, <code>signout</code>, <code>sso</code> or <code>cas</code> in it) gets a
+sequence of its own, after <code>pages</code>: when the strangler's Step 0 moves the sign-in to SESAME, opening that page signs
+the replay user in, and in a shared sequence every page after it would answer signed in. A CakePHP draft also lists a
+normalizer for the <code>post_</code> plus uniqid names <code>postLink()</code> gives its hidden forms, which change on every request.</p>
 <p>Each write is drafted with <code>&quot;csrf&quot;: true</code> in the <code>forms</code> sequence, right after a GET of the page that shows its form,
 so the token comes from that page. When the app has no GET route at the same path, that page gets a <code>todo</code> to point
 it at the right one.</p>
@@ -330,7 +334,9 @@ that is accepted too when every header line but status, content type and <code>L
 body goes with it). The requests later in that sequence that posted the form (the next request when it sends CSRF,
 or a POST to the form's path or a listed path) are reported as <code>sign-in moved to SESAME</code> instead of failing: the
 replay signs in through the fake driver now (<code>compare.silent_sign_in</code>). The signed-in pages after them are compared
-as always.</p>
+as always. Under the fake driver the form page signs in on the spot and redirects back into the app instead of to
+CAS; that is accepted the same way, and the session cookie it opens with it (<code>the sign-in form (200) now signs in through SESAME (the replay's fake driver)</code>). A hand-off to CAS still compares its cookies. Keep the sign-in page in a
+sequence of its own (drafts do): the pages after it in the same sequence would answer signed in.</p>
 <h3 id="which-half-answered">Which half <span class="docs-heading-tail"><span>answered</span><a class="docs-heading-link" aria-label="Link to this section" href="#which-half-answered">#</a></span></h3>
 <p>While a replay runs, the container sets <code>BOOSTER_REPLAY=1</code>, and the mounted app's dispatcher answers every request
 with an <code>X-Booster-Half: laravel</code> or <code>X-Booster-Half: legacy</code> header. The replay reports it and never compares it:
@@ -367,6 +373,10 @@ sign-in path in <code>&quot;compare&quot;: {&quot;silent_sign_in&quot;: [&quot;/
 way a browser does, on GET and HEAD requests only: the redirect to a listed path, its answers, and the redirect back to
 the page asked for, whose answer is the one compared. The transcript lists each hop it followed
 (<code>client: sign-in: followed 302 to GET /_laravel/login</code>). Any other redirect is still recorded, never followed.</p>
+<p>Under the <code>strangler</code> preset, a request the legacy half sent to its sign-in page in the baseline and the Laravel half
+now sends to its own (a 3xx to <code>/_laravel/login</code> where legacy sent <code>/users/login?redirect=...</code>) is the same answer, a
+guest sent to sign in, and the gate says so (&quot;a guest sent to sign-in on both halves&quot;). A page that answered 200 in
+the baseline and now sends to sign-in still differs.</p>
 <h2 id="limits-honestly">Limits, <span class="docs-heading-tail"><span>honestly</span><a class="docs-heading-link" aria-label="Link to this section" href="#limits-honestly">#</a></span></h2>
 <ul>
 <li><strong>No real Oracle, SSO or CAS.</strong> The replay never reaches a real system, by design. An app that cannot render a
@@ -392,7 +402,7 @@ queue. A follow-up request that reads the saved record back (like <code>read bac
   <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#in-three-commands">In three commands</a></li><li class="docs-toc__item"><a href="#what-a-run-does-with-it">What a run does with it</a></li><li class="docs-toc__item"><a href="#the-request-file">The request file</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#what-is-compared">What is compared</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#normalizers">Normalizers</a></li><li class="docs-toc__item"><a href="#design">Design</a></li><li class="docs-toc__item"><a href="#drafting-the-file">Drafting the file</a></li><li class="docs-toc__item"><a href="#pages-behind-sign-in">Pages behind sign-in</a></li><li class="docs-toc__item"><a href="#a-baseline-of-errors">A baseline of errors</a></li><li class="docs-toc__item"><a href="#when-a-hop-changes-how-the-app-is-served">When a hop changes how the app is served</a></li><li class="docs-toc__item"><a href="#strangler-runs">Strangler runs</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#which-half-answered">Which half answered</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#the-strangler-preset">The strangler preset</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#signed-in-sequences">Signed-in sequences</a></li><li class="docs-toc__item"><a href="#limits-honestly">Limits, honestly</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
-  <span>Documents Booster <span data-docs-version>1.20.0</span></span>
+  <span>Documents Booster <span data-docs-version>1.21.0</span></span>
   <span><a rel="noopener" href="https://github.com/waynestate/booster">Source</a> <a href="replay-gate.md">Markdown</a></span>
 </footer>
 </body>

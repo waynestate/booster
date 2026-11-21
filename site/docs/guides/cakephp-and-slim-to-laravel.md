@@ -36,8 +36,8 @@ booster run --path=../my-app --only slim-to-laravel --replay
 
 Run 1 does two things and stops:
 
-1. **Step 0, sign-in on SESAME.** The old app's sign-in moves onto SESAME first, so both halves can share one sign-in and one logout. It is gated by the replay as the app is served today; the sign-in hand-off now goes to CAS, and the gate accepts exactly that change on the paths Step 0 names. An app that already signs in through SESAME skips the change.
-2. **The mount.** Laravel 13 goes at the app root (the same app `sourdough new --laravel` makes). The old Composer root moves, unchanged, to `legacy/` with its own `vendor/`. `public/index.php` becomes a small dispatcher that sends every request to legacy unless the route table, `bootstrap/booster-moved.php`, says Laravel has it. The Laravel half signs in under `/_laravel/login`. The replay checks the mounted app against the untouched app's answers (`--serve-changed`, since the app is now served another way).
+1. **Step 0, sign-in on SESAME.** The old app's sign-in moves onto SESAME first, so both halves can share one sign-in and one logout. It is gated by the replay as the app is served today; the sign-in hand-off now goes to CAS, and the gate accepts exactly that change on the paths Step 0 names. An app that already signs in through SESAME skips the change. Both halves require `waynestate/sesame` `^0.10.1`: 0.10.0 lost the signed-in identity on Laravel's JSON sessions, so a logout on one half did not end the other. On a Laravel app with JSON sessions, users signed in under 0.10.0 are signed out once after the upgrade and sign in again (usually silently, through SSO).
+2. **The mount.** Laravel 13 goes at the app root (the same app `sourdough new --laravel` makes). The old Composer root moves, unchanged, to `legacy/` with its own `vendor/`. `public/index.php` becomes a small dispatcher that sends every request to legacy unless the route table, `bootstrap/booster-moved.php`, says Laravel has it. The Laravel half signs in under `/_laravel/login`. The replay checks the mounted app against the untouched app's answers (`--serve-changed`, since the app is now served another way). The root `composer.json` lists the old app's Composer `repositories` too (a relative path or artifact repository now points into `legacy/`), so both halves find the same packages.
 
 Only when the mount passes its gate does Booster write the ledger, `booster-strangler.json`. A mount that fails leaves its changes in place for you to read, and no ledger: undo it with `git checkout -- . && git clean -fd` and run again once the cause is fixed.
 
@@ -59,6 +59,10 @@ Each run is one diff to review and commit. Booster never commits.
 A moved route keeps the old answer's headers. The first move sets HELMET's `scope` to `web` in `config/helmet.php`, and every moved route skips HELMET's SecurityHeaders, InjectRibbon and RequestForgeryGuard, so a moved page carries no CSP or X-Frame-Options the old app did not send (a nonce CSP would also block its inline scripts). The Laravel half's own pages keep all three. A MANUAL line says so; once the units are on Laravel, drop the skips one route at a time and check each page under HELMET's CSP. A hand-ported route needs the same skip until then.
 
 When a package a move or Step 0 adds needs a shared package (such as `psr/http-message` 2) that a locked package holds at its old major, the gate's `composer update -W` fails on it; Booster then names those locked packages once more, inside `composer.json`'s constraints, and says which in the report.
+
+A moved CakePHP unit that reads the database uses the old app's own connection. At request time, inside the Laravel process, `CakeDatabase` reads the `default` Datasource from `legacy/config/app.php` and `legacy/config/app_local.php` and opens it as the Laravel connection `cake`. That is the app reading its own config, the way the old half does on every request. Booster never reads those values when it moves a unit, and they never reach a report or a log. When the Laravel half gets its own `DB_*` settings, point the moved models at them and drop the bridge (a MANUAL line says so).
+
+After Step 0 on an app with a form sign-in, `src/Sesame/UserResolver.php` looks up the row the form used to find (for example `Users` by `email`) by the CAS username, so `getIdentifier()` still returns that row's id and policies and `user_id` writes keep working. A person with no row signs in with a username only and no id. Make sure that field holds what CAS sends (the AccessID). The mount gives the Laravel half's resolver, `app/Sesame/StranglerUserResolver.php`, the same lookup on the legacy database, once a moved unit has brought `CakeDatabase`, so a moved page sees the same id as the legacy one.
 
 ### A unit Booster cannot move [#](https://booster.apps.wayne.edu/docs/guides/cakephp-and-slim-to-laravel.html#a-unit-booster-cannot-move)
 
@@ -92,7 +96,7 @@ Every strangler run reports, in text and in the JSON report's `strangler` sectio
 
 - the units moved this run, each with its replay line;
 - the units still in legacy, with failed ones marked;
-- every refusal, with file and line;
+- every refusal, with file and line; a refusal several units share prints once with the units it names, and when every refused unit runs the same file (a CakePHP base controller's `initialize()`), a MANUAL line says to port that file first;
 - the MANUAL checklist, grouped: sign-in, mount, route moves, finish;
 - for Slim, the Slim-hosted units still in `routes/web.php` and their `SLIM-HOSTED:` lines, in their own section (`strangler.slim_hosted` in JSON);
 - the next command to run.

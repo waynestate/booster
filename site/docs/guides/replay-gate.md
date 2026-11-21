@@ -145,6 +145,8 @@ A `phpinfo()` page is never drafted: it answers differently on every PHP, so eve
 
 Every GET without parameters becomes a request, plus one unknown path (an honest 404 is an answer too). Every path parameter, form and setup command gets a `todo`, because Booster cannot know which note id exists or what a valid form looks like. Fill those in, delete the `todo` lines, and record.
 
+Each sign-in or sign-out page (a path with `login`, `logout`, `signin`, `signout`, `sso` or `cas` in it) gets a sequence of its own, after `pages`: when the strangler's Step 0 moves the sign-in to SESAME, opening that page signs the replay user in, and in a shared sequence every page after it would answer signed in. A CakePHP draft also lists a normalizer for the `post_` plus uniqid names `postLink()` gives its hidden forms, which change on every request.
+
 Each write is drafted with `"csrf": true` in the `forms` sequence, right after a GET of the page that shows its form, so the token comes from that page. When the app has no GET route at the same path, that page gets a `todo` to point it at the right one.
 
 ## Pages behind sign-in [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#pages-behind-sign-in)
@@ -205,7 +207,7 @@ Without the flag nothing changes: a changed `serve` section is refused like any 
 
 Step 0, which moves the legacy half's sign-in onto SESAME before the mount, changes one kind of answer on purpose: the sign-in hand-off now sends the browser to CAS. Its check accepts exactly that on the request paths Step 0 names, when the baseline answered a redirect, the answer now is a redirect to sign-in, and nothing but the `Location` changed; the report lists each one (`02 requests: GET /auth/login: Location <old> -> <CAS login>`). Every other request is compared as always, and a new cookie on a listed path is still a difference.
 
-On an app with its own sign-in form, Step 0 turns that form page's 200 into a redirect to CAS. On a listed path that is accepted too when every header line but status, content type and `Location` stayed the same (the form's body goes with it). The requests later in that sequence that posted the form (the next request when it sends CSRF, or a POST to the form's path or a listed path) are reported as `sign-in moved to SESAME` instead of failing: the replay signs in through the fake driver now (`compare.silent_sign_in`). The signed-in pages after them are compared as always.
+On an app with its own sign-in form, Step 0 turns that form page's 200 into a redirect to CAS. On a listed path that is accepted too when every header line but status, content type and `Location` stayed the same (the form's body goes with it). The requests later in that sequence that posted the form (the next request when it sends CSRF, or a POST to the form's path or a listed path) are reported as `sign-in moved to SESAME` instead of failing: the replay signs in through the fake driver now (`compare.silent_sign_in`). The signed-in pages after them are compared as always. Under the fake driver the form page signs in on the spot and redirects back into the app instead of to CAS; that is accepted the same way, and the session cookie it opens with it (`the sign-in form (200) now signs in through SESAME (the replay's fake driver)`). A hand-off to CAS still compares its cookies. Keep the sign-in page in a sequence of its own (drafts do): the pages after it in the same sequence would answer signed in.
 
 ### Which half answered [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#which-half-answered)
 
@@ -238,6 +240,8 @@ Signed-in sequence: 02 staff: GET /articles is the first request of sequence "st
 ```
 
 When Laravel answers that redirect later in a sequence, the Laravel half had no session of its own yet. In a browser that is a silent round trip through CAS; in the replay SESAME's `fake` driver signs in at once. List the Laravel half's sign-in path in `"compare": {"silent_sign_in": ["/_laravel/login"]}` and the client follows that one redirect chain the way a browser does, on GET and HEAD requests only: the redirect to a listed path, its answers, and the redirect back to the page asked for, whose answer is the one compared. The transcript lists each hop it followed (`client: sign-in: followed 302 to GET /_laravel/login`). Any other redirect is still recorded, never followed.
+
+Under the `strangler` preset, a request the legacy half sent to its sign-in page in the baseline and the Laravel half now sends to its own (a 3xx to `/_laravel/login` where legacy sent `/users/login?redirect=...`) is the same answer, a guest sent to sign in, and the gate says so ("a guest sent to sign-in on both halves"). A page that answered 200 in the baseline and now sends to sign-in still differs.
 
 ## Limits, honestly [#](https://booster.apps.wayne.edu/docs/guides/replay-gate.html#limits-honestly)
 

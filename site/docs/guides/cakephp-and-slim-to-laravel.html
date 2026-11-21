@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CakePHP and Slim apps onto Laravel | Booster docs</title>
 <meta name="description" content="Booster 1.21 moves a CakePHP 5 or Slim 4 app onto Laravel 13 one unit at a time (the strangler), with sign-in on SESAME first and the replay as the gate for every run.">
-<meta name="docs-version" content="1.20.0">
+<meta name="docs-version" content="1.21.0">
 <link rel="stylesheet" href="../../assets/wayne-ui/wayne-ui.css">
 <link rel="stylesheet" href="../../assets/docs.css">
 <link rel="stylesheet" href="../../docs/theme/booster.css">
@@ -20,7 +20,7 @@
     <a class="masthead__brand" href="../../index.html">
       <img src="../../brand/booster-avatar-256.png" width="36" height="36" alt="">
       <span class="masthead__name">BOOSTER</span>
-      <span class="masthead__ver">1.20.0</span>
+      <span class="masthead__ver">1.21.0</span>
     </a>
     <nav class="masthead__nav" aria-label="Site">
       <a href="../../index.html#record">Record</a>
@@ -73,12 +73,15 @@ The replay is the only thing that can say a moved page still answers the same, s
 <li><strong>Step 0, sign-in on SESAME.</strong> The old app's sign-in moves onto SESAME first, so both halves can share one
 sign-in and one logout. It is gated by the replay as the app is served today; the sign-in hand-off now goes to CAS,
 and the gate accepts exactly that change on the paths Step 0 names. An app that already signs in through SESAME
-skips the change.</li>
+skips the change. Both halves require <code>waynestate/sesame</code> <code>^0.10.1</code>: 0.10.0 lost the signed-in identity on
+Laravel's JSON sessions, so a logout on one half did not end the other. On a Laravel app with JSON sessions, users
+signed in under 0.10.0 are signed out once after the upgrade and sign in again (usually silently, through SSO).</li>
 <li><strong>The mount.</strong> Laravel 13 goes at the app root (the same app <code>sourdough new --laravel</code> makes). The old Composer
 root moves, unchanged, to <code>legacy/</code> with its own <code>vendor/</code>. <code>public/index.php</code> becomes a small dispatcher that sends
 every request to legacy unless the route table, <code>bootstrap/booster-moved.php</code>, says Laravel has it. The Laravel half
 signs in under <code>/_laravel/login</code>. The replay checks the mounted app against the untouched app's answers
-(<code>--serve-changed</code>, since the app is now served another way).</li>
+(<code>--serve-changed</code>, since the app is now served another way). The root <code>composer.json</code> lists the old app's Composer
+<code>repositories</code> too (a relative path or artifact repository now points into <code>legacy/</code>), so both halves find the same packages.</li>
 </ol>
 <p>Only when the mount passes its gate does Booster write the ledger, <code>booster-strangler.json</code>. A mount that fails leaves
 its changes in place for you to read, and no ledger: undo it with <code>git checkout -- . &amp;&amp; git clean -fd</code> and run again
@@ -109,6 +112,18 @@ time and check each page under HELMET's CSP. A hand-ported route needs the same 
 <p>When a package a move or Step 0 adds needs a shared package (such as <code>psr/http-message</code> 2) that a locked package
 holds at its old major, the gate's <code>composer update -W</code> fails on it; Booster then names those locked packages once
 more, inside <code>composer.json</code>'s constraints, and says which in the report.</p>
+<p>A moved CakePHP unit that reads the database uses the old app's own connection. At request time, inside the Laravel
+process, <code>CakeDatabase</code> reads the <code>default</code> Datasource from <code>legacy/config/app.php</code> and <code>legacy/config/app_local.php</code>
+and opens it as the Laravel connection <code>cake</code>. That is the app reading its own config, the way the old half does on
+every request. Booster never reads those values when it moves a unit, and they never reach a report or a log. When
+the Laravel half gets its own <code>DB_*</code> settings, point the moved models at them and drop the bridge (a MANUAL line says
+so).</p>
+<p>After Step 0 on an app with a form sign-in, <code>src/Sesame/UserResolver.php</code> looks up the row the form used to find
+(for example <code>Users</code> by <code>email</code>) by the CAS username, so <code>getIdentifier()</code> still returns that row's id and policies
+and <code>user_id</code> writes keep working. A person with no row signs in with a username only and no id. Make sure that
+field holds what CAS sends (the AccessID). The mount gives the Laravel half's resolver, <code>app/Sesame/StranglerUserResolver.php</code>,
+the same lookup on the legacy database, once a moved unit has brought <code>CakeDatabase</code>, so a moved page sees the same
+id as the legacy one.</p>
 <h3 id="a-unit-booster-cannot-move">A unit Booster cannot <span class="docs-heading-tail"><span>move</span><a class="docs-heading-link" aria-label="Link to this section" href="#a-unit-booster-cannot-move">#</a></span></h3>
 <p>When a unit uses something Booster cannot translate exactly, it refuses that unit, names the file and line, and moves
 on to the next one. Port it by hand in the Laravel half (<code>routes/web.php</code> and a controller), then flip it:</p>
@@ -142,7 +157,8 @@ old app meanwhile (a security fix, a PHP hop), run Booster on it alone with <cod
 <ul>
 <li>the units moved this run, each with its replay line;</li>
 <li>the units still in legacy, with failed ones marked;</li>
-<li>every refusal, with file and line;</li>
+<li>every refusal, with file and line; a refusal several units share prints once with the units it names, and when every
+refused unit runs the same file (a CakePHP base controller's <code>initialize()</code>), a MANUAL line says to port that file first;</li>
 <li>the MANUAL checklist, grouped: sign-in, mount, route moves, finish;</li>
 <li>for Slim, the Slim-hosted units still in <code>routes/web.php</code> and their <code>SLIM-HOSTED:</code> lines, in their own section (<code>strangler.slim_hosted</code> in JSON);</li>
 <li>the next command to run.</li>
@@ -159,7 +175,7 @@ without a ledger (a mount that did not pass), a Laravel app already at the root 
   <nav class="docs-toc" aria-label="On this page"><h2 class="docs-toc__title">On this page</h2><ul class="docs-toc__list"><li class="docs-toc__item"><a href="#before-you-start">Before you start</a></li><li class="docs-toc__item"><a href="#run-1-step-0-and-the-mount">Run 1: Step 0 and the mount</a></li><li class="docs-toc__item"><a href="#later-runs-one-unit-at-a-time">Later runs: one unit at a time</a></li><li class="docs-toc__item docs-toc__item--sub"><a href="#a-unit-booster-cannot-move">A unit Booster cannot move</a></li><li class="docs-toc__item"><a href="#finish">Finish</a></li><li class="docs-toc__item"><a href="#while-the-move-is-in-progress">While the move is in progress</a></li><li class="docs-toc__item"><a href="#the-report">The report</a></li><li class="docs-toc__item"><a href="#stop-signs">Stop signs</a></li></ul></nav>
 </div>
 <footer class="docs-footer">
-  <span>Documents Booster <span data-docs-version>1.20.0</span></span>
+  <span>Documents Booster <span data-docs-version>1.21.0</span></span>
   <span><a rel="noopener" href="https://github.com/waynestate/booster">Source</a> <a href="cakephp-and-slim-to-laravel.md">Markdown</a></span>
 </footer>
 </body>

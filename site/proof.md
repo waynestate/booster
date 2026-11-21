@@ -8,7 +8,7 @@ generator: Squire agent-ready
 
 # Real output, from Booster's own example apps
 
-Captured on 2026-11-20 with Booster 1.20.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
+Captured on 2026-11-20 with Booster 1.21.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
 
 ## laravel-blade
 
@@ -70,13 +70,13 @@ Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes 
 
 PHPCompatibility check for PHP 8.3: no findings.
 
-PHPStan on PHP 8.5: 5 findings (code quality hints, not upgrade blockers).
+PHPStan on PHP 8.5: 10 findings (code quality hints, not upgrade blockers).
    app/Models/Post.php:7 [class.notFound] Class App\Models\Post extends unknown class Illuminate\Database\Eloquent\Model.
    app/Models/Post.php:9 [missingType.property] Property App\Models\Post::$casts has no type specified.
+   tests/PostTest.php:16 [class.notFound] Class App\Tests\PostTest extends unknown class PHPUnit\Framework\TestCase.
+   tests/PostTest.php:18 [class.notFound] Property App\Tests\PostTest::$repository has unknown class PHPUnit\Framework\MockObject\MockObject as its type.
    tests/PostTest.php:18 [property.onlyWritten] Property App\Tests\PostTest::$repository is never read, only written.
-   tests/PostTest.php:27 [staticMethod.deprecated] Call to deprecated method isType() of class PHPUnit\Framework\Assert:
-https://github.com/sebastianbergmann/phpunit/issues/6052
-   tests/PostTest.php:33 [method.alreadyNarrowedType] Call to method PHPUnit\Framework\Assert::assertNotNull() with PHPUnit\Framework\MockObject\Rule\AnyInvokedCount will always evaluate to true.
+   (5 more; run `booster scan --phpstan` to see all)
    Hint: vendor/ is not installed, so the classes your packages provide cannot resolve and most of these findings are noise. Run composer install in the app, then scan again.
 
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
