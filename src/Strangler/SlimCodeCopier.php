@@ -26,7 +26,7 @@ namespace Waynestate\Booster\Strangler;
  */
 final class SlimCodeCopier
 {
-    public const NAMESPACE = 'App\\Http\\Controllers\\Legacy\\';
+    public const LEGACY_NAMESPACE = 'App\\Http\\Controllers\\Legacy\\';
 
     public const DIR = 'app/Http/Controllers/Legacy/';
 
@@ -170,7 +170,7 @@ final class SlimCodeCopier
         $fqcn = ltrim($fqcn, '\\');
         foreach ($this->prefixes as $prefix) {
             if (stripos($fqcn . '\\', $prefix) === 0) {
-                return self::NAMESPACE . $fqcn;
+                return self::LEGACY_NAMESPACE . $fqcn;
             }
         }
 

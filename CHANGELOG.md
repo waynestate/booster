@@ -4,6 +4,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## [Unreleased]
 
+- Changed: `SlimCodeCopier::NAMESPACE` is renamed `LEGACY_NAMESPACE` (same value). Nothing outside the class referenced it. This clears the PHP 8.6 deprecation for a class constant named `namespace`.
+
 - Changed: CI pins Preflight 0.12.0 (components and the a11y checker copy). The php-test component now also runs an advisory PHP 8.6 job that may fail and never gates the pipeline.
 
 - Changed: PROCTOR is `^0.17` in Booster and its `deploy/` layer (was `^0.16`, which does not allow 0.17); 0.17.0 adds three warn-only Oracle checks (`raw-oci`, `oracle-sql-interpolation`, `oracle-credentials-literal`).

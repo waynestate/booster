@@ -823,11 +823,11 @@ final class SlimMover implements AddsComposerPackages, Mover
             $copier->copyClass($ref);
         }
         $name = self::className($route);
-        $class = SlimCodeCopier::NAMESPACE . 'Closures\\' . $name;
+        $class = SlimCodeCopier::LEGACY_NAMESPACE . 'Closures\\' . $name;
         $strict = str_contains($src->code, 'strict_types=1') ? "\ndeclare(strict_types=1);\n" : '';
         $imports = $copier->importLines($src, $closure);
         $body = '        return ' . self::reindent($closure, '        ') . ';';
-        $code = "<?php\n" . $strict . "\nnamespace " . rtrim(SlimCodeCopier::NAMESPACE, '\\') . "\\Closures;\n\n"
+        $code = "<?php\n" . $strict . "\nnamespace " . rtrim(SlimCodeCopier::LEGACY_NAMESPACE, '\\') . "\\Closures;\n\n"
             . ($imports === '' ? '' : $imports . "\n\n")
             . "/**\n * The Slim closure from legacy/" . $route->file . ':' . $route->handlerLine . ", moved by Booster's strangler.\n"
             . " * SlimAdapter binds it to the legacy container, as Slim did.\n */\n"
