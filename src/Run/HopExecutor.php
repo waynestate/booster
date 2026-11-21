@@ -2157,14 +2157,23 @@ final class HopExecutor
         // locked package holds at its old major; `-W` never moves the packages that require it.
         // Name those once more, inside composer.json's constraints (testeval: SESAME 0.10 next to
         // slim/http 1.3 and slim/psr7 1.6, 2026-11-20).
-        $held = $gate->passed || $update === [] ? [] : self::heldByLock($path, $gate->lines, $update);
-        if ($held !== []) {
-            $retry = $signInChanges !== null
-                ? $this->runTestGate($step, $path, $options, $baseline, [...$update, ...$held])
-                : $this->runTestGateWith($step, $path, $options, $baseline, [...$update, ...$held], $this->strangledTestCommand($path, $options, $baseline->gateKind));
-            $gate = new GateReport($retry->passed, [
-                sprintf('composer update named %s too: %s held a package the new requirement needs at its locked major; they moved only inside composer.json\'s constraints.', implode(', ', $held), count($held) === 1 ? 'it' : 'they'),
-                ...$retry->lines,
+        // Each failed update can name one more shared package, so this goes a few rounds.
+        $named = [];
+        for ($round = 0; $round < 4 && !$gate->passed && $update !== []; $round++) {
+            $held = self::heldByLock($path, $gate->lines, [...$update, ...$named]);
+            if ($held === []) {
+                break;
+            }
+            $named = [...$named, ...$held];
+            $gate = $signInChanges !== null
+                ? $this->runTestGate($step, $path, $options, $baseline, [...$update, ...$named])
+                : $this->runTestGateWith($step, $path, $options, $baseline, [...$update, ...$named], $this->strangledTestCommand($path, $options, $baseline->gateKind));
+        }
+        if ($named !== []) {
+            sort($named);
+            $gate = new GateReport($gate->passed, [
+                sprintf('composer update named %s too: %s held a package the new requirement needs at its locked major; they moved only inside composer.json\'s constraints.', implode(', ', $named), count($named) === 1 ? 'it' : 'they'),
+                ...$gate->lines,
             ]);
         }
         if (!$gate->passed) {
