@@ -205,6 +205,11 @@ copies Rector, its `config/rector.php` and `docker/` out of the phar into a temp
 `docker build` are child processes that cannot be pointed at a `phar://` path; the temp directory is removed when the
 command exits.
 
+Booster checks once a day whether a newer stable release exists and, if so, prints one line to standard error after
+the command finishes, with the command that updates however you installed it (PHAR, source checkout, Composer global
+or project dependency). Set `WAYNE_NO_UPDATE_CHECK=1` to turn the check off; it is also skipped on CI and with
+`--quiet`.
+
 ### Quick start
 
 ```
@@ -1635,6 +1640,7 @@ CakePHP 5 and Slim 4 apps move onto Laravel 13 one unit at a time with a bare --
 - Added: under the `strangler` compare preset, a request the legacy half sent to its sign-in page in the baseline and the Laravel half now sends to its own sign-in (`/_laravel/login`) is the same answer, reported as "a guest sent to sign-in on both halves"; the CMS tutorial's add form after a legacy logout differed only there.
 - Changed: the strangler report prints a refusal that several units share once, naming the units, and when every refused unit shares a file (a base controller's `initialize()`), a MANUAL line says to port that file first. The JSON report keeps every refusal. The fleet attendance app's 56 units had printed the same AppController refusals 2,057 times.
 - Fixed: the mount's clean-tree stop sign reads the tree as the run found it, before the baseline, so an app that tracks its logs or `vendor/` is not refused for what its own tests wrote; a strangled app's legacy suite reads `legacy/`'s failOn rules for the unknown-ini tolerance, not the Laravel half's `phpunit.xml` (the fleet attendance app's mount gate failed on `apc.enable_cli`).
+- Added: after any command, one line to standard error when a newer stable release exists, with the update command for however Booster was installed (the PHAR re-download, `git pull`, `composer global update`, or `composer update` / `composer require` for a project dependency); a major bump links the upgrading page. Off on CI, with `--quiet`, or with `WAYNE_NO_UPDATE_CHECK=1`; the check asks Packagist at most once a day and caches its answer in the user cache folder.
 
 ### \[1.20.0\] - 2026-11-20 [#](https://booster.apps.wayne.edu/docs/changelog.html#1-20-0-2026-11-20)
 
@@ -3618,6 +3624,16 @@ Each script writes `build/booster.phar` and verifies it by printing Booster's ve
 
 Every command works from the phar. `detect`, `plan`, `hops` and `init` read only what is bundled inside it. `run` copies Rector, its `config/rector.php` and `docker/` out of the phar into a temp directory first, because Rector and `docker build` are child processes that cannot be pointed at a `phar://` path; the temp directory is removed when the command exits.
 
+### Update notice [#](https://booster.apps.wayne.edu/docs/install.html#update-notice)
+
+After any command, Booster prints one line to standard error when a newer stable release exists, with the command that updates your install: the PHAR re-download, `git pull` for a source checkout, `composer global update` for a Composer global, or `composer update` for a project dependency (a `composer require` with the new constraint when your `composer.json` pins the package below the newest release). When the newest release is a major version up, the line also links the upgrading page.
+
+The check asks Packagist at most once a day and caches its answer in your user cache folder, so an offline machine is not slowed down. It never changes a command's output or exit code. It is skipped on CI, with `--quiet`, and with `WAYNE_NO_UPDATE_CHECK=1`:
+
+```
+export WAYNE_NO_UPDATE_CHECK=1
+```
+
 ---
 
 Source: https://booster.apps.wayne.edu/docs/next.html
@@ -4130,6 +4146,15 @@ export BOOSTER_NPM_CACHE=~/.cache/booster-npm         # or a folder on your mach
 ```
 
 The Node containers run as root, so on Linux a host folder fills with files root owns; a Docker volume keeps them out of your way.
+
+### Update notice [#](https://booster.apps.wayne.edu/docs/reference/configuration.html#update-notice)
+
+Two variables steer the update notice, the one line Booster prints to standard error after a command when a newer stable release exists. They do not appear in the table above, which lists only Booster's own `BOOSTER_*` variables:
+
+- `WAYNE_NO_UPDATE_CHECK` set to `1` turns the check off entirely; any other value leaves it on.
+- `CI` set to anything other than empty, `0` or `false` (as CI systems set it) also turns it off, so pipelines see no extra line.
+
+The check reads Packagist at most once a day and caches its answer in your user cache folder (`~/.cache/waynestate/booster/update-check.json`, `$XDG_CACHE_HOME/waynestate/booster/` when set, or `%LOCALAPPDATA%\waynestate\booster\` on Windows); delete the file to force a fresh check. `--quiet` skips the line too. The [Install](https://booster.apps.wayne.edu/docs/install.html) page's "Update notice" section has the full behaviour.
 
 `.env.example` holds the placeholders. Booster reads no secrets and talks to no Citadel host. Its own network calls only read: the dependency check asks Packagist (and any composer-type repository the app declares) about the app's direct dependencies, which `--no-package-check` turns off, and a plan for an app on `wayne-cas` with no `vendor/` checks the VCS repository `composer.json` names for that package with `git ls-remote`. Everything it prints from an app (file names, diffs) has control characters stripped.
 

@@ -135,3 +135,20 @@ Every command works from the phar. `detect`, `plan`, `hops` and `init` read only
 copies Rector, its `config/rector.php` and `docker/` out of the phar into a temp directory first, because Rector and
 `docker build` are child processes that cannot be pointed at a `phar://` path; the temp directory is removed when the
 command exits.
+
+## Update notice
+
+After any command, Booster prints one line to standard error when a newer stable release exists, with the command
+that updates your install: the PHAR re-download, `git pull` for a source checkout, `composer global update` for a
+Composer global, or `composer update` for a project dependency (a `composer require` with the new constraint when
+your `composer.json` pins the package below the newest release). When the newest release is a major version up, the
+line also links the upgrading page.
+
+The check asks Packagist at most once a day and caches its answer in your user cache folder, so an offline machine is
+not slowed down. It never changes a command's output or exit code. It is skipped on CI, with `--quiet`, and with
+`WAYNE_NO_UPDATE_CHECK=1`:
+
+<!-- docs-test: skip sets your shell's environment -->
+```
+export WAYNE_NO_UPDATE_CHECK=1
+```
