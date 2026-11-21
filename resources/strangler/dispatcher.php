@@ -186,11 +186,12 @@ $booster_route = (static function (): array {
     $folder = $file === null && $plainPhpServer ? $legacyPath($path) : null;
     if ($folder !== null && is_dir($folder)) {
         // A legacy folder with no index under plain php -S: its own 404 page
-        // (PHP 8.5's, the request URI as sent), not the front controller.
+        // (the running PHP's: 8.5 added the viewport meta tag, the request URI as sent), not the front controller.
         http_response_code(404);
         header('Content-Type: text/html; charset=UTF-8');
         if ($method !== 'HEAD') {
-            echo '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>404 Not Found</title><style>' . "\n"
+            $viewport = PHP_VERSION_ID >= 80500 ? '<meta name="viewport" content="width=device-width, initial-scale=1">' : '';
+            echo '<!doctype html><html><head>' . $viewport . '<title>404 Not Found</title><style>' . "\n"
                 . 'body { background-color: #fcfcfc; color: #333333; margin: 0; padding:0; }' . "\n"
                 . 'h1 { font-size: 1.5em; font-weight: normal; background-color: #9999cc; min-height:2em; line-height:2em; border-bottom: 1px inset black; margin: 0; }' . "\n"
                 . 'h1, p { padding-left: 10px; }' . "\n"
