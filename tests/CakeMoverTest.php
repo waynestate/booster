@@ -7,6 +7,7 @@ namespace Waynestate\Booster\Tests;
 use Waynestate\Booster\Strangler\CakeModels;
 use Waynestate\Booster\Strangler\CakeMover;
 use Waynestate\Booster\Strangler\CakeUnitSource;
+use Waynestate\Booster\Strangler\HelmetHold;
 use Waynestate\Booster\Strangler\Unit;
 
 /**
@@ -131,7 +132,7 @@ final class CakeMoverTest extends TestCase
         $result = (new CakeMover())->move($this->unit($app, 'GET /notes/me'), $app);
         $this->assertTrue($result->moved);
         $this->assertStringContainsString(
-            "Route::match(['GET'], 'notes/me', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\MeAction::class)\n    ->middleware('auth.sesame');",
+            "Route::match(['GET'], 'notes/me', \\App\\Http\\Controllers\\Legacy\\Cake\\Notes\\MeAction::class)\n    ->middleware('auth.sesame')" . HelmetHold::SKIP . ';',
             (string) file_get_contents($app . '/routes/web.php'),
         );
         $this->assertStringContainsString(

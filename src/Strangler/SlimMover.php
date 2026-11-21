@@ -166,6 +166,10 @@ final class SlimMover implements AddsComposerPackages, Mover
         $block = "\n" . self::marker($unit->id) . $unit->sourceFile . ':' . $unit->sourceLine . "\n" . implode("\n", $blocks) . "\n";
         file_put_contents($web, rtrim($webCode, "\n") . "\n" . $block);
         $changed[] = 'routes/web.php';
+        if (HelmetHold::scopeToWeb($appRoot)) {
+            $changed[] = HelmetHold::FILE;
+            $manual[] = HelmetHold::MANUAL;
+        }
         if ($this->requirePackages($appRoot, $copier, $front, $manual)) {
             $changed[] = 'composer.json';
         }
@@ -759,6 +763,7 @@ final class SlimMover implements AddsComposerPackages, Mover
             // PreventRequestForgery is Laravel 13's name for ValidateCsrfToken.
             $line .= "\n    ->withoutMiddleware([\\Illuminate\\Foundation\\Http\\Middleware\\PreventRequestForgery::class, \\Illuminate\\Foundation\\Http\\Middleware\\ValidateCsrfToken::class])";
         }
+        $line .= HelmetHold::SKIP;
         if ($route->name !== null) {
             $line .= "\n    ->name(" . var_export($route->name, true) . ')';
         }

@@ -199,6 +199,10 @@ PHP;
         $block = "\n" . self::marker($unit->id) . $unit->sourceFile . ':' . $unit->sourceLine . "\n" . implode("\n", $routeLines) . "\n";
         file_put_contents($web, rtrim($webCode, "\n") . "\n" . $block);
         $changed[] = 'routes/web.php';
+        if (HelmetHold::scopeToWeb($appRoot)) {
+            $changed[] = HelmetHold::FILE;
+            $this->manual[] = HelmetHold::MANUAL;
+        }
         sort($changed);
 
         return new MoveResult(true, array_values(array_unique($changed)), [], array_values(array_unique($this->manual)));
@@ -354,6 +358,7 @@ PHP;
             $route .= "\n    ->withoutMiddleware([\\Illuminate\\Foundation\\Http\\Middleware\\PreventRequestForgery::class, \\Illuminate\\Foundation\\Http\\Middleware\\ValidateCsrfToken::class])";
             $this->manual[] = sprintf('%s:%d %s /%s had no CSRF check in CakePHP and has none in Laravel either (the route skips PreventRequestForgery so the legacy form still posts); add one when its form is ported', $file, $method['line'], implode('|', $writes), ltrim($entry['uri'], '/'));
         }
+        $route .= HelmetHold::SKIP;
         if ($entry['name'] !== null) {
             $route .= "\n    ->name(" . var_export($entry['name'], true) . ')';
         }

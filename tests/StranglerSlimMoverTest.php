@@ -7,6 +7,7 @@ namespace Waynestate\Booster\Tests;
 use PHPUnit\Framework\TestCase;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use Waynestate\Booster\Strangler\HelmetHold;
 use Waynestate\Booster\Strangler\MoveResult;
 use Waynestate\Booster\Strangler\SlimMover;
 use Waynestate\Booster\Strangler\SlimUnitSource;
@@ -119,7 +120,7 @@ final class StranglerSlimMoverTest extends TestCase
         $web = $this->read('routes/web.php');
         self::assertStringContainsString("Route::match(['GET'], 'items/{id}',", $web);
         self::assertStringContainsString("->defaults('booster_slim', 'class:App\\\\Http\\\\Controllers\\\\Legacy\\\\App\\\\Action\\\\ViewItem@show')", $web);
-        self::assertStringContainsString("->where('id', '[0-9]+');", $web);
+        self::assertStringContainsString("->where('id', '[0-9]+')" . HelmetHold::SKIP . ';', $web);
     }
 
     public function testAFormMovesItsGetAndPostTogetherWithoutLaravelsCsrfCheck(): void
