@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "name": "booster",
+  "image": "citadel/php-apache:8.5r3",
+  "public_dir": "public",
+  "mode": "mount",
+  "build_script": "build.sh",
+  "deployments": "deployments/",
+  "health_check": "php health.php",
+  "environment": "local",
+  "server_name": "booster.apps.wayne.test",
+  "time_zone": "America/Detroit",
+  "http_port": 8080,
+  "database": {
+    "mysql": true,
+    "name": "app",
+    "port": 3307
+  },
+  "sign_in": "none"
+}
