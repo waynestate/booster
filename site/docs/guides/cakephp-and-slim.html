@@ -186,7 +186,7 @@ adder typed <code>\Slim\App</code> that a group calls is widened to take the gro
 <li><code>$request-&gt;getAttribute('route')</code> becomes <code>RouteContext::fromRequest($request)-&gt;getRoute()</code>.</li>
 <li>Slim 3's <code>$request-&gt;getUri()-&gt;getBasePath()</code>, which Slim 4's Uri lacks, becomes
 <code>$request-&gt;getAttribute(\Slim\Routing\RouteContext::BASE_PATH, '')</code>: the base path the hop's routing glue puts on
-every request before the app's middleware and routes run (on testeval, a signed-in <code>/login/</code> answered 500).</li>
+every request before the app's middleware and routes run (on a Slim 3 fleet app, a signed-in <code>/login/</code> answered 500).</li>
 <li>Code typed with Slim 3's own <code>Slim\Http\Request</code> and <code>Slim\Http\Response</code> (the official Slim 3 skeleton's routes
 are) moves onto <code>slim/http</code>, whose decorators keep <code>withJson()</code>, <code>write()</code>, <code>getParam()</code> and <code>isXhr()</code> on Slim 4:
 <code>Slim\Http\Request</code> becomes <code>Slim\Http\ServerRequest</code> in use statements, fully qualified names and type hints
