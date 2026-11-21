@@ -88,6 +88,8 @@ final class DependencyRaiseTest extends TestCase
         self::assertNotNull($candidate);
         self::assertSame('acme/di', $candidate['package']);
         self::assertSame('^1.2 || ^2', $candidate['widened']);
+        // Composer already proved no release inside ^1.2 fits, so an older install is raised too.
+        self::assertSame('^1.2 || ^2', $raise->rootHolder($this->app('1.2.0'), '8.4', $failure, ['waynestate/sesame'])['widened'] ?? null);
         // A package the update already names is not raised.
         self::assertNull($raise->rootHolder($dir, '8.4', $failure, ['waynestate/sesame', 'acme/di']));
         // A failure that names no root requirement raises nothing.

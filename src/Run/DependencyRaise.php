@@ -93,9 +93,9 @@ final class DependencyRaise
      * requires directly holds a shared one at its old major (monolog/monolog
      * ^1.17 holds psr/log 1, SESAME needs psr/log 3). Composer names it as
      * "Root composer.json requires <package> <constraint>". The first such
-     * package not in $named, not owned by another hop, and on the newest
-     * release its constraint allows, with a next major for PHP $php, is the
-     * candidate; the caller proves the raise with the gate.
+     * package not in $named and not owned by another hop, with a next major
+     * for PHP $php, is the candidate (Composer already showed that no release
+     * inside its constraint fits); the caller proves the raise with the gate.
      *
      * @param list<string> $named the packages the update already names
      *
@@ -117,7 +117,7 @@ final class DependencyRaise
             if ($section === null || $constraint === null) {
                 continue;
             }
-            $found = $this->qualify($package, $constraint, $locked[$package], $php);
+            $found = $this->qualify($package, $constraint, $locked[$package], $php, false);
             if ($found !== null) {
                 return ['package' => $package, 'section' => $section, 'constraint' => $constraint, ...$found];
             }
@@ -149,7 +149,7 @@ final class DependencyRaise
     /**
      * @return array{widened: string, installed: string, oldMajor: string, newMajor: string, notes: ?string}|null
      */
-    private function qualify(string $package, string $constraint, string $installed, string $php): ?array
+    private function qualify(string $package, string $constraint, string $installed, string $php, bool $newestOnly = true): ?array
     {
         $result = $this->fetcher->fetch(PackageCompat::PACKAGIST . $package . '.json');
         if ($result->status !== PackageFetchResult::OK || $result->data === null) {
@@ -180,7 +180,7 @@ final class DependencyRaise
                 $newestNormal = $normal;
             }
         }
-        if ($newestNormal === null || $newestNormal !== $installedNormal) {
+        if ($newestNormal === null || ($newestOnly && $newestNormal !== $installedNormal)) {
             return null;
         }
         $oldMajor = (int) explode('.', $installedNormal)[0];

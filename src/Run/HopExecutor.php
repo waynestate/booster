@@ -2238,7 +2238,7 @@ final class HopExecutor
             $file = rtrim($path, '/\\') . '/' . $name;
             $files[$file] = is_file($file) ? file_get_contents($file) : false;
         }
-        $tried = sprintf('%s %s is the newest release its constraint %s allows and holds a package the new requirement needs at another major, so Booster raised it: composer.json asks for %s.', $package, $candidate['installed'], $candidate['constraint'], $candidate['widened']);
+        $tried = sprintf('%s (locked %s) holds a package the new requirement needs at another major, and no release inside its constraint %s fits, so Booster raised it: composer.json asks for %s.', $package, $candidate['installed'], $candidate['constraint'], $candidate['widened']);
         try {
             DependencyRaise::widen($path, $candidate);
         } catch (ToolError $e) {
