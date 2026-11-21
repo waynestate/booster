@@ -141,9 +141,11 @@ pattern order, echoed output as the body, <code>Content-Type: text/html</code> b
 <code>urlFor()</code>, <code>getMode()</code>, <code>configureMode()</code>, route middleware, and the app's own properties on <code>$app</code>.</li>
 </ul>
 <p>It does not turn a PHP notice into an error page the way Slim 1 did in development mode: on a new PHP every
-deprecation would become a 500, which is a strange way to celebrate an upgrade. The bridge is the app's code from
-then on. Move one route at a time to plain Slim 4 (or to Laravel) with the replay green after each, and delete the
-file when nothing calls <code>new Slim()</code> any more.</p>
+deprecation would become a 500, which is a strange way to celebrate an upgrade. It defaults to debug off, so a
+migrated app no longer shows Slim's debug error pages unless its own settings turn them on, and a bridge written
+by an earlier Booster release is left as it is. The bridge is the app's code from then on. Move one route at a
+time to plain Slim 4 (or to Laravel) with the replay green after each, and delete the file when nothing calls
+<code>new Slim()</code> any more.</p>
 <h2 id="stop-signs">Stop <span class="docs-heading-tail"><span>signs</span><a class="docs-heading-link" aria-label="Link to this section" href="#stop-signs">#</a></span></h2>
 <p>The hop rewrites a few exact line shapes and nothing else. Anything that touches a moved library in another way is a
 stop sign: the plan leaves the hop out and names the file and line, and a run that finds one refuses the step and
