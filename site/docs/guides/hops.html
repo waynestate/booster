@@ -85,7 +85,7 @@ own output, because the tests never ran.</li>
 <p>When the run raised the app's PHP floor, its report ends with a list of the other places that still name an older
 PHP, each with its file and line: PHP versions in the CI matrix (Preflight's <code>php_versions</code>, a GitHub workflow's
 <code>php:</code> matrix, a <code>PHP_VERSIONS</code> list) and PHP images (<code>php:8.3-cli</code> in a CI job, <code>citadel/php-apache:8.4r5</code> in the
-Squire kit's <code>.env.squire.example</code> or <code>docker-compose.squire.yml</code>, the <code>image</code> in Parity's <code>parity.json</code>, a <code>FROM</code>
+app's Squire kit, the <code>image</code> in Parity's <code>parity.json</code>, a <code>FROM</code>
 line in the app's own <code>Dockerfile</code>, an <code>image:</code> in its <code>docker-compose.yml</code> or <code>compose.yaml</code>), and Laravel Sail's
 runtime (<code>vendor/laravel/sail/runtimes/8.3</code> and <code>sail-8.3/app</code> in a Sail app's <code>docker-compose.yml</code>). Booster never
 edits CI or deploy files, so it lists them instead: a matrix entry below the floor fails on the first push, because

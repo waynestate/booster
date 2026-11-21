@@ -12,6 +12,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## \[Unreleased\] [#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Removed: Squire's local-running kit files (docker-compose.squire.yml, haproxy.cfg, parity scripts, env example; D-095). Parity runs the app locally: `parity up` in `deploy/`.
+
 ## \[1.21.0\] - 2026-11-20 [#](https://booster.apps.wayne.edu/docs/changelog.html#1-21-0-2026-11-20)
 
 CakePHP 5 and Slim 4 apps move onto Laravel 13 one unit at a time with a bare --to-laravel (the strangler): sign-in on SESAME first, the old app in legacy/, and the replay gating every run.
