@@ -4263,7 +4263,7 @@ Step 0 runs before the mount. It reads how the app signs people in today and pic
 | validuser, Slim | the WSUCookie family (a `CheckWSUCookie()` that sets `$this->user->id($uid)`) | that method asks SESAME, then runs the app's own authz check; the login page hands a guest to CAS instead of showing the LDAP form; the logout signs SESAME out too |
 | custom | sign-in Booster cannot map (an LDAP form on its own, a hand-rolled session check) | a MANUAL line; Step 0 stays pending until the owner moves it by hand |
 
-The files it writes for CakePHP: `src/Sesame/LegacySignIn.php`, `src/Sesame/TicketMiddleware.php`, `src/Sesame/UserResolver.php` and `config/sesame.php`. For Slim: `Sesame/LegacySignIn.php` in the folder `composer.json` maps `App\` to. It requires `waynestate/sesame` `^0.10` and `guzzlehttp/guzzle` `^7.9`.
+The files it writes for CakePHP: `src/Sesame/LegacySignIn.php`, `src/Sesame/TicketMiddleware.php`, `src/Sesame/UserResolver.php` and `config/sesame.php`. For Slim: `Sesame/LegacySignIn.php` in the folder `composer.json` maps `App\` to. It requires `waynestate/sesame` `^0.11` and `guzzlehttp/guzzle` `^7.9`.
 
 Every edit is planned first and written only when all of them are known; if any step cannot be placed exactly, or an edited file would not parse, Step 0 writes nothing and names the file and line.
 
