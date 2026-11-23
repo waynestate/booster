@@ -36,7 +36,7 @@ No exit code changed.
 - **Step 0 keeps the user's row.** On a CakePHP form sign-in, both halves' SESAME resolvers look up the row the form
   found (for example `Users` by `email`) by the CAS username, so `getIdentifier()` keeps returning its id. Make sure
   that field holds the AccessID CAS sends.
-- **SESAME `^0.10.1` on both halves.** Step 0 and the mount require `waynestate/sesame` `^0.10.1`, which keeps the
+- **SESAME `^0.11` on both halves.** Step 0 and the mount require `waynestate/sesame` `^0.11`, which keeps the
   signed-in identity on Laravel's JSON sessions (0.10.0 lost it, so a legacy logout left the Laravel half signed in).
   Users signed in under 0.10.0 on a Laravel app with JSON sessions are signed out once and sign in again, usually
   silently through SSO.
