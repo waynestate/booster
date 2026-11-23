@@ -119,7 +119,7 @@ makes every `npm ci` there warn (`EBADENGINE`), and the hop's gate never builds 
 major comes from, in order: `--node=<major>` (22, 24 or 26 today; the policy must still support it); the Node the
 app's Citadel image ships, which the Squire kit mirrors as `NODE_IMAGE` in `.squire/base-fallback.Dockerfile`; and
 otherwise the hop data's target, the newest Node the policy supports (26 today). The plan's step line says
-`node-pin-24 (pins Node 22)`, and its summary says where the 22 came from. `--node` also puts the Node hops back in a
+`node-pin-24 (pins Node 26)`, and its summary says where the 26 came from. `--node` also puts the Node hops back in a
 plan that passed a target version, as `--with-node` does. The later front-end hops run in the same `node:<major>`
 container. A Node floor is like a shelf: put it higher than the server can reach and nothing lands on it.
 

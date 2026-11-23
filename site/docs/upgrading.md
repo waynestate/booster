@@ -184,7 +184,7 @@ Released 2026-11-09. The stack sweep: the `cas-to-sesame` hop writes `waynestate
 
 ### An app that `cas-to-sesame` already moved [#](https://booster.apps.wayne.edu/docs/upgrading.html#an-app-that-cas-to-sesame-already-moved)
 
-An app that ran the `cas-to-sesame` hop on Booster 1.13.0 or earlier stays on the SESAME line that Booster wrote: `waynestate/sesame:^0.6` from Booster 1.12.0 and 1.13.0, `^0.5` from 1.11.0, and `^0.4` before that. SESAME is below 1.0, so a caret stops at the next minor: `composer update` never takes 0.7.0 on its own. A newer Booster does not plan the hop again either, because the app no longer requires `cit-web-infra/wayne-cas`. The move to `^0.7` is yours, and it is one line:
+An app that ran the `cas-to-sesame` hop on Booster 1.13.0 or earlier stays on the SESAME line that Booster wrote: `waynestate/sesame:^0.6` from Booster 1.12.0 and 1.13.0, `^0.5` from 1.11.0, `^0.4` from 1.9.0 and 1.10.0, and `^0.3` from 1.6.0 to 1.8.0. SESAME is below 1.0, so a caret stops at the next minor: `composer update` never takes 0.7.0 on its own. A newer Booster does not plan the hop again either, because the app no longer requires `cit-web-infra/wayne-cas`. The move to `^0.7` is yours, and it is one line:
 
 ```
 composer require waynestate/sesame:^0.7

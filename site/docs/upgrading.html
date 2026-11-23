@@ -383,10 +383,10 @@ image again, and that first gate takes a little longer. Images for older PHP kee
 </ul>
 <h3 id="an-app-that-cas-to-sesame-already-moved">An app that <code>cas-to-sesame</code> already <span class="docs-heading-tail"><span>moved</span><a class="docs-heading-link" aria-label="Link to this section" href="#an-app-that-cas-to-sesame-already-moved">#</a></span></h3>
 <p>An app that ran the <code>cas-to-sesame</code> hop on Booster 1.13.0 or earlier stays on the SESAME line that Booster wrote:
-<code>waynestate/sesame:^0.6</code> from Booster 1.12.0 and 1.13.0, <code>^0.5</code> from 1.11.0, and <code>^0.4</code> before that. SESAME is below
-1.0, so a caret stops at the next minor: <code>composer update</code> never takes 0.7.0 on its own. A newer Booster does not plan
-the hop again either, because the app no longer requires <code>cit-web-infra/wayne-cas</code>. The move to <code>^0.7</code> is yours, and
-it is one line:</p>
+<code>waynestate/sesame:^0.6</code> from Booster 1.12.0 and 1.13.0, <code>^0.5</code> from 1.11.0, <code>^0.4</code> from 1.9.0 and 1.10.0, and
+<code>^0.3</code> from 1.6.0 to 1.8.0. SESAME is below 1.0, so a caret stops at the next minor: <code>composer update</code> never takes
+0.7.0 on its own. A newer Booster does not plan the hop again either, because the app no longer requires
+<code>cit-web-infra/wayne-cas</code>. The move to <code>^0.7</code> is yours, and it is one line:</p>
 <!-- docs-test: skip run in your own app -->
 <pre tabindex="0"><code>composer require waynestate/sesame:^0.7
 </code></pre>

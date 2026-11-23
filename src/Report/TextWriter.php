@@ -167,7 +167,7 @@ final class TextWriter
     /**
      * A hop's id as a step line shows it. The Node pin's id keeps the major it
      * was born with (node-pin-24), so the line adds the major it pins today:
-     * "node-pin-24 (pins Node 22)" reads as one story, not two.
+     * "node-pin-24 (pins Node 26)" reads as one story, not two.
      */
     private static function hopLabel(Hop $hop): string
     {

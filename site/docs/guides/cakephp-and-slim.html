@@ -101,7 +101,7 @@ you; it does not fix them for you.</p>
 <p><strong>The sign-in move.</strong> The 5 step moves the like-for-like AuthComponent calls (<code>$this-&gt;Auth-&gt;user('x')</code> reads the
 identity, <code>setUser()</code> becomes <code>setIdentity()</code>, <code>logout()</code> keeps its name on <code>$this-&gt;Authentication</code>, <code>allow()</code> becomes
 <code>addUnauthenticatedActions()</code>), swaps <code>loadComponent('Auth')</code> for <code>loadComponent('Authentication.Authentication')</code>,
-requires <code>cakephp/authentication ^3.0</code>, and wires <code>src/Application.php</code>: the provider interface, the plugin, the
+requires <code>cakephp/authentication ^3.3</code>, and wires <code>src/Application.php</code>: the provider interface, the plugin, the
 middleware (after CSRF protection, else body parsing, else routing: AuthComponent checked inside the controller, so
 inside every middleware), and a service with the Session authenticator whose guests go to the old <code>loginAction</code>.
 AuthComponent never asked for a sign-in on its own <code>loginAction</code>; the plugin does, so the page would redirect to

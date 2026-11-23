@@ -133,7 +133,7 @@ booster run --path=../my-app --to-php=8.5 --node=22
 
 Without `--node`, an app with the Squire kit gets the Node its Citadel image ships (`NODE_IMAGE` in
 `.squire/base-fallback.Dockerfile`), and any other app gets the newest Node the policy supports. The plan's step line
-says which: `node-pin-24 (pins Node 22)`.
+says which: `node-pin-24 (pins Node 26)`.
 
 Not for: skipping the Node hops and then keeping a Mix build around forever. That is a choice, not a plan.
 

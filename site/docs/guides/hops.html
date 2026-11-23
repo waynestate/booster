@@ -146,7 +146,7 @@ makes every <code>npm ci</code> there warn (<code>EBADENGINE</code>), and the ho
 major comes from, in order: <code>--node=&lt;major&gt;</code> (22, 24 or 26 today; the policy must still support it); the Node the
 app's Citadel image ships, which the Squire kit mirrors as <code>NODE_IMAGE</code> in <code>.squire/base-fallback.Dockerfile</code>; and
 otherwise the hop data's target, the newest Node the policy supports (26 today). The plan's step line says
-<code>node-pin-24 (pins Node 22)</code>, and its summary says where the 22 came from. <code>--node</code> also puts the Node hops back in a
+<code>node-pin-24 (pins Node 26)</code>, and its summary says where the 26 came from. <code>--node</code> also puts the Node hops back in a
 plan that passed a target version, as <code>--with-node</code> does. The later front-end hops run in the same <code>node:&lt;major&gt;</code>
 container. A Node floor is like a shelf: put it higher than the server can reach and nothing lands on it.</p>
 <p>Four hops edit manifests instead of code. <code>node-pin-24</code> sets <code>engines.node</code> in <code>package.json</code> and writes <code>.nvmrc</code>,
