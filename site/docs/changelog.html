@@ -55,10 +55,7 @@
 <p>Changed: CI pins Preflight 0.12.0 (components and the a11y checker copy). The php-test component now also runs an advisory PHP 8.6 job that may fail and never gates the pipeline.</p>
 </li>
 <li>
-<p>Changed: PROCTOR is <code>^0.17</code> in Booster and its <code>deploy/</code> layer (was <code>^0.16</code>, which does not allow 0.17); 0.17.0 adds three warn-only Oracle checks (<code>raw-oci</code>, <code>oracle-sql-interpolation</code>, <code>oracle-credentials-literal</code>).</p>
-</li>
-<li>
-<p>Changed: PROCTOR is <code>^0.18</code> in Booster and its <code>deploy/</code> layer (was <code>^0.17</code>, which does not allow 0.18); 0.18.0 adds the update notice, the fake-driver check and the app-env warning (D-133).</p>
+<p>Changed: PROCTOR is <code>^0.18</code> in Booster and its <code>deploy/</code> layer (was <code>^0.16</code>, via <code>^0.17</code>; each older pin does not allow the next 0.x release); 0.17.0 adds three warn-only Oracle checks (<code>raw-oci</code>, <code>oracle-sql-interpolation</code>, <code>oracle-credentials-literal</code>) and 0.18.0 adds the update notice, the fake-driver check and the app-env warning (D-133).</p>
 </li>
 <li>
 <p>Changed: the Slim 1 bridge that the vendored-to-composer hop writes defaults to debug off, so a migrated app no longer shows Slim's debug pages unless its settings turn them on. Bridges written by earlier versions are left as they are.</p>
