@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7b456721af48e844d8f9efc429df9cb5",
+    "content-hash": "e95e1f0099fdc9a984b6ffe806ecc5b4",
     "packages": [
         {
             "name": "composer/semver",
@@ -1956,16 +1956,16 @@
         },
         {
             "name": "waynestate/proctor",
-            "version": "0.17.0",
+            "version": "0.18.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/waynestate/proctor.git",
-                "reference": "fb1dc3ebfc0a9cc665b17a10a8fc1832df8e3776"
+                "reference": "a4edc9c1993a460d9ffc536a30d43fd744bd9c3a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/waynestate/proctor/zipball/fb1dc3ebfc0a9cc665b17a10a8fc1832df8e3776",
-                "reference": "fb1dc3ebfc0a9cc665b17a10a8fc1832df8e3776",
+                "url": "https://api.github.com/repos/waynestate/proctor/zipball/a4edc9c1993a460d9ffc536a30d43fd744bd9c3a",
+                "reference": "a4edc9c1993a460d9ffc536a30d43fd744bd9c3a",
                 "shasum": ""
             },
             "require": {
@@ -1981,7 +1981,7 @@
                 "league/commonmark": "^2.10",
                 "phpstan/phpstan": "^2.1",
                 "phpunit/phpunit": "^11.5",
-                "waynestate/advisor": "^0.3",
+                "waynestate/advisor": "^0.4",
                 "waynestate/pinstripe": "^0.4"
             },
             "suggest": {
@@ -2016,8 +2016,8 @@
                 "issues": "https://git.wayne.edu/enterprise-apps/proctor/-/issues",
                 "source": "https://github.com/waynestate/proctor"
             },
-            "time": "2026-11-19T07:12:45+00:00",
-            "published-time": "2026-11-19T07:17:50+00:00"
+            "time": "2026-11-22T12:18:11+00:00",
+            "published-time": "2026-11-22T12:18:19+00:00"
         }
     ],
     "packages-dev": [],
