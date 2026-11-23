@@ -44,7 +44,7 @@ final class SlimSignInMigration
             $plan->requirePackage('composer.json', 'guzzlehttp/guzzle', '^7.9', '7.9');
         }
 
-        $plan->requirePackage('composer.json', 'waynestate/sesame', '^0.10.1', '0.10.1');
+        $plan->requirePackage('composer.json', 'waynestate/sesame', '^0.11', '0.11');
 
         return $plan;
     }

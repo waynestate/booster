@@ -245,7 +245,7 @@ JSON;
         }
 
         $composer = json_decode($this->read($app, 'composer.json'), true);
-        self::assertSame('^0.10.1', $composer['require']['waynestate/sesame']);
+        self::assertSame('^0.11', $composer['require']['waynestate/sesame']);
         self::assertSame('^7.9', $composer['require']['guzzlehttp/guzzle']);
 
         $replay = json_decode($this->read($app, 'booster-replay.json'));
@@ -399,8 +399,8 @@ JSON;
         self::assertStringContainsString("    \$config, revocations: \\Waynestate\\Sesame\\Revocation\\FileRevocationStore::fromEnvironment() ?? (is_file(dirname(__DIR__, 2) . '/artisan')", $config);
         $index = $this->read($app, 'public/index.php');
         self::assertStringContainsString('$resolver, revocations: ', $index);
-        // ^0.10 takes in 0.10.0, whose Laravel JSON sessions broke the shared logout: the floor is 0.10.1.
-        self::assertSame('^0.10.1', json_decode($this->read($app, 'composer.json'), true)['require']['waynestate/sesame']);
+        // ^0.10 takes in 0.10.0, whose Laravel JSON sessions broke the shared logout: the floor is 0.11.
+        self::assertSame('^0.11', json_decode($this->read($app, 'composer.json'), true)['require']['waynestate/sesame']);
 
         self::assertTrue(SignInStep::inspect($app, 'slim')->step0Done, 'The store is there now.');
         self::assertSame([], SignInStep::migrate($app, 'slim')->changedFiles);
@@ -472,7 +472,7 @@ JSON;
         self::assertStringContainsString("'driver' => 'sesame'", $this->read($app, 'config/auth.php'));
         self::assertStringContainsString("redirectGuestsTo(fn () => route('sesame.login'))", $this->read($app, 'bootstrap/app.php'));
         self::assertStringContainsString('SESAME_CAS_SERVICE_URL="${APP_URL}/_laravel/login"', $this->read($app, '.env.example'));
-        self::assertSame('^0.10.1', json_decode($this->read($app, 'composer.json'), true)['require']['waynestate/sesame']);
+        self::assertSame('^0.11', json_decode($this->read($app, 'composer.json'), true)['require']['waynestate/sesame']);
         self::assertSame('fake', json_decode($this->read($app, 'booster-replay.json'))->serve->env->SESAME_DRIVER);
 
         self::assertTrue(SignInStep::inspect($app, 'slim')->laravelWired);
