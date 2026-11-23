@@ -13,6 +13,24 @@ when that needs a step of yours.
 To take a new Booster, download the PHAR again (the same `curl` line as on [Install](install.md); its
 `releases/latest` link always names the newest release), or run `git pull` and `composer install` in your clone. `booster --version` prints the version you have.
 
+## 1.22.0
+
+No hop was added or removed, and no exit code or flag changed. Booster's own repository sheds Squire's local-running kit
+files, and one public class constant is renamed.
+
+### What you see
+
+- **A Slim 1 bridge written from now on defaults to debug off.** The vendored-to-composer hop's bridge no longer shows
+  Slim's debug pages unless the app's settings turn them on. A bridge an earlier Booster wrote is left as it is; set the
+  debug setting off by hand there if you want the same.
+- **`SlimCodeCopier::NAMESPACE` is now `SlimCodeCopier::LEGACY_NAMESPACE`** (same value). It cleared a PHP 8.6
+  deprecation for a class constant named `namespace`. Only code that reads the constant from outside Booster needs the
+  new name; nothing in Booster did.
+- **Squire's local-running kit files are gone from the repo** (`docker-compose.squire.yml`, `haproxy.cfg`, the parity
+  scripts and the env example). Run the app locally with `parity up` in `deploy/`.
+- **Pins moved.** PROCTOR is `^0.17` in Booster and its `deploy/` layer, and CI pins Preflight 0.12.0, with an
+  advisory PHP 8.6 job that never gates the pipeline.
+
 ## 1.21.0
 
 A CakePHP 5 or Slim 4 app can move onto Laravel 13 one unit at a time (the strangler). Two hops were added and none

@@ -88,7 +88,7 @@ final class DependencyRaise
     }
 
     /**
-     * The strangler's case (testeval, 2026-11-20): a composer update for a
+     * The strangler's case (a Slim 3 fleet app, 2026-11-20): a composer update for a
      * package Step 0 or a move added fails because a package the app
      * requires directly holds a shared one at its old major (monolog/monolog
      * ^1.17 holds psr/log 1, SESAME needs psr/log 3). Composer names it as

@@ -14,7 +14,7 @@ use PhpToken;
  * `new Slim\Views\Twig($path, $settings)` onto Twig-View 3's
  * `Slim\Views\Twig::create($path, $settings)` (its constructor now takes a
  * loader). The Slim 3 to 4 hop moves Twig-View to 3 and Twig to 3, so without
- * this every page of a Twig app dies on a missing class (testeval,
+ * this every page of a Twig app dies on a missing class (a Slim 3 fleet app,
  * 2026-11-20).
  *
  * The name map is Rector's own (rector-symfony's Twig set, the list Twig's

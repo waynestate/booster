@@ -9,7 +9,7 @@ use PhpToken;
 /**
  * Slim 3's Uri knew the folder the app is served from (`getBasePath()`,
  * `getBaseUrl()`); Slim 4's PSR-7 Uri does not, so a Slim 3 call answers a
- * 500 on Slim 4. Found on testeval (2026-11-20): a signed-in `/login/`
+ * 500 on Slim 4. Found on a Slim 3 fleet app (2026-11-20): a signed-in `/login/`
  * redirected to `$request->getUri()->getBasePath()`. Slim 4 keeps the base
  * path on the app, and the hop's routing glue (LegacyRouting) copies it onto
  * every request as RouteContext::BASE_PATH before the app's middleware and

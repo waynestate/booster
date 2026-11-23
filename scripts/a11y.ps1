@@ -1,5 +1,5 @@
 # Site accessibility gate: Preflight's a11y checker (vendored in
-# tools/a11y/check.mjs from Preflight 0.9.0, pinned by tests/A11yCheckerPinTest.php),
+# tools/a11y/check.mjs from Preflight 0.12.0, pinned by tests/A11yCheckerPinTest.php),
 # run in Docker so no host browser is needed. The same image, tags, color
 # schemes and widths as the a11y-site CI job, so a page that passes here
 # passes CI. Windows PowerShell 5.1 and PowerShell 7; on Linux and macOS use
@@ -18,9 +18,9 @@ Set-Location -LiteralPath (Split-Path -Parent $PSScriptRoot)
 New-Item -ItemType Directory -Force -Path 'tools/a11y/node_modules' | Out-Null
 
 # The a11y component's image default, digest included (templates/a11y/template.yml
-# of Preflight 0.9.0). Its tag sets the playwright npm version, so the package
+# of Preflight 0.12.0). Its tag sets the playwright npm version, so the package
 # and the image's browsers always match.
-$image = "mcr.microsoft.com/playwright:v1.65.0-noble@sha256:6e3fb709361521eb27161606e6da6d2674e5e89fa16516cb37d6fdd91372273d"
+$image = "mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe"
 $pw = ([regex]::Match($image, 'playwright:v(\d+\.\d+\.\d+)')).Groups[1].Value
 if (-not $pw) { throw "cannot read the Playwright version from the image tag $image" }
 

@@ -8,7 +8,7 @@ generator: Squire agent-ready
 
 # Real output, from Booster's own example apps
 
-Captured on 2026-11-20 with Booster 1.21.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
+Captured on 2026-11-21 with Booster 1.22.0. Each app below is one of the example apps in the `examples/` folder. A dry run changes nothing. This page is regenerated each release.
 
 ## laravel-blade
 
@@ -22,7 +22,7 @@ BOOSTER plan for examples/laravel-blade
   PHP: 8.2 -> 8.5
   Laravel: 10 -> 13
   PHPUnit: 10 -> 13
-  policy: waynestate/creed 0.1.8 (today 2026-11-20)
+  policy: waynestate/creed 0.1.8 (today 2026-11-21)
 
 Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.
 
@@ -70,20 +70,20 @@ Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes 
 
 PHPCompatibility check for PHP 8.3: no findings.
 
-PHPStan on PHP 8.5: 10 findings (code quality hints, not upgrade blockers).
+PHPStan on PHP 8.5: 5 findings (code quality hints, not upgrade blockers).
    app/Models/Post.php:7 [class.notFound] Class App\Models\Post extends unknown class Illuminate\Database\Eloquent\Model.
    app/Models/Post.php:9 [missingType.property] Property App\Models\Post::$casts has no type specified.
-   tests/PostTest.php:16 [class.notFound] Class App\Tests\PostTest extends unknown class PHPUnit\Framework\TestCase.
-   tests/PostTest.php:18 [class.notFound] Property App\Tests\PostTest::$repository has unknown class PHPUnit\Framework\MockObject\MockObject as its type.
    tests/PostTest.php:18 [property.onlyWritten] Property App\Tests\PostTest::$repository is never read, only written.
-   (5 more; run `booster scan --phpstan` to see all)
+   tests/PostTest.php:27 [staticMethod.deprecated] Call to deprecated method isType() of class PHPUnit\Framework\Assert:
+https://github.com/sebastianbergmann/phpunit/issues/6052
+   tests/PostTest.php:33 [method.alreadyNarrowedType] Call to method PHPUnit\Framework\Assert::assertNotNull() with PHPUnit\Framework\MockObject\Rule\AnyInvokedCount will always evaluate to true.
    Hint: vendor/ is not installed, so the classes your packages provide cannot resolve and most of these findings are noise. Run composer install in the app, then scan again.
 
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/laravel-blade --today=2026-11-20 --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade --today=2026-11-20)
+Preview the edits: php bin/booster run --path=examples/laravel-blade --today=2026-11-21 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade --today=2026-11-21)
 ```
 
 ### Dry run
@@ -231,7 +231,7 @@ RESULT: PASS (previewed, no tests ran)
 
 Dry run: these changes were previewed, none were applied.
 Nothing was changed. RESULT: PASS means the preview worked; no tests ran.
-Next, if the edits look right: php bin/booster run --path=examples/laravel-blade --today=2026-11-20
+Next, if the edits look right: php bin/booster run --path=examples/laravel-blade --today=2026-11-21
 (It needs Docker and a clean git folder. Commit or stash first.)
 ```
 
@@ -246,7 +246,7 @@ BOOSTER plan for examples/laravel-blade-vue
   app type: laravel-blade-vue
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.8 (today 2026-11-20)
+  policy: waynestate/creed 0.1.8 (today 2026-11-21)
 
 Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.
 
@@ -281,8 +281,8 @@ PHPStan scan: could not run
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/laravel-blade-vue --today=2026-11-20 --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade-vue --today=2026-11-20)
+Preview the edits: php bin/booster run --path=examples/laravel-blade-vue --today=2026-11-21 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-blade-vue --today=2026-11-21)
 ```
 
 ### Dry run
@@ -341,7 +341,7 @@ BOOSTER plan for examples/laravel-inertia-vue
   app type: laravel-inertia-vue
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.8 (today 2026-11-20)
+  policy: waynestate/creed 0.1.8 (today 2026-11-21)
 
 Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.
 
@@ -379,8 +379,8 @@ PHPStan scan: could not run
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/laravel-inertia-vue --today=2026-11-20 --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-inertia-vue --today=2026-11-20)
+Preview the edits: php bin/booster run --path=examples/laravel-inertia-vue --today=2026-11-21 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-inertia-vue --today=2026-11-21)
 ```
 
 ### Dry run
@@ -450,7 +450,7 @@ RESULT: PASS (previewed, no tests ran)
 
 Dry run: these changes were previewed, none were applied.
 Nothing was changed. RESULT: PASS means the preview worked; no tests ran.
-Next, if the edits look right: php bin/booster run --path=examples/laravel-inertia-vue --today=2026-11-20
+Next, if the edits look right: php bin/booster run --path=examples/laravel-inertia-vue --today=2026-11-21
 (It needs Docker and a clean git folder. Commit or stash first.)
 ```
 
@@ -465,7 +465,7 @@ BOOSTER plan for examples/laravel-wayne-cas
   app type: laravel-blade
   PHP: 8.3 -> 8.5
   Laravel: 12 -> 13
-  policy: waynestate/creed 0.1.8 (today 2026-11-20)
+  policy: waynestate/creed 0.1.8 (today 2026-11-21)
 
 Warning: vendor/ is not installed, so Rector and PHPStan cannot see the classes your packages provide: this preview misses edits that need them (an inherited property, a framework base class) and its PHPStan count is mostly noise. Run composer install in the app first, then preview again. A real run installs vendor/ in its baseline before the first hop, so it is not affected.
 
@@ -506,8 +506,8 @@ PHPStan on PHP 8.5: 16 findings (code quality hints, not upgrade blockers).
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/laravel-wayne-cas --today=2026-11-20 --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-wayne-cas --today=2026-11-20)
+Preview the edits: php bin/booster run --path=examples/laravel-wayne-cas --today=2026-11-21 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/laravel-wayne-cas --today=2026-11-21)
 ```
 
 ### Dry run
@@ -560,7 +560,7 @@ Nothing was changed.
 BOOSTER plan for examples/raw-php
   app type: raw-php
   PHP: 7.4 -> 8.5
-  policy: waynestate/creed 0.1.8 (today 2026-11-20)
+  policy: waynestate/creed 0.1.8 (today 2026-11-21)
 
 1. php-74-to-80
    Move PHP 7.4 code to PHP 8.0.
@@ -605,8 +605,8 @@ PHPStan on PHP 8.5: 3 findings (code quality hints, not upgrade blockers).
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/raw-php --today=2026-11-20 --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/raw-php --today=2026-11-20)
+Preview the edits: php bin/booster run --path=examples/raw-php --today=2026-11-21 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/raw-php --today=2026-11-21)
 ```
 
 ### Dry run
@@ -696,7 +696,7 @@ RESULT: PASS (previewed, no tests ran)
 
 Dry run: these changes were previewed, none were applied.
 Nothing was changed. RESULT: PASS means the preview worked; no tests ran.
-Next, if the edits look right: php bin/booster run --path=examples/raw-php --today=2026-11-20
+Next, if the edits look right: php bin/booster run --path=examples/raw-php --today=2026-11-21
 (It needs Docker and a clean git folder. Commit or stash first.)
 ```
 
@@ -710,7 +710,7 @@ Next, if the edits look right: php bin/booster run --path=examples/raw-php --tod
 BOOSTER plan for examples/vue-spa
   app type: raw-php-vue
   PHP: 8.0 -> 8.5
-  policy: waynestate/creed 0.1.8 (today 2026-11-20)
+  policy: waynestate/creed 0.1.8 (today 2026-11-21)
 
 1. php-80-to-81
    Move PHP 8.0 code to PHP 8.1.
@@ -750,8 +750,8 @@ PHPStan on PHP 8.5: no findings.
 Nothing was changed. The numbered list above is the order Booster would do things; "PHPCompatibility check" and "PHPStan" are advice
 for you to read, not errors.
 Booster does every numbered step above when you run it.
-Preview the edits: php bin/booster run --path=examples/vue-spa --today=2026-11-20 --dry-run
-(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/vue-spa --today=2026-11-20)
+Preview the edits: php bin/booster run --path=examples/vue-spa --today=2026-11-21 --dry-run
+(The real run needs Docker, and your app committed in git: php bin/booster run --path=examples/vue-spa --today=2026-11-21)
 ```
 
 ### Dry run

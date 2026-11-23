@@ -168,7 +168,7 @@ the PHP hop that lands on 7.4), then the PHP hops to 8.5. `--to-slim 3.13` is re
 - `$request->getAttribute('route')` becomes `RouteContext::fromRequest($request)->getRoute()`.
 - Slim 3's `$request->getUri()->getBasePath()`, which Slim 4's Uri lacks, becomes
   `$request->getAttribute(\Slim\Routing\RouteContext::BASE_PATH, '')`: the base path the hop's routing glue puts on
-  every request before the app's middleware and routes run (on testeval, a signed-in `/login/` answered 500).
+  every request before the app's middleware and routes run (on a Slim 3 fleet app, a signed-in `/login/` answered 500).
 - Code typed with Slim 3's own `Slim\Http\Request` and `Slim\Http\Response` (the official Slim 3 skeleton's routes
   are) moves onto `slim/http`, whose decorators keep `withJson()`, `write()`, `getParam()` and `isXhr()` on Slim 4:
   `Slim\Http\Request` becomes `Slim\Http\ServerRequest` in use statements, fully qualified names and type hints

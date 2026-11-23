@@ -14,7 +14,7 @@ use Waynestate\Booster\Strangler\SignInSource;
  * - `sesame`: the app already builds a Sesame (`new Sesame(...)`) or boots the
  *   Wayne Auth bridge (`WayneAuth::boot(...)`); Step 0 only hands it the shared
  *   sign-out store, as a named `revocations:` argument.
- * - `validuser`: the WSUCookie family (testeval and its siblings). The method
+ * - `validuser`: the WSUCookie family (the WSUCookie apps). The method
  *   that read the validUser cookie now asks SESAME, keeping the app's own
  *   authz check and user session; the login page hands a guest to CAS instead
  *   of showing the form; the logout signs SESAME out too. The LDAP form's POST
