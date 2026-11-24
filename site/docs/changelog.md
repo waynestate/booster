@@ -14,6 +14,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 - Changed: PROCTOR is `^0.18` in Booster and its `deploy/` layer (was `^0.17`, which does not allow 0.18); 0.18.0 adds the update notice, the fake-driver check and the app-env warning (D-133).
 - Changed: the sign-in migrations (the CakePHP and Slim hops and the strangler's Laravel half) now require SESAME `^0.11` in the app they write (was `^0.10.1`), matching the strangler sign-in guide. An app that already allows 0.11 or newer is left as it is.
+- Docs: a Proof page in the docs site (docs/reference/proof.md), listing the checks composer ci runs and how the Real output page is refreshed.
 
 ## \[1.22.0\] - 2026-11-21 [#](https://booster.apps.wayne.edu/docs/changelog.html#1-22-0-2026-11-21)
 
