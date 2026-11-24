@@ -17,6 +17,8 @@ Run Booster from inside the app you want to upgrade: `--path` defaults to `.`, s
 ```
 mkdir -p ~/bin
 curl -L -o ~/bin/booster.phar https://github.com/waynestate/booster/releases/latest/download/booster.phar
+curl -L -o ~/bin/booster.phar.sha256 https://github.com/waynestate/booster/releases/latest/download/booster.phar.sha256
+(cd ~/bin && sha256sum -c booster.phar.sha256)   # macOS: shasum -a 256 -c
 alias booster='php ~/bin/booster.phar'    # put this line in ~/.bashrc or ~/.zshrc to keep it
 cd /path/to/your-app
 booster detect
@@ -27,11 +29,15 @@ booster run
 
 `detect` reads the app and prints its type and versions. `plan` lists the steps. `run --dry-run` previews the edits and changes nothing. `run` edits files and makes no commit. A real `run` also needs git, a clean git folder (commit or stash first) and a Docker daemon for its test gate.
 
+The `latest` URL always serves the newest tag; in CI, prefer a pinned tag URL (`https://github.com/waynestate/booster/releases/download/<tag>/booster.phar`, with its `booster.phar.sha256` beside it), so a new release cannot change what your pipeline downloads.
+
 On Windows PowerShell, the same single file (`curl.exe` ships with Windows 10 and 11):
 
 ```
 New-Item -ItemType Directory -Force "$HOME\bin" | Out-Null
 curl.exe -L -o "$HOME\bin\booster.phar" https://github.com/waynestate/booster/releases/latest/download/booster.phar
+curl.exe -L -o "$HOME\bin\booster.phar.sha256" https://github.com/waynestate/booster/releases/latest/download/booster.phar.sha256
+(Get-FileHash "$HOME\bin\booster.phar" -Algorithm SHA256).Hash.ToLower()   # compare with the line in booster.phar.sha256
 function booster { php "$HOME\bin\booster.phar" @args }   # put this line in $PROFILE to keep it
 cd C:\path\to\your-app
 booster detect

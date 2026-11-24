@@ -50,6 +50,8 @@ Booster needs PHP 8.3 or newer on the machine; the app it upgrades does not, bec
 <!-- docs-test: skip needs network -->
 <pre tabindex="0"><code>mkdir -p ~/bin
 curl -L -o ~/bin/booster.phar https://github.com/waynestate/booster/releases/latest/download/booster.phar
+curl -L -o ~/bin/booster.phar.sha256 https://github.com/waynestate/booster/releases/latest/download/booster.phar.sha256
+(cd ~/bin &amp;&amp; sha256sum -c booster.phar.sha256)   # macOS: shasum -a 256 -c
 alias booster='php ~/bin/booster.phar'    # put this line in ~/.bashrc or ~/.zshrc to keep it
 cd /path/to/your-app
 booster detect
@@ -60,10 +62,13 @@ booster run
 <p><code>detect</code> reads the app and prints its type and versions. <code>plan</code> lists the steps. <code>run --dry-run</code> previews the edits
 and changes nothing. <code>run</code> edits files and makes no commit. A real <code>run</code> also needs git, a clean git folder (commit
 or stash first) and a Docker daemon for its test gate.</p>
+<p>The <code>latest</code> URL always serves the newest tag; in CI, prefer a pinned tag URL (<code>https://github.com/waynestate/booster/releases/download/&lt;tag&gt;/booster.phar</code>, with its <code>booster.phar.sha256</code> beside it), so a new release cannot change what your pipeline downloads.</p>
 <p>On Windows PowerShell, the same single file (<code>curl.exe</code> ships with Windows 10 and 11):</p>
 <!-- docs-test: skip needs network -->
 <pre tabindex="0"><code>New-Item -ItemType Directory -Force &quot;$HOME\bin&quot; | Out-Null
 curl.exe -L -o &quot;$HOME\bin\booster.phar&quot; https://github.com/waynestate/booster/releases/latest/download/booster.phar
+curl.exe -L -o &quot;$HOME\bin\booster.phar.sha256&quot; https://github.com/waynestate/booster/releases/latest/download/booster.phar.sha256
+(Get-FileHash &quot;$HOME\bin\booster.phar&quot; -Algorithm SHA256).Hash.ToLower()   # compare with the line in booster.phar.sha256
 function booster { php &quot;$HOME\bin\booster.phar&quot; @args }   # put this line in $PROFILE to keep it
 cd C:\path\to\your-app
 booster detect

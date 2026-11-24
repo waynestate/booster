@@ -12,6 +12,8 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ## \[Unreleased\] [#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Added: a `booster.phar.sha256` checksum file published with every phar release (a GitLab release asset and a GitHub release attachment), so a download can be verified with `sha256sum -c booster.phar.sha256` (or `shasum -a 256 -c` on macOS).
+- Changed: the GitHub release workflow uploads the phar and its checksum without `--clobber`, so an existing asset fails the job loudly instead of being replaced; the install docs add a verify step after the download.
 - Changed: PROCTOR is `^0.18` in Booster and its `deploy/` layer (was `^0.17`, which does not allow 0.18); 0.18.0 adds the update notice, the fake-driver check and the app-env warning (D-133).
 - Changed: the sign-in migrations (the CakePHP and Slim hops and the strangler's Laravel half) now require SESAME `^0.11` in the app they write (was `^0.10.1`), matching the strangler sign-in guide. An app that already allows 0.11 or newer is left as it is.
 - Docs: a Proof page in the docs site (docs/reference/proof.md), listing the checks composer ci runs and how the Real output page is refreshed.
