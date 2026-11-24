@@ -8,6 +8,11 @@
       "description": "Rector bundles its own phpdoc-parser and must match PHPStan's, so the two always update together (Booster 1.8.1 shipped Rector 2.8.1 with PHPStan 2.3.4 and Rector died on every closure).",
       "matchPackageNames": ["rector/rector", "phpstan/phpstan"],
       "groupName": "rector and phpstan"
+    },
+    {
+      "description": "tools/a11y mirrors Preflight's pinned checker (axe-core, @axe-core/playwright, Playwright image); a Preflight release moves them together, so Renovate leaves the folder alone (tripped main on 2026-11-24).",
+      "matchFileNames": ["tools/a11y/**"],
+      "enabled": false
     }
   ]
 }
