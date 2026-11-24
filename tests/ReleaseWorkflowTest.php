@@ -44,6 +44,35 @@ final class ReleaseWorkflowTest extends TestCase
         self::assertStringContainsString(self::ARTIFACT, $text, 'GitHub must attach the phar to the release.');
     }
 
+    public function test_release_publishes_a_checksum_and_never_clobbers(): void
+    {
+        $script = $this->ciFile(self::SCRIPT);
+        self::assertStringContainsString(
+            'booster.phar.sha256',
+            $script,
+            'The build script must write the checksum file the releases publish.',
+        );
+
+        $gitlab = $this->ciFile('.gitlab-ci.yml');
+        self::assertStringContainsString(
+            'build/booster.phar.sha256',
+            $gitlab,
+            'GitLab must keep the checksum file as an artifact of the phar job.',
+        );
+
+        $github = $this->ciFile('.github/workflows/release-phar.yml');
+        self::assertStringContainsString(
+            'booster.phar.sha256',
+            $github,
+            'GitHub must attach the checksum file to the release.',
+        );
+        self::assertStringNotContainsString(
+            '--clobber',
+            $github,
+            'A released asset is never replaced: the upload must fail loudly instead of clobbering it.',
+        );
+    }
+
     private function ciFile(string $relative): string
     {
         $path = dirname(__DIR__) . '/' . $relative;
