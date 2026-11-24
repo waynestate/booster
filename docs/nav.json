@@ -93,6 +93,10 @@
         {
           "title": "Strangler sign-in",
           "path": "reference/strangler-sign-in"
+        },
+        {
+          "title": "Proof",
+          "path": "reference/proof"
         }
       ]
     },
