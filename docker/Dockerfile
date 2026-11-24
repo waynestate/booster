@@ -72,7 +72,7 @@ RUN set -eux; \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git unzip \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=mlocati/php-extension-installer:2.13.2@sha256:4fd45396c16685266d32bf147a24ecd5e81029d3820295895bf4a90131190ac9 /usr/bin/install-php-extensions /usr/local/bin/
+COPY --from=mlocati/php-extension-installer:2.13.3@sha256:edda5f9d936fba9b495bdc96ecd19cc8fda7c2574f85db4574795644ae57b456 /usr/bin/install-php-extensions /usr/local/bin/
 RUN install-php-extensions intl ldap soap zip gd pdo_mysql mysqli bcmath pcntl exif redis imagick oci8 \
     && rm -f /etc/apt/apt.conf.d/99jessie-expired-keys
 COPY --from=composer /usr/bin/composer /usr/bin/composer
