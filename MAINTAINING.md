@@ -60,8 +60,9 @@ already ships PHP and Composer.
 - **GitHub:** the mirror carries the tag to `.github/workflows/release-phar.yml`, which builds the same phar and
   attaches it to the GitHub release, creating the release if the mirror did not.
 
-The script verifies the phar by printing Booster's version and prints its SHA-256 checksum in the job log. Building
-locally still works on any commit: `.\scripts\build-phar.ps1` or `scripts/build-phar.sh` (Docker only, no PHP or
+The script verifies the phar by printing Booster's version and prints its SHA-256 checksum in the job log. Released
+assets are never replaced, and the checksum file `booster.phar.sha256` is part of every release. Building locally
+still works on any commit: `.\scripts\build-phar.ps1` or `scripts/build-phar.sh` (Docker only, no PHP or
 Composer on the host).
 
 ## Updating the CREED policy

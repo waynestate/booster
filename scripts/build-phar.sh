@@ -11,7 +11,7 @@
 #      data/, docker/, resources/ and the runtime vendor deps only (no dev deps),
 #   4. copies the built phar back into build/,
 #   5. verifies it runs by printing Booster's version,
-#   6. prints the phar's SHA-256 checksum.
+#   6. prints the phar's SHA-256 checksum and writes build/booster.phar.sha256.
 #
 # By default every step runs through Docker, so no PHP or Composer is needed on
 # the host. Set BOOSTER_PHAR_NO_DOCKER=1 to run the same steps with the php and
@@ -113,7 +113,11 @@ fi
 echo '==> Printing the checksum...'
 # sha256sum is GNU coreutils, shasum is its BSD (macOS) twin.
 if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum build/booster.phar
+    CHECKSUM_LINE="$(sha256sum build/booster.phar)"
 else
-    shasum -a 256 build/booster.phar
+    CHECKSUM_LINE="$(shasum -a 256 build/booster.phar)"
 fi
+echo "$CHECKSUM_LINE"
+# The checksum file ships with the phar and checks the bare file name, so the
+# pair verifies wherever both files land: <hash>  booster.phar, one line.
+printf '%s  booster.phar\n' "${CHECKSUM_LINE%% *}" > build/booster.phar.sha256

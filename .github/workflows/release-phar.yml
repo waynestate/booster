@@ -24,9 +24,12 @@ jobs:
         env:
           BOOSTER_PHAR_NO_DOCKER: '1'
         run: bash scripts/build-phar.sh
-      - name: Attach the phar to the GitHub release
+      # No clobber on the upload, on purpose: a released asset is never replaced.
+      # If the tag already carries the files, the job fails loudly instead of
+      # swapping out what users may have already downloaded.
+      - name: Attach the phar and its checksum to the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" build/booster.phar --generate-notes \
-            || gh release upload --clobber "$GITHUB_REF_NAME" build/booster.phar
+          gh release create "$GITHUB_REF_NAME" build/booster.phar build/booster.phar.sha256 --generate-notes \
+            || gh release upload "$GITHUB_REF_NAME" build/booster.phar build/booster.phar.sha256
