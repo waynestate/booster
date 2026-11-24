@@ -13,7 +13,7 @@ ARG COMPOSER_VERSION=2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b783
 # only their key files are used. bullseye-slim carries the buster, bullseye and
 # bookworm keys as separate files, trixie-slim the bullseye to trixie ring.
 FROM debian:bullseye-slim@sha256:e5b6442dd2e9684cf5e87d8338b5968f3b348636fc0be6d7850a381e3731a2bd AS keys-bullseye
-FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2 AS keys-trixie
+FROM debian:trixie-slim@sha256:8aa5a7bf5a1955bddbe7d74fcdd0b91ab30e74362a8b73af672b0481b35b44a0 AS keys-trixie
 FROM composer:${COMPOSER_VERSION} AS composer
 
 FROM php:${PHP_VERSION}-cli
