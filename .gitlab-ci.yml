@@ -1,31 +1,52 @@
 # composer ci is the contract: the checks are defined there, and this pipeline only wraps them.
 # Booster's pipeline, built from the Preflight components on this GitLab.
-# Pinned to Preflight 0.12.0. Never use ~latest.
+# Pinned to Preflight 0.13.0. Never use ~latest.
 # Booster requires PHP ^8.3, so the test matrix starts at 8.3.
 # Docker Hub images go through the GitLab Dependency Proxy to avoid the anonymous pull limit.
+# D-176 pipeline shape: branch pipelines only, a new commit cancels the old pipeline,
+# pushes run the fast tier, nightly schedules, tags and manual runs the full tier.
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - if: $CI_COMMIT_TAG
+      variables: { PREFLIGHT_TIER: full }
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $PREFLIGHT_TIER == "full"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      variables: { PREFLIGHT_TIER: fast }
+    - if: $CI_PIPELINE_SOURCE == "web"
+      variables: { PREFLIGHT_TIER: full }
+    - if: $CI_COMMIT_BRANCH
+      variables: { PREFLIGHT_TIER: fast }
+default:
+  interruptible: true
 include:
-  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/php-test@0.12.0
+  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/php-test@0.13.0
     inputs:
+      tier: full
       php_versions: ["8.3", "8.4", "8.5"]
       image: "php:${PHP_VERSION}-cli-trixie"
   # No image input: the 0.9.0 default is Composer 2.11.1, pinned by its multi-arch list digest.
-  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/composer-audit@0.12.0
+  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/composer-audit@0.13.0
   # Committed secrets fail the pipeline before they ride along in a release; this repo mirrors to public GitHub.
-  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/secret-detection@0.12.0
+  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/secret-detection@0.13.0
     inputs:
       image: "zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f"
   # The front page deploy layer (ADR-0017): PROCTOR checks deploy/ against CREED's policy, and a failure blocks.
   # Since 0.5.0 the job also keeps PROCTOR's JSON report as proctor.json in its artifact, for ROLLCALL.
-  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/proctor@0.12.0
+  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/proctor@0.13.0
     inputs:
       image: "php:8.5-cli-trixie@sha256:9236fd373d3bcda0659cf94838a744bd79791419292958963f8c6b34a0071554"
       working_dir: deploy
       proctor_command: vendor/bin/proctor check --format=codequality
-  # Accessibility: Preflight's a11y component serves site/ and checks every page with axe-core 4.14.0, light and
+  # Accessibility: Preflight's a11y component serves site/ and checks every page with axe-core 4.14.1, light and
   # dark, at 320 and 1280 px, plus WCAG 1.4.10 reflow, at WCAG 2.2 AA. Its Playwright image comes from
   # mcr.microsoft.com, which the Dependency Proxy does not front, so it takes no image_prefix.
-  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/a11y@0.12.0
+  - component: $CI_SERVER_FQDN/enterprise-apps/preflight/a11y@0.13.0
     inputs:
+      tier: full
       site_dir: site
       pages: ["**/*.html"]
       wcag_tags: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]
@@ -88,6 +109,7 @@ phar:
     BOOSTER_PHAR_NO_DOCKER: '1'
   rules:
     - if: '$CI_COMMIT_TAG'
+  interruptible: false
   script:
     - bash scripts/build-phar.sh
   artifacts:
@@ -107,6 +129,7 @@ release:
     - phar
   rules:
     - if: '$CI_COMMIT_TAG'
+  interruptible: false
   script:
     - |
       set -eu

@@ -26,8 +26,16 @@
 //                          serving siteDir (pages are paths under it)
 //         A11Y_REPORT_DIR  where gl-a11y-junit.xml and gl-a11y-report.json
 //                          are written (default: the working directory)
-// Exit:   0 clean, 1 a violation or a page that did not load, 2 a tool or
-//         configuration error. Prints selectors, never page text.
+//         A11Y_REQUIRED_ROUTES_FILE  optional file of routes the page list
+//                          must cover, one path per line (a leading / is
+//                          allowed; blank lines and lines starting with #
+//                          are ignored). The run fails when a listed route
+//                          is not one of the checked pages. Generate it from
+//                          the app's router so a new route cannot go
+//                          unchecked. Empty: nothing changes.
+// Exit:   0 clean, 1 a violation, a page that did not load, or a required
+//         route that is not on the page list, 2 a tool or configuration
+//         error. Prints selectors, never page text.
 //
 // A pre-flight walk-round is cheap; a go-around in front of the whole
 // airfield is not. This one walks every page, twice in the dark.
@@ -37,9 +45,7 @@ import { readFile, readdir, stat, writeFile, mkdir } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
-
-import { chromium } from "playwright";
-import AxeBuilder from "@axe-core/playwright";
+import { pathToFileURL } from "node:url";
 
 const HEIGHT = 900;
 const REFLOW_WIDTH = 320;
@@ -130,8 +136,9 @@ async function loadConfig(file) {
   const baseUrl = (process.env.A11Y_BASE_URL || "").trim().replace(/\/+$/, "");
   if (baseUrl !== "" && !/^https?:\/\/\S+$/.test(baseUrl)) fail(`A11Y_BASE_URL must be an http or https URL: ${baseUrl}`);
   const reportDir = (process.env.A11Y_REPORT_DIR || "").trim() || process.cwd();
+  const requiredRoutesFile = (process.env.A11Y_REQUIRED_ROUTES_FILE || "").trim();
 
-  return { siteDir, pages, tags, colorSchemes, widths, axeCoreVersion, baseUrl, reportDir };
+  return { siteDir, pages, tags, colorSchemes, widths, axeCoreVersion, baseUrl, reportDir, requiredRoutesFile };
 }
 
 /** One page entry: a path under the site root ("" is the root itself). */
@@ -219,6 +226,44 @@ async function resolvePages(config, rootDir) {
   return pages;
 }
 
+/* --------------------------------------------------------- required routes */
+
+/** Comparison form of a route or page: no leading or trailing slashes. */
+function canon(value) {
+  return value.replace(/\/+$/, "");
+}
+
+/** The index.html form of a route: the root is index.html, /docs/ is docs/index.html. */
+function indexForm(route) {
+  return route === "" ? "index.html" : `${route}/index.html`;
+}
+
+/** Routes from the required-routes file: one per line, normalized like pages, deduped in order. */
+export function parseRequiredRoutes(text) {
+  const seen = new Set();
+  const routes = [];
+  for (const rawLine of String(text).split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (line === "" || line.startsWith("#")) continue;
+    const route = canon(normalizePage(line));
+    if (!seen.has(route)) {
+      seen.add(route);
+      routes.push(route);
+    }
+  }
+  return routes;
+}
+
+/** Required routes that no resolved page covers. */
+export function uncoveredRoutes(routes, pages) {
+  const out = [];
+  for (const route of routes) {
+    const covered = pages.some((page) => canon(page) === route || page === indexForm(route));
+    if (!covered) out.push(route);
+  }
+  return out;
+}
+
 /* ------------------------------------------------------------------ server */
 
 /** Serve rootDir on an ephemeral local port; a folder serves its index.html. */
@@ -304,7 +349,7 @@ function summarize(violation) {
   };
 }
 
-async function checkOne(browser, url, scheme, width, config) {
+async function checkOne(browser, url, scheme, width, config, AxeBuilder) {
   const context = await browser.newContext({
     colorScheme: scheme,
     reducedMotion: "reduce",
@@ -403,6 +448,22 @@ async function main() {
   const rootDir = path.resolve(config.siteDir);
   const pages = await resolvePages(config, rootDir);
 
+  if (config.requiredRoutesFile !== "") {
+    let text;
+    try {
+      text = await readFile(config.requiredRoutesFile, "utf8");
+    } catch {
+      fail(`required_routes_file ${config.requiredRoutesFile} was not found.`);
+    }
+    const uncovered = uncoveredRoutes(parseRequiredRoutes(text), pages);
+    if (uncovered.length > 0) {
+      const shown = uncovered.map((route) => (route === "" ? "/" : `/${route}`)).join(", ");
+      console.log(`a11y: ${uncovered.length} required route(s) are not on the page list: ${shown}. Add them to pages, or drop them from ${config.requiredRoutesFile}.`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
   let server = null;
   let base = config.baseUrl;
   if (base === "") ({ server, base } = await serve(rootDir));
@@ -412,6 +473,9 @@ async function main() {
   console.log(`Preflight a11y: ${pages.length} page${pages.length === 1 ? "" : "s"} x ${modes.length} modes, tags ${config.tags.join(" ")}`);
   console.log(`  ${config.baseUrl === "" ? `serving ${config.siteDir}/ on a local port` : `checking ${config.baseUrl}`}, Playwright ${playwrightVersion()}`);
 
+  // Loaded here so the required-route check above runs before the browser loads.
+  const { chromium } = await import("playwright");
+  const { default: AxeBuilder } = await import("@axe-core/playwright");
   const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"] });
   const checks = [];
   let engine = null;
@@ -421,7 +485,7 @@ async function main() {
       const label = pageName === "" ? "/" : pageName;
       for (const { scheme, width } of modes) {
         const t0 = performance.now();
-        const result = await checkOne(browser, url, scheme, width, config);
+        const result = await checkOne(browser, url, scheme, width, config, AxeBuilder);
         const check = { page: label, scheme, width, violations: [], incomplete: 0, ...result, seconds: (performance.now() - t0) / 1000 };
         engine = engine || check.engine || null;
         checks.push(check);
@@ -471,11 +535,14 @@ async function main() {
   process.exitCode = failing.length === 0 ? 0 : 1;
 }
 
-main().catch((err) => {
-  const message = err && err.message ? err.message : String(err);
-  if (/Executable doesn't exist|browserType\.launch/.test(message)) {
-    console.error("a11y: tool error: Chromium did not start. The playwright npm version must match the image's Playwright release; set playwright_version to the version in the image tag.");
-  }
-  console.error(`a11y: ${err instanceof ToolError ? "" : "tool error: "}${message.split("\n")[0]}`);
-  process.exitCode = 2;
-});
+// Run only when executed directly (node check.mjs ...), not when a test imports this module.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    const message = err && err.message ? err.message : String(err);
+    if (/Executable doesn't exist|browserType\.launch/.test(message)) {
+      console.error("a11y: tool error: Chromium did not start. The playwright npm version must match the image's Playwright release; set playwright_version to the version in the image tag.");
+    }
+    console.error(`a11y: ${err instanceof ToolError ? "" : "tool error: "}${message.split("\n")[0]}`);
+    process.exitCode = 2;
+  });
+}

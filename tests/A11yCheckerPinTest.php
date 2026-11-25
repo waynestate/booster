@@ -14,10 +14,10 @@ namespace Waynestate\Booster\Tests;
 final class A11yCheckerPinTest extends TestCase
 {
     /** Preflight tag the vendored checker comes from (the checker is unchanged since 0.3.1). */
-    private const PREFLIGHT_TAG = '0.12.0';
+    private const PREFLIGHT_TAG = '0.13.0';
 
     /** SHA-256 of tools/a11y/check.mjs at that tag. */
-    private const CHECKER_SHA256 = '8f11379ac03cee8b52e39835639430abe1c749eeb5ffb2abb43aeaa300f1c663';
+    private const CHECKER_SHA256 = '6157b304445d9d21079f12b99c1c610eeb53f16bfcb5b1b3c1bd391ddb1c8b9d';
 
     /** Image default of the a11y component at that tag (digest included). */
     private const IMAGE = 'mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe';
@@ -26,7 +26,7 @@ final class A11yCheckerPinTest extends TestCase
     private const AXE_PLAYWRIGHT_VERSION = '4.14.0';
 
     /** axe-core version in tools/a11y/package.json at that tag. */
-    private const AXE_CORE_VERSION = '4.14.0';
+    private const AXE_CORE_VERSION = '4.14.1';
 
     private const UPDATE = 'Update the vendored checker and its pins: copy tools/a11y/check.mjs from the new '
         . 'Preflight tag, recompute its SHA-256 for CHECKER_SHA256, update PREFLIGHT_TAG, IMAGE and the '

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Site accessibility gate: Preflight's a11y checker (vendored in
-# tools/a11y/check.mjs from Preflight 0.12.0, pinned by tests/A11yCheckerPinTest.php),
+# tools/a11y/check.mjs from Preflight 0.13.0, pinned by tests/A11yCheckerPinTest.php),
 # run in Docker so no host browser is needed. The same image, tags, color
 # schemes and widths as the a11y-site CI job, so a page that passes here
 # passes CI. Linux and macOS; on Windows use scripts/a11y.ps1, or this script
@@ -29,13 +29,13 @@ else
 fi
 
 # The a11y component's image default, digest included (templates/a11y/template.yml
-# of Preflight 0.12.0). Its tag sets the playwright npm version, so the package
+# of Preflight 0.13.0). Its tag sets the playwright npm version, so the package
 # and the image's browsers always match.
 IMAGE="mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe"
 PW=$(printf '%s\n' "$IMAGE" | sed -n 's/^.*playwright:v\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*$/\1/p')
 
 # The a11y-site CI job's inputs, as JSON for the checker.
-CONFIG='{"siteDir": "site", "pages": ["**/*.html"], "tags": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"], "colorSchemes": ["light", "dark"], "widths": [320, 1280], "axeCoreVersion": "4.14.0"}'
+CONFIG='{"siteDir": "site", "pages": ["**/*.html"], "tags": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"], "colorSchemes": ["light", "dark"], "widths": [320, 1280], "axeCoreVersion": "4.14.1"}'
 
 REPORT_DIR="build/a11y"
 mkdir -p "$REPORT_DIR"
