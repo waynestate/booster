@@ -46,6 +46,7 @@
 <p>All notable changes to Booster are recorded here. The format follows Keep a Changelog.</p>
 <h2 id="unreleased"><span class="docs-heading-tail"><span>[Unreleased]</span><a class="docs-heading-link" aria-label="Link to this section" href="#unreleased">#</a></span></h2>
 <ul>
+<li>Changed: CI follows D-176 and pins Preflight 0.13.0 (axe-core 4.14.1 in the a11y checker copy). A push runs the fast tier (composer ci, the audits, PROCTOR, secret detection, the WayneUI copies check); the full tier (PHP matrix and advisory PHP, browser a11y) runs nightly, on tags and on manual runs, and the phar and release jobs are never cancelled. Branch pipelines only, so an open MR no longer doubles a push, and a new commit cancels the pipeline it replaces.</li>
 <li>Added: a <code>booster.phar.sha256</code> checksum file published with every phar release (a GitLab release asset and a GitHub release attachment), so a download can be verified with <code>sha256sum -c booster.phar.sha256</code> (or <code>shasum -a 256 -c</code> on macOS).</li>
 <li>Changed: the GitHub release workflow uploads the phar and its checksum without <code>--clobber</code>, so an existing asset fails the job loudly instead of being replaced; the install docs add a verify step after the download.</li>
 <li>Changed: PROCTOR is <code>^0.18</code> in Booster and its <code>deploy/</code> layer (was <code>^0.17</code>, which does not allow 0.18); 0.18.0 adds the update notice, the fake-driver check and the app-env warning (D-133).</li>

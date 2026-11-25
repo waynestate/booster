@@ -1120,8 +1120,8 @@ agent-ready check, the Real output page check (`bin/build-proof.php --check`) an
 docker run --rm -v "${PWD}:/app" -w /app composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0 sh -c "composer install --no-interaction && composer ci"
 ```
 
-The site's accessibility gate is Preflight's own checker, vendored into `tools/a11y/check.mjs` from Preflight 0.12.0
-and pinned by `tests/A11yCheckerPinTest.php`, so a local run checks exactly what CI checks: axe-core 4.14.0 in a
+The site's accessibility gate is Preflight's own checker, vendored into `tools/a11y/check.mjs` from Preflight 0.13.0
+and pinned by `tests/A11yCheckerPinTest.php`, so a local run checks exactly what CI checks: axe-core 4.14.1 in a
 real Chromium, every page under `site/` in light and dark at 320 and 1280 px, plus the WCAG 1.4.10 reflow check,
 all at WCAG 2.2 AA. It runs in Docker, with no host browser: `sh scripts/a11y.sh` on Linux, macOS and Git Bash, or
 `scripts\a11y.ps1` on Windows PowerShell.
@@ -1601,6 +1601,7 @@ All notable changes to Booster are recorded here. The format follows Keep a Chan
 
 ### \[Unreleased\] [#](https://booster.apps.wayne.edu/docs/changelog.html#unreleased)
 
+- Changed: CI follows D-176 and pins Preflight 0.13.0 (axe-core 4.14.1 in the a11y checker copy). A push runs the fast tier (composer ci, the audits, PROCTOR, secret detection, the WayneUI copies check); the full tier (PHP matrix and advisory PHP, browser a11y) runs nightly, on tags and on manual runs, and the phar and release jobs are never cancelled. Branch pipelines only, so an open MR no longer doubles a push, and a new commit cancels the pipeline it replaces.
 - Added: a `booster.phar.sha256` checksum file published with every phar release (a GitLab release asset and a GitHub release attachment), so a download can be verified with `sha256sum -c booster.phar.sha256` (or `shasum -a 256 -c` on macOS).
 - Changed: the GitHub release workflow uploads the phar and its checksum without `--clobber`, so an existing asset fails the job loudly instead of being replaced; the install docs add a verify step after the download.
 - Changed: PROCTOR is `^0.18` in Booster and its `deploy/` layer (was `^0.17`, which does not allow 0.18); 0.18.0 adds the update notice, the fake-driver check and the app-env warning (D-133).
@@ -4311,7 +4312,7 @@ Proof runs against real Wayne State applications are on a private site, [proof.a
 
 ### Accessibility and secret scanning [#](https://booster.apps.wayne.edu/docs/reference/proof.html#accessibility-and-secret-scanning)
 
-- **Accessibility.** The site's accessibility gate is Preflight's own checker, vendored into `tools/a11y/check.mjs` from Preflight 0.12.0 and pinned by `tests/A11yCheckerPinTest.php`, so a local run checks exactly what CI checks: axe-core 4.14.0 in a real Chromium, every page under `site/` in light and dark at 320 and 1280 px, plus the WCAG 1.4.10 reflow check, all at WCAG 2.2 AA. It runs in Docker, with no host browser: `sh scripts/a11y.sh` on Linux, macOS and Git Bash, or `scripts\a11y.ps1` on Windows PowerShell.
+- **Accessibility.** The site's accessibility gate is Preflight's own checker, vendored into `tools/a11y/check.mjs` from Preflight 0.13.0 and pinned by `tests/A11yCheckerPinTest.php`, so a local run checks exactly what CI checks: axe-core 4.14.1 in a real Chromium, every page under `site/` in light and dark at 320 and 1280 px, plus the WCAG 1.4.10 reflow check, all at WCAG 2.2 AA. It runs in Docker, with no host browser: `sh scripts/a11y.sh` on Linux, macOS and Git Bash, or `scripts\a11y.ps1` on Windows PowerShell.
 - **Secret scanning.** Every release runs a secrets scan of the history and checks that nothing internal (server names, people, app names, IDs) is in the tree. Booster itself reads no secrets and talks to no Citadel host.
 
 ### Related [#](https://booster.apps.wayne.edu/docs/reference/proof.html#related)
